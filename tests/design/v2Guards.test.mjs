@@ -1,0 +1,275 @@
+// Design v2 guard rails: flag gating, workspace isolation, no writes, tokens, copy
+// and demo data. Static checks over the source, so they run without a browser or
+// database. Run: node tests/design/v2Guards.test.mjs
+import assert from 'node:assert'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import en from '../../client/src/v2/i18n/en.js'
+import ru from '../../client/src/v2/i18n/ru.js'
+import id from '../../client/src/v2/i18n/id.js'
+
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+const V2 = path.join(ROOT, 'client', 'src', 'v2')
+const read = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n')
+const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1')
+const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)])
+const files = walk(V2)
+const src = files.filter((f) => /\.(jsx?|mjs)$/.test(f))
+const rel = (f) => path.relative(ROOT, f)
+
+let pass = 0, fail = 0
+const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
+
+// Mutating calls v2 is allowed to make. Every entry reuses an EXISTING endpoint with its
+// existing server-side role check; it is listed in the batch report. All of them live in
+// client/src/v2/lib/actions.js — no other v2 file may write.
+export const WRITE_ALLOW = [
+  { method: 'PATCH', path: '/approve' },        // PATCH /api/debts/:id/approve
+  { method: 'PATCH', path: '/reject' },         // PATCH /api/debts/:id/reject
+  { method: 'POST', path: '/request-info' },    // POST  /api/debts/:id/request-info
+  { method: 'PATCH', path: '/transactions/' },  // PATCH /api/transactions/:id (category)
+  { method: 'POST', path: "'/counterparties'" },// POST  /api/counterparties
+  // Batch 8 — approved proposals (DECISIONS.md): role-checked and audited on the server.
+  { method: 'PATCH', path: '`/counterparties/' }, // PATCH /api/counterparties/:id (P-04)
+  { method: 'PATCH', path: "'/business/targets'" }, // PATCH /api/business/targets (P-01, P-08)
+  { method: 'PATCH', path: '/checklist' },      // PATCH /api/debts/:id/checklist (P-05)
+  // Batch 9 — P-10 (DECISIONS.md): role-checked and audited on the server.
+  { method: 'PATCH', path: "'/pnl-mapping'" },  // PATCH /api/pnl-mapping
+  // Batch 10 — DECISIONS.md final decisions item 5: role-checked and audited on the server.
+  { method: 'POST', path: '/withholding' },     // POST /api/debts/:id/withholding
+  // Batch 11 — P-11 asset register: role-checked and audited on the server.
+  { method: 'POST', path: "'/assets'" },        // POST /api/assets
+  // Batch 12 — P-03 funding register (NOT the bridge's /api/funding): role-checked, audited.
+  { method: 'POST', path: "'/business-funding'" },          // POST /api/business-funding
+  { method: 'POST', path: '/paid`' },                       // POST /api/business-funding/repayments/:rid/paid
+  // Release — "+ Add" expense/income: existing route, role- and wallet-checked; v2 always sends scope 'business'.
+  { method: 'POST', path: "'/transactions/batch'" },       // POST /api/transactions/batch
+  // Documents page review panel (2026-10-09): existing Document Center routes, role-checked and audited.
+  { method: 'POST', path: '/signed-url`' },                 // POST   /api/documents/:id/signed-url
+  { method: 'PATCH', path: '`/documents/' },                // PATCH  /api/documents/:id
+  { method: 'POST', path: '/links`' },                      // POST   /api/documents/:id/links
+  { method: 'DELETE', path: '/links/' },                    // DELETE /api/documents/:id/links/:linkId
+  { method: 'POST', path: '/archive`' },                    // POST   /api/documents/:id/archive
+  { method: 'PATCH', path: '/classification`' },            // PATCH  /api/ai-accountant/documents/:id/classification
+  { method: 'POST', path: '/identify`' },                   // POST   /api/documents/:id/identify (AI explanation)
+  { method: 'POST', path: '/filing`' },                     // POST   /api/documents/:id/filing (bank account + month, counterparty, keep)
+  { method: 'POST', path: '/tax-obligation`' },             // POST   /api/documents/:id/tax-obligation (tax from a document → tax calendar)
+  // Company tax profile editor (2026-10-10): existing routes, role-checked, critical fields audited.
+  { method: 'PUT', path: "'/accountant/profile'" },                  // PUT  /api/accountant/profile
+  { method: 'POST', path: "'/accountant/profile/verify'" },          // POST /api/accountant/profile/verify
+  { method: 'POST', path: "'/accountant/profile/from-documents'" },  // POST /api/accountant/profile/from-documents (AI suggests only)
+  // Sign-in and company setup (2026-10-10, reg/R1–R9): existing routes, checked on the server.
+  { method: 'POST', path: "'/auth/email/start'" },     // POST  /api/auth/email/start (public, rate-limited)
+  { method: 'POST', path: "'/auth/email/verify'" },    // POST  /api/auth/email/verify (public, one-time)
+  { method: 'PATCH', path: "'/me/profile'" },          // PATCH /api/me/profile
+  { method: 'POST', path: '/accept`' },                // POST  /api/invite/:code/accept
+  { method: 'POST', path: "'/businesses'" },           // POST  /api/businesses (creator = owner)
+  // Settings (2026-10-10, Settings + w2/S2): existing routes, role-checked on the server.
+  { method: 'PATCH', path: "'/business/current'" },                        // PATCH  /api/business/current
+  { method: 'POST', path: "'/cashflow-categories'" },                      // POST   /api/cashflow-categories
+  { method: 'PATCH', path: '`/cashflow-categories/' },                     // PATCH  /api/cashflow-categories/:id
+  { method: 'DELETE', path: '`/cashflow-categories/' },                    // DELETE /api/cashflow-categories/:id (archive)
+  { method: 'POST', path: "'/account/integrations/telegram/link-token'" }, // POST   /api/account/integrations/telegram/link-token
+  { method: 'POST', path: "'/account/integrations/telegram/unlink'" },     // POST   /api/account/integrations/telegram/unlink
+  { method: 'POST', path: "'/payment-connections'" },                      // POST   /api/payment-connections
+  { method: 'POST', path: "'/team/invite'" },                              // POST   /api/team/invite
+  { method: 'DELETE', path: '`/team/invites/' },                           // DELETE /api/team/invites/:code
+  { method: 'PATCH', path: '`/team/members/' },                            // PATCH  /api/team/members/:memberId
+  { method: 'DELETE', path: '`/team/members/' },                           // DELETE /api/team/members/:memberId
+  // Accounts (2026-10-10, w2/C1 + C2): existing routes, canManageWallets on the server.
+  { method: 'POST', path: "'/wallets'" },               // POST   /api/wallets
+  { method: 'PUT', path: '`/wallets/' },                 // PUT    /api/wallets/:id (edit, restore)
+  { method: 'DELETE', path: '`/wallets/' },              // DELETE /api/wallets/:id (archive)
+  { method: 'POST', path: '/adjust-balance`' },          // POST   /api/wallets/:id/adjust-balance
+  // Bank statement import (2026-10-10, w2/H1–H3 + k/K4): role-checked on the server.
+  { method: 'POST', path: "'/bank-import/read'" },       // POST /api/bank-import/read (engine reads the file; no write)
+  { method: 'POST', path: "'/bank-import/batches'" },    // POST /api/bank-import/batches
+  { method: 'POST', path: '/suggest`' },                 // POST /api/bank-imports/:batchId/suggest
+  { method: 'POST', path: '/confirm`' },                 // POST /api/bank-imports/:batchId/confirm
+  { method: 'POST', path: "'/classification-rules'" },   // POST /api/classification-rules
+  // Bills and invoices (2026-10-10, w2/E1): read the uploaded invoice, create the record.
+  { method: 'POST', path: '/extract`' },                 // POST /api/documents/:id/extract (reads; writes nothing)
+  { method: 'POST', path: "'/debts'" },                  // POST /api/debts
+  { method: 'PATCH', path: "'/debts/' + encodeURIComponent" }, // PATCH /api/debts/:id (edit a bill)
+  // Counterparty card (2026-10-10, w2/G1): role-checked and audited on the server.
+  { method: 'POST', path: "'/archive', token" },               // POST   /api/counterparties/:id/archive
+  { method: 'DELETE', path: "'/bank-accounts/'" },             // DELETE /api/counterparties/:id/bank-accounts/:accountId
+  // Payroll (2026-10-10, w2/F1 + F2): canManagePayroll on the server.
+  { method: 'POST', path: "'/payroll/employees'" },                        // POST   /api/payroll/employees
+  { method: 'PATCH', path: "'/payroll/employees/' + encodeURIComponent" },  // PATCH  /api/payroll/employees/:id
+  { method: 'DELETE', path: "'/payroll/employees/' + encodeURIComponent" }, // DELETE /api/payroll/employees/:id (archive)
+  { method: 'POST', path: "'/payroll/payments'" },                         // POST   /api/payroll/payments
+  // Money windows (2026-10-10): v2 replacements of the v1 transfer and payment modals.
+  { method: 'POST', path: "'/wallets/transfer'" },                         // POST /api/wallets/transfer (atomic RPC)
+  { method: 'POST', path: "'/decisions/debts/' + encodeURIComponent" },    // POST /api/decisions/debts/:id/payment (simulation)
+  { method: 'POST', path: "'/pay', token" },                               // POST /api/debts/:id/pay (idempotent)
+]
+const ACTIONS = path.join(V2, 'lib', 'actions.js')
+// POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
+const ASK = path.join(V2, 'lib', 'ask.js')
+const ASK_ALLOW = ["'/accountant/ask'", "'/ai-cfo/ask'"]
+
+console.log('\nDesign v2 — flag')
+
+// App.jsx is matched raw: its comments contain route globs like '/business/*' that a
+// naive comment stripper would read as the start of a block comment.
+const appSrc = read(path.join(ROOT, 'client/src/App.jsx'))
+
+t('App.jsx reads VITE_DESIGN_V2 as a strict string compare (default OFF)', () => {
+  assert.ok(/const DESIGN_V2 = import\.meta\.env\.VITE_DESIGN_V2 === 'true'/.test(appSrc), 'flag constant missing')
+})
+
+t('the v2 app is reachable only through the flag-gated lazy import', () => {
+  const app = appSrc
+  const imports = [...app.matchAll(/import\(['"]\.\/v2\/[^'"]+['"]\)/g)]
+  assert.ok(imports.length >= 1, 'expected a lazy import of ./v2')
+  for (const m of imports) {
+    const line = app.slice(app.lastIndexOf('\n', m.index), app.indexOf('\n', m.index))
+    assert.match(line, /DESIGN_V2 \? lazy\(\(\) => import\(/, `ungated v2 import: ${line.trim()}`)
+  }
+  assert.ok(!/^import .* from ['"]\.\/v2/m.test(app), 'App.jsx must not statically import v2')
+})
+
+t('nothing outside client/src/v2 imports v2 statically', () => {
+  const others = walk(path.join(ROOT, 'client', 'src')).filter((f) => !f.startsWith(V2) && /\.(jsx?)$/.test(f))
+  for (const f of others) {
+    const s = code(read(f))
+    assert.ok(!/^import [^\n]* from ['"][./]*v2\//m.test(s), `${rel(f)} statically imports v2`)
+  }
+})
+
+t('flag documented in both .env.example files', () => {
+  assert.match(read(path.join(ROOT, 'client/.env.example')), /^VITE_DESIGN_V2=false$/m)
+  assert.match(read(path.join(ROOT, '.env.example')), /VITE_DESIGN_V2/)
+})
+
+console.log('\nDesign v2 — workspace isolation and writes')
+
+t('v2 never calls a Personal API (Business workspace only)', () => {
+  for (const f of src) {
+    const s = code(read(f))
+    assert.ok(!/['"`]\/(api\/)?personal\//.test(s), `${rel(f)} references a /personal API path`)
+    assert.ok(!/personal-business-connections|['"`]\/(api\/)?funding\b/.test(s), `${rel(f)} touches the Personal↔Business bridge`)
+  }
+})
+
+t('v2 never overrides the business scope header', () => {
+  for (const f of src) assert.ok(!/x-business-id/i.test(code(read(f))), `${rel(f)} sets x-business-id itself`)
+})
+
+t('v2 makes no mutating request outside the reviewed allow-list', () => {
+  for (const f of src) {
+    const s = code(read(f))
+    const writes = [...s.matchAll(/method:\s*['"](POST|PUT|PATCH|DELETE)['"]/g)]
+    if (f === ASK) {
+      for (const m of writes) {
+        const line = s.slice(s.lastIndexOf('\n', m.index), m.index)
+        assert.ok(m[1] === 'POST' && ASK_ALLOW.some((a) => line.includes(a)), `${rel(f)}: only POST to ${ASK_ALLOW.join(', ')}`)
+      }
+      continue
+    }
+    if (f !== ACTIONS) { assert.strictEqual(writes.length, 0, `${rel(f)} writes; only lib/actions.js may`); continue }
+    for (const m of writes) {
+      const line = s.slice(s.lastIndexOf('\n', m.index), m.index)
+      const hit = WRITE_ALLOW.find((w) => line.includes(w.path) && w.method === m[1])
+      assert.ok(hit, `${rel(f)}: ${m[1]} ${line.trim().slice(0, 80)} not in WRITE_ALLOW`)
+    }
+    assert.strictEqual(writes.length, WRITE_ALLOW.length, 'every allowed write is used exactly once')
+  }
+})
+
+t('every allowed write exists on the server (batch 8 routes are the approved ones only)', () => {
+  const server = read(path.join(ROOT, 'server/index.js'))
+  for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
+    /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
+    /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,
+    /app\.patch\('\/api\/pnl-mapping'/, /app\.post\('\/api\/transactions\/batch'/, /app\.post\('\/api\/debts\/:id\/withholding'/,
+    /app\.post\('\/api\/assets'/, /app\.post\('\/api\/business-funding'/, /app\.post\('\/api\/business-funding\/repayments\/:rid\/paid'/,
+    /app\.post\('\/api\/documents\/:id\/signed-url'/, /app\.patch\('\/api\/documents\/:id'/, /app\.post\('\/api\/documents\/:id\/links'/,
+    /app\.delete\('\/api\/documents\/:id\/links\/:linkId'/, /app\.post\('\/api\/documents\/:id\/archive'/,
+    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/, /app\.post\('\/api\/documents\/:id\/tax-obligation'/,
+    /app\.put\('\/api\/accountant\/profile'/, /app\.post\('\/api\/accountant\/profile\/verify'/, /app\.post\('\/api\/accountant\/profile\/from-documents'/,
+    /app\.post\('\/api\/auth\/email\/start'/, /app\.post\('\/api\/auth\/email\/verify'/, /app\.patch\('\/api\/me\/profile'/,
+    /app\.post\('\/api\/invite\/:code\/accept'/, /app\.post\('\/api\/businesses'/,
+    /app\.patch\('\/api\/business\/current'/, /app\.post\('\/api\/cashflow-categories'/, /app\.patch\('\/api\/cashflow-categories\/:id'/,
+    /app\.delete\('\/api\/cashflow-categories\/:id'/, /app\.post\('\/api\/account\/integrations\/telegram\/link-token'/,
+    /app\.post\('\/api\/account\/integrations\/telegram\/unlink'/, /app\.post\('\/api\/payment-connections'/, /app\.post\('\/api\/team\/invite'/,
+    /app\.delete\('\/api\/team\/invites\/:code'/, /app\.patch\('\/api\/team\/members\/:memberId'/, /app\.delete\('\/api\/team\/members\/:memberId'/,
+    /app\.post\('\/api\/wallets'/, /app\.put\('\/api\/wallets\/:id'/, /app\.delete\('\/api\/wallets\/:id'/, /app\.post\('\/api\/wallets\/:id\/adjust-balance'/,
+    /app\.post\('\/api\/bank-import\/read'/, /app\.post\('\/api\/bank-import\/batches'/, /app\.post\('\/api\/bank-imports\/:batchId\/suggest'/,
+    /app\.post\('\/api\/bank-imports\/:batchId\/confirm'/, /app\.post\('\/api\/classification-rules'/,
+    /app\.post\('\/api\/documents\/:id\/extract'/, /app\.post\('\/api\/debts'/, /app\.patch\('\/api\/debts\/:id'/,
+    /app\.post\('\/api\/counterparties\/:id\/archive'/, /app\.delete\('\/api\/counterparties\/:id\/bank-accounts\/:accountId'/,
+    /app\.post\('\/api\/payroll\/employees'/, /app\.patch\('\/api\/payroll\/employees\/:id'/, /app\.delete\('\/api\/payroll\/employees\/:id'/, /app\.post\('\/api\/payroll\/payments'/,
+    /app\.post\('\/api\/wallets\/transfer'/, /app\.post\('\/api\/decisions\/debts\/:id\/payment'/, /app\.post\('\/api\/debts\/:id\/pay'/]) {
+    assert.ok(r.test(server), `server route ${r} missing`)
+  }
+})
+
+t('no direct apiFetch writes hidden behind a helper outside actions.js', () => {
+  for (const f of src) {
+    if (f === ACTIONS || f === ASK) continue
+    assert.ok(!/\bapiFetch\(/.test(code(read(f))) || f.endsWith('data.jsx'), `${rel(f)} calls apiFetch directly (reads go through useApi)`)
+  }
+})
+
+t('no new server endpoint namespace for v2', () => {
+  for (const f of src) assert.ok(!/\/api\/v2\b|['"`]\/v2\//.test(code(read(f))), `${rel(f)} calls a /v2 API`)
+})
+
+console.log('\nDesign v2 — tokens, fonts, data')
+
+t('v2 CSS declares no custom properties (tokens live in brand/tokens.css)', () => {
+  for (const f of files.filter((x) => x.endsWith('.css'))) {
+    assert.ok(!/(^|[;{\s])--[\w-]+\s*:/.test(read(f)), `${rel(f)} declares a custom property`)
+  }
+})
+
+t('v2 CSS uses no raw hex colours', () => {
+  for (const f of files.filter((x) => x.endsWith('.css'))) {
+    const hex = read(f).replace(/\/\*[\s\S]*?\*\//g, '').match(/#[0-9a-fA-F]{3,8}\b/g)
+    assert.ok(!hex, `${rel(f)} hard-codes ${hex && hex.join(', ')}`)
+  }
+})
+
+t('no Google Fonts CDN', () => {
+  for (const f of files) assert.ok(!/fonts\.googleapis|fonts\.gstatic/.test(read(f)), `${rel(f)} loads Google Fonts`)
+})
+
+t('no demo company, people or figures from the designs', () => {
+  const demo = ['Nusantara', 'Sinar Abadi', 'Mitra Bali', 'Para Legals', 'Bali Resort', 'Denpasar', 'Budi', '122.9', '78.2M', '153.9']
+  for (const f of src) {
+    const s = code(read(f))
+    for (const d of demo) assert.ok(!s.includes(d), `${rel(f)} contains design demo value "${d}"`)
+  }
+})
+
+console.log('\nDesign v2 — copy')
+
+const lookup = (dict, key) => key.split('.').reduce((o, k) => (o == null ? o : o[k]), dict)
+const used = new Set()
+for (const f of src) for (const m of code(read(f)).matchAll(/\bt\(\s*['"]([a-zA-Z][\w.]+)['"]/g)) used.add(m[1])
+for (const f of src) for (const m of read(f).matchAll(/(?:labelKey|titleKey):\s*['"]([\w.]+)['"]/g)) used.add(m[1])
+for (const f of src) for (const m of read(f).matchAll(/titleKey="([\w.]+)"/g)) used.add(m[1])
+
+t('every copy key used by v2 exists in EN', () => {
+  const missing = [...used].filter((k) => typeof lookup(en, k) !== 'string')
+  assert.deepStrictEqual(missing, [])
+})
+
+const flat = (o, p = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' ? flat(v, p + k + '.') : [p + k]))
+const enKeys = flat(en)
+const missingRu = enKeys.filter((k) => typeof lookup(ru, k) !== 'string')
+const missingId = enKeys.filter((k) => typeof lookup(id, k) !== 'string')
+console.log(`  ..  RU falls back to EN for ${missingRu.length} key(s)${missingRu.length ? ': ' + missingRu.join(', ') : ''}`)
+console.log(`  ..  ID falls back to EN for ${missingId.length} key(s)${missingId.length ? ': ' + missingId.join(', ') : ''}`)
+
+t('RU and ID carry no key EN does not have', () => {
+  const extra = [...flat(ru), ...flat(id)].filter((k) => typeof lookup(en, k) !== 'string')
+  assert.deepStrictEqual(extra, [])
+})
+
+console.log(`\n${pass} passed, ${fail} failed`)
+process.exit(fail ? 1 : 0)

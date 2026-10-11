@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pulse — first day</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.st{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:16px;align-items:center;padding:18px 0;border-top:1px solid #EDF1F5}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="pulse" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+<header style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Pulse</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Day one · four steps to your first real answer</p>
+</header>
+
+<section style="background: #003366; color: #FFFFFF; border-radius: 24px; padding: 30px 32px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 32px; align-items: center;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<h2 style="margin: 0; font-size: 26px; line-height: 1.25; font-weight: 800;">In about 15 minutes you'll know your runway and what's coming in the next 30 days.</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.55; color: #C9D8E8;">Rough numbers are fine. You can correct them later, and nothing here is shared with anyone.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span class="num" style="font-size: 14px; color: #C9D8E8;">1 of 4 done</span>
+<div style="height: 8px; border-radius: 8px; background: #1E4D7A;"><div style="width: 25%; height: 8px; border-radius: 8px; background: #3399FF;"></div></div>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 8px 26px 10px;">
+<div class="st" style="border-top: none;"><span style="width: 36px; height: 36px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span><span style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; font-weight: 800;">Company profile filled from your documents</span><span style="font-size: 14px; color: #5A6E82;">Deed, NIB and NPWP read by AI · taxes and deadlines set up</span></span><span></span></div>
+<div class="st"><span style="width: 36px; height: 36px; border-radius: 50%; background: #E6F1FB; color: #1565C0; display: flex; align-items: center; justify-content: center; font-weight: 800;">2</span><span style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; font-weight: 800;">Add your accounts and today's balances</span><span style="font-size: 14px; color: #5A6E82;">Bank accounts, cash box, payment gateway · 3 min · unlocks cash on Pulse</span></span><a class="btn btn-p" href="Accounts.dc.html">Add accounts</a></div>
+<div class="st"><span style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid #C2CFDB; color: #5A6E82; display: flex; align-items: center; justify-content: center; font-weight: 800;">3</span><span style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; font-weight: 800;">Import last month's bank statement</span><span style="font-size: 14px; color: #5A6E82;">PDF or CSV · 5 min · unlocks runway and spending</span></span><a class="btn" href="Documents.dc.html">Import</a></div>
+<div class="st"><span style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid #C2CFDB; color: #5A6E82; display: flex; align-items: center; justify-content: center; font-weight: 800;">4</span><span style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; font-weight: 800;">Tell us who owes you and whom you owe</span><span style="font-size: 14px; color: #5A6E82;">Type it, say it or drop invoices · 5 min · unlocks Radar</span></span><a class="btn" href="MobileAdd.dc.html">Add</a></div>
+<div class="st"><span style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid #C2CFDB; color: #5A6E82; display: flex; align-items: center; justify-content: center; font-weight: 800;">5</span><span style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 16px; font-weight: 800;">Optional · invite your team and connect Telegram</span><span style="font-size: 14px; color: #5A6E82;">So expenses and approvals happen where people already are</span></span><a class="btn" href="Settings.dc.html">Set up</a></div>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Radar — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:44px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.chip{font-family:inherit;font-size:14px;font-weight:700;border-radius:999px;height:44px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#5A6E82;min-width:56px;padding-top:8px}
+.kd{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid #EDF1F5}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="width: 390px; height: 1900px; box-sizing: border-box; background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366; display: flex; flex-direction: column;">
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #FFFFFF; border-bottom: 1px solid #DDE5EC;">
+<a style="text-decoration: none; font-family: inherit; display: flex; align-items: center; gap: 10px; border: none; background: none; padding: 0; color: #003366; cursor: pointer; min-height: 44px;" href="MobileMore.dc.html">
+<img src="/_blob/d686945ebf91157e8d05a4e2e61c6202" alt="CFO AI" style="width: 28px; height: 28px;">
+<span style="font-size: 15px; font-weight: 800;">Nusantara Facilities</span>
+<svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px; color: #5A6E82;"><path d="M6 9l6 6 6-6"/></svg>
+</a>
+<a class="btn" aria-label="Notifications" style="width: 44px; padding: 0; border: none; background: transparent;" href="MobileApprovals.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></a>
+</div>
+
+<div style="padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 18px; flex-grow: 1;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 26px; font-weight: 400;">Radar</h1>
+<p style="margin: 0; font-size: 14px; color: #3D556E;">Next 30 days · 2 Oct – 1 Nov</p>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 16px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Expected cash on 1 Nov</span>
+<span class="num" style="font-size: 34px; font-weight: 800; letter-spacing: -0.5px;">Rp 105.6M</span>
+<span style="font-size: 13px; color: #3D556E;">Down Rp 17.3M from today</span>
+</div>
+<svg viewBox="-4 -6 362 206" role="img" aria-label="Projected cash for 30 days. Expected: lowest Rp 92.1M on 8 October, Rp 105.6M on 1 November. Worst case: lowest Rp 42.9M on 30 October." style="width: 100%; height: auto; display: block; font-family: 'Manrope', sans-serif;">
+<line x1="0" y1="20.0" x2="326" y2="20.0" stroke="#EDF1F5"/>
+<line x1="0" y1="70.0" x2="326" y2="70.0" stroke="#EDF1F5"/>
+<line x1="0" y1="120.0" x2="326" y2="120.0" stroke="#EDF1F5"/>
+<line x1="0" y1="170.0" x2="326" y2="170.0" stroke="#C2CFDB"/>
+<text x="332" y="24.0" font-size="11" fill="#5A6E82">150M</text>
+<text x="332" y="74.0" font-size="11" fill="#5A6E82">100M</text>
+<text x="332" y="124.0" font-size="11" fill="#5A6E82">50M</text>
+<text x="332" y="174.0" font-size="11" fill="#5A6E82">0</text>
+<polygon points="0.0,47.1 10.9,47.0 10.9,34.5 32.6,34.2 32.6,58.2 43.5,58.1 43.5,64.8 65.2,64.6 65.2,47.1 86.9,46.8 86.9,56.6 141.3,56.0 141.3,57.5 141.3,57.5 141.3,58.7 152.1,58.6 152.1,10.4 195.6,9.9 195.6,25.5 249.9,24.9 249.9,60.9 304.3,60.3 304.3,60.5 326.0,60.3 326.0,79.0 304.3,78.9 304.3,127.1 304.3,127.1 304.3,126.9 249.9,126.4 249.9,90.4 195.6,90.0 195.6,74.4 141.3,73.9 141.3,72.7 141.3,72.7 141.3,71.2 86.9,70.8 86.9,61.0 65.2,60.8 65.2,78.3 43.5,78.1 43.5,71.5 32.6,71.4 32.6,47.4 0.0,47.1" fill="#3399FF" opacity="0.10"/>
+<path d="M0.0 47.1 L32.6 47.4 L32.6 71.4 L43.5 71.5 L43.5 78.1 L65.2 78.3 L65.2 60.8 L86.9 61.0 L86.9 70.8 L141.3 71.2 L141.3 72.7 L141.3 72.7 L141.3 73.9 L195.6 74.4 L195.6 90.0 L249.9 90.4 L249.9 126.4 L304.3 126.9 L304.3 127.1 L304.3 127.1 L304.3 78.9 L326.0 79.0" fill="none" stroke="#B5740B" stroke-width="2" stroke-dasharray="5 4"/>
+<path d="M0.0 47.1 L32.6 47.2 L32.6 71.2 L43.5 71.2 L43.5 77.8 L65.2 77.9 L65.2 60.4 L86.9 60.4 L86.9 70.2 L141.3 70.3 L141.3 71.8 L141.3 71.8 L141.3 73.0 L152.1 73.0 L152.1 24.8 L195.6 24.9 L195.6 40.5 L228.2 40.6 L228.2 28.1 L249.9 28.1 L249.9 64.1 L304.3 64.2 L304.3 64.4 L326.0 64.4" fill="none" stroke="#003366" stroke-width="3" stroke-linejoin="round"/>
+<circle cx="65.2" cy="77.9" r="5" fill="#FFFFFF" stroke="#003366" stroke-width="3"/>
+<circle cx="304.3" cy="127.1" r="5" fill="#FFFFFF" stroke="#B5740B" stroke-width="3"/>
+<text x="0" y="192" font-size="11" fill="#5A6E82">Today</text>
+<text x="65.2" y="192" font-size="11" fill="#5A6E82" text-anchor="middle">8 Oct</text>
+<text x="152.1" y="192" font-size="11" fill="#5A6E82" text-anchor="middle">16 Oct</text>
+<text x="304.3" y="192" font-size="11" fill="#5A6E82" text-anchor="middle">30 Oct</text>
+</svg>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div style="background: #F4F6F8; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Lowest point</span><span class="num" style="font-size: 18px; font-weight: 800;">Rp 92.1M</span><span style="font-size: 12px; color: #3D556E;">8 Oct</span></div>
+<div style="background: #FBF1DF; border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 700; color: #8B5A08;">Worst case · lowest</span><span class="num" style="font-size: 18px; font-weight: 800; color: #8B5A08;">Rp 42.9M</span><span style="font-size: 12px; color: #3D556E;">30 Oct · Sinar late, Mitra unpaid</span></div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">What if…</h3>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<button class="chip" aria-pressed="true" style="background: #FBF1DF; border-color: #B5740B; color: #8B5A08;">Worst case</button>
+<button class="chip">Sinar Abadi 2 weeks late</button>
+<button class="chip">Collect Mitra Bali now</button>
+<button class="chip">Hire 1 person</button>
+<button class="chip">Revenue −20%</button>
+<a class="chip" style="color: #1565C0;" href="AskSheetMobile.dc.html">Ask your own</a>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+<span style="font-size: 15px; line-height: 1.5;">In the worst case cash falls to <strong>Rp 42.9M on 30 Oct</strong>. Collecting CV Mitra Bali this week lifts that to Rp 55.4M.</span>
+<a class="btn btn-p" href="MobileBills.dc.html">Send reminder to Mitra Bali</a>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px; display: flex; flex-direction: column;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Key dates</h3>
+<span style="font-size: 12px; font-weight: 700; color: #5A6E82;">Cash after</span>
+</div>
+<div class="kd" style="border-top: none;"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">5 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">Payroll</span><span class="num" style="font-size: 13px;">−Rp 24.0M</span></span><span class="num" style="font-size: 13px; color: #3D556E;">98.8M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">6 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">Office rent</span><span class="num" style="font-size: 13px;">−Rp 6.7M · after PPh 4(2)</span></span><span class="num" style="font-size: 13px; color: #3D556E;">92.2M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">8 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">Bali Resort Group</span><span class="num" style="font-size: 13px; color: #0F7A52;">+Rp 17.5M · usually on time</span></span><span class="num" style="font-size: 13px; color: #3D556E;">109.6M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">10 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">Para Legals Indonesia</span><span class="num" style="font-size: 13px;">−Rp 9.8M · <span style="color: #1565C0; font-weight: 700;">needs approval</span></span></span><span class="num" style="font-size: 13px; color: #3D556E;">99.8M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">15 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">Taxes · PPh 21, 23, 4(2)</span><span class="num" style="font-size: 13px;">−Rp 1.48M · <span style="color: #8B5A08; font-weight: 700;">deadline</span></span></span><span class="num" style="font-size: 13px; color: #3D556E;">98.2M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">15 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">BPJS Ketenagakerjaan</span><span class="num" style="font-size: 13px;">−Rp 1.2M · <span style="color: #8B5A08; font-weight: 700;">deadline</span></span></span><span class="num" style="font-size: 13px; color: #3D556E;">97.0M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">16 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">PT Sinar Abadi</span><span class="num" style="font-size: 13px; color: #0F7A52;">+Rp 48.2M · <span style="color: #C62828; font-weight: 700;">was 11 days late</span></span></span><span class="num" style="font-size: 13px; color: #3D556E;">145.2M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">20 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">Cleaning chemicals</span><span class="num" style="font-size: 13px;">−Rp 15.6M</span></span><span class="num" style="font-size: 13px; color: #3D556E;">129.5M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">23 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">CV Mitra Bali</span><span class="num" style="font-size: 13px; color: #0F7A52;">+Rp 12.5M · <span style="color: #C62828; font-weight: 700;">late</span></span></span><span class="num" style="font-size: 13px; color: #3D556E;">141.9M</span></div>
+<div class="kd"><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">25 Oct</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 700;">Location fees</span><span class="num" style="font-size: 13px;">−Rp 36.0M</span></span><span class="num" style="font-size: 13px; color: #3D556E;">105.9M</span></div>
+
+<p style="margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #5A6E82;">Payments of Rp 1M or more. Daily sales and day-to-day costs (≈ Rp 1.4M each) are in the line as averages.</p>
+<a href="Transactions.dc.html" style="margin-top: 8px; font-size: 14px; font-weight: 700; min-height: 44px; display: flex; align-items: center;">Show all 11 · incl. 1 under Rp 1M</a>
+</section>
+</div>
+
+<nav style="display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #DDE5EC; padding: 6px 8px 22px;">
+<a class="tab" href="PulseMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Pulse</a>
+<a class="tab" href="RadarMobile.dc.html" style="color: #1565C0;"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Radar</a>
+<a class="tab" href="MobileAdd.dc.html" aria-label="Add" style="padding-top: 0;"><span style="width: 52px; height: 52px; border-radius: 16px; background: #1565C0; color: #FFFFFF; display: flex; align-items: center; justify-content: center; margin-top: -18px; box-shadow: 0 6px 16px rgba(0, 51, 102, 0.22);"><svg class="ic" viewBox="0 0 24 24" style="width: 24px; height: 24px;"><path d="M12 5v14M5 12h14"/></svg></span>Add</a>
+<a class="tab" href="AICFOMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI CFO</a>
+<a class="tab" href="MobileMore.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>More</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

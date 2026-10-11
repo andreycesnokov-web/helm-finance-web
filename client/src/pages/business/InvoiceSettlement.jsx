@@ -1,0 +1,496 @@
+// Invoice Settlement V1 — what is owed, what has been paid, what remains, and
+// whether this invoice may be closed.
+//
+// WHAT THIS PAGE NEVER DOES:
+//   * pay anything, or contact a bank;
+//   * close an invoice on its own — Close stays disabled until money, documents and
+//     accountant review are all satisfied, and the reasons are listed on screen;
+//   * invent a number. A missing invoice total shows "Needs review", never zero.
+//
+// The money path is the existing payment flow; this page records which transaction and
+// which payment proof settled which invoice, and reports the remaining balance.
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { apiFetch } from '../../lib/api'
+import { useAuth } from '../../hooks/useAuth'
+import { PageHeader, Card, Btn, StatusBadge, Icon } from '../../shell/ui'
+import './InvoiceSettlement.css'
+
+const money = (n, ccy = 'IDR') =>
+  n === null || n === undefined ? '—' : `${ccy} ${Number(n).toLocaleString('de-DE')}`
+
+const STATUS_TONE = {
+  unpaid: 'neutral', partially_paid: 'warning', paid: 'success',
+  overpaid: 'danger', needs_review: 'warning',
+}
+const STATUS_LABEL = {
+  unpaid: 'Unpaid', partially_paid: 'Partially paid', paid: 'Fully paid',
+  overpaid: 'Overpaid — needs review', needs_review: 'Needs review',
+}
+
+export default function InvoiceSettlement() {
+  const { token } = useAuth()
+  const navigate = useNavigate()
+  const [debts, setDebts] = useState([])
+  const [selected, setSelected] = useState(null)
+  const [data, setData] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [editing, setEditing] = useState(null)   // document id being edited
+  const [form, setForm] = useState({})
+  const [saveMsg, setSaveMsg] = useState(null)
+  const [extract, setExtract] = useState(null)   // { documentId, result, duplicate }
+  const [intake, setIntake] = useState(null)     // { documentId, ...pipeline result }
+
+  useEffect(() => {
+    if (!token) return
+    let on = true
+    apiFetch('/debts', token)
+      .then((r) => {
+        if (!on) return
+        const list = (Array.isArray(r) ? r : r.debts || [])
+          .filter((d) => !['cancelled'].includes(d.status))
+        setDebts(list)
+      })
+      .catch((e) => on && setErr(e.message || 'Could not load invoices'))
+    return () => { on = false }
+  }, [token])
+
+  const load = useCallback(async (debtId) => {
+    setBusy(true); setErr(null); setData(null); setSelected(debtId)
+    try { setData(await apiFetch(`/invoices/${debtId}/settlement`, token)) }
+    catch (e) { setErr(e.message || 'Could not load settlement') }
+    finally { setBusy(false) }
+  }, [token])
+
+  const openEditor = (d) => {
+    setSaveMsg(null); setErr(null); setEditing(d.id)
+    setForm({
+      document_number: d.document_number || '',
+      commercial_base_amount: d.commercial_base_amount ?? '',
+      commercial_tax_amount: d.commercial_tax_amount ?? '',
+      gross_amount: d.gross_amount ?? '',
+      currency: 'IDR',
+    })
+  }
+
+  // The full intake pipeline: what is this, who with, what record does it imply,
+  // what is missing, what next. It writes only review metadata — no counterparty,
+  // payable or transaction is created by running it.
+  const runIntake = async (docId) => {
+    setBusy(true); setErr(null); setSaveMsg(null); setIntake(null); setExtract(null)
+    try {
+      const r = await apiFetch(`/documents/${docId}/intake`, token, { method: 'POST' })
+      setIntake({ documentId: docId, ...r })
+    } catch (e2) { setErr(e2.message || 'Could not process the document') }
+    finally { setBusy(false) }
+  }
+
+  // Extraction is a SUGGESTION: this call writes nothing. Applying is a second,
+  // deliberate click that goes through the financial-fields endpoint.
+  const runExtract = async (docId) => {
+    setBusy(true); setErr(null); setSaveMsg(null); setExtract(null)
+    try {
+      const r = await apiFetch(`/documents/${docId}/extract`, token, { method: 'POST' })
+      setExtract({ documentId: docId, ...r })
+    } catch (e2) { setErr(e2.message || 'Could not extract document fields') }
+    finally { setBusy(false) }
+  }
+
+  const applyExtracted = async (intoEditor) => {
+    const f = extract?.extraction?.fields || {}
+    const next = {
+      document_number: f.document_number || '',
+      commercial_base_amount: f.commercial_base_amount ?? '',
+      commercial_tax_amount: f.commercial_tax_amount ?? '',
+      gross_amount: f.gross_amount ?? '',
+      currency: f.currency || 'IDR',
+    }
+    setForm(next); setEditing(extract.documentId)
+    if (intoEditor) { setExtract(null); return }   // "Edit before saving"
+    setBusy(true); setErr(null)
+    try {
+      const num = (v) => (v === '' || v === null ? null : Number(v))
+      await apiFetch(`/documents/${extract.documentId}/financial-fields`, token, {
+        method: 'PATCH',
+        body: {
+          document_number: next.document_number || null,
+          commercial_base_amount: num(next.commercial_base_amount),
+          commercial_tax_amount: num(next.commercial_tax_amount),
+          gross_amount: num(next.gross_amount),
+          currency: next.currency,
+        },
+      })
+      setSaveMsg('Extracted values applied. Settlement recalculated.')
+      setExtract(null); setEditing(null)
+      await load(selected)
+    } catch (e2) { setErr(e2.message || 'Could not apply extracted fields') }
+    finally { setBusy(false) }
+  }
+
+  const saveFields = async () => {
+    setBusy(true); setErr(null); setSaveMsg(null)
+    const num = (v) => (v === '' || v === null ? null : Number(v))
+    try {
+      await apiFetch(`/documents/${editing}/financial-fields`, token, {
+        method: 'PATCH',
+        body: {
+          document_number: form.document_number || null,
+          commercial_base_amount: num(form.commercial_base_amount),
+          commercial_tax_amount: num(form.commercial_tax_amount),
+          gross_amount: num(form.gross_amount),
+          currency: form.currency || 'IDR',
+        },
+      })
+      setSaveMsg('Saved. Settlement recalculated from the recorded figures.')
+      setEditing(null)
+      await load(selected)                 // re-read so the balance reflects the save
+    } catch (e2) { setErr(e2.message || 'Could not save document fields') }
+    finally { setBusy(false) }
+  }
+
+  const head = (
+    <PageHeader eyebrow="Business Workspace" title="Invoice settlement"
+      actions={<>
+        <StatusBadge tone="neutral">Review-first</StatusBadge>
+        <Btn sm variant="ghost" onClick={() => navigate('/business/payables')}>Payables</Btn>
+      </>} />
+  )
+
+  const s = data?.settlement
+  const c = data?.closeout
+
+  return <>{head}
+    <p className="is-note">
+      <Icon.warn width="15" height="15" aria-hidden="true" />
+      Settlement is measured against the invoice total including tax. CFO AI does not pay
+      invoices and does not close them automatically — closing stays your decision.
+    </p>
+
+    <div className="is-grid">
+      <Card title="Invoices">
+        {debts.length === 0 && <p className="is-empty">No open invoices in this workspace.</p>}
+        <ul className="is-list">
+          {debts.map((d) => (
+            <li key={d.id}>
+              <button type="button"
+                className={`is-item${selected === d.id ? ' is-on' : ''}`}
+                onClick={() => load(d.id)}>
+                <span className="is-item-top">
+                  <span className="is-item-cp">{d.counterparty || 'Unnamed'}</span>
+                  <span className="is-item-amt">{money(d.original_amount ?? d.amount, d.currency)}</span>
+                </span>
+                <span className="is-item-sub">
+                  {d.type === 'payable' ? 'Payable' : 'Receivable'}
+                  {d.description ? ` · ${String(d.description).slice(0, 46)}` : ''}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {busy && <Card title="Loading"><p className="is-empty">Loading settlement…</p></Card>}
+      {err && !busy && <Card title="Settlement"><p className="is-err">{err}</p></Card>}
+
+      {data && s && !busy && (
+        <Card title="Settlement">
+          <div className="is-head">
+            <div>
+              <span className="is-eyebrow">
+                {data.invoice.type === 'payable' ? 'Payable' : 'Receivable'}
+                {data.invoice.document_number ? ` · ${data.invoice.document_number}` : ''}
+              </span>
+              <h3 className="is-title">{data.invoice.counterparty}</h3>
+              {data.invoice.description && <p className="is-sub">{data.invoice.description}</p>}
+            </div>
+            <StatusBadge tone={STATUS_TONE[s.status] || 'neutral'}>
+              {STATUS_LABEL[s.status] || s.status}
+            </StatusBadge>
+          </div>
+
+          {/* ── the balance: the decision on this page ──────────────────── */}
+          <section className="is-sec">
+            <div className="is-row"><span>Invoice total</span>
+              <span className="is-mono">{money(s.invoice_total, data.invoice.currency)}</span></div>
+            <div className="is-row"><span>Paid</span>
+              <span className="is-mono is-pos">{money(s.paid_amount, data.invoice.currency)}</span></div>
+            <div className="is-row is-row-strong"><span>Remaining</span>
+              <span className="is-mono">{money(s.remaining_amount, data.invoice.currency)}</span></div>
+            {s.over_paid_amount > 0 && (
+              <p className="is-warn">Overpaid by {money(s.over_paid_amount, data.invoice.currency)}.</p>
+            )}
+            {s.payment_count > 0 && (
+              <p className="is-hint">{s.payment_count} payment{s.payment_count === 1 ? '' : 's'} recorded.</p>
+            )}
+          </section>
+
+          {/* Base-only context. Explicitly not the closeout target. */}
+          {s.base_view && (
+            <section className="is-sec is-context">
+              <span className="is-label">Base amount context</span>
+              <div className="is-row"><span>Base amount (DPP)</span>
+                <span className="is-mono">{money(s.base_view.base_amount, data.invoice.currency)}</span></div>
+              <div className="is-row"><span>Base remaining</span>
+                <span className="is-mono">{money(s.base_view.base_remaining, data.invoice.currency)}</span></div>
+              <p className="is-hint">{s.base_view.note}</p>
+            </section>
+          )}
+
+          {/* ── documents ──────────────────────────────────────────────── */}
+          <section className="is-sec">
+            <span className="is-label">Linked documents</span>
+            <ul className="is-checks">
+              {(c?.checklist || []).map((d) => (
+                <li key={d.key} className={d.present ? 'is-ok' : d.required ? 'is-missing' : ''}>
+                  <span aria-hidden="true">{d.present ? '✓' : '□'}</span>
+                  {d.label}
+                  {!d.required && !d.present && <em> optional</em>}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {/* ── document financial figures ─────────────────────────────── */}
+          {(data.linked_documents || []).length > 0 && (
+            <section className="is-sec">
+              <span className="is-label">Document figures</span>
+              <p className="is-hint">
+                These values can be entered manually now and will later be filled by
+                automatic extraction. CFO AI does not read PDFs yet.
+              </p>
+              <ul className="is-docs">
+                {data.linked_documents.map((d) => (
+                  <li key={d.id}>
+                    <div className="is-doc-row">
+                      <span className="is-doc-type">
+                        {d.document_type} {d.document_number ? `· ${d.document_number}` : ''}
+                      </span>
+                      <span className="is-mono is-doc-amt">
+                        {d.gross_amount != null
+                          ? money(d.gross_amount, data.invoice.currency)
+                          : 'no figures recorded'}
+                      </span>
+                      <Btn sm variant="ghost" disabled={busy}
+                        onClick={() => runIntake(d.id)}>What is this?</Btn>
+                      <Btn sm variant="ghost" disabled={busy}
+                        onClick={() => runExtract(d.id)}>Extract fields</Btn>
+                      <Btn sm variant="ghost" disabled={busy}
+                        onClick={() => (editing === d.id ? setEditing(null) : openEditor(d))}>
+                        {editing === d.id ? 'Cancel' : 'Edit figures'}
+                      </Btn>
+                    </div>
+
+                    {/* ── intake result ─────────────────────────────────── */}
+                    {intake && intake.documentId === d.id && (
+                      <div className="is-intake">
+                        <div className="is-extract-top">
+                          <span className="is-label">
+                            {intake.document.type.replace(/_/g, ' ')} · {intake.document.direction.replace(/_/g, ' ')}
+                          </span>
+                          <StatusBadge tone={
+                            intake.status === 'ready_to_confirm' ? 'success'
+                              : intake.status === 'unsupported' ? 'neutral' : 'warning'}>
+                            {intake.status.replace(/_/g, ' ')}
+                          </StatusBadge>
+                        </div>
+
+                        <p className="is-hint">{intake.document.business_meaning}</p>
+                        {intake.document.direction_reason && (
+                          <p className="is-hint">{intake.document.direction_reason}</p>
+                        )}
+
+                        <ul className="is-intake-kv">
+                          <li><span>Counterparty</span><span>
+                            {intake.counterparty.status === 'matched' ? 'Recognised'
+                              : intake.counterparty.status === 'possible_match' ? 'Possible match — confirm'
+                                : intake.counterparty.status === 'not_found'
+                                  ? `Not found${intake.counterparty.suggested_counterparty?.legal_name ? ` — suggest "${intake.counterparty.suggested_counterparty.legal_name}"` : ''}`
+                                  : 'Needs review'}
+                          </span></li>
+                          <li><span>Suggested record</span><span>
+                            {intake.financial_record.suggested_record_type.replace(/_/g, ' ')}
+                            {intake.financial_record.amount != null
+                              ? ` · ${money(intake.financial_record.amount, intake.financial_record.currency)}` : ''}
+                          </span></li>
+                          <li><span>Tax</span><span>
+                            {intake.tax.tax_status.replace(/_/g, ' ')}
+                            {intake.tax.ppn_amount != null ? ` · PPN ${money(intake.tax.ppn_amount, intake.financial_record.currency)}` : ''}
+                          </span></li>
+                        </ul>
+
+                        {intake.missing_fields?.length > 0 && (
+                          <p className="is-warn">Missing: {intake.missing_fields.join(', ')}.</p>
+                        )}
+                        {(intake.blockers || []).map((b) => <p key={b} className="is-warn">{b}</p>)}
+                        {(intake.warnings || []).slice(0, 3).map((w) => <p key={w} className="is-hint">{w}</p>)}
+
+                        <span className="is-label">Next</span>
+                        <div className="is-actions">
+                          {(intake.next_actions || []).map((a) => (
+                            <Btn key={a.key} sm variant="ghost" disabled={!a.enabled || busy}
+                              title={a.note || ''}
+                              onClick={() => {
+                                if (a.key === 'create_counterparty' || a.key === 'review_counterparty_match'
+                                  || a.key === 'view_counterparty') navigate('/business/counterparties')
+                                else if (a.key === 'create_payable_draft' || a.key === 'link_to_existing_record'
+                                  || a.key === 'create_transaction_draft') navigate('/business/payables')
+                                else if (a.key === 'create_receivable_draft') navigate('/business/receivables')
+                                else if (a.key === 'request_accountant_review') navigate('/business/accountant')
+                                else if (a.key === 'review_fields' || a.key === 'enter_manually') openEditor(d)
+                                else setIntake(null)
+                              }}>{a.label}</Btn>
+                          ))}
+                        </div>
+                        <p className="is-hint">
+                          CFO AI suggests; you confirm. Nothing here has been created — each action
+                          takes you to the step that creates it.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ── extraction review ─────────────────────────────── */}
+                    {extract && extract.documentId === d.id && (
+                      <div className="is-extract">
+                        <div className="is-extract-top">
+                          <span className="is-label">
+                            Detected: {extract.extraction.document_type} · confidence {extract.extraction.confidence}
+                          </span>
+                          <StatusBadge tone={extract.extraction.status === 'needs_manual_review' ? 'warning' : 'info'}>
+                            {extract.extraction.status === 'needs_manual_review' ? 'Needs manual review' : 'Suggested'}
+                          </StatusBadge>
+                        </div>
+
+                        {extract.extraction.status === 'needs_manual_review' ? (
+                          <p className="is-warn">
+                            Automatic extraction needs OCR/Vision for a scanned document.
+                            Enter the values manually for now.
+                          </p>
+                        ) : (
+                          <ul className="is-extract-fields">
+                            {[['Reference', extract.extraction.fields.document_number],
+                              ['Faktur serial', extract.extraction.fields.tax_invoice_serial],
+                              ['Issuer', extract.extraction.fields.issuer_name],
+                              ['Buyer', extract.extraction.fields.buyer_name],
+                              ['Base / DPP', extract.extraction.fields.commercial_base_amount],
+                              ['Tax / PPN', extract.extraction.fields.commercial_tax_amount],
+                              ['Total', extract.extraction.fields.gross_amount],
+                              ['Payment reference', extract.extraction.fields.payment_reference_number],
+                              ['Payment status', extract.extraction.fields.payment_status],
+                              ['Amount paid', extract.extraction.fields.amount]]
+                              .filter(([, v]) => v !== null && v !== undefined && v !== '')
+                              .map(([k, v]) => (
+                                <li key={k}><span>{k}</span><span className="is-mono">
+                                  {typeof v === 'number' ? money(v, data.invoice.currency) : String(v)}
+                                </span></li>
+                              ))}
+                          </ul>
+                        )}
+
+                        {extract.duplicate?.duplicate && (
+                          <p className="is-warn">Possible duplicate: {extract.duplicate.reason}</p>
+                        )}
+                        {(extract.extraction.missing_fields || []).length > 0 && (
+                          <p className="is-hint">
+                            Not found: {extract.extraction.missing_fields.join(', ')}.
+                          </p>
+                        )}
+                        {(extract.extraction.warnings || []).map((w) => (
+                          <p key={w} className="is-hint">{w}</p>
+                        ))}
+                        {extract.extraction.raw_text_excerpt && (
+                          <details className="is-raw">
+                            <summary>Raw text excerpt</summary>
+                            <p>{extract.extraction.raw_text_excerpt}</p>
+                          </details>
+                        )}
+
+                        <div className="is-actions">
+                          <Btn sm disabled={busy || extract.extraction.status === 'needs_manual_review'}
+                            onClick={() => applyExtracted(false)}>Apply extracted fields</Btn>
+                          <Btn sm variant="ghost" disabled={busy || extract.extraction.status === 'needs_manual_review'}
+                            onClick={() => applyExtracted(true)}>Edit before saving</Btn>
+                          <Btn sm variant="ghost" disabled={busy}
+                            onClick={() => setExtract(null)}>Reject extraction</Btn>
+                        </div>
+                        <p className="is-hint">
+                          Extraction reads text the document already carries. It is a suggestion —
+                          nothing is saved until you apply it.
+                        </p>
+                      </div>
+                    )}
+
+                    {editing === d.id && (
+                      <div className="is-form">
+                        <label className="is-field"><span>Reference / invoice number</span>
+                          <input value={form.document_number}
+                            onChange={(e) => setForm((f) => ({ ...f, document_number: e.target.value }))}
+                            placeholder="X2610001139" /></label>
+                        <label className="is-field"><span>Base amount / DPP</span>
+                          <input type="number" min="0" value={form.commercial_base_amount}
+                            onChange={(e) => setForm((f) => ({ ...f, commercial_base_amount: e.target.value }))}
+                            placeholder="129600000" /></label>
+                        <label className="is-field"><span>Tax amount / PPN</span>
+                          <input type="number" min="0" value={form.commercial_tax_amount}
+                            onChange={(e) => setForm((f) => ({ ...f, commercial_tax_amount: e.target.value }))}
+                            placeholder="14256000" /></label>
+                        <label className="is-field"><span>Total amount</span>
+                          <input type="number" min="0" value={form.gross_amount}
+                            onChange={(e) => setForm((f) => ({ ...f, gross_amount: e.target.value }))}
+                            placeholder="143856000" /></label>
+                        <label className="is-field"><span>Currency</span>
+                          <input value={form.currency}
+                            onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} /></label>
+                        <div className="is-form-actions">
+                          <Btn sm disabled={busy} onClick={saveFields}>Save figures</Btn>
+                          <span className="is-hint">
+                            Leave the total blank to derive it from base + tax.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {saveMsg && <p className="is-ok">{saveMsg}</p>}
+            </section>
+          )}
+
+          {/* ── closeout ───────────────────────────────────────────────── */}
+          <section className="is-sec">
+            <span className="is-label">Closeout</span>
+            <p className="is-state">{c?.state}</p>
+            {!c?.can_close && (c?.blockers || []).length > 0 && (
+              <ul className="is-blockers">
+                {c.blockers.map((b) => <li key={b}>{b}</li>)}
+              </ul>
+            )}
+            <div className="is-actions">
+              <Btn sm variant="ghost" onClick={() => navigate('/business/payables')}>Record a payment</Btn>
+              <Btn sm variant="ghost" onClick={() => navigate('/business/documents')}>Link a document</Btn>
+              <Btn sm variant="ghost" onClick={() => navigate('/business/accountant')}>Request accountant review</Btn>
+              <Btn sm disabled={!c?.can_close}
+                title={c?.can_close ? 'All closeout conditions are met' : (c?.blockers || [])[0]}>
+                Close invoice
+              </Btn>
+            </div>
+            {!c?.can_close && (
+              <p className="is-hint">
+                Close stays disabled until the balance is settled, the required documents are
+                attached and the accountant has confirmed.
+              </p>
+            )}
+          </section>
+
+          {data.allocations && !data.allocations.matches_paid_amount && (
+            <p className="is-warn">
+              Recorded allocations ({money(data.allocations.total, data.invoice.currency)}) do not
+              match the paid amount on this invoice. The payment is real; the audit trail is
+              incomplete. Link each payment to its proof.
+            </p>
+          )}
+        </Card>
+      )}
+    </div>
+  </>
+}

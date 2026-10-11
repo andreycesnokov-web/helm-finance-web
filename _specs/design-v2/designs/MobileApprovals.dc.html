@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Approvals — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:15px;font-weight:700;border-radius:12px;height:48px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#5A6E82;min-width:56px;padding-top:8px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="width: 390px; height: 1200px; box-sizing: border-box; background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366; display: flex; flex-direction: column;">
+<div style="display: flex; align-items: center; gap: 4px; padding: 10px 8px; background: #FFFFFF; border-bottom: 1px solid #DDE5EC;">
+<a href="MobileMore.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #003366;"><svg class="ic" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></a>
+<span style="font-size: 17px; font-weight: 800;">Approvals</span>
+</div>
+<div style="padding: 18px 16px 24px; display: flex; flex-direction: column; gap: 14px; flex-grow: 1;">
+<p style="margin: 0; font-size: 14px; color: #3D556E;">2 waiting · nothing counts until you approve</p>
+
+<article style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; justify-content: space-between; gap: 12px;"><span style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 12px; font-weight: 700; color: #5A6E82;">Bill to pay · due 10 Oct</span><a href="BillDetail.dc.html" style="font-size: 17px; font-weight: 800; color: #003366;">PT Para Legals Indonesia</a></span><span class="num" style="font-size: 18px; font-weight: 800;">Rp 10.0M</span></div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px;"><span class="tag" style="background: #F1EDFF; color: #5B3FC4;">From AI assistant</span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Pay supplier Rp 9.8M · PPh 23</span></div>
+<a href="BillDetail.dc.html" style="font-size: 14px; font-weight: 700; min-height: 44px; display: flex; align-items: center; gap: 6px;"><svg class="ic" viewBox="0 0 24 24" style="width: 18px; height: 18px;"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>View invoice PDF</a>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px;"><button class="btn">Reject</button><button class="btn">Ask</button><button class="btn btn-p">Approve</button></div>
+</article>
+
+<article style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; justify-content: space-between; gap: 12px;"><span style="display: flex; flex-direction: column; gap: 3px;"><span style="font-size: 12px; font-weight: 700; color: #5A6E82;">Expense claim · Telegram</span><span style="font-size: 17px; font-weight: 800;">Budi · fuel</span></span><span class="num" style="font-size: 18px; font-weight: 800;">Rp 300K</span></div>
+<div style="background: #FBF1DF; border-radius: 12px; padding: 10px 12px; font-size: 14px; line-height: 1.45; color: #003366;">A Rp 450K transfer to Budi on 1 Oct may already cover this. <a href="Transactions.dc.html" style="font-weight: 700;">Check</a></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px;"><button class="btn">Reject</button><button class="btn">Ask</button><button class="btn btn-p">Approve</button></div>
+</article>
+
+<section style="display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 15px; font-weight: 800;">Recently decided</h3>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 4px 14px;">
+<div style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; font-size: 14px;"><span>Kimia Bersih · approved</span><span class="num" style="font-weight: 800;">Rp 15.6M</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; font-size: 14px; border-top: 1px solid #EDF1F5;"><span>October payroll · approved</span><span class="num" style="font-weight: 800;">Rp 24.0M</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; min-height: 52px; font-size: 14px; border-top: 1px solid #EDF1F5;"><span>Team lunch · rejected</span><span class="num" style="font-weight: 800; color: #5A6E82;">Rp 1.2M</span></div>
+</div>
+</section>
+</div>
+<nav style="display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #DDE5EC; padding: 6px 8px 22px;">
+<a class="tab" href="PulseMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Pulse</a>
+<a class="tab" href="RadarMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Radar</a>
+<a class="tab" href="MobileAdd.dc.html" aria-label="Add" style="padding-top: 0;"><span style="width: 52px; height: 52px; border-radius: 16px; background: #1565C0; color: #FFFFFF; display: flex; align-items: center; justify-content: center; margin-top: -18px; box-shadow: 0 6px 16px rgba(0, 51, 102, 0.22);"><svg class="ic" viewBox="0 0 24 24" style="width: 24px; height: 24px;"><path d="M12 5v14M5 12h14"/></svg></span>Add</a>
+<a class="tab" href="AICFOMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI CFO</a>
+<a class="tab" href="MobileMore.dc.html" style="color: #1565C0;"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>More</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1200}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

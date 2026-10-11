@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Accountant — documents by transaction</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.chip{font-family:inherit;font-size:13px;font-weight:700;border-radius:999px;height:34px;padding:0 13px;border:1px solid #DDE5EC;background:#FFFFFF;color:#3D556E;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.pr{display:grid;grid-template-columns:52px minmax(0,1.2fr) 96px minmax(0,1.6fr) 108px;gap:12px;align-items:center;padding:12px 10px;border-top:1px solid #EDF1F5;font-size:14px}
+.pr>*{min-width:0}
+.fn{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dk{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;border-radius:8px;padding:3px 8px;white-space:nowrap}
+.ok{background:#E5F4EE;color:#0F7A52}
+.no{background:#FBEAEA;color:#C62828}
+.wait{background:#F4F6F8;color:#5A6E82;border:1px dashed #C2CFDB}
+.docs{display:flex;flex-wrap:wrap;gap:5px}
+.fd{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.fd>*{min-width:0}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="accountant" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">AI Accountant</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">One folder per transaction — you see at a glance which ones are complete</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<button class="btn">September 2026<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button>
+<button class="btn btn-p"><svg class="ic" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>Download for Rina</button>
+</div>
+</header>
+
+<nav aria-label="AI Accountant sections" style="display: flex; gap: 26px; border-bottom: 1px solid #DDE5EC;">
+<a href="Accountant.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Month close</a>
+<a href="AccountantPackages.dc.html" aria-current="page" style="font-size: 14px; font-weight: 700; color: #003366; padding: 10px 2px; border-bottom: 2px solid #003366;">Documents by transaction</a>
+<a href="AccountantTaxes.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Tax calendar</a>
+<a href="CompanyProfile.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Tax profile</a>
+</nav>
+
+<section style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Complete</span><span class="num" style="font-size: 26px; font-weight: 800; color: #0F7A52;">36</span><span style="font-size: 12px; color: #5A6E82;">of 41 transactions</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Missing a document</span><span class="num" style="font-size: 26px; font-weight: 800; color: #C62828;">3</span><span style="font-size: 12px; color: #5A6E82;">all payment proofs</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 13px; font-weight: 600; color: #5A6E82;">No category</span><span class="num" style="font-size: 26px; font-weight: 800; color: #8B5A08;">2</span><span style="font-size: 12px; color: #5A6E82;">AI suggests one for each</span></div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 13px; font-weight: 600; color: #5A6E82;">Tax slips to make</span><span class="num" style="font-size: 26px; font-weight: 800;">3</span><span style="font-size: 12px; color: #5A6E82;">before paying on 15 Oct · not blocking the close</span></div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 14px 14px 8px;">
+<div style="display: flex; gap: 8px; flex-wrap: wrap; padding: 0 6px 10px;">
+<button class="chip" aria-pressed="true" style="background: #003366; border-color: #003366; color: #FFFFFF;">All · 41</button>
+<button class="chip">Not complete · 5</button>
+<button class="chip">Money out</button>
+<button class="chip">Money in</button>
+<button class="chip">Payroll</button>
+</div>
+<div class="pr" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 6px 10px;"><span>Date</span><span>Transaction</span><span style="text-align: right;">Amount</span><span>Package</span><span>Status</span></div>
+
+<div class="pr" style="background: #E6F1FB; border-radius: 12px;"><span class="num" style="font-weight: 700; color: #5A6E82;">6 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">Office rent · Sep</span><span class="fn" style="font-size: 12px; color: #5A6E82;">PT Graha Denpasar · after PPh 4(2)</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 6.7M</span><span class="docs"><span class="dk ok">Lease</span><span class="dk ok">Invoice</span><span class="dk no">Payment proof</span><span class="dk wait">PPh 4(2) slip</span></span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">Missing 1</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">29 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">PT Kimia Bersih</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Cleaning chemicals</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 6.8M</span><span class="docs"><span class="dk ok">Invoice</span><span class="dk no">Payment proof</span></span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">Missing 1</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">5 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">Payroll · Sep</span><span class="fn" style="font-size: 12px; color: #5A6E82;">6 people · Mandiri</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 25.6M</span><span class="docs"><span class="dk ok">Payslips</span><span class="dk ok">PPh 21 calc</span><span class="dk ok">BPJS</span><span class="dk no">Bank transfer</span></span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">Missing 1</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">18 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">PT Jasa Teknik Bali</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Machine repair service · after PPh 23</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 26.0M</span><span class="docs"><span class="dk ok">Invoice</span><span class="dk ok">Payment proof</span><span class="dk wait">PPh 23 slip</span></span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Slip to make</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">12 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">CV Desain Kreatif</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Design services · after PPh 23</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 4.4M</span><span class="docs"><span class="dk ok">Invoice</span><span class="dk ok">Payment proof</span><span class="dk wait">PPh 23 slip</span></span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Slip to make</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">30 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">PT Bali Resort Group</span><span class="fn" style="font-size: 12px; color: #5A6E82;">INV-0409 paid</span></span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 22.0M</span><span class="docs"><span class="dk ok">Our invoice</span><span class="dk ok">Payment received</span></span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Complete</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">26 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">Tokopedia</span><span class="fn" style="font-size: 12px; color: #8B5A08;">AI suggests: Office supplies</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 380K</span><span class="docs"><span class="dk ok">Receipt</span><span class="dk no">Category</span></span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">No category</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">25 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">QRIS 88213 WARUNG</span><span class="fn" style="font-size: 12px; color: #8B5A08;">AI suggests: Team meals</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 215K</span><span class="docs"><span class="dk ok">Bank line</span><span class="dk no">Category</span></span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">No category</span></span></div>
+
+<div class="pr"><span class="num" style="font-weight: 700; color: #5A6E82;">1–30 Sep</span><span style="display: flex; flex-direction: column; gap: 2px;"><span class="fn" style="font-weight: 800;">Midtrans settlements</span><span class="fn" style="font-size: 12px; color: #5A6E82;">30 daily payouts, grouped</span></span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 41.3M</span><span class="docs"><span class="dk ok">Settlement report</span><span class="dk ok">Bank lines</span></span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Complete</span></span></div>
+
+<div style="display: flex; justify-content: space-between; padding: 12px 10px 4px; border-top: 1px solid #EDF1F5; font-size: 13px; color: #5A6E82;"><span>Showing 9 of 41 · complete ones collapsed</span><a href="#" style="font-weight: 700;">Show all</a></div>
+</section>
+
+<aside style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #E6F1FB; color: #1565C0; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+<span style="display: flex; flex-direction: column; min-width: 0;"><span class="fn" style="font-size: 16px; font-weight: 800;">Office rent · September</span><span class="num" style="font-size: 13px; color: #5A6E82;">6 Sep · Rp 6.7M paid · Rp 740K withheld · BCA</span></span>
+</div>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: #3D556E;">Rent is taxed at 10% PPh 4(2), which you withhold. Your accountant needs these four documents.</p>
+<div>
+<div class="fd" style="border-top: none;"><span style="width: 22px; height: 22px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><path d="M20 6L9 17l-5-5"/></svg></span><span style="display: flex; flex-direction: column;"><span class="fn">Lease agreement</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Jan–Dec 2026 · reused every month</span></span><a href="#" style="font-weight: 700;">View</a></div>
+<div class="fd"><span style="width: 22px; height: 22px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 13px; height: 13px;"><path d="M20 6L9 17l-5-5"/></svg></span><span style="display: flex; flex-direction: column;"><span class="fn">Landlord invoice</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Rp 7.4M</span></span><a href="#" style="font-weight: 700;">View</a></div>
+<div class="fd"><span style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid #C62828;"></span><span style="display: flex; flex-direction: column;"><span class="fn" style="font-weight: 700;">Payment proof</span><span class="fn" style="font-size: 12px; color: #C62828;">Missing · BCA transfer receipt</span></span><a class="btn" style="height: 34px;" href="Documents.dc.html">Upload</a></div>
+<div class="fd"><span style="width: 22px; height: 22px; border-radius: 50%; border: 2px dashed #C2CFDB;"></span><span style="display: flex; flex-direction: column;"><span class="fn">PPh 4(2) withholding slip</span><span class="fn" style="font-size: 12px; color: #5A6E82;">Rp 740K · make before paying on 15 Oct</span></span><span></span></div>
+</div>
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 12px; font-weight: 700; color: #5A6E82;">Rina · accountant · 1 Oct</span>
+<span style="font-size: 14px; line-height: 1.45;">Please add the transfer receipt — the bank line alone is not enough for the rent.</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;"><button class="btn" style="justify-content: center;">Reply to Rina</button><button class="btn" style="justify-content: center;">Download folder</button></div>
+</aside>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">What goes in each folder</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.6; color: #3D556E;">AI Accountant decides the list from the transaction type and your tax profile: a supplier bill needs the invoice and payment proof, plus a withholding slip for services and rent; a sale needs your invoice and the payment received; payroll needs payslips, the PPh 21 calculation, BPJS and the bank transfer.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">What Rina receives</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.6; color: #3D556E;">One ZIP per month: a folder per transaction named by date and counterparty, an Excel index with every transaction and its status, bank statements, and the tax summary. She can comment on any folder here instead of messaging you.</p>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1380}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

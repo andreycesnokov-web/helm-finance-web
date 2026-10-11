@@ -1,0 +1,750 @@
+import { useState, useEffect, lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './hooks/useAuth'
+import { useAccess } from './hooks/useAccess'
+import { useSwipeBack } from './hooks/useSwipeBack'
+import { useTranslation } from './hooks/useTranslation'
+import { getLang, setLang } from './i18n/index'
+import { apiFetch } from './lib/api'
+import { WorkspaceProvider } from './shell/WorkspaceProvider'
+
+// ── Localize text from backend (AI insight strings) ──────────────────────────
+const RU_TEXT_MAP = {
+  'Business is financially stable': 'Финансы бизнеса стабильны',
+  'Immediate cash action required': 'Требуются действия по деньгам',
+  'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.': 'Денежная позиция стабильная, срочных рисков нет. Продолжайте контролировать финансы.',
+  'Not enough expense history': 'Недостаточно истории расходов',
+  'Runway unknown — add expenses': 'Запас денег неизвестен — добавьте расходы',
+  'No payables': 'Обязательств нет',
+  'No receivables': 'Дебиторки нет',
+  'No monthly data yet': 'За месяц пока нет данных',
+  'No significant risks': 'Существенных рисков нет',
+  'Finances look stable': 'Финансы выглядят стабильно',
+  'No urgent actions detected. Keep adding transactions daily and review cash weekly.': 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
+  'Healthy': 'Хорошо',
+  'Critical': 'Критично',
+  'Not enough data': 'Недостаточно данных',
+  'No risks detected.': 'Рисков не обнаружено.',
+  'Income covers obligations.': 'Доход покрывает обязательства.',
+}
+function localizeText(text, lang) {
+  if (!text) return text
+  if (lang !== 'ru') return text
+  return RU_TEXT_MAP[text] || text
+}
+import Login from './pages/Login'
+import Pulse from './pages/Pulse'
+import Accounts from './pages/Accounts'
+import Add from './pages/Add'
+import Radar from './pages/Radar'
+import Settings from './pages/Settings'
+import Transactions from './pages/Transactions'
+import AICFO from './pages/AICFO'
+import Receivables from './pages/Receivables'
+import Payables from './pages/Payables'
+import Invoices from './pages/Invoices'
+import Payroll from './pages/Payroll'
+import Tasks from './pages/Tasks'
+import Approvals from './pages/Approvals'
+import Team from './pages/Team'
+import Documents from './pages/Documents'
+import BankImport from './pages/BankImport'
+import TeamOnboarding, { MemberTutorial } from './pages/TeamOnboarding'
+import JoinInvite from './pages/JoinInvite'
+import Admin from './pages/Admin'
+import AdminUser from './pages/AdminUser'
+import AdminDashboard from './pages/AdminDashboard'
+import AdminBusinesses from './pages/AdminBusinesses'
+import AdminBusinessDetail from './pages/AdminBusinessDetail'
+import AdminAccessAudit from './pages/AdminAccessAudit'
+import AdminPaymentConnections from './pages/AdminPaymentConnections'
+import TaxRulesAdmin from './pages/TaxRulesAdmin'
+import TaxProfile from './pages/TaxProfile'
+import ComplianceCalendar from './pages/ComplianceCalendar'
+import WalletDetail from './pages/WalletDetail'
+import Onboarding, { shouldShowOnboarding, clearOnboardingFlags } from './pages/Onboarding'
+import PreviewApp from './pages/PreviewApp'
+import OnboardingPreview from './pages/OnboardingPreview'
+import EmailLogin from './pages/EmailLogin'
+import EmailCallback from './pages/EmailCallback'
+import OAuthConsent from './pages/OAuthConsent'
+import UploadLink from './pages/UploadLink'
+import TelegramLogin from './pages/TelegramLogin'
+import PersonalProfile from './pages/PersonalProfile'
+import { PersonalLayout, PersonalShell, PersonalOverview, PersonalAccounts, PersonalTransactions, PersonalOnboarding } from './pages/personal'
+import { BusinessLayout, BusinessShell, BusinessPulse, BusinessAccounts, BusinessTransactions, BusinessPayables, BusinessReceivables, BusinessInvoices, BusinessIncomingPayments, BusinessPaymentConnections, BusinessFunding, BusinessNew, BusinessIntercompany, BusinessDocuments } from './pages/business'
+// Premium hub renders the Workbench/Calendar/Tax Draft module when
+// VITE_AI_ACCOUNTANT_PREMIUM=true; flag off → the existing profile page unchanged.
+import { BusinessAccountantHub } from './pages/business/AccountantPremium'
+// Production onboarding (migration 054 API). Always routed: with ONBOARDING_ENABLED off the
+// backend 404s and the page renders an explanatory "not enabled yet" state.
+import BusinessOnboarding from './pages/business/Onboarding'
+import TaxSplit from './pages/business/TaxSplit'
+import InvoiceSettlement from './pages/business/InvoiceSettlement'
+import Counterparties from './pages/business/Counterparties'
+
+// Personal/Funding UI requires migrations 037–039. OFF by default so production stays
+// safe until they're applied. Enable in env: VITE_PERSONAL_FUNDING_UI_ENABLED=true.
+const PERSONAL_FUNDING_UI = import.meta.env.VITE_PERSONAL_FUNDING_UI_ENABLED === 'true'
+// Email-primary identity UI (Phase 1). Default OFF → /login/email + /account routes are
+// not registered (Telegram login unchanged). Backend is independently gated by
+// EMAIL_AUTH_ENABLED. No personal finance here.
+const EMAIL_AUTH_UI = import.meta.env.VITE_EMAIL_AUTH_ENABLED === 'true'
+
+// ── Mobile bottom nav keys (labels resolved at render time via t()) ───────────
+const NAV_KEYS = [
+  { path: '/',         labelKey: 'nav.pulse',    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
+  { path: '/add',      labelKey: 'nav.add',      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> },
+  { path: '/radar',    labelKey: 'nav.radar',    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> },
+  { path: '/cfo',      labelKey: 'nav.cfo',      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
+  { path: '/accounts', labelKey: 'nav.accounts', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
+  { path: '/settings', labelKey: 'nav.settings', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
+]
+
+// ── Desktop sidebar nav groups ────────────────────────────────────────────────
+// Titles resolved at render time via t() in Sidebar component
+// active: true  → page exists, link is clickable
+// active: false → coming soon, rendered as disabled (no navigation, no crash)
+const SIDEBAR_GROUPS = [
+  {
+    titleKey: 'nav.sectionOverview',
+    items: [
+      { path: '/',      labelKey: 'nav.pulse',  label: 'Pulse',  active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
+      { path: '/radar', labelKey: 'nav.radar',  label: 'Radar',  active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> },
+      { path: '/cfo',   labelKey: 'nav.cfo',    label: 'AI CFO', active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
+    ],
+  },
+  {
+    titleKey: 'nav.sectionFinance',
+    items: [
+      { path: '/transactions', labelKey: 'nav.transactions', label: 'Transactions', active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6" strokeWidth="2.5"/><line x1="3" y1="12" x2="3.01" y2="12" strokeWidth="2.5"/><line x1="3" y1="18" x2="3.01" y2="18" strokeWidth="2.5"/></svg> },
+      { path: '/accounts',    labelKey: 'nav.accounts',    label: 'Accounts',     active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
+      { path: '/invoices',    labelKey: 'nav.invoices',    label: 'Invoices',     active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
+      { path: '/receivables', labelKey: 'nav.receivables', label: 'Receivables',  active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> },
+      { path: '/payables',    labelKey: 'nav.payables',    label: 'Payables',     active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> },
+    ],
+  },
+  {
+    titleKey: 'nav.sectionOperations',
+    items: [
+      { path: '/payroll',   labelKey: 'nav.payroll',   label: 'Payroll',   active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+      { path: '/tasks',     labelKey: 'nav.tasks',     label: 'Tasks',     active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
+      { path: '/approvals', labelKey: 'nav.approvals', label: 'Approvals', active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
+      { path: '/team',      labelKey: 'nav.team',      label: 'Team',      active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+      { path: '/business/accountant', labelKey: 'nav.accountant', label: 'AI Accountant', active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg> },
+      { path: '/documents', labelKey: 'nav.documents', label: 'Documents', active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> },
+      { path: '/bank-import', labelKey: 'nav.bankImport', label: 'Bank import', active: true,
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M9 21v-6h6v6"/></svg> },
+    ],
+  },
+]
+
+const fmtShort = (n) => {
+  const abs = Math.abs(Number(n))
+  if (abs >= 1000000) return (abs / 1000000).toFixed(1) + 'M'
+  if (abs >= 1000) return (abs / 1000).toFixed(0) + 'K'
+  return abs.toLocaleString()
+}
+
+// ── Settings icon (reused in sidebar user block) ──────────────────────────────
+const SettingsIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+)
+
+// ── Desktop Sidebar V2 ────────────────────────────────────────────────────────
+function Sidebar() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { planLabel, isTrialActive, effectivePlan, hasFeature } = useAccess()
+  const { t } = useTranslation()
+
+  const initials = (user?.firstName?.[0] || user?.first_name?.[0] || 'A').toUpperCase()
+  const displayName = user?.firstName || user?.first_name || 'Account'
+
+  // Badge style: amber for trial, green for paid, default for free
+  const badgeStyle = isTrialActive
+    ? { background: 'rgba(254,243,199,0.15)', color: '#FCD34D', border: '1px solid rgba(252,211,77,0.3)' }
+    : effectivePlan !== 'free'
+      ? { background: 'rgba(209,250,229,0.12)', color: '#6EE7B7', border: '1px solid rgba(110,231,183,0.25)' }
+      : {}
+
+  return (
+    <div className="sidebar">
+
+      {/* ── CFO AI brand block ─── */}
+      <div className="sidebar-business-block">
+        {/* CSS-only logo mark — no external images */}
+        <div className="cfo-logo-mark">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Bar chart bars */}
+            <rect x="2" y="14" width="4" height="7" rx="1" fill="rgba(255,255,255,0.55)"/>
+            <rect x="8" y="9"  width="4" height="12" rx="1" fill="rgba(255,255,255,0.80)"/>
+            <rect x="14" y="5" width="4" height="16" rx="1" fill="#fff"/>
+            {/* AI spark line */}
+            <path d="M18.5 5L20 3" stroke="rgba(255,255,255,0.65)" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="20.5" cy="2.5" r="1" fill="rgba(255,255,255,0.5)"/>
+          </svg>
+        </div>
+        <div>
+          <div className="sidebar-business-name">CFO AI</div>
+          <div className="sidebar-business-sub">Financial OS</div>
+        </div>
+      </div>
+
+      {/* ── Nav groups ─── */}
+      <div className="sidebar-nav-scroll">
+        {SIDEBAR_GROUPS.map(group => (
+          <div key={group.titleKey} className="sidebar-section">
+            <div className="sidebar-section-title">{t(group.titleKey)}</div>
+            {group.items.map(item => {
+              const isActive = location.pathname === item.path
+
+              if (!item.active) {
+                // Disabled / coming soon — not clickable, no route crash
+                return (
+                  <div key={item.path} className="sidebar-nav-item disabled">
+                    <span className="sidebar-nav-item-icon">{item.icon}</span>
+                    <span className="sidebar-nav-item-label">{t(item.labelKey)}</span>
+                    <span className="coming-soon-badge">Soon</span>
+                  </div>
+                )
+              }
+
+              // Determine if this item requires a locked feature
+              const FEATURE_MAP = {
+                '/payroll':   'payroll_enabled',
+                '/approvals': 'approval_flow_enabled',
+              }
+              const featureKey = FEATURE_MAP[item.path]
+              const isLocked   = featureKey ? !hasFeature(featureKey) : false
+
+              return (
+                <button
+                  key={item.path}
+                  className={`sidebar-nav-item${isActive ? ' active' : ''}`}
+                  onClick={() => navigate(item.path)}
+                >
+                  <span className="sidebar-nav-item-icon">{item.icon}</span>
+                  <span className="sidebar-nav-item-label">{t(item.labelKey)}</span>
+                  {isLocked && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, lineHeight: 1,
+                      background: 'rgba(107,114,128,0.15)',
+                      color: 'var(--text-3)',
+                      padding: '2px 6px', borderRadius: 6,
+                      letterSpacing: '0.03em',
+                    }}>🔒</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* ── User block ─── */}
+      <div className="sidebar-user-block">
+        <div className="sidebar-user-info">
+          <div className="sidebar-user-avatar">{initials}</div>
+          <div className="sidebar-user-details">
+            <div className="sidebar-user-name">{displayName}</div>
+            <span className="sidebar-plan-badge" style={badgeStyle}>{planLabel}</span>
+          </div>
+        </div>
+        <button className="sidebar-settings-btn" onClick={() => navigate('/settings')} title="Settings">
+          <SettingsIcon />
+        </button>
+      </div>
+
+    </div>
+  )
+}
+
+function BottomNav() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { t } = useTranslation()
+  return (
+    <nav className="nav">
+      {NAV_KEYS.map(item => (
+        <button key={item.path} className={`nav-btn${location.pathname === item.path ? ' active' : ''}`} onClick={() => navigate(item.path)}>
+          {item.icon}<span>{t(item.labelKey)}</span>
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+export function RightPanel({ data }) {
+  const { t } = useTranslation()
+  const lang = getLang()
+  const d = data || {}
+  const upcoming = (d.debts || []).filter(x => !x.is_settled).slice(0, 5)
+  const statusDot = d.aiStatus === 'critical' ? '#F04438' : d.aiStatus === 'attention' ? '#F79009' : '#12B76A'
+  const statusLabel = d.aiStatus === 'critical' ? t('pulse.critical') : d.aiStatus === 'attention' ? t('common.attention') : t('pulse.healthy')
+  const runwayColor = (d.runway || 0) > 14 ? 'var(--green-dark)' : (d.runway || 0) > 7 ? 'var(--amber-dark)' : 'var(--red)'
+
+  const recRu = lang === 'ru'
+    ? ((d.runway || 0) < 7
+        ? 'Собирайте дебиторку немедленно — высокий риск для денег.'
+        : (d.runway || 0) < 14
+          ? 'Проверьте ближайшие платежи и защитите запас дней.'
+          : 'Финансы стабильны. Сосредоточьтесь на росте дохода.')
+    : lang === 'id'
+      ? ((d.runway || 0) < 7
+          ? 'Segera tagih piutang — risiko kas tinggi.'
+          : (d.runway || 0) < 14
+            ? 'Periksa pembayaran mendatang dan lindungi cadangan kas.'
+            : 'Keuangan terlihat stabil. Fokus pada pertumbuhan pemasukan.')
+      : ((d.runway || 0) < 7
+          ? 'Collect receivables immediately — cash risk is high.'
+          : (d.runway || 0) < 14
+            ? 'Review upcoming payments and protect runway.'
+            : 'Finances look stable. Focus on growing income.')
+
+  const SecTitle = ({ children }) => (
+    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 10 }}>{children}</div>
+  )
+
+  return (
+    <div className="desktop-right" style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+
+      {/* ── AI CFO Card — premium dark navy ─── */}
+      <div style={{ marginBottom: 18 }}>
+        <SecTitle>AI CFO</SecTitle>
+        <div style={{
+          background: 'linear-gradient(140deg, #0D1B2E 0%, #162035 100%)',
+          borderRadius: 14,
+          padding: '14px 14px 12px',
+          borderLeft: `3px solid ${statusDot}`,
+          boxShadow: '0 4px 16px rgba(11,18,32,0.18)',
+        }}>
+          {/* Status row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.08)', border: '0.5px solid rgba(255,255,255,.12)', borderRadius: 20, padding: '2px 8px 2px 7px' }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: statusDot, flexShrink: 0, boxShadow: `0 0 5px ${statusDot}` }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{statusLabel}</span>
+            </div>
+          </div>
+          {/* AI text */}
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,.80)', lineHeight: 1.6, marginBottom: 10 }}>
+            {localizeText(d.aiText, lang) || (lang === 'ru' ? 'Анализируем финансовую позицию...' : 'Analysing your financial position...')}
+          </div>
+          {/* Recommendation */}
+          <div style={{ borderTop: '0.5px solid rgba(255,255,255,.08)', paddingTop: 10 }}>
+            <div style={{ fontSize: 11, color: 'rgba(99,152,255,.8)', letterSpacing: '0.07em', marginBottom: 5, fontWeight: 800 }}>{t('pulse.recommendation2')}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', lineHeight: 1.55 }}>
+              {recRu}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Upcoming ─── */}
+      <div style={{ marginBottom: 18 }}>
+        <SecTitle>{t('pulse.upcoming')}</SecTitle>
+        {upcoming.length === 0
+          ? <div style={{ fontSize: 13, color: 'var(--text-4)', padding: '8px 0' }}>{t('pulse.noUpcoming')}</div>
+          : upcoming.map(debt => {
+              const days = Math.round((new Date(debt.due_date) - new Date()) / 86400000)
+              const isOverdue = days < 0
+              return (
+                <div key={debt.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '0.5px solid var(--border)' }}>
+                  <div>
+                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600, marginBottom: 2 }}>{debt.counterparty}</div>
+                    <div style={{ fontSize: 12, color: isOverdue ? 'var(--red)' : 'var(--text-4)', fontWeight: isOverdue ? 600 : 400 }}>
+                      {isOverdue ? `⚠ ${t('pulse.overdue')}` : days === 0 ? t('pulse.today') : `in ${days}d`}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: debt.type === 'receivable' ? 'var(--green-dark)' : 'var(--red-dark)' }}>
+                    {debt.type === 'receivable' ? '+' : '−'}{fmtShort(debt.amount)}
+                  </div>
+                </div>
+              )
+            })
+        }
+      </div>
+
+      {/* ── Quick Stats ─── */}
+      <div>
+        <SecTitle>{t('pulse.quickStats')}</SecTitle>
+        <div style={{ background: 'var(--surface-card)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          {[
+            { label: t('pulse.runway'),      value: (!d.runway || d.runway >= 999) ? '—' : `${d.runway} days`,             color: runwayColor },
+            { label: t('pulse.burnRate'),    value: `${fmtShort(d.burnRate || 0)} / ${lang === 'ru' ? 'день' : 'day'}`,     color: 'var(--text)' },
+            { label: t('pulse.netPosition'), value: `${(d.netPosition || 0) >= 0 ? '+' : ''}${fmtShort(d.netPosition || 0)}`, color: (d.netPosition || 0) >= 0 ? 'var(--green-dark)' : 'var(--red)' },
+            { label: t('common.receivables'), value: `+${fmtShort(d.receivables || 0)}`,                                     color: 'var(--green-dark)' },
+            { label: t('common.payables'),    value: `−${fmtShort(d.payables || 0)}`,                                        color: 'var(--red-dark)' },
+          ].map((s, i, arr) => (
+            <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: i < arr.length - 1 ? '0.5px solid var(--border)' : 'none' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{s.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  )
+}
+
+function Layout({ children, rightPanel }) {
+  const { user, token, loading } = useAuth()
+
+  // Sync language from user profile on startup
+  useEffect(() => {
+    if (!token) return
+    apiFetch('/profile', token)
+      .then(profile => {
+        if (profile?.language && profile.language !== getLang()) {
+          setLang(profile.language)
+        }
+      })
+      .catch(() => {})
+  }, [token])
+
+  if (loading) return <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>Loading...</div>
+  if (!user) return <Navigate to="/login" replace />
+  return (
+    <WorkspaceProvider>
+      <Sidebar />
+      <div className="desktop-layout">
+        <div className="desktop-main">{children}</div>
+        {rightPanel}
+      </div>
+      <BottomNav />
+    </WorkspaceProvider>
+  )
+}
+
+function PulseWrapper() {
+  const [pulseData, setPulseData]       = useState(null)
+  const [showOnboarding, setOnboarding] = useState(false)
+  const { access, loading } = useAccess()
+  const memberRole = access?.membership?.role
+
+  // Wait for access to resolve before deciding where to land — otherwise a no-business
+  // email user would briefly bounce to /business/pulse (→ 409) before we know.
+  if (loading) return null
+
+  // Email-first Personal Account with no business yet → land on /account onboarding,
+  // never the Business shell. Only when the email-auth UI is enabled; Telegram/legacy
+  // (business !== null, or flag off) keep the existing /business/pulse behavior.
+  let lastWorkspace = null
+  try { lastWorkspace = localStorage.getItem('last_active_workspace_id') || localStorage.getItem('activeWorkspaceId') } catch {}
+  if (EMAIL_AUTH_UI && lastWorkspace === 'personal') {
+    return <Navigate to="/account" replace />
+  }
+  if (EMAIL_AUTH_UI && access && access.business === null) {
+    return <Navigate to="/account" replace />
+  }
+
+  // Manager / employee: Web App is a learning & setup surface, not a finance
+  // dashboard (the backend returns 403 on /pulse for these roles anyway).
+  if (memberRole && ['manager', 'employee'].includes(memberRole)) {
+    if (DESIGN_V2) return <Navigate to="/business/home" replace />
+    return (
+      <Layout>
+        <MemberTutorial />
+      </Layout>
+    )
+  }
+
+  // After pulse loads, run detection via exported shouldShowOnboarding()
+  const handleDataLoad = (d) => {
+    setPulseData(d)
+    if (shouldShowOnboarding(d)) setOnboarding(true)
+  }
+
+  // Skip: stores cfo_onboarding_skipped, hides wizard
+  const handleSkip     = () => setOnboarding(false)
+  // Complete: stores cfo_onboarded, hides wizard
+  const handleComplete = () => setOnboarding(false)
+
+  if (showOnboarding) {
+    return <Onboarding onSkip={handleSkip} onComplete={handleComplete} />
+  }
+
+  // Default authenticated landing is the premium Business shell, not the legacy
+  // dashboard. (Legacy routes remain reachable directly as a migration fallback.)
+  return <Navigate to="/business/pulse" replace />
+}
+
+// Standalone onboarding route — clears both flags, shows wizard, then redirects home
+function OnboardingRoute() {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
+  if (loading) return null
+  if (!user)   return <Navigate to="/login" replace />
+  // Clear both flags so the full wizard runs fresh
+  clearOnboardingFlags()
+  return (
+    <Onboarding
+      onSkip={() => navigate('/', { replace: true })}
+      onComplete={() => navigate('/', { replace: true })}
+    />
+  )
+}
+
+// ── Swipe-back arc indicator ──────────────────────────────────────────────────
+function SwipeBackIndicator() {
+  const { progress, arcY } = useSwipeBack()
+  if (progress <= 0) return null
+
+  const SIZE    = 56                          // max arc diameter
+  const radius  = 20 + progress * 14         // arc grows from 20→34
+  const opacity = 0.35 + progress * 0.55     // fades in
+  const translateX = -SIZE / 2 + progress * (SIZE / 2 + 4) // slides in from left
+
+  return (
+    <div style={{
+      position: 'fixed',
+      left: 0,
+      top: arcY - SIZE / 2,
+      width: SIZE,
+      height: SIZE,
+      zIndex: 9999,
+      pointerEvents: 'none',
+      transform: `translateX(${translateX}px)`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      {/* Arc background */}
+      <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={{ position: 'absolute', inset: 0 }}>
+        <circle
+          cx={SIZE / 2} cy={SIZE / 2} r={radius}
+          fill={`rgba(255,255,255,${opacity * 0.18})`}
+          stroke={`rgba(255,255,255,${opacity * 0.6})`}
+          strokeWidth="1.5"
+        />
+      </svg>
+      {/* Arrow chevron */}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke={`rgba(255,255,255,${opacity})`} strokeWidth="2.5" strokeLinecap="round"
+        style={{ position: 'relative', transform: `scale(${0.7 + progress * 0.3})` }}
+      >
+        <path d="M15 18l-6-6 6-6"/>
+      </svg>
+    </div>
+  )
+}
+
+// Design preview — visual QA for the shared page hero and token layer.
+// The flag is read at module scope so the whole page, including its stylesheet,
+// stays out of a production bundle: a static import would ship DesignPreview.css
+// to every customer even though the component never renders.
+const DESIGN_PREVIEW_ON = import.meta.env.VITE_DESIGN_PREVIEW_ENABLED === 'true'
+const DesignPreview = DESIGN_PREVIEW_ON ? lazy(() => import('./pages/DesignPreview')) : null
+
+// CFO AI redesign v2 (_specs/design-v2). Build-time flag, default OFF. The whole v2
+// workspace sits behind ONE lazy boundary: with the flag OFF this import() is in a dead
+// branch, Rollup never emits the chunk, and the legacy /business route tree below is
+// exactly what ships today. With the flag ON, /business/* is handed to the v2 app,
+// which keeps every existing /business path resolvable.
+const DESIGN_V2 = import.meta.env.VITE_DESIGN_V2 === 'true'
+const V2BusinessApp = DESIGN_V2 ? lazy(() => import('./v2/BusinessApp')) : null
+// Platform admin v2 (overview, companies, flags & system). Same flag, same lazy boundary;
+// every other /admin route stays the existing page.
+const V2AdminApp = DESIGN_V2 ? lazy(() => import('./v2/AdminApp')) : null
+// Sign-in, account and invitation in the v2 design (reg/R1–R10). Needs email sign-in too:
+// without it /login keeps the Telegram widget.
+const V2Auth = DESIGN_V2 ? lazy(() => import('./v2/auth/AuthApp')) : null
+const V2_AUTH = DESIGN_V2 && EMAIL_AUTH_UI
+const v2Auth = (page) => <Suspense fallback={null}><V2Auth page={page} /></Suspense>
+
+// With the v2 design on, the old top-level pages (bookmarks, bot links) open their v2 screens;
+// query parameters are kept. Without the flag they stay exactly as they were.
+function LegacyToV2({ to }) {
+  const location = useLocation()
+  const [path, q] = to.split('?')
+  const params = new URLSearchParams(q || '')
+  new URLSearchParams(location.search || '').forEach((v, k) => params.set(k, v))
+  const qs = params.toString()
+  return <Navigate to={`${path}${qs ? '?' + qs : ''}`} replace />
+}
+
+// Redirect legacy /accountant addresses to /business/accountant with search query preservation (e.g. ?ask=... / ?q=...).
+function AccountantRedirect({ to = '/business/accountant' }) {
+  const location = useLocation()
+  const [targetPath, targetSearch] = to.split('?')
+  const mergedParams = new URLSearchParams(targetSearch || '')
+  const incomingParams = new URLSearchParams(location.search || '')
+  incomingParams.forEach((val, key) => mergedParams.set(key, val))
+  const searchStr = mergedParams.toString()
+  return <Navigate to={`${targetPath}${searchStr ? '?' + searchStr : ''}`} replace />
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <SwipeBackIndicator />
+        <Routes>
+          <Route path="/login" element={V2_AUTH ? v2Auth('signin') : <Login />} />
+          {/* "Sign in with CFO Finance" consent for AI clients (MCP OAuth). Handles sign-in itself. */}
+          <Route path="/oauth/consent" element={<OAuthConsent />} />
+          {/* Upload link from an AI assistant (MCP upload_document). Sign-in required on the page. */}
+          <Route path="/upload" element={<UploadLink />} />
+          {/* Email-primary identity UI — only when VITE_EMAIL_AUTH_ENABLED=true.
+              Telegram login (/login) stays the default and is unchanged. */}
+          {EMAIL_AUTH_UI && <Route path="/login/email" element={V2_AUTH ? v2Auth('signin') : <EmailLogin />} />}
+          {EMAIL_AUTH_UI && <Route path="/login/email/callback" element={V2_AUTH ? v2Auth('callback') : <EmailCallback />} />}
+          {EMAIL_AUTH_UI && <Route path="/account" element={V2_AUTH ? v2Auth('account') : <PersonalProfile />} />}
+          {V2_AUTH && <Route path="/join" element={v2Auth('join')} />}
+          {/* Legacy Telegram login: a real page when email auth is on; when off, /login
+              already shows the widget, so just send /login/telegram back to /login. */}
+          {EMAIL_AUTH_UI
+            ? <Route path="/login/telegram" element={<TelegramLogin />} />
+            : <Route path="/login/telegram" element={<Navigate to="/login" replace />} />}
+          <Route path="/" element={<PulseWrapper />} />
+          <Route path="/add"          element={DESIGN_V2 ? <LegacyToV2 to="/business/add" /> : <Layout><Add /></Layout>} />
+          <Route path="/radar"        element={DESIGN_V2 ? <LegacyToV2 to="/business/radar" /> : <Layout><Radar /></Layout>} />
+          <Route path="/accounts"     element={DESIGN_V2 ? <LegacyToV2 to="/business/accounts" /> : <Layout><Accounts /></Layout>} />
+          <Route path="/accounts/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/accounts" /> : <Layout><WalletDetail /></Layout>} />
+          <Route path="/transactions" element={DESIGN_V2 ? <LegacyToV2 to="/business/transactions" /> : <Layout><Transactions /></Layout>} />
+          <Route path="/settings"     element={DESIGN_V2 ? <LegacyToV2 to="/business/settings" /> : <Layout><Settings /></Layout>} />
+          <Route path="/cfo"          element={DESIGN_V2 ? <LegacyToV2 to="/business/ai-cfo" /> : <Layout><AICFO /></Layout>} />
+          <Route path="/receivables"  element={DESIGN_V2 ? <LegacyToV2 to="/business/receivables" /> : <Layout><Receivables /></Layout>} />
+          <Route path="/payables"     element={DESIGN_V2 ? <LegacyToV2 to="/business/payables" /> : <Layout><Payables /></Layout>} />
+          <Route path="/invoices"     element={DESIGN_V2 ? <LegacyToV2 to="/business/invoices" /> : <Layout><Invoices /></Layout>} />
+          <Route path="/payroll"      element={DESIGN_V2 ? <LegacyToV2 to="/business/payroll" /> : <Layout><Payroll /></Layout>} />
+          <Route path="/tasks"        element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Tasks /></Layout>} />
+          <Route path="/approvals"    element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Approvals /></Layout>} />
+          <Route path="/team"         element={DESIGN_V2 ? <LegacyToV2 to="/business/settings?tab=team" /> : <Layout><Team /></Layout>} />
+          <Route path="/accountant/tax-profile" element={<AccountantRedirect to="/business/accountant/tax-profile" />} />
+          <Route path="/accountant/calendar" element={<AccountantRedirect to="/business/accountant?tab=taxes" />} />
+          <Route path="/accountant"   element={<AccountantRedirect to="/business/accountant" />} />
+          <Route path="/accountant/*" element={<AccountantRedirect to="/business/accountant" />} />
+          <Route path="/documents"    element={DESIGN_V2 ? <LegacyToV2 to="/business/documents" /> : <Layout><Documents /></Layout>} />
+          <Route path="/bank-import"  element={DESIGN_V2 ? <LegacyToV2 to="/business/bank-import" /> : <Layout><BankImport /></Layout>} />
+          <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
+          {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
+              404s in any build without the flag (e.g. production). */}
+          <Route path="/demo/personal-overview" element={<PreviewApp />} />
+          {/* Gated by VITE_DESIGN_PREVIEW_ENABLED. Without the flag the route is never
+              registered, so /design-preview falls through to the normal 404. Never
+              linked from navigation. */}
+          {DESIGN_PREVIEW_ON && (
+            <Route path="/design-preview" element={
+              <Suspense fallback={null}><DesignPreview /></Suspense>
+            } />
+          )}
+          {/* Local design review only. Hidden from navigation and omitted from production routes. */}
+          {import.meta.env.DEV && <Route path="/_preview/onboarding" element={<OnboardingPreview />} />}
+          {/* Live Personal Workspace (Phase 2) — premium shell, real endpoints, no synthetic data. */}
+          {/* Personal/Funding UI depends on migrations 037–039. Gated so production
+              (without those migrations) hides the routes instead of hitting missing
+              tables. Enable with VITE_PERSONAL_FUNDING_UI_ENABLED=true. */}
+          {PERSONAL_FUNDING_UI ? (
+            <Route element={<PersonalLayout />}>
+              <Route path="/personal" element={<PersonalShell><PersonalOverview /></PersonalShell>} />
+              <Route path="/personal/accounts" element={<PersonalShell><PersonalAccounts /></PersonalShell>} />
+              <Route path="/personal/transactions" element={<PersonalShell><PersonalTransactions /></PersonalShell>} />
+              <Route path="/personal/onboarding" element={<PersonalOnboarding />} />
+            </Route>
+          ) : (
+            <Route path="/personal/*" element={<Navigate to="/" replace />} />
+          )}
+          {/* Business Workspace in premium shell (Phase 3, presentation-only). Legacy
+              /,/accounts routes remain untouched during the migration. */}
+          {DESIGN_V2 ? (
+            <Route path="/business/*" element={
+              <Suspense fallback={null}><V2BusinessApp /></Suspense>
+            } />
+          ) : (
+          <Route element={<BusinessLayout />}>
+            <Route path="/business/pulse" element={<BusinessShell><BusinessPulse /></BusinessShell>} />
+            {/* Use the full legacy Accounts (add/edit/archive/balances) inside the premium
+                shell — restores functionality the minimal premium card view lacked. */}
+            <Route path="/business/accounts" element={<BusinessShell><Accounts /></BusinessShell>} />
+            <Route path="/business/transactions" element={<BusinessShell><BusinessTransactions /></BusinessShell>} />
+            <Route path="/business/payables" element={<BusinessShell><BusinessPayables /></BusinessShell>} />
+            <Route path="/business/receivables" element={<BusinessShell><BusinessReceivables /></BusinessShell>} />
+            <Route path="/business/accountant" element={<BusinessShell><BusinessAccountantHub /></BusinessShell>} />
+            {/* AI Tax Split V1 — suggestion-only invoice→tax→accountant flow. */}
+            <Route path="/business/accountant/tax-split" element={<BusinessShell><TaxSplit /></BusinessShell>} />
+            {/* Invoice settlement V1 — partial payment tracking and closeout gates. */}
+            <Route path="/business/accountant/settlement" element={<BusinessShell><InvoiceSettlement /></BusinessShell>} />
+            <Route path="/business/invoices" element={<BusinessShell><BusinessInvoices /></BusinessShell>} />
+            {/* Counterparty Intelligence V1 — vendor/customer directory. */}
+            <Route path="/business/counterparties" element={<BusinessShell><Counterparties /></BusinessShell>} />
+            {/* Not-yet-migrated modules: existing components rendered INSIDE the premium
+                shell (real content + premium sidebar/header), so the user never sees the
+                legacy Layout. Legacy routes (/cfo,/payroll,…) remain by direct URL only. */}
+            <Route path="/business/ai-cfo" element={<BusinessShell><AICFO /></BusinessShell>} />
+            <Route path="/business/radar" element={<BusinessShell><Radar /></BusinessShell>} />
+            <Route path="/business/payroll" element={<BusinessShell><Payroll /></BusinessShell>} />
+            <Route path="/business/approvals" element={<BusinessShell><Approvals /></BusinessShell>} />
+            <Route path="/business/team" element={<BusinessShell><Team /></BusinessShell>} />
+            <Route path="/business/documents" element={<BusinessShell><BusinessDocuments /></BusinessShell>} />
+            <Route path="/business/settings" element={<BusinessShell><Settings /></BusinessShell>} />
+            <Route path="/business/bank-import" element={<BusinessShell><BankImport /></BusinessShell>} />
+            <Route path="/business/incoming-payments" element={<BusinessShell><BusinessIncomingPayments /></BusinessShell>} />
+            <Route path="/business/payment-connections" element={<BusinessShell><BusinessPaymentConnections /></BusinessShell>} />
+            {/* Funding & Investors: premium placeholder when flag on; safe redirect to
+                pulse when flag off (route never crashes / dead-links). */}
+            <Route path="/business/funding-investors" element={<BusinessShell><BusinessFunding /></BusinessShell>} />
+            {/* Create an additional business (owner) — does not affect the existing one. */}
+            <Route path="/business/new" element={<BusinessShell><BusinessNew /></BusinessShell>} />
+            {/* Holding / Intercompany Transfers — premium foundation + plan (no ledger writes yet). */}
+            <Route path="/business/intercompany" element={<BusinessShell><BusinessIntercompany /></BusinessShell>} />
+            {/* Guided onboarding — flow content and progress from /api/onboarding/*. Explains the
+                product; writes nothing but the caller's own progress. */}
+            <Route path="/business/onboarding" element={<BusinessShell><BusinessOnboarding /></BusinessShell>} />
+          </Route>
+          )}
+          {/* Public invite page — no auth required to view, Telegram widget handles login */}
+          <Route path="/invite/:code" element={V2_AUTH ? v2Auth('join') : <JoinInvite />} />
+          {/* Standalone onboarding — accessible directly to re-run setup */}
+          <Route path="/onboarding" element={<OnboardingRoute />} />
+          {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
+          <Route path="/admin"           element={<Layout><Admin /></Layout>} />
+          {/* Platform Admin Dashboard (read-only owner console) */}
+          {DESIGN_V2 ? (
+            <>
+              <Route path="/admin/dashboard" element={<Suspense fallback={null}><V2AdminApp page="overview" /></Suspense>} />
+              {/* v2 only: the new Flags & system page. */}
+              <Route path="/admin/system" element={<Suspense fallback={null}><V2AdminApp page="system" /></Suspense>} />
+            </>
+          ) : <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />}
+          {/* Users console is also reachable at /admin/users (same list as /admin) so the
+              natural URL renders instead of an unmatched-route blank page. */}
+          <Route path="/admin/users"     element={<Layout><Admin /></Layout>} />
+          <Route path="/admin/users/:id" element={<Layout><AdminUser /></Layout>} />
+          {DESIGN_V2
+            ? <Route path="/admin/businesses" element={<Suspense fallback={null}><V2AdminApp page="companies" /></Suspense>} />
+            : <Route path="/admin/businesses" element={<Layout><AdminBusinesses /></Layout>} />}
+          {DESIGN_V2 ? (
+            <>
+              <Route path="/admin/businesses/:businessId" element={<Suspense fallback={null}><V2AdminApp page="companies" /></Suspense>} />
+              {/* v2 only: the existing company tools (plan, trial, archive) stay one click away. */}
+              <Route path="/admin/businesses/:businessId/tools" element={<Layout><AdminBusinessDetail /></Layout>} />
+            </>
+          ) : <Route path="/admin/businesses/:businessId" element={<Layout><AdminBusinessDetail /></Layout>} />}
+          <Route path="/admin/access-audit" element={<Layout><AdminAccessAudit /></Layout>} />
+          <Route path="/admin/payment-connections" element={<Layout><AdminPaymentConnections /></Layout>} />
+          <Route path="/admin/tax-rules" element={<Layout><TaxRulesAdmin /></Layout>} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}

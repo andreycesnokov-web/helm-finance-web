@@ -1,0 +1,74 @@
+import { apiFetch } from './api'
+
+export const DOC_TYPES = [
+  'vendor_invoice', 'customer_invoice', 'tax_invoice', 'bukti_potong',
+  'tax_billing', 'payment_proof', 'filing_confirmation', 'bank_document', 'other',
+]
+
+export const MAX_FILE_BYTES = 20 * 1024 * 1024
+
+async function sha256Hex(file) {
+  const buf = await file.arrayBuffer()
+  const hash = await crypto.subtle.digest('SHA-256', buf)
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Signed-upload flow: init → PUT to storage → complete. Returns the created
+// document (or throws with a friendly message). `meta` carries document fields;
+// `link` is an optional { target_type, target_id }.
+/**
+ * Upload one document.
+ *
+ * `onStage` reports where we are, because the three steps fail differently and the
+ * user is entitled to know which one they are waiting on:
+ *   'storing'  → PUTting the bytes into storage
+ *   'creating' → asking the server to create the document record
+ * The promise resolves with the upload-complete body, whose `document.id` is the ONLY
+ * evidence that the upload actually succeeded. A stored object alone is not.
+ */
+const MIME_BY_EXT = {
+  csv: 'text/csv',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: 'application/vnd.ms-excel',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+}
+
+export async function uploadDocument(token, file, meta = {}, link = null, onStage = null, opts = {}) {
+  const ext = String(file.name || '').toLowerCase().split('.').pop()
+  const mimeType = file.type || MIME_BY_EXT[ext] || 'application/octet-stream'
+  const payload = {
+    file_name: file.name, mime_type: mimeType,
+    file_size: file.size, document_type: meta.document_type || null,
+  }
+  // opts.businessId: upload into a specific company instead of the active workspace (the
+  // AI-assistant upload link names its company). The server still checks membership.
+  const headers = opts.businessId ? { 'x-business-id': opts.businessId } : undefined
+  // Preliminary hash so the backend can short-circuit a same-business duplicate
+  // before we waste an upload. The backend re-verifies the hash server-side.
+  const sha256 = await sha256Hex(file)
+  onStage?.('storing')
+  const init = await apiFetch('/documents/upload-init', token, { method: 'POST', headers, body: { ...payload, sha256 } })
+  const putRes = await fetch(init.upload_url, {
+    method: 'PUT',
+    headers: { 'content-type': payload.mime_type, 'x-upsert': 'false' },
+    body: file,
+  })
+  if (!putRes.ok) throw new Error('Upload to storage failed')
+  onStage?.('creating')
+  return apiFetch('/documents/upload-complete', token, {
+    method: 'POST',
+    headers,
+    body: {
+      document_id: init.document_id, storage_path: init.storage_path,
+      ...payload, sha256, ...meta, link: link || undefined,
+    },
+  })
+}
+
+export async function getSignedUrl(token, documentId, mode = 'view') {
+  const r = await apiFetch(`/documents/${documentId}/signed-url`, token, { method: 'POST', body: { mode } })
+  return r.url
+}

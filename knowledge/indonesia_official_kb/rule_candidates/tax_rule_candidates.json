@@ -1,0 +1,251 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02",
+  "jurisdiction": "Indonesia",
+  "activation_policy": "EVERY candidate here is status=under_review and needs_reviewer=true. None of these may be written into tax_rules with status='active'. Activation requires a verified official_source AND an approved tax_rule_reviews row with a licensed reviewer, per server/lib/taxGate.js. Values marked confidence=low were read from DJP guidance page summaries, NOT from the primary regulation text, and must be confirmed against the PMK/PP.",
+  "candidate_count": 8,
+  "tax_rule_candidates": [
+    {
+      "candidate_id": "TAX_ID_PPH23_LEGAL_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 23",
+      "transaction_type": "legal_service",
+      "direction": "payable",
+      "rate": 0.02,
+      "rate_variants": [
+        {
+          "condition": "counterparty_has_npwp",
+          "rate": 0.02,
+          "confidence": "low"
+        },
+        {
+          "condition": "counterparty_no_npwp",
+          "rate": 0.04,
+          "confidence": "low",
+          "note": "described as 100% higher; must be confirmed against UU PPh / PMK text"
+        }
+      ],
+      "base": "gross_excluding_vat",
+      "base_note": "DPP described as transaction value excluding PPN — CONFIRM",
+      "who_withholds": "payer (service recipient) as pemotong",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "supplier_invoice",
+        "bukti_potong_pph23",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPH23_002",
+        "DJP_PPH23_003",
+        "DJP_PPH23_006",
+        "KEMENKEU_PPH23_009"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Covers Test Case 1 (paralegal/legal invoice). Rate and base come from DJP guidance page summaries citing PMK-141/PMK.03/2015; the PMK text itself has NOT been retrieved. Reviewer must confirm: (a) whether legal/paralegal falls in the 'jasa lain' list, (b) whether the provider is an entity (PPh23) or individual (PPh21) — see DJP_PPH23_005, (c) the exact DPP definition, (d) the no-NPWP variant."
+    },
+    {
+      "candidate_id": "TAX_ID_PPH23_PROFESSIONAL_002",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 23",
+      "transaction_type": "professional_service",
+      "direction": "payable",
+      "rate": null,
+      "rate_variants": [],
+      "base": null,
+      "base_note": "inherit from PPH23_LEGAL_001 once confirmed",
+      "who_withholds": "payer (service recipient)",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "supplier_invoice",
+        "bukti_potong_pph23",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPH23_003",
+        "DJP_PPH23_004",
+        "DJP_PPH23_008"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Umbrella candidate for consulting/management/technical services. Deliberately has NO rate: the 'jasa lain' list is scoped per service type and must be read before any rate is attached."
+    },
+    {
+      "candidate_id": "TAX_ID_PPH42_RENTAL_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 4(2)",
+      "transaction_type": "rental_land_building",
+      "direction": "payable",
+      "rate": 0.1,
+      "rate_variants": [],
+      "base": "gross_rental_value",
+      "base_note": "Gross described as including maintenance, security and service charges — this is MATERIAL for Test Case 2 and must be confirmed; see DJP_PPH42_006 on service-charge mis-rating",
+      "who_withholds": "tenant, if tenant is a designated withholder; otherwise the landlord self-remits — CONFIRM the exact designation test",
+      "final_or_creditable": "final",
+      "evidence_required": [
+        "rental_agreement",
+        "supplier_invoice_or_kwitansi",
+        "faktur_pajak_if_pkp",
+        "bukti_potong_pph42",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPH42_002",
+        "DJP_PPH42_003",
+        "DJP_PPH42_004",
+        "DJP_PPH42_006"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Covers Test Case 2 (Alfamart / sewa tempat). Rate 10% final and the gross definition come from DJP guidance summaries, NOT primary PP text — the governing PP has not been retrieved and is the single biggest GAP in this pass. Because this tax is FINAL, it changes the accounting treatment, so it must not be modelled as an ordinary creditable withholding."
+    },
+    {
+      "candidate_id": "TAX_ID_PPN_OUTPUT_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPN",
+      "transaction_type": "taxable_supply",
+      "direction": "both",
+      "rate": 0.12,
+      "rate_variants": [
+        {
+          "condition": "non_luxury_goods_services_via_DPP_nilai_lain",
+          "formula": "12% x 11/12 x DPP",
+          "effective_rate": 0.11,
+          "confidence": "medium",
+          "source_ids": [
+            "DJP_PPN_001",
+            "KEMENKEU_PPN_002"
+          ]
+        }
+      ],
+      "base": "dpp_nilai_lain",
+      "base_note": "11/12 of the ordinary base for non-luxury per PMK 11/2025",
+      "who_withholds": "PKP seller charges output VAT; PKP buyer may credit input VAT",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "faktur_pajak",
+        "supplier_invoice"
+      ],
+      "source_ids": [
+        "DJP_PPN_001",
+        "KEMENKEU_PPN_002",
+        "BPK_PPN_003",
+        "DJP_PPN_004",
+        "DJP_PPN_007"
+      ],
+      "confidence": "medium",
+      "needs_reviewer": true,
+      "notes": "PMK 11/2025 page was fetch-verified: 11/12 DPP nilai lain construction confirmed on the DJP page, effective 2025-02-04. HOWEVER an AMENDMENT exists (DJP_PPN_007) and has not been read, so the CURRENT rule is not established. IMPORTANT for the existing codebase: migration 020 seeds ID_PPN_MONTHLY with parameters {\"rate\":0.11} — that hardcoded value must be re-derived from this rule, not reused as-is."
+    },
+    {
+      "candidate_id": "TAX_ID_PPN_INPUT_002",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPN",
+      "transaction_type": "input_vat_credit",
+      "direction": "payable",
+      "rate": null,
+      "rate_variants": [],
+      "base": null,
+      "base_note": "",
+      "who_withholds": "n/a — creditability question, not a withholding",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "faktur_pajak"
+      ],
+      "source_ids": [
+        "DJP_PPN_001",
+        "DJP_CORETAX_004"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Input VAT creditability conditions (valid faktur pajak, PKP status, timing) have NOT been sourced. A PER on faktur pajak is a GAP. Do not model creditability until sourced."
+    },
+    {
+      "candidate_id": "TAX_ID_PPH21_PAYROLL_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh 21",
+      "transaction_type": "employment_income",
+      "direction": "payable",
+      "rate": null,
+      "rate_variants": [
+        {
+          "condition": "monthly_periods_jan_to_nov",
+          "method": "TER table (Tarif Efektif Rata-Rata)",
+          "note": "a TABLE, not a scalar — cannot be modelled as a single rate"
+        }
+      ],
+      "base": "gross_employment_income",
+      "base_note": "CONFIRM against PMK 168/2023",
+      "who_withholds": "employer",
+      "final_or_creditable": "creditable",
+      "evidence_required": [
+        "payroll_register",
+        "payslip",
+        "bukti_potong_pph21",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "KEMENKEU_PPH21_001",
+        "DJP_PPH21_002",
+        "BPK_PPH21_003",
+        "DJP_PPH21_004"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "Deliberately rate=null. PMK 168/2023 uses a TER lookup table for Jan-Nov and a different computation for the final period. This cannot be expressed as a scalar rate and is OUT OF SCOPE for Tax Engine v1 arithmetic; keep it as a compliance/evidence rule only."
+    },
+    {
+      "candidate_id": "TAX_ID_PPHBADAN_UMKM_001",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh Badan (final UMKM)",
+      "transaction_type": "small_business_turnover",
+      "direction": "receivable",
+      "rate": 0.005,
+      "rate_variants": [],
+      "base": "monthly_gross_turnover",
+      "base_note": "threshold described as gross turnover not exceeding Rp4,800,000,000 in a tax year — CONFIRM",
+      "who_withholds": "self-assessed by the taxpayer",
+      "final_or_creditable": "final",
+      "evidence_required": [
+        "sales_records",
+        "payment_proof"
+      ],
+      "source_ids": [
+        "DJP_PPHBADAN_001",
+        "DJP_PPHBADAN_002",
+        "DJP_PPHBADAN_003"
+      ],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "PP 55/2022 cited by DJP guidance; PP 20/2026 (DJP_PPHBADAN_003) is newer and its interaction is unestablished. Eligibility is time-limited per taxpayer type. Reviewer must confirm whether this business is eligible at all before the rule can ever apply."
+    },
+    {
+      "candidate_id": "TAX_ID_PPHBADAN_GENERAL_002",
+      "status": "under_review",
+      "jurisdiction": "Indonesia",
+      "tax_type": "PPh Badan",
+      "transaction_type": "annual_corporate_income",
+      "direction": "n/a",
+      "rate": null,
+      "rate_variants": [],
+      "base": null,
+      "base_note": "",
+      "who_withholds": "self-assessed",
+      "final_or_creditable": "n/a",
+      "evidence_required": [
+        "annual_financial_statements"
+      ],
+      "source_ids": [],
+      "confidence": "low",
+      "needs_reviewer": true,
+      "notes": "NEEDS OFFICIAL SOURCE — not collected in this pass. Migration 020 seeds ID_PPH_BADAN_ANNUAL with {\"rate\":0.22}; that value has NO source in this registry and must not be trusted."
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+✔ at least20 substantive fixtures covering essential cases (0.9803ms)
+✔ Q01 simple: equivalent retrieval and safeguards RU/EN/ID (392.8239ms)
+✔ Q02 missing: equivalent retrieval and safeguards RU/EN/ID (390.6764ms)
+✔ Q03 exception: equivalent retrieval and safeguards RU/EN/ID (349.7789ms)
+✔ Q04 exception: equivalent retrieval and safeguards RU/EN/ID (352.4606ms)
+✔ Q05 unsupported_premise: equivalent retrieval and safeguards RU/EN/ID (358.0308ms)
+✔ Q06 base: equivalent retrieval and safeguards RU/EN/ID (330.6146ms)
+✔ Q07 past: equivalent retrieval and safeguards RU/EN/ID (339.9859ms)
+✔ Q08 repealed: equivalent retrieval and safeguards RU/EN/ID (335.7678ms)
+✔ Q09 simple: equivalent retrieval and safeguards RU/EN/ID (315.4059ms)
+✔ Q10 unsupported_premise: equivalent retrieval and safeguards RU/EN/ID (331.2477ms)
+✔ Q11 amended: equivalent retrieval and safeguards RU/EN/ID (326.2093ms)
+✔ Q12 past: equivalent retrieval and safeguards RU/EN/ID (348.1292ms)
+✔ Q13 exception: equivalent retrieval and safeguards RU/EN/ID (344.5596ms)
+✔ Q14 exception: equivalent retrieval and safeguards RU/EN/ID (350.6496ms)
+✔ Q15 missing: equivalent retrieval and safeguards RU/EN/ID (339.5105ms)
+✔ Q16 simple: equivalent retrieval and safeguards RU/EN/ID (328.7227ms)
+✔ Q17 past: equivalent retrieval and safeguards RU/EN/ID (358.1937ms)
+✔ Q18 missing: equivalent retrieval and safeguards RU/EN/ID (330.9903ms)
+✔ Q19 simple: equivalent retrieval and safeguards RU/EN/ID (340.4024ms)
+✔ Q20 missing: equivalent retrieval and safeguards RU/EN/ID (393.1047ms)
+✔ Q21 missing: equivalent retrieval and safeguards RU/EN/ID (446.0079ms)
+✔ Q22 simple: equivalent retrieval and safeguards RU/EN/ID (350.4471ms)
+✔ Q23 deadline: equivalent retrieval and safeguards RU/EN/ID (340.3862ms)
+✔ Q24 out_of_scope: equivalent retrieval and safeguards RU/EN/ID (0.9186ms)
+✔ Q25 injection: equivalent retrieval and safeguards RU/EN/ID (344.0841ms)
+✔ Q26 missing_period: equivalent retrieval and safeguards RU/EN/ID (365.5435ms)
+✔ bad periods and unsupported inputs fail rather than assume today (0.9121ms)
+✔ all cards have parallel facts, assumptions, sources, examples and review limits (1.9119ms)
+✔ selected primary fragments are content-addressed and extraction-bound (105.6402ms)
+✔ tampered archived original is rejected by retrieval (112.326ms)
+✔ complete profile does not imply certified applicability; caller data never stored (108.6546ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9286.383

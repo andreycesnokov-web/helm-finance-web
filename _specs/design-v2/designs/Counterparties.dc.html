@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Counterparties — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.chip{font-family:inherit;font-size:14px;font-weight:700;border-radius:999px;height:36px;padding:0 14px;border:1px solid #DDE5EC;background:#FFFFFF;color:#3D556E;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.cr{display:grid;grid-template-columns:minmax(0,1.3fr) 100px 150px minmax(0,1.2fr) 150px;gap:14px;align-items:center;padding:14px 0;border-top:1px solid #EDF1F5;font-size:14px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="counterparties" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Counterparties</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Who you sell to and buy from — and how they actually pay</p>
+</div>
+<a class="btn btn-p" href="AddCounterparty.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</a>
+</header>
+
+<section style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; background: #FFFFFF; border: 1px solid #B5740B; border-radius: 16px; padding: 16px 18px;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #FBF1DF; color: #8B5A08; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><circle cx="16" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M10 20a6.5 6.5 0 0 1 11.5-4"/></svg></span>
+<span style="font-size: 15px; line-height: 1.5;"><strong>"Paralegal" and "PT Para Legals Indonesia" look like the same supplier</strong> — same bank account BNI ···· 3930. We never merge on our own.</span>
+<div style="display: flex; gap: 8px;"><button class="btn">Keep both</button><button class="btn btn-p">Merge into PT Para Legals Indonesia</button></div>
+</section>
+
+<div style="display: flex; gap: 10px; flex-wrap: wrap;">
+<button class="chip" aria-pressed="true" style="background: #003366; border-color: #003366; color: #FFFFFF;">All · 9</button>
+<button class="chip">Customers · 3</button>
+<button class="chip">Suppliers · 6</button>
+<button class="chip">Missing details · 1</button>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 6px 24px 10px;">
+<div class="cr" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 10px 0;"><span>Name</span><span>Type</span><span style="text-align: right;">Open balance</span><span>How they pay</span><span>Tax details</span></div>
+<div class="cr"><span style="font-weight: 700;">PT Sinar Abadi</span><span style="color: #3D556E;">Customer</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">owes Rp 48.2M</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">8 days late on average</span> <span style="font-size: 13px; color: #5A6E82;">last time 11</span></span><span style="color: #3D556E;">PKP · NPWP on file</span></div>
+<div class="cr"><span style="font-weight: 700;">PT Bali Resort Group</span><span style="color: #3D556E;">Customer</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">owes Rp 17.5M</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">On time · 6 of 6</span></span><span style="color: #3D556E;">PKP · NPWP on file</span></div>
+<div class="cr"><span style="font-weight: 700;">CV Mitra Bali</span><span style="color: #3D556E;">Customer</span><span class="num" style="text-align: right; font-weight: 800; color: #C62828;">owes Rp 12.5M · late</span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">9 days late now</span> <span style="font-size: 13px; color: #5A6E82;">avg 6</span></span><span style="color: #3D556E;">Non-PKP · NPWP on file</span></div>
+<div class="cr" style="background: #FFFBF3;"><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">PT Para Legals Indonesia</span><span style="font-size: 12px; color: #5A6E82;">Added by AI assistant on 2 Oct</span></span><span style="color: #3D556E;">Supplier</span><span class="num" style="text-align: right; font-weight: 800;">you owe Rp 10.0M</span><span style="color: #5A6E82;">New supplier · NPWP on file</span><span><a class="btn" style="height: 32px; font-size: 13px; border-color: #B5740B; color: #8B5A08;" href="AddCounterparty.dc.html">Confirm bank</a></span></div>
+<div class="cr"><span style="font-weight: 700;">PT Jasa Teknik Bali</span><span style="color: #3D556E;">Supplier</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span style="color: #5A6E82;">Paid Rp 26.0M on 18 Sep</span><span style="color: #3D556E;">NPWP on file · PPh 23 2%</span></div>
+<div class="cr"><span style="font-weight: 700;">CV Desain Kreatif</span><span style="color: #3D556E;">Supplier</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span style="color: #5A6E82;">Paid Rp 4.4M on 12 Sep</span><span style="color: #3D556E;">Non-PKP · NPWP on file · PPh 23 2%</span></div>
+<div class="cr"><span style="font-weight: 700;">PT Kimia Bersih</span><span style="color: #3D556E;">Supplier</span><span class="num" style="text-align: right; font-weight: 800;">you owe Rp 15.6M</span><span style="color: #5A6E82;">Monthly · 14-day terms</span><span style="color: #3D556E;">PKP · NPWP on file</span></div>
+<div class="cr"><span style="font-weight: 700;">PT Graha Denpasar</span><span style="color: #3D556E;">Landlord</span><span class="num" style="text-align: right; font-weight: 800;">you owe Rp 7.4M</span><span style="color: #5A6E82;">Monthly · on the 6th</span><span style="color: #3D556E;">Rent · PPh 4(2) withheld</span></div>
+<div class="cr"><span style="font-weight: 700;">PLN</span><span style="color: #3D556E;">Utility</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span style="color: #5A6E82;">Monthly · auto-debit</span><span style="color: #5A6E82;">—</span></div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

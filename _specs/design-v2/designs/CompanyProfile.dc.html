@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Company profile — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.card{background:#FFFFFF;border:1px solid #DDE5EC;border-radius:20px;padding:18px 22px 8px}
+.f{display:grid;grid-template-columns:190px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.f>*{min-width:0}
+.fl{color:#5A6E82;font-weight:600}
+.src{font-size:12px;color:#5A6E82;white-space:nowrap}
+.seg{font-family:inherit;font-size:13px;font-weight:700;height:34px;padding:0 14px;border:none;border-radius:8px;background:transparent;color:#5A6E82;cursor:pointer}
+.kb{display:grid;grid-template-columns:70px minmax(0,1fr) 110px 60px;gap:12px;align-items:center;padding:12px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.kb>*{min-width:0}
+.ob{display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;padding:10px 0;border-top:1px solid #EDF1F5;font-size:14px;line-height:1.45}
+.ob>*{min-width:0}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="settings" hint-size="248px,100%"></dc-import>
+<main style="padding: 28px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
+
+<nav aria-label="Breadcrumb" style="font-size: 14px; color: #5A6E82;"><a href="Settings.dc.html">Settings</a> / Company profile</nav>
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Company profile</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">CFO AI uses this to work out your taxes, reports and deadlines</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 220px;">
+<span class="num" style="font-size: 13px; font-weight: 700; color: #3D556E;">Profile 90% complete</span>
+<div style="height: 8px; border-radius: 8px; background: #DDE5EC;"><div style="width: 90%; height: 8px; border-radius: 8px; background: #1565C0;"></div></div>
+</div>
+</header>
+
+<section style="display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 16px; align-items: center; background: #FFFFFF; border: 2px dashed #C2CFDB; border-radius: 20px; padding: 18px 22px;">
+<span style="width: 48px; height: 48px; border-radius: 14px; background: #E6F1FB; color: #1565C0; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 22px; height: 22px;"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg></span>
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+<span style="font-size: 15px; font-weight: 800;">Upload your company documents — AI fills the fields, you confirm</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px;">
+<span class="tag" style="background: #E5F4EE; color: #0F7A52;">Deed of establishment</span>
+<span class="tag" style="background: #E5F4EE; color: #0F7A52;">SK Kemenkumham</span>
+<span class="tag" style="background: #E5F4EE; color: #0F7A52;">NIB from OSS</span>
+<span class="tag" style="background: #E5F4EE; color: #0F7A52;">NPWP card</span>
+<span class="tag" style="background: #F4F6F8; color: #5A6E82;">Deed amendments · none yet</span>
+<span class="tag" style="background: #F4F6F8; color: #5A6E82;">SPPKP · only when PKP</span>
+</div>
+</div>
+<a class="btn btn-p" href="Documents.dc.html">Upload</a>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<div style="display: flex; flex-direction: column; gap: 16px;">
+
+<section class="card">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">Legal entity</h3>
+<div class="f"><span class="fl">Legal name</span><span style="font-weight: 700;">PT Nusantara Facilities</span><span class="src">from deed</span></div>
+<div class="f"><span class="fl">Legal form</span><span>PT · limited liability company</span><span class="src">from deed</span></div>
+<div class="f"><span class="fl">Capital status</span><span role="group" aria-label="Capital status" style="display: inline-flex; background: #F4F6F8; border-radius: 10px; padding: 3px; gap: 3px; justify-self: start;"><button class="seg" aria-pressed="true" style="background: #FFFFFF; color: #003366;">PMDN · domestic</button><button class="seg">PMA · foreign</button></span><span class="src">from NIB</span></div>
+<div class="f"><span class="fl">Business scale</span><span>Micro business · capital under Rp 1B</span><span class="src">from NIB</span></div>
+<div class="f"><span class="fl">Founded</span><span class="num">14 Mar 2024</span><span class="src">from deed</span></div>
+<div class="f"><span class="fl">Registered address</span><span>Jl. [street], Denpasar, Bali</span><span class="src">from NIB</span></div>
+</section>
+
+<section class="card">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">Licence &amp; business activities</h3><span class="num" style="font-size: 13px; color: #5A6E82;">NIB ···· 8814 · OSS-RBA</span></div>
+<div class="kb" style="font-size: 12px; font-weight: 700; color: #5A6E82; border-top: none; padding: 6px 0;"><span>KBLI</span><span>Activity</span><span>Risk level</span><span></span></div>
+<div class="kb"><span class="num" style="font-weight: 800;">81210</span><span>General cleaning of buildings</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Low</span></span><span class="tag" style="background: #E6F1FB; color: #1565C0;">Main</span></div>
+<div class="kb"><span class="num" style="font-weight: 800;">47999</span><span>Retail outside shops · vending machines</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Low</span></span><span></span></div>
+<p style="margin: 10px 0 8px; font-size: 13px; line-height: 1.5; color: #5A6E82;">Read from your NIB. Revenue in Transactions is tagged to an activity, so you can see which part of the business earns what.</p>
+</section>
+
+<section class="card">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">Tax</h3>
+<div class="f"><span class="fl">NPWP</span><span class="num">···· ···· ···· 4821</span><span class="src">from card</span></div>
+<div class="f"><span class="fl">Tax office</span><span>KPP Pratama Denpasar Timur</span><span class="src">from card</span></div>
+<div class="f"><span class="fl">VAT status</span><span>Not PKP <span style="color: #5A6E82;">· revenue this year Rp 612M of the Rp 4.8B threshold</span></span><span class="src">you · checked by AI</span></div>
+<div class="f"><span class="fl">Income tax regime</span><span>General · PPh 25 instalment Rp 0 this year</span><span class="src">Rina confirmed</span></div>
+<div class="f"><span class="fl">Fiscal year</span><span>January – December</span><span class="src">default</span></div>
+</section>
+
+<section class="card">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">People</h3>
+<div class="f"><span class="fl">Director</span><span>Andrew</span><span class="src">from deed</span></div>
+<div class="f" style="background: #FFFBF3;"><span class="fl">Commissioner</span><span style="color: #8B5A08; font-weight: 700;">Not filled in · needed for the annual return</span><a class="btn" style="height: 34px;" href="MobileAdd.dc.html">Add</a></div>
+<div class="f"><span class="fl">Shareholders</span><span>[Founder] 80% · [Angel investor] 20%</span><span class="src">from deed</span></div>
+<div class="f"><span class="fl">Employees</span><span class="num">6 · all registered with BPJS</span><span class="src">from Payroll</span></div>
+</section>
+</div>
+
+<aside style="display: flex; flex-direction: column; gap: 16px;">
+<section style="background: #003366; color: #FFFFFF; border-radius: 20px; padding: 20px 22px; display: flex; flex-direction: column; gap: 6px;">
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #C9D8E8;"><svg class="ic" viewBox="0 0 24 24" style="color: #3399FF;"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>What CFO AI worked out</span>
+<span style="font-size: 18px; font-weight: 800; line-height: 1.3;">5 monthly duties, 2 yearly ones, and 2 things you don't need yet</span>
+</section>
+<section class="card" style="padding-bottom: 12px;">
+<p style="margin: 0 0 4px; font-size: 13px; font-weight: 800; color: #5A6E82;">Every month</p>
+<div class="ob" style="border-top: none;"><span class="num" style="font-weight: 800; color: #1565C0;">1</span><span><strong>PPh 21</strong> — you have 6 employees</span></div>
+<div class="ob"><span class="num" style="font-weight: 800; color: #1565C0;">2</span><span><strong>PPh 23</strong> — when you pay for services, like repairs and design</span></div>
+<div class="ob"><span class="num" style="font-weight: 800; color: #1565C0;">3</span><span><strong>PPh 4(2)</strong> — you rent your office</span></div>
+<div class="ob"><span class="num" style="font-weight: 800; color: #1565C0;">4</span><span><strong>BPJS</strong> health and employment — staff are registered</span></div>
+<div class="ob"><span class="num" style="font-weight: 800; color: #1565C0;">5</span><span><strong>SPT Masa</strong> — two reports by the 20th: PPh 21, and Unifikasi for 23 and 4(2)</span></div>
+<p style="margin: 12px 0 4px; font-size: 13px; font-weight: 800; color: #5A6E82;">Every year</p>
+<div class="ob" style="border-top: none;"><span class="num" style="font-weight: 800; color: #1565C0;">6</span><span><strong>Annual company return</strong> by 30 April</span></div>
+<div class="ob"><span class="num" style="font-weight: 800; color: #1565C0;">7</span><span><strong>1721-A1 slips</strong> to employees by 31 January</span></div>
+<p style="margin: 12px 0 4px; font-size: 13px; font-weight: 800; color: #5A6E82;">Not needed now</p>
+<div class="ob" style="border-top: none; color: #3D556E;"><span>—</span><span><strong>PPN</strong> — not PKP. We'll warn you at Rp 4.0B of revenue.</span></div>
+<div class="ob" style="color: #3D556E;"><span>—</span><span><strong>LKPM</strong> investment report — not required for micro businesses. Needed once capital passes Rp 1B or the company turns PMA.</span></div>
+<a class="btn" href="AccountantTaxes.dc.html" style="justify-content: center; margin-top: 10px;">Open tax calendar</a>
+</section>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #5A6E82;">Built from verified tax rules. Change any field and the calendar updates. Rina reviews the profile once a year.</p>
+</aside>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1640}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

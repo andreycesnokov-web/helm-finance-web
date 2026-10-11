@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bills and invoices — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.br{display:grid;grid-template-columns:minmax(0,1.3fr) 130px 90px minmax(0,1.3fr) 120px 150px;gap:14px;align-items:center;padding:14px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.tabb{font-family:inherit;font-size:14px;font-weight:700;height:40px;padding:0 4px;border:none;border-bottom:2px solid transparent;background:none;color:#5A6E82;cursor:pointer}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="bills" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Bills &amp; invoices</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">What you're owed and what you owe, in one place</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<a class="btn" href="MobileAdd.dc.html">Add a bill</a>
+<a class="btn btn-p" href="MobileAdd.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New invoice</a>
+</div>
+</header>
+
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Owed to you · 3 invoices</span>
+<span class="num" style="font-size: 32px; font-weight: 800; color: #0F7A52;">Rp 78.2M</span>
+<div style="display: flex; height: 8px; border-radius: 6px; overflow: hidden; gap: 2px;"><div style="width: 16%; background: #C62828;"></div><div style="width: 84%; background: #8FD3B4;"></div></div>
+<span style="font-size: 13px; color: #3D556E;"><strong style="color: #C62828;">Rp 12.5M late</strong> · Rp 65.7M due in the next 14 days</span>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">You owe · 3 bills</span>
+<span class="num" style="font-size: 32px; font-weight: 800;">Rp 33.0M</span>
+<div style="display: flex; height: 8px; border-radius: 6px; overflow: hidden; gap: 2px;"><div style="width: 30%; background: #3399FF;"></div><div style="width: 70%; background: #C2CFDB;"></div></div>
+<span style="font-size: 13px; color: #3D556E;"><strong style="color: #1565C0;">Rp 10.0M waiting for your approval</strong> · nothing overdue · payroll is under Payroll</span>
+</div>
+</section>
+
+<section style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; background: #E6F1FB; border-radius: 16px; padding: 14px 18px;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #FFFFFF; color: #1565C0; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M17 7L7 17M7 9v8h8"/></svg></span>
+<span style="font-size: 15px;"><strong>Rp 1.2M arrived from "PT MSA" on 1 Oct</strong> and matches no invoice. Tell us what it was so it counts correctly.</span>
+<a class="btn" href="Transactions.dc.html">Match payment</a>
+</section>
+
+<div style="display: flex; gap: 24px; border-bottom: 1px solid #DDE5EC;">
+<a class="tabb" aria-selected="true" style="color: #003366; border-bottom-color: #003366;" href="BillDetail.dc.html">Open</a>
+<a class="tabb" href="Transactions.dc.html">Paid</a>
+<button class="tabb">All invoices you issued</button>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 24px 10px;">
+<h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 800;">To collect</h3>
+<div class="br" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 8px 0;"><span>Customer</span><span>Invoice</span><span>Due</span><span>Status</span><span style="text-align: right;">Amount</span><span></span></div>
+<div class="br"><span style="font-weight: 700;">CV Mitra Bali</span><span class="num" style="color: #3D556E;">INV-0412</span><span class="num">23 Sep</span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">9 days late</span> <span style="font-size: 13px; color: #5A6E82;">reminded once</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 12.5M</span><span style="text-align: right;"><button class="btn btn-p">Send reminder</button></span></div>
+<div class="br"><span style="font-weight: 700;">PT Bali Resort Group</span><span class="num" style="color: #3D556E;">INV-0416</span><span class="num">8 Oct</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Usually on time</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 17.5M</span><span style="text-align: right;"><a class="btn" href="BillDetail.dc.html">Open</a></span></div>
+<div class="br"><span style="font-weight: 700;">PT Sinar Abadi</span><span class="num" style="color: #3D556E;">INV-0418</span><span class="num">16 Oct</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Pays 8 days late on average</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 48.2M</span><span style="text-align: right;"><button class="btn">Remind early</button></span></div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 24px 10px;">
+<h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 800;">To pay</h3>
+<div class="br" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 8px 0;"><span>Supplier</span><span>Bill</span><span>Due</span><span>Status</span><span style="text-align: right;">Amount</span><span></span></div>
+<div class="br"><span style="font-weight: 700;">PT Graha Denpasar</span><span style="color: #3D556E;">Office rent, Oct</span><span class="num">6 Oct</span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Approved</span> <span style="font-size: 13px; color: #5A6E82;">withhold PPh 4(2)</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 7.4M</span><span style="text-align: right;"><a class="btn" href="Transactions.dc.html">Mark paid</a></span></div>
+<div class="br" style="background: #F7FBFF;"><span style="display: flex; flex-direction: column; gap: 2px;"><a href="BillDetail.dc.html" style="font-weight: 700; color: #003366;">PT Para Legals Indonesia</a><span style="font-size: 12px; color: #5A6E82;">Added by AI assistant</span></span><span class="num" style="color: #3D556E;">832/INV/IX/2026</span><span class="num">10 Oct</span><span><span class="tag" style="background: #E6F1FB; color: #1565C0;">Waiting for your approval</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 10.0M</span><span style="text-align: right;"><a class="btn btn-p" href="BillDetail.dc.html">Review</a></span></div>
+<div class="br"><span style="font-weight: 700;">PT Kimia Bersih</span><span style="color: #3D556E;">Cleaning chemicals</span><span class="num">20 Oct</span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Approved</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 15.6M</span><span style="text-align: right;"><a class="btn" href="Transactions.dc.html">Mark paid</a></span></div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

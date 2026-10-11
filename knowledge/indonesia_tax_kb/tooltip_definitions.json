@@ -1,0 +1,473 @@
+[
+  {
+    "topic_id": "pph21",
+    "name": "PPh 21 — Pajak Penghasilan Pasal 21",
+    "search_topic": "pph21",
+    "claim_ids": [
+      "PAYROLL_SCOPE",
+      "PAYROLL_METHOD",
+      "PAYROLL_BASE",
+      "P21_SHORT_DEFINITION",
+      "P21_SHORT_MECHANISM",
+      "P21_SHORT_CONDITION",
+      "P21_ABBREVIATION"
+    ],
+    "check_fields": [
+      "employment_type",
+      "payroll_period"
+    ],
+    "related_topic_ids": [
+      "pph26"
+    ],
+    "gaps": [],
+    "ask": {
+      "ru": "Объясни PPh 21 — Pajak Penghasilan Pasal 21 по доступным источникам и укажи ограничения.",
+      "en": "Explain PPh 21 — Pajak Penghasilan Pasal 21 using available sources and state the limitations.",
+      "id": "Jelaskan PPh 21 — Pajak Penghasilan Pasal 21 berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "P21_SHORT_DEFINITION",
+        "P21_SHORT_MECHANISM",
+        "P21_SHORT_CONDITION",
+        "PAYROLL_SCOPE",
+        "PAYROLL_METHOD",
+        "PAYROLL_BASE"
+      ],
+      "what_is": [
+        "P21_SHORT_DEFINITION"
+      ],
+      "how_it_works": [
+        "P21_SHORT_MECHANISM"
+      ],
+      "main_condition": [
+        "P21_SHORT_CONDITION"
+      ],
+      "summary": [
+        "P21_SHORT_DEFINITION",
+        "P21_SHORT_MECHANISM",
+        "P21_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "P21_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "pph26",
+    "name": "PPh 26 — Pajak Penghasilan Pasal 26",
+    "search_topic": "pph26",
+    "claim_ids": [
+      "FOREIGN_SCOPE",
+      "P26_SHORT_DEFINITION",
+      "P26_SHORT_MECHANISM",
+      "P26_SHORT_CONDITION",
+      "P26_ABBREVIATION"
+    ],
+    "check_fields": [
+      "recipient_residency",
+      "income_type"
+    ],
+    "related_topic_ids": [
+      "pph21"
+    ],
+    "gaps": [
+      "treaty_and_current_rules_not_reviewed"
+    ],
+    "ask": {
+      "ru": "Объясни PPh 26 — Pajak Penghasilan Pasal 26 по доступным источникам и укажи ограничения.",
+      "en": "Explain PPh 26 — Pajak Penghasilan Pasal 26 using available sources and state the limitations.",
+      "id": "Jelaskan PPh 26 — Pajak Penghasilan Pasal 26 berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "P26_SHORT_DEFINITION",
+        "P26_SHORT_MECHANISM",
+        "P26_SHORT_CONDITION",
+        "FOREIGN_SCOPE"
+      ],
+      "what_is": [
+        "P26_SHORT_DEFINITION"
+      ],
+      "how_it_works": [
+        "P26_SHORT_MECHANISM"
+      ],
+      "main_condition": [
+        "P26_SHORT_CONDITION"
+      ],
+      "summary": [
+        "P26_SHORT_DEFINITION",
+        "P26_SHORT_MECHANISM",
+        "P26_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "P26_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "pph23",
+    "name": "PPh 23 — Pajak Penghasilan Pasal 23",
+    "search_topic": "pph23",
+    "claim_ids": [
+      "SERVICE_SCOPE",
+      "SERVICE_EXCEPTIONS",
+      "SERVICE_REIMBURSEMENT",
+      "SERVICE_NPWP",
+      "P23_SHORT_DEFINITION",
+      "P23_SHORT_MECHANISM",
+      "P23_SHORT_CONDITION",
+      "P23_ABBREVIATION"
+    ],
+    "check_fields": [
+      "service_category",
+      "recipient_npwp"
+    ],
+    "related_topic_ids": [
+      "pph21",
+      "pph_final_rent",
+      "npwp_nik"
+    ],
+    "gaps": [],
+    "ask": {
+      "ru": "Объясни PPh 23 — Pajak Penghasilan Pasal 23 по доступным источникам и укажи ограничения.",
+      "en": "Explain PPh 23 — Pajak Penghasilan Pasal 23 using available sources and state the limitations.",
+      "id": "Jelaskan PPh 23 — Pajak Penghasilan Pasal 23 berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "P23_SHORT_DEFINITION",
+        "P23_SHORT_MECHANISM",
+        "P23_SHORT_CONDITION",
+        "SERVICE_SCOPE",
+        "SERVICE_EXCEPTIONS",
+        "SERVICE_REIMBURSEMENT",
+        "SERVICE_NPWP"
+      ],
+      "what_is": [
+        "P23_SHORT_DEFINITION"
+      ],
+      "how_it_works": [
+        "P23_SHORT_MECHANISM"
+      ],
+      "main_condition": [
+        "P23_SHORT_CONDITION"
+      ],
+      "summary": [
+        "P23_SHORT_DEFINITION",
+        "P23_SHORT_MECHANISM",
+        "P23_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "P23_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "pph_final_rent",
+    "name": "PPh Final — sewa tanah/bangunan",
+    "search_topic": "pph_final_rent",
+    "claim_ids": [
+      "RENT_SCOPE",
+      "RENT_PAYER",
+      "RENT_BASE",
+      "RENT_SHORT_DEFINITION",
+      "RENT_SHORT_MECHANISM",
+      "RENT_SHORT_CONDITION",
+      "RENT_ABBREVIATION"
+    ],
+    "check_fields": [
+      "rental_object",
+      "payer_withholder_status"
+    ],
+    "related_topic_ids": [
+      "pph23"
+    ],
+    "gaps": [],
+    "ask": {
+      "ru": "Объясни PPh Final — sewa tanah/bangunan по доступным источникам и укажи ограничения.",
+      "en": "Explain PPh Final — sewa tanah/bangunan using available sources and state the limitations.",
+      "id": "Jelaskan PPh Final — sewa tanah/bangunan berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "RENT_SHORT_DEFINITION",
+        "RENT_SHORT_MECHANISM",
+        "RENT_SHORT_CONDITION",
+        "RENT_SCOPE",
+        "RENT_PAYER",
+        "RENT_BASE"
+      ],
+      "what_is": [
+        "RENT_SHORT_DEFINITION"
+      ],
+      "how_it_works": [
+        "RENT_SHORT_MECHANISM"
+      ],
+      "main_condition": [
+        "RENT_SHORT_CONDITION"
+      ],
+      "summary": [
+        "RENT_SHORT_DEFINITION",
+        "RENT_SHORT_MECHANISM",
+        "RENT_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "RENT_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "pph25",
+    "name": "PPh 25 — Pajak Penghasilan Pasal 25",
+    "search_topic": "pph25_29",
+    "claim_ids": [
+      "INSTALLMENT_METHOD",
+      "INSTALLMENT_REPORTING",
+      "P25_SHORT_DEFINITION",
+      "P25_SHORT_MECHANISM",
+      "P25_SHORT_CONDITION",
+      "P25_ABBREVIATION"
+    ],
+    "check_fields": [
+      "special_installment_category",
+      "tax_year"
+    ],
+    "related_topic_ids": [
+      "pph29"
+    ],
+    "gaps": [],
+    "ask": {
+      "ru": "Объясни PPh 25 — Pajak Penghasilan Pasal 25 по доступным источникам и укажи ограничения.",
+      "en": "Explain PPh 25 — Pajak Penghasilan Pasal 25 using available sources and state the limitations.",
+      "id": "Jelaskan PPh 25 — Pajak Penghasilan Pasal 25 berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "P25_SHORT_DEFINITION",
+        "P25_SHORT_MECHANISM",
+        "P25_SHORT_CONDITION",
+        "INSTALLMENT_METHOD",
+        "INSTALLMENT_REPORTING"
+      ],
+      "what_is": [
+        "P25_SHORT_DEFINITION"
+      ],
+      "how_it_works": [
+        "P25_SHORT_MECHANISM"
+      ],
+      "main_condition": [
+        "P25_SHORT_CONDITION"
+      ],
+      "summary": [
+        "P25_SHORT_DEFINITION",
+        "P25_SHORT_MECHANISM",
+        "P25_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "P25_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "pph29",
+    "name": "PPh 29 — Pajak Penghasilan Pasal 29",
+    "search_topic": "pph25_29",
+    "claim_ids": [
+      "ANNUAL_UNDERPAYMENT",
+      "P29_SHORT_DEFINITION",
+      "P29_SHORT_CONDITION",
+      "P29_ABBREVIATION"
+    ],
+    "check_fields": [
+      "tax_year",
+      "creditable_withholding"
+    ],
+    "related_topic_ids": [
+      "pph25"
+    ],
+    "gaps": [
+      "payer_and_company_specific_application_not_separately_grounded",
+      "current_annual_payment_procedure_unconfirmed"
+    ],
+    "ask": {
+      "ru": "Объясни PPh 29 — Pajak Penghasilan Pasal 29 по доступным источникам и укажи ограничения.",
+      "en": "Explain PPh 29 — Pajak Penghasilan Pasal 29 using available sources and state the limitations.",
+      "id": "Jelaskan PPh 29 — Pajak Penghasilan Pasal 29 berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "P29_SHORT_DEFINITION",
+        "P29_SHORT_CONDITION",
+        "ANNUAL_UNDERPAYMENT"
+      ],
+      "what_is": [
+        "P29_SHORT_DEFINITION"
+      ],
+      "how_it_works": [],
+      "main_condition": [
+        "P29_SHORT_CONDITION"
+      ],
+      "summary": [
+        "P29_SHORT_DEFINITION",
+        "P29_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "P29_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "ppn",
+    "name": "PPN — Pajak Pertambahan Nilai",
+    "search_topic": "ppn_pkp",
+    "claim_ids": [
+      "VAT_SCOPE",
+      "VAT_MECHANISM",
+      "VAT_CREDIT",
+      "VAT_JAN_TRANSITION",
+      "PPN_SHORT_DEFINITION",
+      "PPN_SHORT_MECHANISM",
+      "PPN_SHORT_CONDITION",
+      "PPN_ABBREVIATION"
+    ],
+    "check_fields": [
+      "taxable_supply_type",
+      "special_vat_base"
+    ],
+    "related_topic_ids": [
+      "pkp"
+    ],
+    "gaps": [],
+    "ask": {
+      "ru": "Объясни PPN — Pajak Pertambahan Nilai по доступным источникам и укажи ограничения.",
+      "en": "Explain PPN — Pajak Pertambahan Nilai using available sources and state the limitations.",
+      "id": "Jelaskan PPN — Pajak Pertambahan Nilai berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "PPN_SHORT_DEFINITION",
+        "PPN_SHORT_MECHANISM",
+        "PPN_SHORT_CONDITION",
+        "VAT_SCOPE",
+        "VAT_MECHANISM",
+        "VAT_CREDIT",
+        "VAT_JAN_TRANSITION"
+      ],
+      "what_is": [
+        "PPN_SHORT_DEFINITION"
+      ],
+      "how_it_works": [
+        "PPN_SHORT_MECHANISM"
+      ],
+      "main_condition": [
+        "PPN_SHORT_CONDITION"
+      ],
+      "summary": [
+        "PPN_SHORT_DEFINITION",
+        "PPN_SHORT_MECHANISM",
+        "PPN_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "PPN_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "pkp",
+    "name": "PKP — Pengusaha Kena Pajak",
+    "search_topic": "ppn_pkp",
+    "claim_ids": [
+      "PKP_SCOPE",
+      "PKP_REGISTRATION",
+      "PKP_SHORT_DEFINITION",
+      "PKP_SHORT_MECHANISM",
+      "PKP_SHORT_CONDITION",
+      "PKP_ABBREVIATION"
+    ],
+    "check_fields": [
+      "vat_status",
+      "annual_turnover"
+    ],
+    "related_topic_ids": [
+      "ppn",
+      "npwp_nik"
+    ],
+    "gaps": [],
+    "ask": {
+      "ru": "Объясни PKP — Pengusaha Kena Pajak по доступным источникам и укажи ограничения.",
+      "en": "Explain PKP — Pengusaha Kena Pajak using available sources and state the limitations.",
+      "id": "Jelaskan PKP — Pengusaha Kena Pajak berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "PKP_SHORT_DEFINITION",
+        "PKP_SHORT_MECHANISM",
+        "PKP_SHORT_CONDITION",
+        "PKP_SCOPE",
+        "PKP_REGISTRATION"
+      ],
+      "what_is": [
+        "PKP_SHORT_DEFINITION"
+      ],
+      "how_it_works": [
+        "PKP_SHORT_MECHANISM"
+      ],
+      "main_condition": [
+        "PKP_SHORT_CONDITION"
+      ],
+      "summary": [
+        "PKP_SHORT_DEFINITION",
+        "PKP_SHORT_MECHANISM",
+        "PKP_SHORT_CONDITION"
+      ],
+      "abbreviation": [
+        "PKP_ABBREVIATION"
+      ]
+    },
+    "schema_version": 2
+  },
+  {
+    "topic_id": "npwp_nik",
+    "name": "NPWP / NIK",
+    "search_topic": "pph23",
+    "claim_ids": [
+      "SERVICE_NPWP"
+    ],
+    "check_fields": [
+      "recipient_npwp"
+    ],
+    "related_topic_ids": [
+      "pkp",
+      "pph23"
+    ],
+    "gaps": [
+      "definition_and_abbreviation_unconfirmed",
+      "NPWP_NIK_identity_integration_primary_text_not_reviewed",
+      "only_PPh23_context_available"
+    ],
+    "ask": {
+      "ru": "Объясни NPWP / NIK по доступным источникам и укажи ограничения.",
+      "en": "Explain NPWP / NIK using available sources and state the limitations.",
+      "id": "Jelaskan NPWP / NIK berdasarkan sumber yang tersedia dan sebutkan keterbatasannya."
+    },
+    "section_claim_ids": {
+      "detailed_explanation": [
+        "SERVICE_NPWP"
+      ],
+      "summary": [],
+      "what_is": [],
+      "how_it_works": [],
+      "main_condition": [],
+      "abbreviation": []
+    },
+    "schema_version": 2
+  }
+]

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Performance — forecast</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.card{background:#FFFFFF;border:1px solid #DDE5EC;border-radius:20px}
+.kpi{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kl{font-size:13px;font-weight:600;color:#5A6E82}
+.kv{font-size:24px;font-weight:800}
+.ks{font-size:13px;color:#3D556E;line-height:1.45}
+.lg{display:inline-flex;align-items:center;gap:8px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.wf{display:grid;grid-template-columns:170px minmax(0,1fr) 110px;gap:14px;align-items:center;padding:9px 0;font-size:14px}
+.wf>*{min-width:0}
+.trk{position:relative;height:22px}
+.cl{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px;gap:12px;padding:9px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.cl>*{min-width:0}
+details summary{cursor:pointer;font-size:13px;font-weight:700;color:#1565C0;list-style:none}
+.tb{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.tb th,.tb td{padding:6px 8px;border-top:1px solid #EDF1F5;text-align:right;white-space:nowrap}
+.tb th:first-child,.tb td:first-child{text-align:left}
+.cl{grid-template-columns:minmax(0,1fr) 64px 96px}
+.tb th{color:#5A6E82;font-weight:700}
+
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="performance" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Performance</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Is the business making money, and where does the cash go</p>
+</div>
+<div style="display: flex; gap: 10px;"><button class="btn">September 2026<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button><button class="btn"><svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 20h16"/></svg>Export</button></div>
+</header>
+<nav aria-label="Performance views" style="display: flex; gap: 26px; border-bottom: 1px solid #DDE5EC;"><a href="Performance.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Profit</a><a href="PerformanceCash.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Cash</a><a href="PerformanceForecast.dc.html" aria-current="page" style="font-size: 14px; font-weight: 700; color: #003366; padding: 10px 2px; border-bottom: 2px solid #003366;">Forecast</a></nav>
+<section class="card" style="padding: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+<div class="kpi"><span class="kl">Owed to you · next 30 days</span><span class="num kv" style="color: #0F7A52;">+Rp 78.2M</span><span class="ks">3 invoices · Rp 12.5M already late</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">To pay · next 30 days</span><span class="num kv">−Rp 94.9M</span><span class="ks">Bills, payroll, taxes, location fees</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">Cash on 1 Nov</span><span class="num kv">Rp 105.6M</span><span class="ks">With daily sales and costs · <a href="Radar.dc.html" style="font-weight: 700;">Radar</a></span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">Cash runs out</span><span class="num kv" style="color: #C62828;">≈ 20 Dec</span><span class="ks">If the Rp 64M monthly burn doesn't change</span></div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+<figure class="card" style="margin: 0; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">Invoices and bills by week</h3><span style="font-size: 13px; color: #5A6E82;">Next 30 days · Rp millions · daily sales and costs not included</span></div>
+<svg viewBox="-48 -8 576 210" role="img" aria-label="Money due in and out by week for the next 30 days: Rp 78.2M owed to you, Rp 94.9M to pay." style="width: 100%; height: auto; display: block; font-family: 'Manrope', sans-serif;">
+<line x1="0" y1="170.0" x2="520" y2="170.0" stroke="#C2CFDB" stroke-width="1"/>
+<text x="-8" y="175.0" font-size="13" fill="#5A6E82" text-anchor="end">0</text>
+<line x1="0" y1="100.0" x2="520" y2="100.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="105.0" font-size="13" fill="#5A6E82" text-anchor="end">25M</text>
+<line x1="0" y1="30.0" x2="520" y2="30.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="35.0" font-size="13" fill="#5A6E82" text-anchor="end">50M</text>
+<path d="M23.0 170.0V125.0Q23.0 121.0 27.0 121.0H47.0Q51.0 121.0 51.0 125.0V170.0Z" fill="#2A6FD1"><title>2–8 Oct · coming in Rp 17.5M</title></path>
+<path d="M53.0 170.0V88.2Q53.0 84.2 57.0 84.2H77.0Q81.0 84.2 81.0 88.2V170.0Z" fill="#D98A1C"><title>2–8 Oct · going out Rp 30.7M</title></path>
+<text x="37.0" y="115.0" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">17.5</text>
+<text x="67.0" y="78.2" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">30.7</text>
+<text x="52.0" y="192" font-size="13" fill="#5A6E82" text-anchor="middle">2–8 Oct</text>
+
+<path d="M157.0 170.0V139.1Q157.0 135.1 161.0 135.1H181.0Q185.0 135.1 185.0 139.1V170.0Z" fill="#D98A1C"><title>9–15 Oct · going out Rp 12.5M</title></path>
+<text x="171.0" y="129.1" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">12.5</text>
+<text x="156.0" y="192" font-size="13" fill="#5A6E82" text-anchor="middle">9–15 Oct</text>
+<path d="M231.0 170.0V39.0Q231.0 35.0 235.0 35.0H255.0Q259.0 35.0 259.0 39.0V170.0Z" fill="#2A6FD1"><title>16–22 Oct · coming in Rp 48.2M</title></path>
+<path d="M261.0 170.0V130.3Q261.0 126.3 265.0 126.3H285.0Q289.0 126.3 289.0 130.3V170.0Z" fill="#D98A1C"><title>16–22 Oct · going out Rp 15.6M</title></path>
+<text x="245.0" y="29.0" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">48.2</text>
+<text x="275.0" y="120.3" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">15.6</text>
+<text x="260.0" y="192" font-size="13" fill="#5A6E82" text-anchor="middle">16–22 Oct</text>
+<path d="M335.0 170.0V139.0Q335.0 135.0 339.0 135.0H359.0Q363.0 135.0 363.0 139.0V170.0Z" fill="#2A6FD1"><title>23–29 Oct · coming in Rp 12.5M</title></path>
+<path d="M365.0 170.0V73.2Q365.0 69.2 369.0 69.2H389.0Q393.0 69.2 393.0 73.2V170.0Z" fill="#D98A1C"><title>23–29 Oct · going out Rp 36.0M</title></path>
+<text x="349.0" y="129.0" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">12.5</text>
+<text x="379.0" y="63.2" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">36.0</text>
+<text x="364.0" y="192" font-size="13" fill="#5A6E82" text-anchor="middle">23–29 Oct</text>
+
+<path d="M469.0 170.0V169.7Q469.0 169.4 469.3 169.4H496.7Q497.0 169.4 497.0 169.7V170.0Z" fill="#D98A1C"><title>30 Oct–1 Nov · going out Rp 0.2M</title></path>
+<text x="483.0" y="163.4" font-size="13" font-weight="800" fill="#003366" text-anchor="middle">0.2</text>
+<text x="468.0" y="192" font-size="13" fill="#5A6E82" text-anchor="middle">30 Oct–1 Nov</text>
+</svg>
+<figcaption style="display: flex; gap: 18px; font-size: 13px; color: #3D556E;"><span class="lg"><span class="sw" style="background: #2A6FD1;"></span>Coming in</span><span class="lg"><span class="sw" style="background: #D98A1C;"></span>Going out</span></figcaption>
+<details><summary>Show as table</summary><table class="tb"><tr><th>Week</th><th>Coming in</th><th>Going out</th></tr><tr><td class="num">2–8 Oct</td><td class="num">17.5</td><td class="num">30.7</td></tr><tr><td class="num">9–15 Oct</td><td class="num">—</td><td class="num">12.5</td></tr><tr><td class="num">16–22 Oct</td><td class="num">48.2</td><td class="num">15.6</td></tr><tr><td class="num">23–29 Oct</td><td class="num">12.5</td><td class="num">36.0</td></tr><tr><td class="num">30 Oct–1 Nov</td><td class="num">—</td><td class="num">0.2</td></tr></table></details>
+</figure>
+<figure class="card" style="margin: 0; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">Cash at month end · next 3 months</h3><span style="font-size: 13px; color: #5A6E82;">October from Radar · then the average burn · December includes the Rp 30.0M loan repayment</span></div>
+<svg viewBox="-56 -8 584 260" role="img" aria-label="Cash at month end: Rp 122.9M in September, Rp 105.6M expected in October, Rp 41.6M in November and minus Rp 52.4M in December if the burn stays the same." style="width: 100%; height: auto; display: block; font-family: 'Manrope', sans-serif;">
+<line x1="0" y1="50.0" x2="520" y2="50.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="55.0" font-size="13" fill="#5A6E82" text-anchor="end">100M</text>
+<line x1="0" y1="95.0" x2="520" y2="95.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="100.0" font-size="13" fill="#5A6E82" text-anchor="end">50M</text>
+<line x1="0" y1="140.0" x2="520" y2="140.0" stroke="#C2CFDB" stroke-width="1"/>
+<text x="-8" y="145.0" font-size="13" fill="#5A6E82" text-anchor="end">0</text>
+<line x1="0" y1="185.0" x2="520" y2="185.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="190.0" font-size="13" fill="#5A6E82" text-anchor="end">−50M</text>
+<path d="M43.0 140.0V33.4Q43.0 29.4 47.0 29.4H83.0Q87.0 29.4 87.0 33.4V140.0Z" fill="#2A6FD1"><title>End of Sep · Rp 122.9M</title></path>
+<text x="65.0" y="21.4" font-size="14" font-weight="800" fill="#003366" text-anchor="middle">122.9</text>
+<text x="65.0" y="226" font-size="13" font-weight="700" fill="#3D556E" text-anchor="middle">Sep</text>
+<text x="65.0" y="244" font-size="12" fill="#5A6E82" text-anchor="middle">Today</text>
+<path d="M173.0 140.0V49.0Q173.0 45.0 177.0 45.0H213.0Q217.0 45.0 217.0 49.0V140.0Z" fill="#2A6FD1"><title>End of Oct · Rp 105.6M</title></path>
+<text x="195.0" y="37.0" font-size="14" font-weight="800" fill="#003366" text-anchor="middle">105.6</text>
+<text x="195.0" y="226" font-size="13" font-weight="700" fill="#3D556E" text-anchor="middle">Oct</text>
+<text x="195.0" y="244" font-size="12" fill="#5A6E82" text-anchor="middle">Radar</text>
+<path d="M303.0 140.0V106.6Q303.0 102.6 307.0 102.6H343.0Q347.0 102.6 347.0 106.6V140.0Z" fill="#2A6FD1"><title>End of Nov · Rp 41.6M</title></path>
+<text x="325.0" y="94.6" font-size="14" font-weight="800" fill="#003366" text-anchor="middle">41.6</text>
+<text x="325.0" y="226" font-size="13" font-weight="700" fill="#3D556E" text-anchor="middle">Nov</text>
+<text x="325.0" y="244" font-size="12" fill="#5A6E82" text-anchor="middle">If burn stays</text>
+<path d="M433.0 140.0V183.2Q433.0 187.2 437.0 187.2H473.0Q477.0 187.2 477.0 183.2V140.0Z" fill="#C62828"><title>End of Dec · −Rp 52.4M</title></path>
+<text x="455.0" y="205.2" font-size="14" font-weight="800" fill="#C62828" text-anchor="middle">−52.4</text>
+<text x="455.0" y="226" font-size="13" font-weight="700" fill="#3D556E" text-anchor="middle">Dec</text>
+<text x="455.0" y="244" font-size="12" fill="#5A6E82" text-anchor="middle">Incl. loan due</text>
+</svg>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: #3D556E;">Runway on Pulse (58 days) divides today's cash by the average burn. This forecast also counts the Rp 78.2M customers already owe you, so the cash-out date is later — about 20 Dec, before the Rp 30.0M Nusantara Holding loan is due on 31 Dec.</p>
+</figure>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start;">
+<section class="card" style="padding: 20px 24px 12px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">To pay · <span class="num">Rp 94.9M</span></h3><a href="Bills.dc.html" style="font-size: 13px; font-weight: 700;">Bills</a></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">Payroll · 6 people</span><span style="font-size: 12px; color: #5A6E82;">Scheduled</span></span><span class="num" style="color: #5A6E82;">5 Oct</span><span class="num" style="text-align: right; font-weight: 800;">Rp 24.0M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">Office rent · Graha</span><span style="font-size: 12px; color: #5A6E82;">After PPh 4(2) of Rp 740K</span></span><span class="num" style="color: #5A6E82;">6 Oct</span><span class="num" style="text-align: right; font-weight: 800;">Rp 6.7M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">PT Para Legals Indonesia</span><span style="font-size: 12px; color: #5A6E82;">After PPh 23 · waiting for approval</span></span><span class="num" style="color: #5A6E82;">10 Oct</span><span class="num" style="text-align: right; font-weight: 800;">Rp 9.8M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">Taxes and BPJS TK</span><span style="font-size: 12px; color: #5A6E82;">PPh 21, 23, 4(2) · BPJS</span></span><span class="num" style="color: #5A6E82;">15 Oct</span><span class="num" style="text-align: right; font-weight: 800;">Rp 2.7M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">PT Kimia Bersih</span><span style="font-size: 12px; color: #5A6E82;">Cleaning chemicals</span></span><span class="num" style="color: #5A6E82;">20 Oct</span><span class="num" style="text-align: right; font-weight: 800;">Rp 15.6M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">Location fees</span><span style="font-size: 12px; color: #5A6E82;">30 machines · every month</span></span><span class="num" style="color: #5A6E82;">25 Oct</span><span class="num" style="text-align: right; font-weight: 800;">Rp 36.0M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">Loan interest</span><span style="font-size: 12px; color: #5A6E82;">Nusantara Holding</span></span><span class="num" style="color: #5A6E82;">30 Oct</span><span class="num" style="text-align: right; font-weight: 800;">Rp 200K</span></div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 20px;">
+<section class="card" style="padding: 20px 24px 12px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">To collect · <span class="num">Rp 78.2M</span></h3><a href="Bills.dc.html" style="font-size: 13px; font-weight: 700;">Invoices</a></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">PT Bali Resort Group</span><span style="font-size: 12px; color: #5A6E82;">Usually on time</span></span><span class="num" style="color: #5A6E82;">8 Oct</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">Rp 17.5M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">PT Sinar Abadi</span><span style="font-size: 12px; color: #5A6E82;">Paid 11 days late last time</span></span><span class="num" style="color: #5A6E82;">16 Oct</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">Rp 48.2M</span></div>
+<div class="cl"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 700;">CV Mitra Bali</span><span style="font-size: 12px; color: #5A6E82;">9 days late · promised 23 Oct</span></span><span class="num" style="color: #5A6E82;">23 Oct</span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">Rp 12.5M</span></div>
+</section>
+<section style="background: #003366; color: #FFFFFF; border-radius: 20px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px;">
+<span style="font-size: 13px; font-weight: 700; color: #C9D8E8;">To move the cash-out date</span>
+<span style="font-size: 15px; line-height: 1.55; color: #DCE7F2;">Saving Rp 9M a month on location fees adds about 9 days of runway. Getting Mitra Bali to pay this week adds 6. Raising or extending the Nusantara loan buys time, but doesn't fix the burn.</span>
+<a class="btn" href="AICFO.dc.html" style="align-self: flex-start; background: transparent; border-color: #3D6A96; color: #FFFFFF;">Plan it with AI CFO</a>
+</section>
+</section>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

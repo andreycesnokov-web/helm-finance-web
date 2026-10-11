@@ -1,0 +1,177 @@
+/* client/src/components/InfoTooltip.css */
+
+.info-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1;
+  margin-left: 5px;
+}
+
+/* Icon trigger button */
+.info-tooltip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-default, #d0d7de);
+  background: var(--surface-card, #ffffff);
+  color: var(--text-muted, #656d76);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  outline: none;
+  user-select: none;
+}
+
+.info-tooltip-btn:hover,
+.info-tooltip-btn:focus-visible {
+  border-color: var(--brand-electric-blue, #0969da);
+  color: var(--brand-electric-blue, #0969da);
+  background: var(--surface-subtle, #f6f8fa);
+  box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.2);
+}
+
+.info-tooltip-btn.is-warn {
+  border-color: var(--warning-border, #d4a72c);
+  color: var(--warning-ink, #9a6700);
+  background: #fff8c5;
+}
+
+.info-tooltip-btn.is-warn:hover,
+.info-tooltip-btn.is-warn:focus-visible {
+  border-color: #9a6700;
+  box-shadow: 0 0 0 2px rgba(154, 103, 0, 0.25);
+}
+
+/* Popover card container */
+.info-tooltip-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: min(320px, calc(100vw - 32px));
+  max-width: 340px;
+  background: var(--surface-card, #ffffff);
+  border: 1px solid var(--border-default, #d0d7de);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 20, 50, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+  padding: 14px 16px;
+  font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-primary, #1f2328);
+  animation: tooltip-fade-in 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  white-space: normal;
+}
+
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Header with title and close button */
+.info-tooltip-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle, #eaeef2);
+  padding-bottom: 6px;
+}
+
+.info-tooltip-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--brand-navy, #003366);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-tooltip-close {
+  background: none;
+  border: none;
+  padding: 2px;
+  color: var(--text-muted, #656d76);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.info-tooltip-close:hover {
+  color: var(--text-primary, #1f2328);
+  background: var(--surface-subtle, #f6f8fa);
+}
+
+/* Structured answer sections */
+.info-tooltip-section {
+  margin-bottom: 8px;
+}
+
+.info-tooltip-section:last-child {
+  margin-bottom: 0;
+}
+
+.info-tooltip-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #656d76);
+  margin-bottom: 2px;
+}
+
+.info-tooltip-text {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-primary, #24292f);
+}
+
+/* Responsive adjustment for 320px and 390px screens */
+@media (max-width: 480px) {
+  .info-tooltip-popover {
+    position: fixed;
+    top: auto;
+    bottom: 20px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-width: calc(100vw - 32px);
+    transform: none;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 20, 50, 0.2);
+    animation: tooltip-slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes tooltip-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

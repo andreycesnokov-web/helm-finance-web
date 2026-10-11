@@ -1,0 +1,106 @@
+/* ============================================================================
+   AI Tax Split V1. Brandbook tokens only: Navy #003366, Electric Blue #3399FF,
+   White, Pale Grey #F4F6F8. Class prefix: ts-
+   The payment split is the visually strongest element — it is the decision.
+   ========================================================================== */
+
+.ts-disclaimer {
+  display: flex; align-items: flex-start; gap: 9px;
+  margin: 0 0 18px; padding: 11px 14px;
+  border: 1px solid var(--warning); border-radius: 12px; background: var(--warning-soft);
+  font-size: 12.5px; line-height: 1.55; color: var(--text-primary); max-width: 96ch;
+}
+.ts-disclaimer svg { flex: 0 0 auto; color: var(--warning); margin-top: 2px; }
+
+.ts-grid { display: grid; gap: 18px; align-items: start; }
+@media (min-width: 1180px) { .ts-grid { grid-template-columns: minmax(340px, 420px) 1fr; } }
+
+/* ── input form ─────────────────────────────────────────────────────────── */
+.ts-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ts-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ts-field-wide { grid-column: 1 / -1; }
+.ts-field > span {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ts-field > span em { font-style: normal; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.ts-field input, .ts-field select {
+  min-height: 38px; padding: 8px 11px; font: inherit; font-size: 13.5px;
+  border: 1px solid var(--border-default); border-radius: 10px;
+  background: var(--surface-card); color: var(--text-primary);
+}
+.ts-field input:focus-visible, .ts-field select:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: 1px;
+}
+.ts-form-actions { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 4px; }
+
+/* ── result ─────────────────────────────────────────────────────────────── */
+.ts-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ts-detected {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--brand-electric-blue-ink);
+}
+.ts-title { margin: 3px 0 0; font-family: var(--font-display); font-size: 18px; color: var(--brand-navy); }
+.ts-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--text-muted); }
+
+.ts-sec { display: flex; flex-direction: column; gap: 7px; padding: 14px 0; border-bottom: 1px solid var(--border-subtle); }
+.ts-sec:last-child { border-bottom: 0; }
+.ts-label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ts-kv, .ts-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; font-size: 13px; }
+.ts-kv > span:first-child, .ts-row > span:first-child { color: var(--text-muted); }
+.ts-kv > span:last-child, .ts-row > span:last-child { font-weight: 700; color: var(--text-primary); }
+.ts-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.ts-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-muted); max-width: 84ch; }
+.ts-note code { font-family: var(--font-mono); font-size: .92em; color: var(--brand-navy); }
+.ts-warn { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--warning); font-weight: 600; max-width: 84ch; }
+.ts-err { margin: 10px 0 0; font-size: 12.5px; color: var(--danger); font-weight: 600; }
+.ts-ok { margin: 0; font-size: 12.5px; color: var(--success); font-weight: 600; }
+
+/* ── the split: strongest element on the page ───────────────────────────── */
+.ts-pay { background: var(--brand-pale-grey); border-radius: 14px; padding: 15px 16px; margin: 4px 0; border-bottom: 0; }
+.ts-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 8px; }
+.ts-card {
+  display: flex; flex-direction: column; gap: 4px; padding: 13px 15px;
+  border: 1px solid var(--border-default); border-radius: 12px; background: var(--surface-card);
+}
+.ts-card--tax { background: var(--brand-navy); border-color: transparent; }
+.ts-card-k {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ts-card--tax .ts-card-k { color: rgba(255, 255, 255, .72); }
+.ts-card-v {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: 18px; font-weight: 700; color: var(--brand-navy); overflow-wrap: anywhere;
+}
+.ts-card--tax .ts-card-v { color: var(--brand-white); }
+
+/* ── lists ──────────────────────────────────────────────────────────────── */
+.ts-guide, .ts-docs, .ts-reasons { margin: 2px 0 0; padding-left: 20px; font-size: 12.5px; line-height: 1.65; color: var(--text-secondary); }
+.ts-guide li, .ts-docs li, .ts-reasons li { margin-bottom: 4px; }
+.ts-reasons { color: var(--text-secondary); }
+
+.ts-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 6px; }
+.ts-hook { background: var(--info-soft, var(--brand-pale-grey)); border-radius: 12px; padding: 12px 14px; border-bottom: 0; }
+
+/* ── status tracker ─────────────────────────────────────────────────────── */
+.ts-track { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ts-track li {
+  font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--text-muted);
+}
+.ts-track li.is-past { background: var(--success-soft); border-color: transparent; color: var(--success); }
+.ts-track li.is-now { background: var(--brand-navy); border-color: transparent; color: var(--brand-white); }
+
+@media (max-width: 720px) {
+  .ts-form { grid-template-columns: 1fr; }
+  .ts-cards { grid-template-columns: 1fr; }
+}

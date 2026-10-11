@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Approvals — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.tabb{font-family:inherit;font-size:14px;font-weight:700;height:40px;padding:0 4px;border:none;border-bottom:2px solid transparent;background:none;color:#5A6E82;cursor:pointer}
+.hr{display:grid;grid-template-columns:28px minmax(0,1fr) 130px 160px;gap:14px;align-items:center;padding:13px 0;border-top:1px solid #EDF1F5;font-size:14px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="approvals" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Approvals</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Nothing from your team or your AI assistant is paid until you approve it. Radar already shows its effect, so you can decide.</p>
+</header>
+
+<div style="display: flex; gap: 24px; border-bottom: 1px solid #DDE5EC;">
+<button class="tabb" aria-selected="true" style="color: #003366; border-bottom-color: #003366;">Waiting · 2</button>
+<button class="tabb">Decided</button>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<div style="display: flex; flex-direction: column; gap: 16px;">
+
+<article style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 20px;">
+<a href="BillDetail.dc.html" aria-label="Open the invoice PDF" style="width: 96px; height: 124px; border-radius: 10px; border: 1px solid #DDE5EC; background: #F8FAFC; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #5A6E82; font-size: 12px; font-weight: 700;"><svg class="ic" viewBox="0 0 24 24" style="width: 26px; height: 26px;"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>PDF</a>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 13px; font-weight: 700; color: #5A6E82;">Bill to pay</span>
+<a href="BillDetail.dc.html" style="font-size: 18px; font-weight: 800; color: #003366;">PT Para Legals Indonesia</a>
+<span style="font-size: 14px; color: #3D556E;">Legal services, September · due 10 Oct</span>
+</div>
+<span class="num" style="font-size: 22px; font-weight: 800;">Rp 10.0M</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<span class="tag" style="background: #F1EDFF; color: #5B3FC4;">From AI assistant · for Andrew</span>
+<span class="tag" style="background: #FBF1DF; color: #8B5A08;">PPh 23 · pay supplier Rp 9.8M</span>
+<span class="tag" style="background: #F4F6F8; color: #3D556E;">Cash after paying Rp 99.8M</span>
+</div>
+<div style="display: flex; gap: 8px; padding-top: 4px;"><button class="btn">Reject</button><button class="btn">Ask for details</button><span style="flex-grow: 1;"></span><button class="btn btn-p">Approve</button></div>
+</div>
+</article>
+
+<article style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 20px;">
+<span aria-label="Receipt photo" role="img" style="width: 96px; height: 124px; border-radius: 10px; border: 1px solid #DDE5EC; background: #F8FAFC; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #5A6E82; font-size: 12px; font-weight: 700;"><svg class="ic" viewBox="0 0 24 24" style="width: 26px; height: 26px;"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 17l-5-5-8 7"/></svg>Photo</span>
+<div style="display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 13px; font-weight: 700; color: #5A6E82;">Expense claim</span>
+<span style="font-size: 18px; font-weight: 800;">Budi Santoso · fuel for site visits</span>
+<span style="font-size: 14px; color: #3D556E;">Pay back to Budi · paid by him on 30 Sep</span>
+</div>
+<span class="num" style="font-size: 22px; font-weight: 800;">Rp 300K</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<span class="tag" style="background: #E6F1FB; color: #1565C0;">From Telegram · employee</span>
+<span class="tag" style="background: #FBF1DF; color: #8B5A08;">Rp 450K transfer to Budi on 1 Oct may already cover this</span>
+</div>
+<div style="display: flex; gap: 8px; padding-top: 4px;"><button class="btn">Reject</button><button class="btn">Ask for details</button><span style="flex-grow: 1;"></span><button class="btn btn-p">Approve</button></div>
+</div>
+</article>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 18px 22px 8px;">
+<h3 style="margin: 0 0 4px; font-size: 16px; font-weight: 800;">Recently decided</h3>
+<div class="hr"><span style="width: 24px; height: 24px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M20 6L9 17l-5-5"/></svg></span><span>PT Kimia Bersih · cleaning chemicals<br><span style="font-size: 12px; color: #5A6E82;">from Dewi · approved by you on 30 Sep</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 15.6M</span><span style="text-align: right; color: #5A6E82;">Web</span></div>
+<div class="hr"><span style="width: 24px; height: 24px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M20 6L9 17l-5-5"/></svg></span><span>October payroll<br><span style="font-size: 12px; color: #5A6E82;">approved by you on 28 Sep</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 24.0M</span><span style="text-align: right; color: #5A6E82;">Telegram</span></div>
+<div class="hr"><span style="width: 24px; height: 24px; border-radius: 50%; background: #FBEAEA; color: #C62828; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 6l12 12M18 6L6 18"/></svg></span><span>Team lunch<br><span style="font-size: 12px; color: #5A6E82;">from Dewi · rejected: "not a business expense"</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 1.2M</span><span style="text-align: right; color: #5A6E82;">Web</span></div>
+</section>
+</div>
+
+<aside style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 12px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">How approvals work</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">Managers, employees and AI assistants can only submit. You and your CFO approve — here or with one tap in Telegram.</p>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3D556E;">An approved bill becomes something to pay. Nothing is ever paid automatically.</p>
+<a href="Settings.dc.html" style="font-size: 14px; font-weight: 700;">Who can approve</a>
+</aside>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

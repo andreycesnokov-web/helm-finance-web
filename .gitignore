@@ -1,0 +1,19 @@
+node_modules
+.env
+client/node_modules/
+client/dist/
+.claude/worktrees/
+supabase/.local-env
+supabase/.local-base.sql
+supabase/.temp/
+supabase/.branches/
+*.local-snapshot.sql
+
+client/.env
+client/.env.local
+client/.env.*.local
+.env.local
+
+# FX cache files (transient runtime cache, never tracked in git)
+server/data/*.json
+!server/data/.gitkeep

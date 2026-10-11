@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>CFO AI — Financial OS</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#003366" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CFO AI" />
+
+    <!-- Official CFO AI brand icons. The .ico / PNG versions are for services that do not
+         read SVG (favicon fetchers, AI-client connector tiles, link previews). -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/svg+xml" href="/brand/symbol_navy_blue_dot_transparent.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Link previews (messengers, social) -->
+    <meta property="og:site_name" content="CFO AI" />
+    <meta property="og:title" content="CFO AI — Financial OS" />
+    <meta property="og:image" content="https://app.cfo-ai.site/brand/app_icon_navy_rounded_1024.png" />
+    <meta name="twitter:card" content="summary" />
+
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+        background: #fff;
+        /* Safe area for notch phones */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      #root { max-width: 430px; margin: 0 auto; min-height: 100dvh; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(r => console.log('SW registered'))
+            .catch(e => console.log('SW error', e));
+        });
+      }
+    </script>
+  </body>
+</html>

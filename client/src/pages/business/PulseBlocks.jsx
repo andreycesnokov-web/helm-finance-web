@@ -1,0 +1,785 @@
+// Financial Pulse Dashboard v1 — presentation blocks.
+//
+// HONESTY RULES THIS FILE ENFORCES:
+//   • Every figure shown is a value the backend already returns from GET /api/pulse, or a
+//     count from GET /api/business/financial-counts. Nothing is derived into a new
+//     accounting metric on the client.
+//   • Metrics the ledger cannot support (EBITDA, CAPEX, gross profit, net profit) are NOT
+//     approximated. They render as readiness cards that state what is missing.
+//   • The only client-side arithmetic is presentational: comparing two figures the API
+//     already returned (receivables vs payables) and counting non-zero data sources.
+//
+// NAMING: what the API calls `expenses` is shown as "Operating cash out", because
+// CASH_OUT_LEGACY = ['expense','payroll'] — bank, FX and network fees are classed as
+// 'fee' and are NOT included. The helper text says so rather than quietly mislabelling it
+// as total operating expenses. The backend formula is unchanged.
+//
+// EMPTY WORKSPACE: an account with no data is the FIRST impression, so it is designed, not
+// defaulted. Zeros stay honest (Rp 0 is the true balance) but recede, and the page leads
+// with what to do next instead of a grid of dashes.
+import { Card, StatusBadge, Btn, Icon, DataList, FlagshipMark } from '../../shell/ui'
+import { compactIdr } from '../../lib/money'
+import { t } from '../../i18n'
+import InfoTooltip from '../../components/InfoTooltip'
+import './Pulse.css'
+
+// compactIdr now lives in lib/money.js: Wallets shows the same headline figure,
+// and two copies of a money formatter is how two pages start disagreeing about
+// what "Rp 152.5M" means. The exact amount stays in the title attribute and in
+// the caption beneath, so precision is one glance away.
+
+/* ── executive hero ───────────────────────────────────────────────────────── */
+
+export function ExecutiveHero({ d, idr, readiness, empty }) {
+  const cash = Number(d.totalBalance || 0)
+  const compact = compactIdr(cash)
+  const exact = idr(cash)
+  const negative = cash < 0
+  const runway = d.runway == null || d.runway === 999 ? null : Number(d.runway)
+  const lowRunway = runway !== null && runway < 30
+
+  // These two are OPERATING figures: the API classifies every transaction before
+  // summing, so an opening balance, a transfer or owner funding is real cash that
+  // moved but never appears here. Whatever was excluded is shown below the cards.
+  const other = d.other_cash_movement || {}
+  const otherTotal = Number(other.total || 0)
+
+  // Colour carries meaning here, so it is spent carefully.
+  //
+  // Red used to mark "operating cash out", which made every ordinary month look
+  // like something had gone wrong — and left nothing louder for the cases that
+  // genuinely are wrong. Red is now reserved for a real negative position; a
+  // short runway is a warning, not a loss; and green only appears when there is
+  // actually something positive to report, so "+ Rp 0" no longer reads as good
+  // news. Cash out is simply ink: large, important, not a failure.
+  const income = Number(d.income || 0)
+  const net = Number(d.netPosition || 0)
+
+  // Explicit Daily Spend vs Net Burn vs Runway definitions:
+  const hasUnvalued = Boolean(d.has_unvalued_tx)
+  const unvaluedCount = Number(d.unvalued_tx_count || 0)
+
+  // 1. Daily Spend: rolling average operating expenses over window (null if no expense data)
+  const dailySpendVal = d.daily_spend !== undefined && d.daily_spend !== null ? Number(d.daily_spend) : null
+  const dailySpendWindow = d.daily_spend_window_days || d.burnWindowDays || 30
+  const windowRangeStr = d.window_start && d.window_end ? `${d.window_start} – ${d.window_end}` : `${dailySpendWindow}d window`
+
+  // 2. Net Burn: excess of operating expenses over operating inflows
+  const netBurnVal = d.net_burn_daily !== undefined && d.net_burn_daily !== null ? Number(d.net_burn_daily) : null
+
+  // 3. Runway explanation
+  let runwayHint = ''
+  let runwayChip = null
+  if (hasUnvalued) {
+    runwayHint = t('pulse.blockedValuation') || 'Blocked: incomplete FX valuation'
+    runwayChip = t('pulse.partial') || 'Partial'
+  } else if (d.runway_reason === 'positive_cash_flow') {
+    runwayHint = t('pulse.cashFlowPositive') || 'Cash flow positive · receipts cover expenses'
+    runwayChip = 'Cash flow +'
+  } else if (d.runway_reason === 'break_even') {
+    runwayHint = t('pulse.breakEven') || 'Break-even · receipts equal expenses'
+    runwayChip = 'Break-even'
+  } else if (d.runway_reason === 'insufficient_data' || runway === null) {
+    runwayHint = t('pulse.requiresExpenseHistory') || 'Requires operating expense history'
+    runwayChip = null
+  } else {
+    runwayHint = `At ${idr(netBurnVal || 0)}/day net burn · ${dailySpendWindow}d window`
+    runwayChip = lowRunway ? 'Below 30 days' : null
+  }
+
+  const kpis = [
+    {
+      key: 'revenue',
+      label: 'Operating revenue this month',
+      value: '+ ' + idr(d.income),
+      tone: income > 0 ? 'pos' : undefined,
+      hint: 'Earned revenue only · excludes opening balances, funding and transfers'
+    },
+    {
+      key: 'outflow',
+      label: 'Operating cash out this month',
+      value: '− ' + idr(d.expenses),
+      hint: 'Direct costs and operating expenses · excludes CAPEX, tax and financing'
+    },
+    {
+      key: 'daily_spend',
+      label: t('pulse.dailySpend') || 'Daily spend',
+      term: 'daily_spend',
+      value: dailySpendVal === null ? '—' : `${idr(dailySpendVal)} / day${hasUnvalued ? ` (${t('pulse.partial') || 'partial'})` : ''}`,
+      hint: hasUnvalued
+        ? `${t('pulse.unvaluedExcluded', { n: unvaluedCount }) || `Excluded unvalued: ${unvaluedCount}`} · ${windowRangeStr}`
+        : dailySpendVal === null
+        ? (t('pulse.requiresExpenseHistory') || 'No operating expense history yet')
+        : `Average over rolling ${dailySpendWindow} days (${windowRangeStr})`
+    },
+    {
+      key: 'net_burn',
+      label: t('pulse.netCashBurn') || 'Net cash burn',
+      term: 'gross_net_burn',
+      value: hasUnvalued
+        ? '—'
+        : netBurnVal === null
+        ? '—'
+        : idr(netBurnVal) + ' / day',
+      tone: netBurnVal > 0 ? 'warn' : undefined,
+      hint: hasUnvalued
+        ? (t('pulse.blockedValuation') || 'Blocked: incomplete FX valuation')
+        : d.runway_reason === 'positive_cash_flow'
+        ? (t('pulse.cashFlowPositive') || 'Operating inflows exceed outflows (0 net drain)')
+        : d.runway_reason === 'break_even'
+        ? (t('pulse.breakEven') || 'Operating inflows equal outflows (0 net drain)')
+        : netBurnVal === null
+        ? (t('pulse.requiresOperatingHistory') || 'Requires operating history')
+        : (t('pulse.dailyCashDrain') || 'Excess of cash outflows over inflows per day')
+    },
+    {
+      key: 'runway',
+      label: t('pulse.runway') || 'Runway',
+      term: 'runway',
+      value: hasUnvalued || runway === null ? '—' : `${runway} days`,
+      tone: lowRunway ? 'warn' : undefined,
+      chip: runwayChip,
+      hint: runwayHint
+    },
+    {
+      key: 'net',
+      label: 'Net position',
+      value: idr(d.netPosition),
+      tone: net < 0 ? 'neg' : net > 0 ? 'pos' : undefined,
+      hint: 'Balance sheet view: cash + receivables − payables. Not operating performance.'
+    },
+  ]
+
+  return (
+    <section className={`pulse-exec${empty ? ' is-empty' : ''}`}>
+      {/* Navy corporate surface — the one place the brand background is used at scale,
+          and the one card on this page that carries the brand mark. Same component
+          as the mark on Accounts' total balance, so the two cannot diverge. */}
+      <div className="pulse-cash cfo-flagship">
+        <FlagshipMark />
+        <div className="pulse-cash-top">
+          <span className="pulse-cash-label">Total cash · IDR</span>
+          {readiness}
+        </div>
+        {/* One line, always: compacted above 1M, tabular figures, no wrap. */}
+        <div className="pulse-cash-value" title={exact}>{compact || exact}</div>
+        {negative && (
+          // The headline number stays white — a huge red figure on navy reads as an alarm
+          // rather than a fact. The state is carried by a restrained pill instead.
+          <span className="pulse-cash-flag">Negative cash position</span>
+        )}
+        <p className="pulse-cash-meta">
+          {empty
+            ? 'No accounts connected yet — this updates the moment you add one.'
+            : compact
+              ? `${exact} · confirmed cash across all business accounts`
+              : 'Confirmed cash across all business accounts'}
+        </p>
+      </div>
+
+      <div className="pulse-kpis">
+        {kpis.map((k) => (
+          <div key={k.key} className="pulse-kpi">
+            <span className="pulse-kpi-label">
+              {k.label}
+              {k.term && <InfoTooltip term={k.term} />}
+            </span>
+            <span className={`pulse-kpi-value ${empty ? 'is-muted' : (k.tone || '')}`}>{k.value}</span>
+            {k.chip && !empty && <span className="pulse-kpi-chip">{k.chip}</span>}
+            <span className="pulse-kpi-hint">{k.hint}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* What moved but is not operating performance. Shown so the excluded money is
+          accounted for rather than quietly missing from the figures above. */}
+      {!empty && otherTotal > 0 && (
+        <div className="pulse-other">
+          <span className="pulse-other-label">Other cash movement this month</span>
+          <ul className="pulse-other-list">
+            {[['Opening balances', other.opening_balance],
+              ['Funding', other.funding],
+              ['Transfers', other.transfers],
+              ['Balance corrections', other.balance_corrections],
+              ['CAPEX', other.capex],
+              ['Tax', other.tax],
+              ['Needs review', other.needs_review]]
+              .filter(([, v]) => Number(v || 0) > 0)
+              .map(([label, v]) => (
+                <li key={label}><span>{label}</span><span className="pulse-other-amt">{idr(v)}</span></li>
+              ))}
+          </ul>
+          <p className="pulse-other-note">
+            Real cash movement, excluded from operating revenue and operating cash out so
+            it cannot distort performance.
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Unclassified transactions. The figures above are only as good as the classification
+ * behind them, so the count is stated plainly with a route to fix it — never hidden.
+ */
+export function NeedsReviewNotice({ count, navigate }) {
+  if (!count) return null
+  return (
+    <div className="pulse-review-note">
+      <Icon.warn width="15" height="15" aria-hidden="true" />
+      <span>
+        {count} transaction{count === 1 ? '' : 's'} need{count === 1 ? 's' : ''} classification review.
+        {' '}Until classified {count === 1 ? 'it is' : 'they are'} excluded from every figure on this page.
+      </span>
+      <button type="button" className="pulse-review-cta" onClick={() => navigate('/business/transactions')}>
+        Review classification<Icon.chev width="13" height="13" aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+/* ── empty-workspace callout ──────────────────────────────────────────────── */
+
+const FIRST_STEPS = [
+  { key: 'wallet', label: 'Add business wallet', sub: 'Bank, cash, e-wallet or gateway', icon: 'wallet', to: '/business/accounts', primary: true },
+  { key: 'transaction', label: 'Add transaction', sub: 'Record money in or out', icon: 'list', to: '/business/transactions' },
+  { key: 'document', label: 'Upload document', sub: 'Invoice, receipt or contract', icon: 'doc', to: '/business/documents' },
+  { key: 'provider', label: 'Connect payment provider', sub: 'Route incoming payments', icon: 'link', to: '/business/payment-connections' },
+]
+
+/**
+ * Shown only when the workspace genuinely has no data. It is the page's lead: the numbers
+ * above are all legitimately zero, so the useful thing to say is what unlocks them.
+ */
+export function EmptyWorkspaceCallout({ navigate }) {
+  return (
+    <section className="pulse-start">
+      <div className="pulse-start-head">
+        <span className="pulse-start-ic"><Icon.play width="20" height="20" aria-hidden="true" /></span>
+        <div>
+          <h2 className="pulse-start-title">Your finance workspace is ready</h2>
+          <p className="pulse-start-sub">
+            Add the first data source to unlock CFO insights. Cash, runway and working capital
+            start calculating as soon as there is something to calculate from — nothing here is
+            estimated in the meantime.
+          </p>
+        </div>
+      </div>
+      <div className="pulse-start-grid">
+        {FIRST_STEPS.map((a) => {
+          const C = Icon[a.icon] || Icon.dot
+          return (
+            <button key={a.key} type="button"
+              className={`pulse-start-action${a.primary ? ' is-primary' : ''}`}
+              onClick={() => navigate(a.to)}>
+              <span className="pulse-start-action-ic"><C width="18" height="18" aria-hidden="true" /></span>
+              <span className="pulse-start-action-text">
+                <span className="pulse-start-action-label">
+                  {a.label}
+                  {a.primary && <em>Start here</em>}
+                </span>
+                <span className="pulse-start-action-sub">{a.sub}</span>
+              </span>
+              <Icon.chev width="15" height="15" className="pulse-start-chev" aria-hidden="true" />
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+/* ── financial trends ─────────────────────────────────────────────────────── */
+
+/**
+ * An empty chart FRAME — grid, axis and month slots, drawn from nothing.
+ *
+ * There is deliberately no data path: not a flat line, not a sample series, not a shimmer
+ * pretending to be values. A placeholder shaped like a plotted line is indistinguishable
+ * from real data at a glance, and this is a finance product. The frame shows where the
+ * chart will live; the chips say what unlocks it.
+ */
+function ChartFrame({ variant = 'line' }) {
+  const cols = 6
+  return (
+    <svg className="pulse-trend-svg" viewBox="0 0 320 100" preserveAspectRatio="none"
+      role="presentation" aria-hidden="true" focusable="false">
+      {[20, 42, 64].map((y) => (
+        <line key={y} x1="26" y1={y} x2="308" y2={y} className="pulse-trend-grid" strokeDasharray="3 6" />
+      ))}
+      <line x1="26" y1="8" x2="26" y2="82" className="pulse-trend-axis" />
+      <line x1="26" y1="82" x2="308" y2="82" className="pulse-trend-axis" />
+      {variant === 'bars' ? (
+        // Receivables vs payables is a comparison, so its frame is bar-shaped.
+        [0, 1].map((i) => (
+          <rect key={i} x={78 + i * 106} y="34" width="84" height="48" rx="6" className="pulse-trend-slot" />
+        ))
+      ) : (
+        Array.from({ length: cols }).map((_, i) => {
+          const x = 26 + ((i + 1) * (282 / (cols + 1)))
+          return <line key={i} x1={x} y1="80" x2={x} y2="86" className="pulse-trend-axis" />
+        })
+      )}
+    </svg>
+  )
+}
+
+/* Compact SVG series plot. Dependency-free on purpose: two polylines on one scale. */
+function SeriesChart({ series, lines }) {
+  const pts = series.length
+  if (pts < 2) return null
+  const vals = lines.flatMap((l) => series.map((s) => Number(l.get(s) || 0)))
+  const max = Math.max(...vals, 0)
+  const min = Math.min(...vals, 0)
+  const span = (max - min) || 1
+  const x = (i) => 26 + (i * (282 / Math.max(1, pts - 1)))
+  const y = (v) => 82 - ((Number(v || 0) - min) / span) * 74
+  return (
+    <svg viewBox="0 0 320 92" className="pulse-trend-svg" role="img"
+      aria-label={`${lines.map((l) => l.label).join(' and ')} by month`}>
+      {[20, 42, 64].map((gy) => (
+        <line key={gy} x1="26" y1={gy} x2="308" y2={gy} className="pulse-trend-grid" strokeDasharray="3 6" />
+      ))}
+      <line x1="26" y1="8" x2="26" y2="82" className="pulse-trend-axis" />
+      <line x1="26" y1="82" x2="308" y2="82" className="pulse-trend-axis" />
+      {min < 0 && <line x1="26" y1={y(0)} x2="308" y2={y(0)} className="pulse-trend-axis" strokeDasharray="2 4" />}
+      {lines.map((l) => (
+        <polyline key={l.label} fill="none" stroke={l.color} strokeWidth="2"
+          strokeLinejoin="round" strokeLinecap="round"
+          points={series.map((sp, i) => `${x(i)},${y(l.get(sp))}`).join(' ')} />
+      ))}
+      {lines.map((l) => (
+        <circle key={`${l.label}-end`} cx={x(pts - 1)} cy={y(l.get(series[pts - 1]))} r="3" fill={l.color} />
+      ))}
+    </svg>
+  )
+}
+
+const Legend = ({ lines }) => (
+  <ul className="pulse-legend">
+    {lines.map((l) => (
+      <li key={l.label}><span className="pulse-legend-dot" style={{ background: l.color }} />{l.label}</li>
+    ))}
+  </ul>
+)
+
+const C_REV = '#1f9d55'
+const C_OUT = '#d64545'
+const C_GP = '#3399FF'
+const C_EB = '#003366'
+
+/**
+ * Financial trends.
+ *
+ * Plots real monthly series from GET /api/pulse/advanced-insights once at least two
+ * months exist. Below that there is no trend to draw, so the frame keeps its honest
+ * "needs history" state rather than rendering a single point as a line. Every plotted
+ * figure is cash-basis and estimated, and the caption says so on screen.
+ *
+ * The two forward-looking frames stay locked: V1 has no forecast model, and a projection
+ * drawn from a couple of months of history would be a guess wearing a chart.
+ */
+export function TrendsSection({ insights }) {
+  const data = insights?.data
+  const series = Array.isArray(data?.series) ? data.series : []
+  const enough = series.length >= 2
+
+  const charts = [
+    { key: 'revenue', title: 'Revenue vs operating cash out',
+      lines: [{ label: 'Revenue', color: C_REV, get: (s) => s.revenue },
+        { label: 'Direct + operating costs', color: C_OUT, get: (s) => s.direct_costs + s.opex }],
+      pill: 'Revenue history needed', body: 'Needs revenue recorded across more than one month.',
+      chips: ['Revenue history', 'Monthly transactions'] },
+    { key: 'profit', title: 'Gross profit / estimated EBITDA',
+      lines: [{ label: 'Gross profit', color: C_GP, get: (s) => s.gross_profit },
+        { label: 'Estimated EBITDA', color: C_EB, get: (s) => s.estimated_ebitda }],
+      pill: 'Cost structure needed', body: 'Needs revenue and classified costs across more than one month.',
+      chips: ['Direct costs', 'Operating costs'] },
+  ]
+  const frames = [
+    { key: 'runway', title: 'Cash runway forecast', variant: 'line', pill: 'Forecast model needed',
+      body: 'Needs a forward projection model - V1 does not estimate the future from past months.',
+      chips: ['Cash balance', 'Burn history'] },
+    { key: 'workingcap', title: 'Receivables vs payables forecast', variant: 'bars', pill: 'Due-date forecast needed',
+      body: 'Open balances appear in Working capital below; a dated forecast is not modelled in V1.',
+      chips: ['Receivables', 'Payables'] },
+  ]
+
+  return (
+    <section className="pulse-trends">
+      <div className="pulse-trends-head">
+        <div>
+          <h2 className="pulse-trends-title">Financial trends</h2>
+          <p className="pulse-trends-sub">
+            {enough
+              ? 'Monthly cash-basis figures from your recorded transactions. Estimates, not audited accounting.'
+              : 'Monthly trend charts will appear once the system has enough transaction history. We do not estimate trends from incomplete data.'}
+          </p>
+        </div>
+        <StatusBadge tone={enough ? 'info' : 'neutral'}>
+          {insights?.loading ? 'Loading' : enough ? `${series.length} months - cash-basis` : 'Needs monthly history'}
+        </StatusBadge>
+      </div>
+      <div className="pulse-trends-grid">
+        {charts.map((c) => (
+          <article key={c.key} className="pulse-trend">
+            <h3 className="pulse-trend-name">{c.title}</h3>
+            <div className="pulse-trend-frame">
+              {enough ? <SeriesChart series={series} lines={c.lines} />
+                : <><ChartFrame variant="line" /><span className="pulse-trend-pill">{c.pill}</span></>}
+            </div>
+            {enough ? <Legend lines={c.lines} /> : <p className="pulse-trend-body">{c.body}</p>}
+            {!enough && <ul className="pulse-chips">{c.chips.map((x) => <li key={x} className="pulse-chip">{x}</li>)}</ul>}
+          </article>
+        ))}
+        {frames.map((t) => (
+          <article key={t.key} className="pulse-trend">
+            <h3 className="pulse-trend-name">{t.title}</h3>
+            <div className="pulse-trend-frame">
+              <ChartFrame variant={t.variant} />
+              <span className="pulse-trend-pill">{t.pill}</span>
+            </div>
+            <p className="pulse-trend-body">{t.body}</p>
+            <ul className="pulse-chips">{t.chips.map((c) => <li key={c} className="pulse-chip">{c}</li>)}</ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Factual, not scored: how many of the four data sources this workspace actually has, and
+ * the real counts behind each. No weighting, no invented "confidence percentage".
+ */
+export function readinessOf(counts) {
+  const c = counts || {}
+  const sources = [
+    { key: 'wallets', label: 'Accounts', n: Number(c.wallets || 0), to: '/business/accounts', unlocks: 'Total cash' },
+    { key: 'transactions', label: 'Transactions', n: Number(c.transactions || 0), to: '/business/transactions', unlocks: 'Revenue, cash out, runway' },
+    { key: 'debts', label: 'Receivables & payables', n: Number(c.debts || 0), to: '/business/receivables', unlocks: 'Working capital, net position' },
+    { key: 'bank_import_batches', label: 'Bank imports', n: Number(c.bank_import_batches || 0), to: '/business/bank-import', unlocks: 'Faster transaction entry' },
+  ]
+  const present = sources.filter((s) => s.n > 0).length
+  return { sources, present, total: sources.length }
+}
+
+// Setup progress, not an alarm: an empty workspace is a normal starting point, so 0/4 is
+// neutral rather than a warning.
+export function ReadinessBadge({ readiness, loading }) {
+  if (loading) return null
+  const { present, total } = readiness
+  return (
+    <StatusBadge tone={present === total ? 'success' : 'neutral'}>
+      {present} of {total} sources connected
+    </StatusBadge>
+  )
+}
+
+export function ReadinessPanel({ readiness, loading, navigate }) {
+  if (loading) return null
+  const { sources, present, total } = readiness
+  const pct = total ? Math.round((present / total) * 100) : 0
+  return (
+    <Card title="Setup progress">
+      <div className="pulse-progress">
+        <div className="pulse-progress-head">
+          <span className="pulse-progress-count">{present} of {total} data sources connected</span>
+          <span className="pulse-progress-pct">{pct}%</span>
+        </div>
+        <span className="pulse-progress-bar" role="progressbar" aria-valuenow={present}
+          aria-valuemin={0} aria-valuemax={total} aria-label="Data sources connected">
+          <span className="pulse-progress-fill" style={{ width: `${pct}%` }} />
+        </span>
+      </div>
+      <ul className="pulse-readiness">
+        {sources.map((s) => (
+          <li key={s.key} className={s.n > 0 ? 'is-on' : ''}>
+            <span className="pulse-readiness-mark" aria-hidden="true">
+              {s.n > 0 ? <Icon.check width="12" height="12" /> : <Icon.dot width="7" height="7" />}
+            </span>
+            <span className="pulse-readiness-text">
+              <span className="pulse-readiness-label">{s.label}</span>
+              <span className="pulse-readiness-unlocks">Unlocks {s.unlocks.toLowerCase()}</span>
+            </span>
+            {s.n > 0
+              ? <span className="pulse-readiness-n">{s.n}</span>
+              : <button type="button" className="pulse-readiness-go" onClick={() => navigate(s.to)}>Add</button>}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+/* ── working capital ──────────────────────────────────────────────────────── */
+
+export function WorkingCapital({ d, idr, navigate }) {
+  const rec = Number(d.receivables || 0)
+  const pay = Number(d.payables || 0)
+  const pendRec = Number(d.pendingReceivables || 0)
+  const pendPay = Number(d.pendingPayables || 0)
+  const max = Math.max(rec, pay)
+  // Presentational only: the two bars are proportional to two figures the API returned.
+  const pctOf = (v) => (max > 0 ? Math.round((v / max) * 100) : 0)
+  const empty = rec === 0 && pay === 0 && pendRec === 0 && pendPay === 0
+
+  return (
+    <Card title="Working capital"
+      action={empty ? null : (
+        <StatusBadge tone={pay > rec ? 'warning' : 'neutral'}>
+          {pay > rec ? 'Owed more than owed to you' : 'Balanced'}
+        </StatusBadge>
+      )}>
+      {empty ? (
+        <div className="pulse-empty">
+          <span className="pulse-empty-ic"><Icon.transfer width="20" height="20" aria-hidden="true" /></span>
+          <p className="pulse-empty-title">Nothing owed either way yet</p>
+          <p className="pulse-empty-body">
+            Once you record what customers owe you and what you owe suppliers, this compares the
+            two side by side — the gap between them is what working capital actually means.
+          </p>
+          <Btn sm variant="ghost" onClick={() => navigate('/business/receivables')}>Add a receivable</Btn>
+        </div>
+      ) : (
+        <>
+          <div className="pulse-wc">
+            {[
+              { label: 'Receivables', v: rec, pending: pendRec, tone: 'pos', note: 'Owed to you' },
+              { label: 'Payables', v: pay, pending: pendPay, tone: 'neg', note: 'You owe' },
+            ].map((row) => (
+              <div key={row.label} className="pulse-wc-row">
+                <div className="pulse-wc-head">
+                  <span className="pulse-wc-label">{row.label}<em>{row.note}</em></span>
+                  <span className={`pulse-wc-v ${row.tone}`}>{idr(row.v)}</span>
+                </div>
+                <span className="pulse-wc-bar">
+                  <span className={`pulse-wc-fill ${row.tone}`} style={{ width: `${pctOf(row.v)}%` }} />
+                </span>
+                {row.pending > 0 && (
+                  <span className="pulse-wc-pending">+{idr(row.pending)} pending — not counted in cash</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="pulse-note">
+            Receivables are not cash. They are shown beside payables so the gap between what is
+            owed to you and what you owe is visible at a glance.
+          </p>
+          {/* Contextual, in the section it belongs to — not a duplicated action block. */}
+          <div className="pulse-card-actions">
+            <Btn sm variant="ghost" onClick={() => navigate('/business/receivables')}>Add receivable</Btn>
+            <Btn sm variant="ghost" onClick={() => navigate('/business/payables')}>Add payable</Btn>
+          </div>
+        </>
+      )}
+    </Card>
+  )
+}
+
+/* ── advanced financial insights (locked) ─────────────────────────────────── */
+/* -- advanced financial insights ------------------------------------------- */
+
+/**
+ * Each card is unlocked ONLY by its own status from GET /api/pulse/advanced-insights.
+ * A metric the ledger cannot support keeps its locked state and says what it needs - the
+ * point of this section is that it never shows a number it cannot stand behind. Unlocked
+ * cards are labelled cash-basis estimates requiring accountant review, because that is
+ * exactly what they are: keyword-classified cash movements, not audited accounting.
+ */
+export function AdvancedInsights({ navigate, insights, idr }) {
+  const data = insights?.data
+  const m = data?.metrics
+  const st = data?.status || {}
+  const fmt = (v) => (typeof idr === 'function' ? idr(v) : `IDR ${Number(v || 0).toLocaleString('de-DE')}`)
+  const pct = (v) => (v === null || v === undefined ? null : `${(v * 100).toFixed(1)}%`)
+
+  const CARDS = [
+    { key: 'gross', title: 'Gross profit', icon: 'fund',
+      unlocked: st.gross_profit === 'available',
+      value: m && fmt(m.gross_profit),
+      note: m && m.gross_margin !== null ? `Gross margin ${pct(m.gross_margin)} - cash-basis` : 'Cash-basis estimate',
+      lockedStatus: 'Needs cost structure',
+      body: 'What is left from revenue after the direct cost of delivering it.',
+      needs: ['COGS tracked', 'Direct costs categorised', 'Revenue lines mapped'],
+      cta: 'Set up cost structure', to: '/business/transactions' },
+    { key: 'capex', title: 'CAPEX', icon: 'bank',
+      unlocked: st.capex === 'available',
+      value: m && fmt(m.capex),
+      note: 'Equipment / long-term spend tagged - cash-basis, not depreciated',
+      lockedStatus: 'Needs asset structure',
+      body: 'What you spend on assets like equipment - separate from the day-to-day running costs.',
+      needs: ['Asset purchases classified', 'Equipment / long-term spend tagged', 'Operating spend separated'],
+      cta: 'Review asset structure', to: '/business/transactions' },
+    { key: 'ebitda', title: 'Estimated EBITDA', icon: 'cfo',
+      unlocked: st.ebitda === 'estimated',
+      value: m && fmt(m.estimated_ebitda),
+      note: 'Cash-basis, before depreciation and amortisation - needs accountant review',
+      lockedStatus: 'Locked insight',
+      body: 'How profitable the business is before interest, tax and non-cash charges like depreciation.',
+      needs: ['Depreciation classified', 'Amortisation classified', 'Interest mapped', 'Tax expense mapped'],
+      cta: 'View requirements', to: '/business/accountant' },
+    { key: 'net', title: 'Estimated net profit', icon: 'acct',
+      unlocked: st.net_profit === 'estimated',
+      value: m && fmt(m.estimated_net_profit),
+      note: 'Incomplete until tax, interest and depreciation are fully mapped - needs accountant review',
+      lockedStatus: 'Needs full profit structure',
+      body: 'What the business actually keeps once every cost is accounted for.',
+      needs: ['Gross profit available', 'Interest mapped', 'Tax mapped', 'Depreciation / amortisation mapped'],
+      cta: 'Complete finance structure', to: '/business/accountant' },
+  ]
+
+  const anyUnlocked = CARDS.some((c) => c.unlocked)
+
+  return (
+    <section className="pulse-insights">
+      <div className="pulse-insights-head">
+        <div>
+          <h2 className="pulse-insights-title">Advanced financial insights</h2>
+          <p className="pulse-insights-sub">
+            {anyUnlocked
+              ? 'Cash-basis estimates from your recorded transactions. These are not audited accounting figures - your accountant must confirm them.'
+              : 'These metrics require structured accounting data. We leave them locked until the system can calculate them honestly.'}
+          </p>
+        </div>
+        <StatusBadge tone={anyUnlocked ? 'warning' : 'neutral'}>
+          {insights?.loading ? 'Loading' : anyUnlocked ? 'Estimated - review required' : 'Locked until structured'}
+        </StatusBadge>
+      </div>
+
+      {anyUnlocked && data?.period?.from && (
+        <p className="pulse-insights-period">
+          Period {String(data.period.from).slice(0, 10)} to {String(data.period.to).slice(0, 10)} - {data.transactions_considered} transactions classified
+        </p>
+      )}
+
+      <div className="pulse-insights-grid">
+        {CARDS.map((c) => {
+          const C = Icon[c.icon] || Icon.dot
+          return (
+            <article key={c.key} className={`pulse-insight${c.unlocked ? ' is-live' : ''}`}>
+              <header className="pulse-insight-top">
+                <span className="pulse-insight-ic"><C width="17" height="17" aria-hidden="true" /></span>
+                <span className="pulse-insight-status">
+                  {c.unlocked ? 'Estimated'
+                    : <><Icon.lock width="10" height="10" aria-hidden="true" />{c.lockedStatus}</>}
+                </span>
+              </header>
+              <h3 className="pulse-insight-title">{c.title}</h3>
+              {c.unlocked ? (
+                <>
+                  <p className="pulse-insight-value">{c.value}</p>
+                  <p className="pulse-insight-note">{c.note}</p>
+                </>
+              ) : (
+                <>
+                  <p className="pulse-insight-body">{c.body}</p>
+                  <span className="pulse-insight-label">Unlocks when</span>
+                  <ul className="pulse-chips">
+                    {c.needs.map((n) => <li key={n} className="pulse-chip">{n}</li>)}
+                  </ul>
+                </>
+              )}
+              <button type="button" className="pulse-insight-cta" onClick={() => navigate(c.to)}>
+                {c.unlocked ? 'Review with accountant' : c.cta}
+                <Icon.chev width="13" height="13" aria-hidden="true" />
+              </button>
+            </article>
+          )
+        })}
+      </div>
+
+      {anyUnlocked && Array.isArray(data?.warnings) && data.warnings.length > 0 && (
+        <ul className="pulse-insights-warnings">
+          {data.warnings.map((w) => <li key={w}>{w}</li>)}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+/* ── AI CFO summary ───────────────────────────────────────────────────────── */
+
+/**
+ * Deterministic risk checks over figures the API already returned. These are plain
+ * comparisons, stated in the copy so the reasoning is visible — not a model output and not
+ * a hidden formula. `aiText` from the backend is shown verbatim as the current read.
+ */
+function risksOf(d) {
+  const out = []
+  const cash = Number(d.totalBalance || 0)
+  const pay = Number(d.payables || 0)
+  const runway = d.runway == null || d.runway === 999 ? null : Number(d.runway)
+  if (runway !== null && runway < 30) out.push(`Runway is ${runway} days at the current burn rate.`)
+  if (pay > cash && pay > 0) out.push('Payables exceed cash on hand — obligations are larger than the money available today.')
+  if (Number(d.income || 0) === 0 && Number(d.expenses || 0) > 0) out.push('Spending is recorded this month but no income is.')
+  return out
+}
+
+export function CfoSummary({ d, readiness, countsLoading, navigate, premium, empty }) {
+  const risks = risksOf(d)
+  const gaps = countsLoading ? [] : readiness.sources.filter((s) => s.n === 0).map((s) => s.label)
+  return (
+    <Card title="AI CFO summary"
+      action={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <StatusBadge tone="info"><Icon.cfo width="13" height="13" /> Live</StatusBadge>
+        <Btn sm variant="ghost" onClick={() => navigate('/business/ai-cfo')}>Ask AI CFO</Btn>
+      </span>}>
+      <div className="pulse-cfo">
+        <span className="pulse-cfo-ic"><Icon.cfo width="20" height="20" aria-hidden="true" /></span>
+        <div className="pulse-cfo-body">
+          <p className="pulse-cfo-read">
+            {empty
+              ? 'Nothing to analyse yet. This becomes a real read of your position as soon as the first account or transaction exists.'
+              : (d.aiText || 'No urgent actions detected.')}
+          </p>
+
+          {!empty && (
+            <div className="pulse-cfo-block">
+              <span className="pulse-cfo-label">Risk</span>
+              {risks.length
+                ? <ul className="pulse-cfo-list">{risks.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                : <p className="pulse-cfo-p">No threshold breached: runway, payables and income are all within normal range for the data recorded.</p>}
+            </div>
+          )}
+
+          <div className="pulse-cfo-block">
+            <span className="pulse-cfo-label">Data gaps</span>
+            {gaps.length
+              ? <p className="pulse-cfo-p">Not yet recorded: {gaps.join(', ').toLowerCase()}. Figures above are computed from what exists, so treat them as partial.</p>
+              : <p className="pulse-cfo-p">All four data sources have records. Figures above are computed from a complete set of inputs.</p>}
+          </div>
+
+          <div className="pulse-cfo-block">
+            <span className="pulse-cfo-label">Next action</span>
+            <p className="pulse-cfo-p">
+              {gaps.length
+                ? `Add ${gaps[0].toLowerCase()} first — it feeds the largest number of figures on this page.`
+                : risks.length
+                  ? 'Review the risk above before committing to any large payment.'
+                  : 'Keep recording transactions daily so runway and burn stay accurate.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+export function RecentActivity({ items, navigate }) {
+  return (
+    <Card title="Recent activity">
+      {items.length === 0 ? (
+        <div className="pulse-empty">
+          <span className="pulse-empty-ic"><Icon.list width="20" height="20" aria-hidden="true" /></span>
+          <p className="pulse-empty-title">No transactions yet</p>
+          <p className="pulse-empty-body">
+            The latest money movements appear here as a running sanity check on the totals above.
+          </p>
+          <Btn sm variant="ghost" onClick={() => navigate('/business/transactions')}>Add a transaction</Btn>
+        </div>
+      ) : <DataList items={items} />}
+    </Card>
+  )
+}

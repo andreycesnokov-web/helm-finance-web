@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Performance — profit</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.card{background:#FFFFFF;border:1px solid #DDE5EC;border-radius:20px}
+.kpi{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kl{font-size:13px;font-weight:600;color:#5A6E82}
+.kv{font-size:24px;font-weight:800}
+.ks{font-size:13px;color:#3D556E;line-height:1.45}
+.lg{display:inline-flex;align-items:center;gap:8px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.wf{display:grid;grid-template-columns:170px minmax(0,1fr) 110px;gap:14px;align-items:center;padding:9px 0;font-size:14px}
+.wf>*{min-width:0}
+.trk{position:relative;height:22px}
+.cl{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px;gap:12px;padding:9px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.cl>*{min-width:0}
+details summary{cursor:pointer;font-size:13px;font-weight:700;color:#1565C0;list-style:none}
+.tb{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.tb th,.tb td{padding:6px 8px;border-top:1px solid #EDF1F5;text-align:right;white-space:nowrap}
+.tb th:first-child,.tb td:first-child{text-align:left}
+.tb th{color:#5A6E82;font-weight:700}
+
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="performance" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Performance</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Is the business making money, and where does the cash go</p>
+</div>
+<div style="display: flex; gap: 10px;"><button class="btn">September 2026<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button><button class="btn"><svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 20h16"/></svg>Export</button></div>
+</header>
+<nav aria-label="Performance views" style="display: flex; gap: 26px; border-bottom: 1px solid #DDE5EC;"><a href="Performance.dc.html" aria-current="page" style="font-size: 14px; font-weight: 700; color: #003366; padding: 10px 2px; border-bottom: 2px solid #003366;">Profit</a><a href="PerformanceCash.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Cash</a><a href="PerformanceForecast.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Forecast</a></nav>
+<div style="display: flex; align-items: center; gap: 12px; background: #FBF1DF; border-radius: 14px; padding: 12px 16px; font-size: 14px; color: #3D556E;">
+<span class="tag" style="background: #FFFFFF; color: #8B5A08;">Estimate</span>
+<span style="flex-grow: 1;">September isn't closed yet. These numbers firm up when Rina closes the month — 39 of 41 records have a category.</span>
+<a href="Accountant.dc.html" style="font-weight: 700; white-space: nowrap;">Month close</a>
+</div>
+
+<section class="card" style="padding: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+<div class="kpi"><span class="kl">Revenue · September</span><span class="num kv">Rp 107.0M</span><span class="ks" style="color: #0F7A52; font-weight: 700;">24% up on August</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">Gross profit</span><span class="num kv">Rp 28.1M</span><span class="ks">26% margin. Without the one-off Rp 26.5M machine repair: Rp 54.6M, 51%</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">EBITDA</span><span class="num kv">−Rp 65.7M</span><span class="ks">Without the one-off repair: −Rp 39.2M</span></div>
+<div class="kpi" style="border-left: 1px solid #EDF1F5;"><span class="kl">Net profit</span><span class="num kv">−Rp 76.4M</span><span class="ks">Last 12 months −Rp 506.3M</span></div>
+</section>
+
+<section style="background: #003366; color: #FFFFFF; border-radius: 20px; padding: 20px 24px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 16px; align-items: center;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #0A3C6E; color: #FFFFFF; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></span>
+<span style="font-size: 15px; line-height: 1.55; color: #DCE7F2;"><strong style="color: #FFFFFF;">Revenue more than doubled in a year, but costs grew faster.</strong> Since the <a href="PerformanceApril.dc.html" title="See what changed in April" style="color: #FFFFFF; font-weight: 700; text-decoration: underline; text-decoration-color: #3399FF; text-decoration-thickness: 2px; text-underline-offset: 3px; background: rgba(51, 153, 255, 0.18); border-radius: 4px; padding: 0 4px;">April expansion</a> each month loses Rp 49–76M. Location fees alone are Rp 36M — a third of revenue. To reach zero EBITDA at a 51% gross margin you need about Rp 185M of revenue a month, or lower fixed costs.</span>
+<a class="btn" href="AskPanel.dc.html" style="background: transparent; border-color: #3D6A96; color: #FFFFFF;">Ask AI CFO</a>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+<figure class="card" style="margin: 0; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">Revenue and gross profit</h3><span style="font-size: 13px; color: #5A6E82;">Last 12 months · Rp millions</span></div>
+<svg viewBox="-56 -8 700 244" role="img" aria-label="Revenue and gross profit by month, October 2025 to September 2026. Revenue grew from Rp 44.0M to Rp 107.0M; gross profit was Rp 28.1M in September." style="width: 100%; height: auto; display: block; font-family: 'Manrope', sans-serif;">
+<line x1="0" y1="200.0" x2="640" y2="200.0" stroke="#C2CFDB" stroke-width="1"/>
+<text x="-8" y="205.0" font-size="15" fill="#5A6E82" text-anchor="end">0</text>
+<line x1="0" y1="120.0" x2="640" y2="120.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="125.0" font-size="15" fill="#5A6E82" text-anchor="end">50M</text>
+<line x1="0" y1="40.0" x2="640" y2="40.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="45.0" font-size="15" fill="#5A6E82" text-anchor="end">100M</text>
+<path d="M9.7 200.0V133.6Q9.7 129.6 13.7 129.6H21.7Q25.7 129.6 25.7 133.6V200.0Z" fill="#2A6FD1"><title>October 2025 · revenue Rp 44.0M</title></path>
+<path d="M27.7 200.0V176.3Q27.7 172.3 31.7 172.3H39.7Q43.7 172.3 43.7 176.3V200.0Z" fill="#D98A1C"><title>October 2025 · gross profit Rp 17.3M (39%)</title></path>
+<path d="M63.0 200.0V132.0Q63.0 128.0 67.0 128.0H75.0Q79.0 128.0 79.0 132.0V200.0Z" fill="#2A6FD1"><title>November 2025 · revenue Rp 45.0M</title></path>
+<path d="M81.0 200.0V175.0Q81.0 171.0 85.0 171.0H93.0Q97.0 171.0 97.0 175.0V200.0Z" fill="#D98A1C"><title>November 2025 · gross profit Rp 18.1M (40%)</title></path>
+<path d="M116.3 200.0V124.0Q116.3 120.0 120.3 120.0H128.3Q132.3 120.0 132.3 124.0V200.0Z" fill="#2A6FD1"><title>December 2025 · revenue Rp 50.0M</title></path>
+<path d="M134.3 200.0V168.3Q134.3 164.3 138.3 164.3H146.3Q150.3 164.3 150.3 168.3V200.0Z" fill="#D98A1C"><title>December 2025 · gross profit Rp 22.3M (45%)</title></path>
+<path d="M169.7 200.0V127.2Q169.7 123.2 173.7 123.2H181.7Q185.7 123.2 185.7 127.2V200.0Z" fill="#2A6FD1"><title>January 2026 · revenue Rp 48.0M</title></path>
+<path d="M187.7 200.0V171.0Q187.7 167.0 191.7 167.0H199.7Q203.7 167.0 203.7 171.0V200.0Z" fill="#D98A1C"><title>January 2026 · gross profit Rp 20.6M (43%)</title></path>
+<path d="M223.0 200.0V124.0Q223.0 120.0 227.0 120.0H235.0Q239.0 120.0 239.0 124.0V200.0Z" fill="#2A6FD1"><title>February 2026 · revenue Rp 50.0M</title></path>
+<path d="M241.0 200.0V168.3Q241.0 164.3 245.0 164.3H253.0Q257.0 164.3 257.0 168.3V200.0Z" fill="#D98A1C"><title>February 2026 · gross profit Rp 22.3M (45%)</title></path>
+<path d="M276.3 200.0V119.2Q276.3 115.2 280.3 115.2H288.3Q292.3 115.2 292.3 119.2V200.0Z" fill="#2A6FD1"><title>March 2026 · revenue Rp 53.0M</title></path>
+<path d="M294.3 200.0V164.2Q294.3 160.2 298.3 160.2H306.3Q310.3 160.2 310.3 164.2V200.0Z" fill="#D98A1C"><title>March 2026 · gross profit Rp 24.9M (47%)</title></path>
+<path d="M329.7 200.0V111.2Q329.7 107.2 333.7 107.2H341.7Q345.7 107.2 345.7 111.2V200.0Z" fill="#2A6FD1"><title>April 2026 · revenue Rp 58.0M</title></path>
+<path d="M347.7 200.0V173.4Q347.7 169.4 351.7 169.4H359.7Q363.7 169.4 363.7 173.4V200.0Z" fill="#D98A1C"><title>April 2026 · gross profit Rp 19.1M (33%)</title></path>
+<path d="M383.0 200.0V103.2Q383.0 99.2 387.0 99.2H395.0Q399.0 99.2 399.0 103.2V200.0Z" fill="#2A6FD1"><title>May 2026 · revenue Rp 63.0M</title></path>
+<path d="M401.0 200.0V176.3Q401.0 172.3 405.0 172.3H413.0Q417.0 172.3 417.0 176.3V200.0Z" fill="#D98A1C"><title>May 2026 · gross profit Rp 17.3M (27%)</title></path>
+<path d="M436.3 200.0V96.8Q436.3 92.8 440.3 92.8H448.3Q452.3 92.8 452.3 96.8V200.0Z" fill="#2A6FD1"><title>June 2026 · revenue Rp 67.0M</title></path>
+<path d="M454.3 200.0V170.9Q454.3 166.9 458.3 166.9H466.3Q470.3 166.9 470.3 170.9V200.0Z" fill="#D98A1C"><title>June 2026 · gross profit Rp 20.7M (31%)</title></path>
+<path d="M489.7 200.0V76.0Q489.7 72.0 493.7 72.0H501.7Q505.7 72.0 505.7 76.0V200.0Z" fill="#2A6FD1"><title>July 2026 · revenue Rp 80.0M</title></path>
+<path d="M507.7 200.0V153.3Q507.7 149.3 511.7 149.3H519.7Q523.7 149.3 523.7 153.3V200.0Z" fill="#D98A1C"><title>July 2026 · gross profit Rp 31.7M (40%)</title></path>
+<path d="M543.0 200.0V66.4Q543.0 62.4 547.0 62.4H555.0Q559.0 62.4 559.0 66.4V200.0Z" fill="#2A6FD1"><title>August 2026 · revenue Rp 86.0M</title></path>
+<path d="M561.0 200.0V145.1Q561.0 141.1 565.0 141.1H573.0Q577.0 141.1 577.0 145.1V200.0Z" fill="#D98A1C"><title>August 2026 · gross profit Rp 36.8M (43%)</title></path>
+<path d="M596.3 200.0V32.8Q596.3 28.8 600.3 28.8H608.3Q612.3 28.8 612.3 32.8V200.0Z" fill="#2A6FD1"><title>September 2026 · revenue Rp 107.0M</title></path>
+<path d="M614.3 200.0V159.0Q614.3 155.0 618.3 155.0H626.3Q630.3 155.0 630.3 159.0V200.0Z" fill="#D98A1C"><title>September 2026 · gross profit Rp 28.1M (26%)</title></path>
+<text x="604.3" y="22.8" font-size="15" font-weight="800" fill="#003366" text-anchor="middle">107.0</text>
+<text x="622.3" y="149.0" font-size="15" font-weight="800" fill="#003366" text-anchor="middle">28.1</text>
+<text x="26.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Oct '25</text>
+<text x="80.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Nov</text>
+<text x="133.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Dec</text>
+<text x="186.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Jan '26</text>
+<text x="240.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Feb</text>
+<text x="293.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Mar</text>
+<text x="346.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Apr</text>
+<text x="400.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">May</text>
+<text x="453.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Jun</text>
+<text x="506.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Jul</text>
+<text x="560.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Aug</text>
+<text x="613.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Sep</text>
+</svg>
+<figcaption style="display: flex; gap: 18px; font-size: 13px; color: #3D556E;"><span class="lg"><span class="sw" style="background: #2A6FD1;"></span>Revenue</span><span class="lg"><span class="sw" style="background: #D98A1C;"></span>Gross profit</span></figcaption>
+<details><summary>Show as table</summary><table class="tb"><tr><th>Month</th><th>Revenue</th><th>Gross profit</th><th>Margin</th></tr><tr><td class="num">October 2025</td><td class="num">44.0</td><td class="num">17.3</td><td class="num">39%</td></tr><tr><td class="num">November 2025</td><td class="num">45.0</td><td class="num">18.1</td><td class="num">40%</td></tr><tr><td class="num">December 2025</td><td class="num">50.0</td><td class="num">22.3</td><td class="num">45%</td></tr><tr><td class="num">January 2026</td><td class="num">48.0</td><td class="num">20.6</td><td class="num">43%</td></tr><tr><td class="num">February 2026</td><td class="num">50.0</td><td class="num">22.3</td><td class="num">45%</td></tr><tr><td class="num">March 2026</td><td class="num">53.0</td><td class="num">24.9</td><td class="num">47%</td></tr><tr><td class="num">April 2026</td><td class="num">58.0</td><td class="num">19.1</td><td class="num">33%</td></tr><tr><td class="num">May 2026</td><td class="num">63.0</td><td class="num">17.3</td><td class="num">27%</td></tr><tr><td class="num">June 2026</td><td class="num">67.0</td><td class="num">20.7</td><td class="num">31%</td></tr><tr><td class="num">July 2026</td><td class="num">80.0</td><td class="num">31.7</td><td class="num">40%</td></tr><tr><td class="num">August 2026</td><td class="num">86.0</td><td class="num">36.8</td><td class="num">43%</td></tr><tr><td class="num">September 2026</td><td class="num">107.0</td><td class="num">28.1</td><td class="num">26%</td></tr></table></details>
+</figure>
+<figure class="card" style="margin: 0; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; min-width: 0;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">EBITDA and net profit</h3><span style="font-size: 13px; color: #5A6E82;">Last 12 months · below zero means a loss</span></div>
+<svg viewBox="-56 -8 700 244" role="img" aria-label="EBITDA and net profit by month. Both negative all year; September EBITDA −Rp 65.7M, net profit −Rp 76.4M." style="width: 100%; height: auto; display: block; font-family: 'Manrope', sans-serif;">
+<line x1="0" y1="18.0" x2="640" y2="18.0" stroke="#C2CFDB" stroke-width="1"/>
+<text x="-8" y="23.0" font-size="15" fill="#5A6E82" text-anchor="end">0</text>
+<line x1="0" y1="102.0" x2="640" y2="102.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="107.0" font-size="15" fill="#5A6E82" text-anchor="end">−40M</text>
+<line x1="0" y1="186.0" x2="640" y2="186.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="191.0" font-size="15" fill="#5A6E82" text-anchor="end">−80M</text>
+<path d="M9.7 18.0V52.6Q9.7 56.6 13.7 56.6H21.7Q25.7 56.6 25.7 52.6V18.0Z" fill="#2A6FD1"><title>October 2025 · EBITDA −Rp 18.4M</title></path>
+<path d="M27.7 18.0V71.3Q27.7 75.3 31.7 75.3H39.7Q43.7 75.3 43.7 71.3V18.0Z" fill="#D98A1C"><title>October 2025 · net profit −Rp 27.3M</title></path>
+<path d="M63.0 18.0V51.0Q63.0 55.0 67.0 55.0H75.0Q79.0 55.0 79.0 51.0V18.0Z" fill="#2A6FD1"><title>November 2025 · EBITDA −Rp 17.6M</title></path>
+<path d="M81.0 18.0V69.6Q81.0 73.6 85.0 73.6H93.0Q97.0 73.6 97.0 69.6V18.0Z" fill="#D98A1C"><title>November 2025 · net profit −Rp 26.5M</title></path>
+<path d="M116.3 18.0V42.1Q116.3 46.1 120.3 46.1H128.3Q132.3 46.1 132.3 42.1V18.0Z" fill="#2A6FD1"><title>December 2025 · EBITDA −Rp 13.4M</title></path>
+<path d="M134.3 18.0V60.8Q134.3 64.8 138.3 64.8H146.3Q150.3 64.8 150.3 60.8V18.0Z" fill="#D98A1C"><title>December 2025 · net profit −Rp 22.3M</title></path>
+<path d="M169.7 18.0V48.9Q169.7 52.9 173.7 52.9H181.7Q185.7 52.9 185.7 48.9V18.0Z" fill="#2A6FD1"><title>January 2026 · EBITDA −Rp 16.6M</title></path>
+<path d="M187.7 18.0V67.5Q187.7 71.5 191.7 71.5H199.7Q203.7 71.5 203.7 67.5V18.0Z" fill="#D98A1C"><title>January 2026 · net profit −Rp 25.5M</title></path>
+<path d="M223.0 18.0V45.3Q223.0 49.3 227.0 49.3H235.0Q239.0 49.3 239.0 45.3V18.0Z" fill="#2A6FD1"><title>February 2026 · EBITDA −Rp 14.9M</title></path>
+<path d="M241.0 18.0V63.9Q241.0 67.9 245.0 67.9H253.0Q257.0 67.9 257.0 63.9V18.0Z" fill="#D98A1C"><title>February 2026 · net profit −Rp 23.8M</title></path>
+<path d="M276.3 18.0V40.9Q276.3 44.9 280.3 44.9H288.3Q292.3 44.9 292.3 40.9V18.0Z" fill="#2A6FD1"><title>March 2026 · EBITDA −Rp 12.8M</title></path>
+<path d="M294.3 18.0V59.5Q294.3 63.5 298.3 63.5H306.3Q310.3 63.5 310.3 59.5V18.0Z" fill="#D98A1C"><title>March 2026 · net profit −Rp 21.7M</title></path>
+<path d="M329.7 18.0V94.4Q329.7 98.4 333.7 98.4H341.7Q345.7 98.4 345.7 94.4V18.0Z" fill="#2A6FD1"><title>April 2026 · EBITDA −Rp 38.3M</title></path>
+<path d="M347.7 18.0V116.5Q347.7 120.5 351.7 120.5H359.7Q363.7 120.5 363.7 116.5V18.0Z" fill="#D98A1C"><title>April 2026 · net profit −Rp 48.8M</title></path>
+<path d="M383.0 18.0V112.9Q383.0 116.9 387.0 116.9H395.0Q399.0 116.9 399.0 112.9V18.0Z" fill="#2A6FD1"><title>May 2026 · EBITDA −Rp 47.1M</title></path>
+<path d="M401.0 18.0V135.0Q401.0 139.0 405.0 139.0H413.0Q417.0 139.0 417.0 135.0V18.0Z" fill="#D98A1C"><title>May 2026 · net profit −Rp 57.6M</title></path>
+<path d="M436.3 18.0V118.4Q436.3 122.4 440.3 122.4H448.3Q452.3 122.4 452.3 118.4V18.0Z" fill="#2A6FD1"><title>June 2026 · EBITDA −Rp 49.7M</title></path>
+<path d="M454.3 18.0V140.4Q454.3 144.4 458.3 144.4H466.3Q470.3 144.4 470.3 140.4V18.0Z" fill="#D98A1C"><title>June 2026 · net profit −Rp 60.2M</title></path>
+<path d="M489.7 18.0V116.3Q489.7 120.3 493.7 120.3H501.7Q505.7 120.3 505.7 116.3V18.0Z" fill="#2A6FD1"><title>July 2026 · EBITDA −Rp 48.7M</title></path>
+<path d="M507.7 18.0V138.8Q507.7 142.8 511.7 142.8H519.7Q523.7 142.8 523.7 138.8V18.0Z" fill="#D98A1C"><title>July 2026 · net profit −Rp 59.4M</title></path>
+<path d="M543.0 18.0V110.8Q543.0 114.8 547.0 114.8H555.0Q559.0 114.8 559.0 110.8V18.0Z" fill="#2A6FD1"><title>August 2026 · EBITDA −Rp 46.1M</title></path>
+<path d="M561.0 18.0V133.3Q561.0 137.3 565.0 137.3H573.0Q577.0 137.3 577.0 133.3V18.0Z" fill="#D98A1C"><title>August 2026 · net profit −Rp 56.8M</title></path>
+<path d="M596.3 18.0V152.1Q596.3 156.1 600.3 156.1H608.3Q612.3 156.1 612.3 152.1V18.0Z" fill="#2A6FD1"><title>September 2026 · EBITDA −Rp 65.7M</title></path>
+<path d="M614.3 18.0V174.5Q614.3 178.5 618.3 178.5H626.3Q630.3 178.5 630.3 174.5V18.0Z" fill="#D98A1C"><title>September 2026 · net profit −Rp 76.4M</title></path>
+<text x="604.3" y="171.1" font-size="15" font-weight="800" fill="#003366" text-anchor="end">−65.7</text>
+<text x="622.3" y="193.5" font-size="15" font-weight="800" fill="#003366" text-anchor="middle">−76.4</text>
+<text x="26.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Oct '25</text>
+<text x="80.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Nov</text>
+<text x="133.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Dec</text>
+<text x="186.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Jan '26</text>
+<text x="240.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Feb</text>
+<text x="293.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Mar</text>
+<text x="346.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Apr</text>
+<text x="400.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">May</text>
+<text x="453.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Jun</text>
+<text x="506.7" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Jul</text>
+<text x="560.0" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Aug</text>
+<text x="613.3" y="228" font-size="15" fill="#5A6E82" text-anchor="middle">Sep</text>
+</svg>
+<figcaption style="display: flex; gap: 18px; font-size: 13px; color: #3D556E;"><span class="lg"><span class="sw" style="background: #2A6FD1;"></span>EBITDA</span><span class="lg"><span class="sw" style="background: #D98A1C;"></span>Net profit</span></figcaption>
+<details><summary>Show as table</summary><table class="tb"><tr><th>Month</th><th>EBITDA</th><th>Depreciation</th><th>Interest</th><th>Net profit</th></tr><tr><td class="num">October 2025</td><td class="num">-18.4</td><td class="num">-8.9</td><td class="num">0.0</td><td class="num">-27.3</td></tr><tr><td class="num">November 2025</td><td class="num">-17.6</td><td class="num">-8.9</td><td class="num">0.0</td><td class="num">-26.5</td></tr><tr><td class="num">December 2025</td><td class="num">-13.4</td><td class="num">-8.9</td><td class="num">0.0</td><td class="num">-22.3</td></tr><tr><td class="num">January 2026</td><td class="num">-16.6</td><td class="num">-8.9</td><td class="num">0.0</td><td class="num">-25.5</td></tr><tr><td class="num">February 2026</td><td class="num">-14.9</td><td class="num">-8.9</td><td class="num">0.0</td><td class="num">-23.8</td></tr><tr><td class="num">March 2026</td><td class="num">-12.8</td><td class="num">-8.9</td><td class="num">0.0</td><td class="num">-21.7</td></tr><tr><td class="num">April 2026</td><td class="num">-38.3</td><td class="num">-10.5</td><td class="num">0.0</td><td class="num">-48.8</td></tr><tr><td class="num">May 2026</td><td class="num">-47.1</td><td class="num">-10.5</td><td class="num">0.0</td><td class="num">-57.6</td></tr><tr><td class="num">June 2026</td><td class="num">-49.7</td><td class="num">-10.5</td><td class="num">0.0</td><td class="num">-60.2</td></tr><tr><td class="num">July 2026</td><td class="num">-48.7</td><td class="num">-10.5</td><td class="num">-0.2</td><td class="num">-59.4</td></tr><tr><td class="num">August 2026</td><td class="num">-46.1</td><td class="num">-10.5</td><td class="num">-0.2</td><td class="num">-56.8</td></tr><tr><td class="num">September 2026</td><td class="num">-65.7</td><td class="num">-10.5</td><td class="num">-0.2</td><td class="num">-76.4</td></tr></table></details>
+</figure>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<section class="card" style="padding: 20px 24px 12px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">From revenue to profit · September</h3><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Estimate</span></div>
+<div class="wf"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 600;">Revenue</span><span style="font-size: 12px; color: #5A6E82;">Invoiced in September</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 42.11%; width: 56.32%; background: #2A6FD1; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 600;">Rp 107.0M</span></div>
+<div class="wf"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 600;">Direct costs</span><span style="font-size: 12px; color: #5A6E82;">Locations, chemicals, repair, fees</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 56.89%; width: 41.53%; background: #D98A1C; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 600;">−Rp 78.9M</span></div>
+<div class="wf" style="border-top: 1px solid #EDF1F5;"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 800;">Gross profit</span><span style="font-size: 12px; color: #5A6E82;">26% margin</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 42.11%; width: 14.79%; background: #003366; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 28.1M</span></div>
+<div class="wf"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 600;">Operating costs</span><span style="font-size: 12px; color: #5A6E82;">People, rent, legal, other</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 7.51%; width: 49.39%; background: #D98A1C; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 600;">−Rp 93.8M</span></div>
+<div class="wf" style="border-top: 1px solid #EDF1F5;"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 800;">EBITDA</span><span style="font-size: 12px; color: #5A6E82;">Before depreciation and interest</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 7.51%; width: 34.60%; background: #003366; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 65.7M</span></div>
+<div class="wf"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 600;">Depreciation</span><span style="font-size: 12px; color: #5A6E82;">Wear and tear · from Assets</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 1.97%; width: 5.53%; background: #D98A1C; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 600;">−Rp 10.5M</span></div>
+<div class="wf"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 600;">Interest</span><span style="font-size: 12px; color: #5A6E82;">Nusantara Holding loan</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 1.87%; width: 0.40%; background: #D98A1C; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 600;">−Rp 200K</span></div>
+<div class="wf"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 600;">Income tax</span><span style="font-size: 12px; color: #5A6E82;">Loss, so nothing due</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span></span><span class="num" style="text-align: right; font-weight: 600;">Rp 0</span></div>
+<div class="wf" style="border-top: 1px solid #EDF1F5;"><span style="display: flex; flex-direction: column; gap: 1px;"><span style="font-weight: 800;">Net profit</span><span style="font-size: 12px; color: #5A6E82;">Estimate until Rina closes September</span></span><span class="trk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 3px; height: 16px; left: 1.87%; width: 40.24%; background: #003366; border-radius: 4px;"></span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 76.4M</span></div>
+</section>
+<section class="card" style="padding: 20px 24px 12px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">Where the money went</h3><a href="Transactions.dc.html" style="font-size: 13px; font-weight: 700;">Transactions</a></div>
+<div class="cl" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 4px 0;"><span>Cost</span><span style="text-align: right;">September</span><span style="text-align: right;">August</span></div>
+<div class="cl" style="font-size: 12px; font-weight: 800; color: #5A6E82; padding-top: 14px;"><span>Direct costs</span><span></span><span></span></div>
+<div class="cl"><span style="font-weight: 600;">Location fees · 30 machines</span><span class="num" style="text-align: right; font-weight: 800;">Rp 36.0M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 36.0M</span></div>
+<div class="cl"><span style="font-weight: 600;">Cleaning chemicals</span><span class="num" style="text-align: right; font-weight: 800;">Rp 15.6M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 12.6M</span></div>
+<div class="cl"><span style="font-weight: 600; color: #8B5A08;">Machine repair · one-off</span><span class="num" style="text-align: right; font-weight: 800;">Rp 26.5M</span><span class="num" style="text-align: right; color: #5A6E82;">—</span></div>
+<div class="cl"><span style="font-weight: 600;">Payment fees</span><span class="num" style="text-align: right; font-weight: 800;">Rp 0.8M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 0.6M</span></div>
+<div class="cl" style="font-size: 12px; font-weight: 800; color: #5A6E82; padding-top: 14px;"><span>Operating costs</span><span></span><span></span></div>
+<div class="cl"><span style="font-weight: 600;">People · salaries and BPJS</span><span class="num" style="text-align: right; font-weight: 800;">Rp 27.8M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 27.5M</span></div>
+<div class="cl"><span style="font-weight: 600;">Office rent</span><span class="num" style="text-align: right; font-weight: 800;">Rp 7.4M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 7.4M</span></div>
+<div class="cl"><span style="font-weight: 600; color: #8B5A08;">Legal and accounting</span><span class="num" style="text-align: right; font-weight: 800;">Rp 10.0M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 3.0M</span></div>
+<div class="cl"><span style="font-weight: 600;">Design and marketing</span><span class="num" style="text-align: right; font-weight: 800;">Rp 4.5M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 3.0M</span></div>
+<div class="cl"><span style="font-weight: 600;">Utilities</span><span class="num" style="text-align: right; font-weight: 800;">Rp 2.1M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 2.0M</span></div>
+<div class="cl"><span style="font-weight: 600;">Other day-to-day costs</span><span class="num" style="text-align: right; font-weight: 800;">Rp 42.0M</span><span class="num" style="text-align: right; color: #5A6E82;">Rp 40.0M</span></div>
+<p style="margin: 10px 0 6px; font-size: 12px; line-height: 1.5; color: #5A6E82;">Amber lines are unusual for the month: a one-off repair and the Para Legals legal bill.</p>
+</section>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+<section class="card" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">How profit is counted</h3>
+<ul style="margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6; color: #3D556E;">
+<li>Revenue counts in the month you invoice or deliver — not when the money arrives.</li>
+<li>Costs count in the month you get the goods or service, including bills not yet paid.</li>
+<li>Equipment over Rp 5M becomes an asset and is spread over its life as depreciation.</li>
+<li>Loans, investor money and moves between your own accounts are never revenue or cost.</li>
+<li>Taxes you withhold for others (PPh 21, PPh 23) are not your cost.</li>
+</ul>
+</section>
+<section class="card" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Set up for your type of business</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.6; color: #3D556E;">Every category belongs to one group: revenue, direct cost, operating cost, asset purchase, funding, tax or transfer. CFO AI picks the groups from your KBLI codes — here, services and vending.</p>
+<p style="margin: 0; font-size: 14px; line-height: 1.6; color: #3D556E;">A restaurant would see food and drink cost as a direct cost. A rental business, property upkeep and agent fees. A developer, land and construction, with revenue counted when units are handed over.</p>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #F4F6F8; border-radius: 12px; padding: 12px 14px; font-size: 14px;"><span><strong class="num">39 of 41</strong> September records grouped · 2 need a category</span><a class="btn" href="Transactions.dc.html">Review</a></div>
+</section>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1820}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

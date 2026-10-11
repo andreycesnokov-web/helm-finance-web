@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Performance — mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:44px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.chip{font-family:inherit;font-size:14px;font-weight:700;border-radius:999px;height:44px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#5A6E82;min-width:56px;padding-top:8px}
+.kd{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid #EDF1F5}
+.kp{background:#FFFFFF;border:1px solid #DDE5EC;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.wm{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:10px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.wm>*{min-width:0}
+.tk{grid-column:1 / span 2;position:relative;height:12px}
+.lg{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="width: 390px; height: 1480px; box-sizing: border-box; background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366; display: flex; flex-direction: column;">
+
+<div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #FFFFFF; border-bottom: 1px solid #DDE5EC;">
+<a style="text-decoration: none; font-family: inherit; display: flex; align-items: center; gap: 10px; border: none; background: none; padding: 0; color: #003366; cursor: pointer; min-height: 44px;" href="MobileMore.dc.html">
+<img src="/_blob/d686945ebf91157e8d05a4e2e61c6202" alt="CFO AI" style="width: 28px; height: 28px;">
+<span style="font-size: 15px; font-weight: 800;">Nusantara Facilities</span>
+<svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px; color: #5A6E82;"><path d="M6 9l6 6 6-6"/></svg>
+</a>
+<a class="btn" aria-label="Notifications" style="width: 44px; padding: 0; border: none; background: transparent;" href="MobileApprovals.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></a>
+</div>
+
+<div style="padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 16px; flex-grow: 1;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 26px; font-weight: 400;">Performance</h1>
+<p style="margin: 0; font-size: 14px; color: #3D556E;">September 2026 · <span style="color: #8B5A08; font-weight: 700;">estimate until Rina closes it</span></p>
+</div>
+<div role="group" aria-label="Performance views" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 12px; padding: 4px; gap: 4px;"><button class="btn" aria-pressed="true" style="height: 36px; border: none; background: #003366; color: #FFFFFF;">Profit</button><button class="btn" style="height: 36px; border: none; color: #5A6E82;">Cash</button><button class="btn" style="height: 36px; border: none; color: #5A6E82;">Forecast</button></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div class="kp"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Revenue</span><span class="num" style="font-size: 18px; font-weight: 800;">Rp 107.0M</span><span style="font-size: 12px; font-weight: 700; color: #0F7A52;">24% up on Aug</span></div>
+<div class="kp"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Gross profit</span><span class="num" style="font-size: 18px; font-weight: 800;">Rp 28.1M</span><span style="font-size: 12px; color: #3D556E;">26% · 51% excl. repair</span></div>
+<div class="kp"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">EBITDA</span><span class="num" style="font-size: 18px; font-weight: 800;">−Rp 65.7M</span><span style="font-size: 12px; color: #3D556E;">−Rp 39.2M excl. repair</span></div>
+<div class="kp"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Net profit</span><span class="num" style="font-size: 18px; font-weight: 800;">−Rp 76.4M</span><span style="font-size: 12px; color: #3D556E;">12 months −Rp 506.3M</span></div>
+</div>
+<figure style="margin: 0; background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 800;">Revenue and gross profit · 12 months</h3>
+<svg viewBox="-36 -6 366 180" role="img" aria-label="Revenue and gross profit by month: revenue grew from Rp 44.0M to Rp 107.0M; gross profit Rp 28.1M in September." style="width: 100%; height: auto; display: block; font-family: 'Manrope', sans-serif;">
+<line x1="0" y1="150.0" x2="326" y2="150.0" stroke="#C2CFDB" stroke-width="1"/>
+<text x="-8" y="155.0" font-size="11" fill="#5A6E82" text-anchor="end">0</text>
+<line x1="0" y1="87.5" x2="326" y2="87.5" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="92.5" font-size="11" fill="#5A6E82" text-anchor="end">50M</text>
+<line x1="0" y1="25.0" x2="326" y2="25.0" stroke="#EDF1F5" stroke-width="1"/>
+<text x="-8" y="30.0" font-size="11" fill="#5A6E82" text-anchor="end">100M</text>
+<path d="M4.1 150.0V99.0Q4.1 95.0 8.1 95.0H9.1Q13.1 95.0 13.1 99.0V150.0Z" fill="#2A6FD1"><title>October 2025 · revenue Rp 44.0M</title></path>
+<path d="M14.1 150.0V132.4Q14.1 128.4 18.1 128.4H19.1Q23.1 128.4 23.1 132.4V150.0Z" fill="#D98A1C"><title>October 2025 · gross profit Rp 17.3M</title></path>
+<path d="M31.2 150.0V97.8Q31.2 93.8 35.2 93.8H36.2Q40.2 93.8 40.2 97.8V150.0Z" fill="#2A6FD1"><title>November 2025 · revenue Rp 45.0M</title></path>
+<path d="M41.2 150.0V131.4Q41.2 127.4 45.2 127.4H46.2Q50.2 127.4 50.2 131.4V150.0Z" fill="#D98A1C"><title>November 2025 · gross profit Rp 18.1M</title></path>
+<path d="M58.4 150.0V91.5Q58.4 87.5 62.4 87.5H63.4Q67.4 87.5 67.4 91.5V150.0Z" fill="#2A6FD1"><title>December 2025 · revenue Rp 50.0M</title></path>
+<path d="M68.4 150.0V126.1Q68.4 122.1 72.4 122.1H73.4Q77.4 122.1 77.4 126.1V150.0Z" fill="#D98A1C"><title>December 2025 · gross profit Rp 22.3M</title></path>
+<path d="M85.6 150.0V94.0Q85.6 90.0 89.6 90.0H90.6Q94.6 90.0 94.6 94.0V150.0Z" fill="#2A6FD1"><title>January 2026 · revenue Rp 48.0M</title></path>
+<path d="M95.6 150.0V128.2Q95.6 124.2 99.6 124.2H100.6Q104.6 124.2 104.6 128.2V150.0Z" fill="#D98A1C"><title>January 2026 · gross profit Rp 20.6M</title></path>
+<path d="M112.8 150.0V91.5Q112.8 87.5 116.8 87.5H117.8Q121.8 87.5 121.8 91.5V150.0Z" fill="#2A6FD1"><title>February 2026 · revenue Rp 50.0M</title></path>
+<path d="M122.8 150.0V126.1Q122.8 122.1 126.8 122.1H127.8Q131.8 122.1 131.8 126.1V150.0Z" fill="#D98A1C"><title>February 2026 · gross profit Rp 22.3M</title></path>
+<path d="M139.9 150.0V87.8Q139.9 83.8 143.9 83.8H144.9Q148.9 83.8 148.9 87.8V150.0Z" fill="#2A6FD1"><title>March 2026 · revenue Rp 53.0M</title></path>
+<path d="M149.9 150.0V122.9Q149.9 118.9 153.9 118.9H154.9Q158.9 118.9 158.9 122.9V150.0Z" fill="#D98A1C"><title>March 2026 · gross profit Rp 24.9M</title></path>
+<path d="M167.1 150.0V81.5Q167.1 77.5 171.1 77.5H172.1Q176.1 77.5 176.1 81.5V150.0Z" fill="#2A6FD1"><title>April 2026 · revenue Rp 58.0M</title></path>
+<path d="M177.1 150.0V130.1Q177.1 126.1 181.1 126.1H182.1Q186.1 126.1 186.1 130.1V150.0Z" fill="#D98A1C"><title>April 2026 · gross profit Rp 19.1M</title></path>
+<path d="M194.3 150.0V75.2Q194.3 71.2 198.3 71.2H199.3Q203.3 71.2 203.3 75.2V150.0Z" fill="#2A6FD1"><title>May 2026 · revenue Rp 63.0M</title></path>
+<path d="M204.3 150.0V132.4Q204.3 128.4 208.3 128.4H209.3Q213.3 128.4 213.3 132.4V150.0Z" fill="#D98A1C"><title>May 2026 · gross profit Rp 17.3M</title></path>
+<path d="M221.4 150.0V70.2Q221.4 66.2 225.4 66.2H226.4Q230.4 66.2 230.4 70.2V150.0Z" fill="#2A6FD1"><title>June 2026 · revenue Rp 67.0M</title></path>
+<path d="M231.4 150.0V128.1Q231.4 124.1 235.4 124.1H236.4Q240.4 124.1 240.4 128.1V150.0Z" fill="#D98A1C"><title>June 2026 · gross profit Rp 20.7M</title></path>
+<path d="M248.6 150.0V54.0Q248.6 50.0 252.6 50.0H253.6Q257.6 50.0 257.6 54.0V150.0Z" fill="#2A6FD1"><title>July 2026 · revenue Rp 80.0M</title></path>
+<path d="M258.6 150.0V114.4Q258.6 110.4 262.6 110.4H263.6Q267.6 110.4 267.6 114.4V150.0Z" fill="#D98A1C"><title>July 2026 · gross profit Rp 31.7M</title></path>
+<path d="M275.8 150.0V46.5Q275.8 42.5 279.8 42.5H280.8Q284.8 42.5 284.8 46.5V150.0Z" fill="#2A6FD1"><title>August 2026 · revenue Rp 86.0M</title></path>
+<path d="M285.8 150.0V108.0Q285.8 104.0 289.8 104.0H290.8Q294.8 104.0 294.8 108.0V150.0Z" fill="#D98A1C"><title>August 2026 · gross profit Rp 36.8M</title></path>
+<path d="M302.9 150.0V20.2Q302.9 16.2 306.9 16.2H307.9Q311.9 16.2 311.9 20.2V150.0Z" fill="#2A6FD1"><title>September 2026 · revenue Rp 107.0M</title></path>
+<path d="M312.9 150.0V118.9Q312.9 114.9 316.9 114.9H317.9Q321.9 114.9 321.9 118.9V150.0Z" fill="#D98A1C"><title>September 2026 · gross profit Rp 28.1M</title></path>
+<text x="13.6" y="168" font-size="11" fill="#5A6E82" text-anchor="middle">Oct '25</text>
+<text x="95.1" y="168" font-size="11" fill="#5A6E82" text-anchor="middle">Jan '26</text>
+<text x="176.6" y="168" font-size="11" fill="#5A6E82" text-anchor="middle">Apr</text>
+<text x="258.1" y="168" font-size="11" fill="#5A6E82" text-anchor="middle">Jul</text>
+<text x="312.4" y="168" font-size="11" fill="#5A6E82" text-anchor="middle">Sep</text>
+<text x="307.4" y="11.2" font-size="11" font-weight="800" fill="#003366" text-anchor="end">107.0</text>
+</svg>
+<figcaption style="display: flex; gap: 16px; font-size: 12px; color: #3D556E;"><span class="lg"><span class="sw" style="background: #2A6FD1;"></span>Revenue</span><span class="lg"><span class="sw" style="background: #D98A1C;"></span>Gross profit</span></figcaption>
+</figure>
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 16px; padding: 16px 16px 8px;">
+<h3 style="margin: 0 0 4px; font-size: 16px; font-weight: 800;">From revenue to profit</h3>
+<div class="wm"><span style="font-weight: 600;">Revenue</span><span class="num" style="font-weight: 600; text-align: right;">Rp 107.0M</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 42.11%; width: 56.32%; background: #2A6FD1; border-radius: 4px;"></span></span></div>
+<div class="wm"><span style="font-weight: 600;">Direct costs</span><span class="num" style="font-weight: 600; text-align: right;">−Rp 78.9M</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 56.89%; width: 41.53%; background: #D98A1C; border-radius: 4px;"></span></span></div>
+<div class="wm"><span style="font-weight: 800;">Gross profit</span><span class="num" style="font-weight: 800; text-align: right;">Rp 28.1M</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 42.11%; width: 14.79%; background: #003366; border-radius: 4px;"></span></span></div>
+<div class="wm"><span style="font-weight: 600;">Operating costs</span><span class="num" style="font-weight: 600; text-align: right;">−Rp 93.8M</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 7.51%; width: 49.39%; background: #D98A1C; border-radius: 4px;"></span></span></div>
+<div class="wm"><span style="font-weight: 800;">EBITDA</span><span class="num" style="font-weight: 800; text-align: right;">−Rp 65.7M</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 7.51%; width: 34.60%; background: #003366; border-radius: 4px;"></span></span></div>
+<div class="wm"><span style="font-weight: 600;">Depreciation</span><span class="num" style="font-weight: 600; text-align: right;">−Rp 10.5M</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 1.97%; width: 5.53%; background: #D98A1C; border-radius: 4px;"></span></span></div>
+<div class="wm"><span style="font-weight: 600;">Interest</span><span class="num" style="font-weight: 600; text-align: right;">−Rp 200K</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 1.87%; width: 0.60%; background: #D98A1C; border-radius: 4px;"></span></span></div>
+<div class="wm"><span style="font-weight: 800;">Net profit</span><span class="num" style="font-weight: 800; text-align: right;">−Rp 76.4M</span><span class="tk"><span style="position: absolute; top: 0; bottom: 0; left: 42.11%; width: 1px; background: #C2CFDB;"></span><span style="position: absolute; top: 2px; height: 8px; left: 1.87%; width: 40.24%; background: #003366; border-radius: 4px;"></span></span></div>
+</section>
+<section style="background: #003366; color: #FFFFFF; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+<span style="font-size: 14px; line-height: 1.55; color: #DCE7F2;"><strong style="color: #FFFFFF;">Costs grew faster than sales.</strong> Location fees are Rp 36M a month — a third of revenue. The repair (Rp 26.5M) won't repeat.</span>
+<a class="btn" href="AskSheetMobile.dc.html" style="background: transparent; border-color: #3D6A96; color: #FFFFFF;">Ask AI CFO</a>
+</section>
+</div>
+
+<nav style="display: flex; justify-content: space-around; align-items: flex-start; background: #FFFFFF; border-top: 1px solid #DDE5EC; padding: 6px 8px 22px;">
+<a class="tab" href="PulseMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Pulse</a>
+<a class="tab" href="RadarMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Radar</a>
+<a class="tab" href="MobileAdd.dc.html" aria-label="Add" style="padding-top: 0;"><span style="width: 52px; height: 52px; border-radius: 16px; background: #1565C0; color: #FFFFFF; display: flex; align-items: center; justify-content: center; margin-top: -18px; box-shadow: 0 6px 16px rgba(0, 51, 102, 0.22);"><svg class="ic" viewBox="0 0 24 24" style="width: 24px; height: 24px;"><path d="M12 5v14M5 12h14"/></svg></span>Add</a>
+<a class="tab" href="AICFOMobile.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI CFO</a>
+<a class="tab" href="MobileMore.dc.html" style="color: #1565C0;"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>More</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1480}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

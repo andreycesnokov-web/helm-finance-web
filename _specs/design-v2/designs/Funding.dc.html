@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Funding — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.fr{display:grid;grid-template-columns:minmax(0,1.4fr) 150px 130px 130px minmax(0,1.2fr);gap:16px;align-items:center;padding:16px 0;border-top:1px solid #EDF1F5;font-size:14px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="funding" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Funding</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Money from investors, from you and from your other companies — never counted as revenue</p>
+</div>
+<a class="btn btn-p" href="MobileAdd.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Record funding</a>
+</header>
+
+<section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Raised from outside</span>
+<span class="num" style="font-size: 30px; font-weight: 800;">Rp 205.0M</span>
+<span style="font-size: 13px; color: #3D556E;">Rp 120.0M equity · Rp 85.0M loans</span>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Still to pay back</span>
+<span class="num" style="font-size: 30px; font-weight: 800;">Rp 75.0M</span>
+<span style="font-size: 13px; color: #3D556E;">Founder Rp 45.0M · Nusantara Holding Rp 30.0M</span>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 6px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Next repayment</span>
+<span class="num" style="font-size: 30px; font-weight: 800;">31 Dec</span>
+<span style="font-size: 13px; color: #3D556E;">Rp 30.0M to Nusantara Holding · outside the 30-day Radar</span>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 8px 24px 12px;">
+<div class="fr" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 10px 0;"><span>From</span><span>Type</span><span style="text-align: right;">Received</span><span style="text-align: right;">To pay back</span><span>Terms</span></div>
+<div class="fr"><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">You (founder)</span><span style="font-size: 13px; color: #5A6E82;">Also shown in your Personal workspace</span></span><span><span class="tag" style="background: #E6F1FB; color: #1565C0;">Founder loan</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 55.0M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 45.0M</span><span style="color: #3D556E;">No interest · repay when runway is above 90 days</span></div>
+<div class="fr"><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">[Angel investor name]</span><span style="font-size: 13px; color: #5A6E82;">June 2026</span></span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Equity</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 120.0M</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span style="color: #3D556E;">20% · quarterly update promised</span></div>
+<div class="fr"><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">Nusantara Holding</span><span style="font-size: 13px; color: #5A6E82;">Your other company · intercompany</span></span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Intercompany loan</span></span><span class="num" style="text-align: right; font-weight: 800;">Rp 30.0M</span><span class="num" style="text-align: right; font-weight: 800;">Rp 30.0M</span><span style="color: #3D556E;">8% a year · Rp 200K interest paid monthly · due 31 Dec</span></div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;">
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">How funding shows in your numbers</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.6; color: #3D556E;">It adds to cash and runway on Pulse. It is never revenue, so it cannot make a month look profitable. Repayments appear on Radar as soon as they fall inside the forecast window.</p>
+</section>
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Investor update</h3>
+<p style="margin: 0; font-size: 14px; line-height: 1.6; color: #3D556E;">Your angel was promised a quarterly update. Q3 ended on 30 Sep.</p>
+<a class="btn btn-p" href="AICFO.dc.html" style="align-self: flex-start;">Draft Q3 update with AI CFO</a>
+</section>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":920}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

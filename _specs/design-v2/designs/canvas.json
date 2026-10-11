@@ -1,0 +1,490 @@
+{
+ "v": 3,
+ "attachments": {},
+ "boards": {
+  "AICFO.dc.html": {
+   "expand": "fill",
+   "h": 1200,
+   "title": "AI CFO — desktop",
+   "w": 1440,
+   "x": 0,
+   "y": 4440,
+   "is_interactive": true
+  },
+  "AICFOMobile.dc.html": {
+   "h": 1820,
+   "title": "AI CFO — mobile",
+   "w": 390,
+   "x": 1520,
+   "y": 4440,
+   "is_interactive": true
+  },
+  "Accountant.dc.html": {
+   "expand": "fill",
+   "h": 1080,
+   "title": "AI Accountant — month close and taxes",
+   "w": 1440,
+   "x": 1520,
+   "y": 11360,
+   "is_interactive": true
+  },
+  "Accounts.dc.html": {
+   "expand": "fill",
+   "h": 1000,
+   "title": "Accounts",
+   "w": 1440,
+   "x": 0,
+   "y": 6800,
+   "is_interactive": true
+  },
+  "Approvals.dc.html": {
+   "expand": "fill",
+   "h": 1120,
+   "title": "Approvals",
+   "w": 1440,
+   "x": 0,
+   "y": 9700,
+   "is_interactive": true
+  },
+  "BillDetail.dc.html": {
+   "expand": "fill",
+   "h": 1120,
+   "title": "Bill detail — tax split, documents, cash effect",
+   "w": 1440,
+   "x": 1520,
+   "y": 8400,
+   "is_interactive": true
+  },
+  "Bills.dc.html": {
+   "expand": "fill",
+   "h": 1180,
+   "title": "Bills & invoices (receivables + payables + invoices)",
+   "w": 1440,
+   "x": 0,
+   "y": 8400,
+   "is_interactive": true
+  },
+  "Counterparties.dc.html": {
+   "expand": "fill",
+   "h": 960,
+   "title": "Counterparties",
+   "w": 1440,
+   "x": 1520,
+   "y": 9700,
+   "is_interactive": true
+  },
+  "Documents.dc.html": {
+   "expand": "fill",
+   "h": 1000,
+   "title": "Documents",
+   "w": 1440,
+   "x": 0,
+   "y": 11360,
+   "is_interactive": true
+  },
+  "FirstDay.dc.html": {
+   "expand": "fill",
+   "h": 900,
+   "title": "Pulse — first day (replaces Onboarding)",
+   "w": 1440,
+   "x": 3040,
+   "y": 13680,
+   "is_interactive": true
+  },
+  "Funding.dc.html": {
+   "expand": "fill",
+   "h": 920,
+   "title": "Funding (investors + intercompany)",
+   "w": 1440,
+   "x": 3040,
+   "y": 6800,
+   "is_interactive": true
+  },
+  "Main.dc.html": {
+   "expand": "fill",
+   "h": 1160,
+   "title": "Pulse — desktop",
+   "w": 1440,
+   "x": 0,
+   "y": 0,
+   "is_interactive": true
+  },
+  "MobileAdd.dc.html": {
+   "h": 844,
+   "title": "Add — mobile",
+   "w": 390,
+   "x": 470,
+   "y": 15780,
+   "is_interactive": true
+  },
+  "MobileApprovals.dc.html": {
+   "h": 1200,
+   "title": "Approvals — mobile",
+   "w": 390,
+   "x": 940,
+   "y": 15780,
+   "is_interactive": true
+  },
+  "MobileBills.dc.html": {
+   "h": 1300,
+   "title": "Bills & invoices — mobile",
+   "w": 390,
+   "x": 1410,
+   "y": 15780,
+   "is_interactive": true
+  },
+  "MobileMore.dc.html": {
+   "h": 1500,
+   "title": "More — mobile",
+   "w": 390,
+   "x": 0,
+   "y": 15780,
+   "is_interactive": true
+  },
+  "Payroll.dc.html": {
+   "expand": "fill",
+   "h": 1060,
+   "title": "Payroll",
+   "w": 1440,
+   "x": 3040,
+   "y": 8400,
+   "is_interactive": true
+  },
+  "Personal.dc.html": {
+   "expand": "fill",
+   "h": 860,
+   "title": "Personal workspace",
+   "w": 1440,
+   "x": 1520,
+   "y": 13680,
+   "is_interactive": true
+  },
+  "PulseMobile.dc.html": {
+   "h": 1760,
+   "title": "Pulse — mobile",
+   "w": 390,
+   "x": 1520,
+   "y": 0,
+   "is_interactive": true
+  },
+  "Radar.dc.html": {
+   "expand": "fill",
+   "h": 1560,
+   "title": "Radar — desktop",
+   "w": 1440,
+   "x": 0,
+   "y": 2200,
+   "is_interactive": true
+  },
+  "RadarMobile.dc.html": {
+   "h": 1900,
+   "title": "Radar — mobile",
+   "w": 390,
+   "x": 1520,
+   "y": 2200,
+   "is_interactive": true
+  },
+  "Settings.dc.html": {
+   "expand": "fill",
+   "h": 1500,
+   "title": "Settings — targets, company, team, connections, plan",
+   "w": 1440,
+   "x": 0,
+   "y": 13680,
+   "is_interactive": true
+  },
+  "Sidebar.dc.html": {
+   "h": 1040,
+   "title": "Component — sidebar",
+   "w": 248,
+   "x": 3600,
+   "y": 0,
+   "is_interactive": true
+  },
+  "Transactions.dc.html": {
+   "expand": "fill",
+   "h": 1060,
+   "title": "Transactions",
+   "w": 1440,
+   "x": 1520,
+   "y": 6800,
+   "is_interactive": true
+  },
+  "AccountantPackages.dc.html": {
+   "x": 3040,
+   "y": 11360,
+   "w": 1440,
+   "h": 1380,
+   "title": "AI Accountant — documents by transaction",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "AccountantTaxes.dc.html": {
+   "x": 4560,
+   "y": 11360,
+   "w": 1440,
+   "h": 1640,
+   "title": "AI Accountant — tax calendar",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Assets.dc.html": {
+   "x": 4560,
+   "y": 6800,
+   "w": 1440,
+   "h": 1180,
+   "title": "Assets & balance",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "CompanyProfile.dc.html": {
+   "x": 4560,
+   "y": 13680,
+   "w": 1440,
+   "h": 1640,
+   "title": "Company profile — legal, activities (KBLI), tax, people",
+   "expand": "fill",
+   "is_interactive": true
+  },
+  "Performance.dc.html": {
+   "expand": "fill",
+   "h": 1820,
+   "title": "Performance — profit (accrual)",
+   "w": 1440,
+   "x": 4200,
+   "y": 0,
+   "is_interactive": true
+  },
+  "PerformanceCash.dc.html": {
+   "expand": "fill",
+   "h": 1580,
+   "title": "Performance — cash",
+   "w": 1440,
+   "x": 4200,
+   "y": 2200,
+   "is_interactive": true
+  },
+  "PerformanceForecast.dc.html": {
+   "expand": "fill",
+   "h": 1240,
+   "title": "Performance — forecast (payables, receivables, runway)",
+   "w": 1440,
+   "x": 4200,
+   "y": 4440,
+   "is_interactive": true
+  },
+  "PerformanceMobile.dc.html": {
+   "h": 1480,
+   "title": "Performance — mobile",
+   "w": 390,
+   "x": 5720,
+   "y": 0,
+   "is_interactive": true
+  },
+  "AskPanel.dc.html": {
+   "expand": "fill",
+   "h": 900,
+   "title": "AI CFO panel — opens from any page",
+   "w": 1440,
+   "x": 4200,
+   "y": 5760,
+   "is_interactive": true
+  },
+  "AskSheetMobile.dc.html": {
+   "h": 844,
+   "title": "AI CFO sheet — mobile",
+   "w": 390,
+   "x": 5720,
+   "y": 5760,
+   "is_interactive": true
+  },
+  "AddAsset.dc.html": {
+   "expand": "fill",
+   "h": 1320,
+   "title": "Add asset — invoice, details, documents by type",
+   "w": 1440,
+   "x": 6080,
+   "y": 6800,
+   "is_interactive": true
+  },
+  "AddCounterparty.dc.html": {
+   "expand": "fill",
+   "h": 1500,
+   "title": "Add counterparty — from a document, tax rules, duplicates",
+   "w": 1440,
+   "x": 3040,
+   "y": 9500,
+   "is_interactive": true
+  },
+  "AdminOverview.dc.html": {
+   "expand": "fill",
+   "h": 1260,
+   "title": "Platform admin — overview",
+   "w": 1440,
+   "x": 0,
+   "y": 17700,
+   "is_interactive": true
+  },
+  "AdminCompanies.dc.html": {
+   "expand": "fill",
+   "h": 1060,
+   "title": "Platform admin — companies",
+   "w": 1440,
+   "x": 1520,
+   "y": 17700,
+   "is_interactive": true
+  },
+  "AdminSystem.dc.html": {
+   "expand": "fill",
+   "h": 1200,
+   "title": "Platform admin — flags, services, AI cost, audit",
+   "w": 1440,
+   "x": 3040,
+   "y": 17700,
+   "is_interactive": true
+  },
+  "PerformanceApril.dc.html": {
+   "expand": "fill",
+   "h": 1340,
+   "title": "Performance — April expansion (opened from the AI note)",
+   "w": 1440,
+   "x": 6190,
+   "y": 0,
+   "is_interactive": true
+  }
+ },
+ "createdOnFiles": {
+  "at": "2026-10-02T05:10:00Z",
+  "v": 1
+ },
+ "designSystems": [],
+ "launch": {
+  "view": "canvas"
+ },
+ "notes": {
+  "t_acc": {
+   "kind": "title1",
+   "maxW": 6000,
+   "text": "Accounting — documents, month close, taxes",
+   "w": 240,
+   "x": 0,
+   "y": 11060
+  },
+  "t_cfo": {
+   "kind": "title1",
+   "maxW": 1910,
+   "text": "AI CFO — what should I decide",
+   "w": 240,
+   "x": 0,
+   "y": 4140
+  },
+  "t_mob": {
+   "kind": "title1",
+   "maxW": 1800,
+   "text": "Mobile — More, Add, Approvals, Bills",
+   "w": 240,
+   "x": 0,
+   "y": 15480
+  },
+  "t_money": {
+   "kind": "title1",
+   "maxW": 6000,
+   "text": "Money — accounts, transactions, funding, assets",
+   "w": 240,
+   "x": 0,
+   "y": 6500
+  },
+  "t_obl": {
+   "kind": "title1",
+   "maxW": 4480,
+   "text": "Obligations — what you're owed, what you owe, who decides",
+   "w": 240,
+   "x": 0,
+   "y": 8100
+  },
+  "t_pulse": {
+   "kind": "title1",
+   "maxW": 1910,
+   "text": "Pulse — am I OK, and what needs me today",
+   "w": 240,
+   "x": 0,
+   "y": -300
+  },
+  "t_radar": {
+   "kind": "title1",
+   "maxW": 1910,
+   "text": "Radar — where cash goes in the next 30 days",
+   "w": 240,
+   "x": 0,
+   "y": 1900
+  },
+  "t_set": {
+   "kind": "title1",
+   "maxW": 6000,
+   "text": "Settings, company profile, Personal and first day",
+   "w": 240,
+   "x": 0,
+   "y": 13380
+  },
+  "t_perf": {
+   "kind": "title1",
+   "maxW": 3430,
+   "text": "Performance — is the business making money (profit, cash, forecast)",
+   "w": 240,
+   "x": 4200,
+   "y": -300
+  },
+  "t_admin": {
+   "kind": "title1",
+   "maxW": 4480,
+   "text": "Platform admin — only you, as the owner of CFO AI",
+   "w": 240,
+   "x": 0,
+   "y": 17400
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "PulseMobile.dc.html",
+  "Sidebar.dc.html",
+  "Radar.dc.html",
+  "RadarMobile.dc.html",
+  "AICFO.dc.html",
+  "AICFOMobile.dc.html",
+  "Performance.dc.html",
+  "PerformanceCash.dc.html",
+  "PerformanceForecast.dc.html",
+  "PerformanceMobile.dc.html",
+  "PerformanceApril.dc.html",
+  "AskPanel.dc.html",
+  "AskSheetMobile.dc.html",
+  "Accounts.dc.html",
+  "Transactions.dc.html",
+  "Funding.dc.html",
+  "Assets.dc.html",
+  "AddAsset.dc.html",
+  "Bills.dc.html",
+  "BillDetail.dc.html",
+  "Payroll.dc.html",
+  "Approvals.dc.html",
+  "Counterparties.dc.html",
+  "AddCounterparty.dc.html",
+  "Documents.dc.html",
+  "Accountant.dc.html",
+  "AccountantPackages.dc.html",
+  "AccountantTaxes.dc.html",
+  "Settings.dc.html",
+  "CompanyProfile.dc.html",
+  "Personal.dc.html",
+  "FirstDay.dc.html",
+  "MobileMore.dc.html",
+  "MobileAdd.dc.html",
+  "MobileApprovals.dc.html",
+  "MobileBills.dc.html",
+  "AdminOverview.dc.html",
+  "AdminCompanies.dc.html",
+  "AdminSystem.dc.html"
+ ],
+ "pages": [],
+ "title": "CFO AI — full app redesign"
+}

@@ -1,0 +1,493 @@
+{
+  "research_as_of": "2026-10-06",
+  "legacy_file_inventory": [
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/bank_statement/README.md",
+      "bytes": 525,
+      "sha256": "cda7649a011bad1c6bc1cc74296060bffd762cbbcdfa36889545f59e945aa20e",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/invoice_requirements/README.md",
+      "bytes": 621,
+      "sha256": "424e7fc08c184fc01b4578da30f27e3e9af947da214494fab53f67533c8f5512",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/payment_proof/README.md",
+      "bytes": 613,
+      "sha256": "0aace696e58a4d283052ddb238babaa16eabcab1db1422c709e7c1703106ea0b",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/payroll_documents/README.md",
+      "bytes": 565,
+      "sha256": "305a3ac5598a62799b86ca54e2ab5a94004085df97aa13a9c8ebb5df636691ea",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/README.md",
+      "bytes": 791,
+      "sha256": "ee12374ac5774a955fd01af604b2b53a1ed6c107b965ae55ff3137c8cf241e2c",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/receipt_kwitansi/README.md",
+      "bytes": 514,
+      "sha256": "ff72d591b6b948f75971c122463775875be64ebe3820d0f94600f69844b7735c",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/rental_agreement/README.md",
+      "bytes": 627,
+      "sha256": "586d059c455e2bd913994df858f067bfb2f58d7d086ceee910ef68167f299912",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/accounting_evidence/tax_invoice/README.md",
+      "bytes": 551,
+      "sha256": "8368da84b8dbbe5d6c27ed15f08dc0197efc0a5cd7c14f8003c3ea6eed6a2f98",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/bpjs/README.md",
+      "bytes": 1567,
+      "sha256": "3ce7cb353146e225d73d60127a3de7871a1461fe93b609ad8d719fe5ffa09362",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/business_licenses/README.md",
+      "bytes": 972,
+      "sha256": "94b9ae80e76dcd5ff5e7e5cd830a757bc084ff5e2a84a8fd25df6313e13e0ee6",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/kbli/README.md",
+      "bytes": 1000,
+      "sha256": "e9ba0a14e67134dca76b3b56efbffa83f6793b8bb6b0622fa9081b097e2da783",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/lkpm/README.md",
+      "bytes": 1726,
+      "sha256": "ec13ab010fd01f3d451d7ea422fd46e04fb2312e4871797c155c4a883db01aff",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/nib/README.md",
+      "bytes": 855,
+      "sha256": "e89ed9bf0c6ef5a2bce770ec60fb14d73e778e852a9c5794fd4c61559a784fe6",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/oss/README.md",
+      "bytes": 1044,
+      "sha256": "0508062ba0d16d40382a5234ee01e8631675df3fcd461f160cf6a6b12e233d7d",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/pt_pma/README.md",
+      "bytes": 674,
+      "sha256": "338510e960925ab88c372c112fa6aa93ade6a9e55a8caf4c287a3d18fef32b96",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/compliance/README.md",
+      "bytes": 658,
+      "sha256": "d5c88eb35719301503621599dc870ac94bff6c7f94372430a59d4cff246931bb",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/ingestion_plan.md",
+      "bytes": 5669,
+      "sha256": "919ce37fdaa28d77f616c4b59c03904b8afed179b4c17603b81a725b35772603",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/raw_sources/MANIFEST.md",
+      "bytes": 2690,
+      "sha256": "e0c0bcca4a4358f1d959bb1fb6a6db85967967ee380d8ae391957ca7af14d323",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/README.md",
+      "bytes": 5740,
+      "sha256": "544a4db0d99f011a9f1d97efd49ae283ea8154eca2bfae244a208072e0110f03",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/reviewer_notes.md",
+      "bytes": 6674,
+      "sha256": "8746b90791ec4e1b57473fa72c6ad3854cc561b824ba26496984689f010782b2",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/rule_candidates/compliance_rule_candidates.json",
+      "bytes": 4179,
+      "sha256": "d39fb7434489c98d2f08be4af95f49c620561f02f1f12e88b3f927cbe88de633",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/rule_candidates/evidence_rule_candidates.json",
+      "bytes": 5335,
+      "sha256": "a004952c5fca0604622ff87ca342eb358f17a94c2143852f1bc4e9284822bb51",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/rule_candidates/tax_rule_candidates.json",
+      "bytes": 10330,
+      "sha256": "798cdbb438a943e098fcf9e5c1ba50a3f0b31a4ea190d91f84cae37395d6f9d8",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/secondary_references/README.md",
+      "bytes": 700,
+      "sha256": "9e054c856838432fee325077277923bda22bd9fd73ea4a17840144e339788885",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/source_registry.csv",
+      "bytes": 20455,
+      "sha256": "a15c4f4bbe711cba4713f99b87fdd39b87ff05de6d40851adb3c4554731284d2",
+      "inspection": "parsed_registry",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/source_registry.json",
+      "bytes": 46681,
+      "sha256": "40fdf5c5fcc6d7c74fd77b90b3d76644c7e26df6809aba7bf98e313cf15ebb68",
+      "inspection": "parsed_registry",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/accounting_evidence/evidence_overview.md",
+      "bytes": 1579,
+      "sha256": "8a6ed33e6ae2330db3d9e9634d987f87b258368e94b037698e52dd87869f64b1",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/accounting_evidence/README.md",
+      "bytes": 524,
+      "sha256": "0b56fcb718f0c726cfeb1146c95912ddd76baa3b80aebe90cbe7b599d2016d85",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/compliance/lkpm_bpjs.md",
+      "bytes": 1717,
+      "sha256": "3a90f84eae2197c1a9bb8fb56e0b7eee27dd41828f862b042e973e656fe7df3d",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/compliance/oss_nib_kbli.md",
+      "bytes": 1424,
+      "sha256": "e670f083b4cb2e56962a26d0186862179d79e147fe6f7d17d12536a39a0398e1",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/compliance/README.md",
+      "bytes": 506,
+      "sha256": "89bd03c84e60a37124ba8d79138595bdf39f9642b2ae649ad1a9ec37657fca8f",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/tax/coretax_bukti_potong.md",
+      "bytes": 1675,
+      "sha256": "03af86a4cf0dc5bea486b9472ce5a637cf83dc4431c16a22aaf61bbb3b7d5761",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/tax/pph_23.md",
+      "bytes": 1465,
+      "sha256": "f87a1f140fbb1d5269e98988e4eeb24ce8060ed134acb7bca36aa668cdcd5def",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/tax/pph_4_2.md",
+      "bytes": 1665,
+      "sha256": "546852b34cbe272e79eb3be9656508f8d587bde7b4338eb70f48947b9a683e0e",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/tax/ppn_vat.md",
+      "bytes": 1672,
+      "sha256": "dce97bc67a8a8ed3b9a25b02fed45970a934d72124710467275fcce23af4b17f",
+      "inspection": "read_research_reference",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/summaries/tax/README.md",
+      "bytes": 492,
+      "sha256": "3b49a36278f6d847d3f07fcb3d594ef3a88a8786665f2ef2a77a295a89e75d38",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/bukti_potong/README.md",
+      "bytes": 1083,
+      "sha256": "b2a9716c6f6d6d543d5265c6377f435f4959eb9a9cfeb9d0c4bf66ce08b4dd41",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/coretax/README.md",
+      "bytes": 1432,
+      "sha256": "ad203db678d79e7c490c85fa9f658a724b9fea6bc62f8b487a4edde6f03dd5ea",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/faktur_pajak/README.md",
+      "bytes": 906,
+      "sha256": "2abac3daf01f62f331718780139378c5cf850dd9cdf79ae61b20c704010ea1f3",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/pph_21/README.md",
+      "bytes": 1590,
+      "sha256": "d5b0e2a0e8006bdb896d2737aa1c8a8c24694fc5561c3f73031a52822b768d66",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/pph_23/README.md",
+      "bytes": 2591,
+      "sha256": "4d243ac3d2e9cee6d0b41c748c545d997191dd5542cc0216185ec67c0b91b2e2",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/pph_4_2/README.md",
+      "bytes": 1808,
+      "sha256": "f83f79def9b302f6a48a8a9153ff50392a8dc9bf12893d9b26d7297cb4324190",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/pph_badan/README.md",
+      "bytes": 1448,
+      "sha256": "9e2ffe335a6d9cbe77efab7ae01546ba4ec63e8d503ebb5961f11076c1f09bc9",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/ppn_vat/README.md",
+      "bytes": 2697,
+      "sha256": "11cc7b1379e399f4591fabdfef899d804e673417cca722492cf30adcb6c451b4",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/README.md",
+      "bytes": 800,
+      "sha256": "c294672d713420ee65cde8cb31982d18f45d722cd648b3a8a5b54d27dcdb8915",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    },
+    {
+      "path": "knowledge/indonesia_official_kb/tax/withholding/README.md",
+      "bytes": 839,
+      "sha256": "4d6a197695276bdc8721804b67e1698d014c76b6a9343473f062b7d3d6909e2d",
+      "inspection": "read_excerpt_only",
+      "legal_status": "not_verified"
+    }
+  ],
+  "legacy_registry_sources": 66,
+  "legacy_csv_rows": 66,
+  "legacy_archived_documents": [],
+  "legacy_downloaded_file_fields": 0,
+  "legacy_statuses": [
+    "collected"
+  ],
+  "legacy_claims_not_adopted": "All prior rate candidates are under review; a file hash establishes identity only.",
+  "live_database_inspected": false,
+  "new_sources": [
+    {
+      "id": "PP34_2017",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6",
+      "read_scope": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    {
+      "id": "PMK141_2015",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4",
+      "read_scope": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "PP55_2022",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "110443f869e4ef2314a2752dd0f57744c9d1f3c07bce233c62ac9d6151a0aaf6",
+      "read_scope": [
+        53,
+        56
+      ]
+    },
+    {
+      "id": "PP20_2026",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "3aadd85768e7dc3dd5f8431178ee0dd1d03d631835a493288563692de7cf8520",
+      "read_scope": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    {
+      "id": "PP58_2023",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "69b2e76e54fceba8a49afe73fd5385e9d343c27012f6bda49f657f7fb722cf5f",
+      "read_scope": [
+        5,
+        11
+      ]
+    },
+    {
+      "id": "PMK168_2023",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+      "read_scope": [
+        5,
+        15,
+        23
+      ]
+    },
+    {
+      "id": "PMK164_2023",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc",
+      "read_scope": [
+        6,
+        16,
+        22,
+        23
+      ]
+    },
+    {
+      "id": "PMK131_2024",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd",
+      "read_scope": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "PMK11_2025",
+      "status": "downloaded_extracted_not_read",
+      "sha256": "373a13e091cc697145b6624aa450c3dc60c8594501e900685964584152b35b6c",
+      "read_scope": []
+    },
+    {
+      "id": "PMK53_2025",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "8e01b291898f145c1b87649b9dbf53308a8e3cb75537eb954202c4afde1ebce5",
+      "read_scope": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "PMK81_2024",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574",
+      "read_scope": [
+        78,
+        80,
+        83,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143
+      ]
+    },
+    {
+      "id": "PMK1_2026",
+      "status": "download_failed",
+      "sha256": null,
+      "read_scope": []
+    },
+    {
+      "id": "PMK54_2025",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "77857b932602e5c46431155b82d3ebcfc3111e9289927b218f4316445a09b3f0",
+      "read_scope": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "DJP_SDSN_2023",
+      "status": "downloaded_selected_provisions_read",
+      "sha256": "45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc",
+      "read_scope": [
+        213,
+        214,
+        231,
+        232,
+        236,
+        242,
+        243,
+        244,
+        249,
+        252
+      ]
+    }
+  ]
+}

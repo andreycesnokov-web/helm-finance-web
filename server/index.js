@@ -1,0 +1,16658 @@
+const express = require('express');
+const cors = require('cors');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const { createClient } = require('@supabase/supabase-js');
+const { calculateDueDate, ymd } = require('./lib/dueDate');
+const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
+const { VALID_PLANS, computeBusinessAccess } = require('./lib/businessAccess');
+const docV = require('./lib/documentValidation');
+const { buildReminderRow } = require('./lib/reminderScope');
+const FININ = require('./lib/financialInsights');
+const SETTLE = require('./lib/invoiceSettlement');
+const docA = require('./lib/documentAccess');
+const TX = require('./lib/transactionClass');
+const WL = require('./lib/walletLedger');
+const { balanceFailure, nativeInputIsExact } = require('./lib/balanceFailure');
+const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
+const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
+const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
+const DW = require('./lib/debtWithholding');        // remaining balance with withholdings (batch 10)
+const ASSETS = require('./lib/assetRegister');      // Design v2 P-11 (migration 063)
+const BFUND = require('./lib/businessFunding');     // Design v2 P-03 (migration 064)
+const aiAccountantCore = require('./lib/aiAccountantCore');
+// Telegram-created payables are IDR-only until multi-currency payables exist end to end.
+// See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
+const { isSupportedTelegramCurrency, currencyNotSupported, normalizeCurrency } = require('./lib/telegramCurrency');
+// PR2.5: route-level Telegram actor resolution, gated by
+// TELEGRAM_CHANNEL_IDENTITY_RESOLVER_ENABLED (default OFF). With the flag off this
+// returns Number(telegram_id) — exactly what the inline code below used to do.
+const { resolveTelegramActorForRoute, sendTelegramActorError, isActorError } = require('./lib/telegramActor');
+// PR3: the active WORKSPACE, gated by TELEGRAM_ACTIVE_WORKSPACE_STATE_ENABLED (default OFF,
+// and ignored unless the identity resolver flag is also on). With both off this resolves the
+// same workspace from the same table as before — the change is that a failed lookup is now
+// reported as a failure instead of as "you have no workspaces".
+const { resolveTelegramActiveWorkspace, setTelegramActiveWorkspace } = require('./lib/telegramWorkspace');
+// PR2.6: outbound Telegram recipients. A platform user id is NOT a chat id — migration 042
+// gave email-origin accounts negative ids, and Telegram reads a negative chat_id as a GROUP.
+const { resolveTelegramNotificationRecipients, resolveSingleTelegramRecipient, isSendableChatId } = require('./lib/telegramNotifications');
+const {
+  resolveNotificationAudience, isGrantableCategory, isGrantableRole,
+  GRANTABLE_CATEGORIES, categoriesForRole,
+} = require('./lib/notificationPolicy');
+const { loadBusinessGrants, isGrantsEnabled } = require('./lib/notificationGrants');
+// PR4a: connecting and disconnecting a Telegram account. Identity only — a link grants no
+// access of any kind, and membership stays entirely in business_members.
+const telegramLink = require('./lib/telegramLink');
+const personalFundingRouter = require('./routes/personalFunding');
+const multer = require('multer');
+require('dotenv').config();
+
+// --- Environment validation (fail fast, never log secret values) -----------
+
+const REQUIRED_ENV = [
+  'SUPABASE_URL',
+  'SUPABASE_SECRET_KEY',
+  'BOT_TOKEN',
+  'JWT_SECRET',
+  // PR0.5: the only credential that authenticates the Telegram bot. Previously optional,
+  // because requireBotSecret() fell back to BOT_TOKEN when it was unset — which meant a
+  // missing value produced working-but-wrong authentication instead of an error.
+  'TELEGRAM_WEBHOOK_SECRET',
+];
+
+const missing = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missing.length > 0) {
+  console.error(`FATAL: Missing required environment variables: ${missing.join(', ')}`);
+  console.error('Set these variables before starting the server.');
+  process.exit(1);
+}
+
+const app = express();
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static('client/dist'));
+
+const { resolveActiveBusiness: _resolveActiveBusiness, getPrimaryBusinessId } = require('./lib/businessResolver');
+// Personal Workspace is gated (migrations 037–039 not applied). Until it is explicitly
+// enabled, business pages/API must not create personal-scoped wallets/records.
+const PERSONAL_WORKSPACE_ENABLED = process.env.PERSONAL_WORKSPACE_ENABLED === 'true';
+// Personal Account v1 (dark by default). A SEPARATE flag from the legacy
+// PERSONAL_WORKSPACE_ENABLED (which controls the old within-business wallet scope).
+// When off, every /api/personal/* route returns 404 and nothing is provisioned.
+// Requires migration 044 (personal owner-only guard + one-personal-per-owner index).
+const PERSONAL_ACCOUNT_V1_ENABLED = process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true';
+const PW = require('./lib/personalWorkspace');
+const fx = require('./lib/fxProvider');
+const Anthropic = require('@anthropic-ai/sdk');
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Email-primary identity (Phase 1) is OFF by default. Endpoints 404 when disabled.
+// Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
+// app_user_id_seq). Telegram auth is unaffected by this flag.
+const EMAIL_AUTH_ENABLED = process.env.EMAIL_AUTH_ENABLED === 'true';
+// DEV-ONLY: when true, the OTP code is returned in the API response for local testing.
+// NEVER enable in production. Off by default. HARD-DISABLED whenever NODE_ENV==='production'
+// regardless of the env var, so prod can never echo login codes/magic links in responses.
+const EMAIL_AUTH_DEV_RETURN_CODE = process.env.EMAIL_AUTH_DEV_RETURN_CODE === 'true'
+  && process.env.NODE_ENV !== 'production';
+// Email provider (magic-link delivery). Only 'resend' is wired. Missing/other → no send
+// (dev relies on EMAIL_AUTH_DEV_RETURN_CODE to surface the link locally).
+const { sendMagicLinkEmail } = require('./lib/emailSender');
+const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || '';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const EMAIL_FROM = process.env.EMAIL_FROM || '';
+const APP_BASE_URL = process.env.APP_BASE_URL || '';
+// Telegram per-user active-business routing (multi-business). OFF by default. When OFF,
+// existing Telegram behavior is unchanged and nothing queries telegram_user_state
+// (migration 043) — so production is safe before 043 is applied. When ON, the
+// active-business endpoints + resolver are live and from-receipt routes via the selection.
+const TELEGRAM_ACTIVE_BUSINESS_ENABLED = process.env.TELEGRAM_ACTIVE_BUSINESS_ENABLED === 'true';
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
+const JWT_SECRET = process.env.JWT_SECRET;
+const BOT_TOKEN = process.env.BOT_TOKEN;
+
+// --- Telegram Login verification ------------------------------------------
+
+function verifyTelegramAuth(data) {
+  const { hash, ...rest } = data;
+  const secret = crypto.createHash('sha256').update(BOT_TOKEN).digest();
+  const checkString = Object.keys(rest).sort()
+    .map(k => `${k}=${rest[k]}`).join('\n');
+  const hmac = crypto.createHmac('sha256', secret).update(checkString).digest('hex');
+  if (hmac !== hash) return false;
+  if (Date.now() / 1000 - parseInt(rest.auth_date) > 86400) return false;
+  return true;
+}
+
+// --- Auth ------------------------------------------------------------------
+
+app.post('/api/auth/telegram', async (req, res) => {
+  try {
+    const data = req.body;
+    if (!verifyTelegramAuth(data)) {
+      return res.status(401).json({ error: 'Invalid Telegram auth' });
+    }
+    const { data: user, error } = await supabase
+      .from('users')
+      .upsert({
+        id: data.id,
+        username: data.username || '',
+        first_name: data.first_name || '',
+      }, { onConflict: 'id' })
+      .select().single();
+    if (error) throw error;
+    const token = jwt.sign({ userId: user.id, firstName: user.first_name }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Auth middleware -------------------------------------------------------
+
+function auth(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'No token' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL IDENTITY (Phase 1) — OTP login, Personal Account shell, email team invites.
+// All endpoints are gated by EMAIL_AUTH_ENABLED (404 when off). Telegram auth above is
+// untouched. Requires migration 042. New email-first users get a NEGATIVE BIGINT id
+// (next_app_user_id) — disjoint from positive Telegram ids.
+// ─────────────────────────────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
+const hashEmailCode = (code) => crypto.createHash('sha256').update(`${JWT_SECRET}:${code}`).digest('hex');
+const sixDigitCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+const magicToken = () => crypto.randomBytes(32).toString('hex');   // 256-bit URL-safe token
+const OTP_TTL_MS = 10 * 60 * 1000;       // 10 minutes
+
+// Tiny in-memory rate limiter (best-effort; resets on restart). Keyed by email+ip.
+const _rl = new Map();
+function rateLimited(key, max, windowMs) {
+  const now = Date.now();
+  const e = _rl.get(key);
+  if (!e || now > e.reset) { _rl.set(key, { n: 1, reset: now + windowMs }); return false; }
+  e.n += 1; return e.n > max;
+}
+
+// Feature gate middleware — 404 when email auth is disabled (no surface area).
+function emailAuthGate(req, res, next) {
+  if (!EMAIL_AUTH_ENABLED) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Resolve the internal user for an email, or create a new email-first user with a
+// NEGATIVE id + an identity + a Personal Account profile shell. Returns { id, display_name }.
+// Schema-safe: the base `users` table varies across environments, so we insert only the
+// id and gracefully drop any optional column the live schema lacks (e.g. first_name).
+// The display name lives in user_profiles.display_name, never assumed on users.
+async function resolveOrCreateEmailUser(email) {
+  const { data: idRows } = await supabase.from('user_email_identities')
+    .select('user_id').eq('email', email).limit(1);
+  if (idRows?.length) {
+    const uid = idRows[0].user_id;
+    const { data: prof } = await supabase.from('user_profiles').select('display_name').eq('user_id', uid).limit(1);
+    return { id: uid, display_name: prof?.[0]?.display_name || null };
+  }
+  const { data: idResp, error: idErr } = await supabase.rpc('next_app_user_id');
+  if (idErr) throw idErr;
+  const newId = Array.isArray(idResp) ? idResp[0] : idResp;
+  const localPart = email.split('@')[0];
+  // graceful insert: keep id; drop optional columns the schema doesn't have.
+  let row = { id: newId, username: '', first_name: localPart }, uErr;
+  for (let i = 0; i < 4; i++) {
+    ({ error: uErr } = await supabase.from('users').insert(row));
+    if (!uErr) break;
+    const col = /find the '([a-z_]+)' column/i.exec(uErr.message || '')?.[1];
+    if (col && col in row && col !== 'id') { delete row[col]; continue; }
+    break;
+  }
+  if (uErr) throw uErr;
+  await supabase.from('user_email_identities').insert({ user_id: newId, email, email_verified_at: new Date().toISOString() });
+  await supabase.from('user_profiles').insert({ user_id: newId, display_name: localPart });
+  return { id: newId, display_name: localPart };
+}
+
+// Persist a secret (6-digit code OR magic token) for an email/purpose; stores only the
+// HASH and returns the plaintext secret (caller emails it). Reuses email_login_codes —
+// magic links and OTP codes share the table (purpose-scoped, hashed, single-use, expiring).
+// FAILS LOUDLY: if the row cannot be persisted (e.g. Supabase unreachable), we throw a
+// typed error so the caller aborts BEFORE emailing a link whose token was never stored —
+// that combination produced "invalid or expired" for every link during the outage.
+// Logs the technical reason only (no token, no magic link, no secret ever logged).
+async function issueEmailSecret(email, purpose, secret) {
+  const { error } = await supabase.from('email_login_codes').insert({
+    email, code_hash: hashEmailCode(secret), purpose,
+    expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+  });
+  if (error) {
+    console.error(`[email-auth] ${purpose} secret NOT stored for ${email} — insert failed: ${error.message}`);
+    const err = new Error('secret_not_persisted');
+    err.code = 'secret_not_persisted';
+    throw err;
+  }
+  console.log(`[email-auth] ${purpose} secret issued for ${email}`);
+  return secret;
+}
+async function issueEmailCode(email, purpose) { return issueEmailSecret(email, purpose, sixDigitCode()); }
+
+// Look up an UNCONSUMED, UNEXPIRED code/token by its HASH (validate-first; touches no
+// users). Matching by code_hash supports both the 6-digit code (with email) and the
+// magic token (by token alone — the token itself is the secret). Returns rec or null.
+async function findUnconsumedCode({ email = null, purpose, codeHash }) {
+  let q = supabase.from('email_login_codes').select('*')
+    .eq('purpose', purpose).eq('code_hash', codeHash).is('consumed_at', null)
+    .order('created_at', { ascending: false }).limit(1);
+  if (email) q = q.eq('email', email);
+  const { data } = await q;
+  const rec = data?.[0];
+  if (!rec) return null;
+  if (new Date(rec.expires_at) < new Date()) return null;
+  return rec;
+}
+
+// Atomically mark a validated code consumed (single-use, race-safe via the
+// `consumed_at IS NULL` guard). Returns true only if THIS call consumed it.
+async function markCodeConsumed(recId, userId) {
+  const { data } = await supabase.from('email_login_codes')
+    .update({ consumed_at: new Date().toISOString(), consumed_by_user_id: userId || null })
+    .eq('id', recId).is('consumed_at', null).select('id');
+  return !!data?.length;
+}
+
+const emailJwt = (user, email) => jwt.sign({
+  userId: user.id,
+  firstName: user.display_name || (email ? email.split('@')[0] : 'User'),
+  auth_channel: 'email',
+}, JWT_SECRET, { expiresIn: '30d' });
+
+// POST /api/auth/email/start — MAGIC-LINK FIRST. Issues a magic-link token AND a 6-digit
+// fallback code (both hashed, single-use, expiring). Always returns { ok:true }
+// (anti-enumeration). In DEV only (EMAIL_AUTH_DEV_RETURN_CODE) returns the magic link +
+// code for local testing — NEVER in production.
+app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'ip';
+    if (rateLimited(`start:${email}`, 5, 60 * 60 * 1000) || rateLimited(`start-ip:${ip}`, 30, 60 * 60 * 1000))
+      return res.status(429).json({ error: 'rate_limited' });
+    // Persist FIRST. If the token cannot be stored we must NOT send an email — a link whose
+    // token was never saved always fails later as "invalid or expired". Returns a safe 503;
+    // the failure is store-wide (not per-email) so this leaks no account existence.
+    let token, code;
+    try {
+      token = await issueEmailSecret(email, 'login', magicToken());   // magic link
+      code = await issueEmailCode(email, 'login');                    // fallback OTP (dev/manual only)
+    } catch (e) {
+      if (e?.code === 'secret_not_persisted') {
+        return res.status(503).json({
+          error: 'auth_temporarily_unavailable',
+          message: 'Login is temporarily unavailable. Please try again in a few minutes.',
+        });
+      }
+      throw e;
+    }
+    const magic_link_path = `/login/email/callback?token=${token}`;
+    const magicLinkUrl = `${APP_BASE_URL}${magic_link_path}`;
+    // Send ONLY the magic link (the 6-digit code is fallback/dev-only, never emailed).
+    // NON-FATAL: a send failure must NOT change the response (anti-enumeration) and must
+    // not reveal whether the email exists. Errors are logged server-side without secrets.
+    try { await sendMagicLinkEmail({ provider: EMAIL_PROVIDER, apiKey: RESEND_API_KEY, from: EMAIL_FROM, toEmail: email, magicLinkUrl }); }
+    catch (e) { console.warn('[email-send] unexpected error:', e.message); }
+    // Dev convenience only: surface the link/code in the response (NEVER in production).
+    if (EMAIL_AUTH_DEV_RETURN_CODE) console.log(`[email-auth][dev] magic link for ${email}: ${magicLinkUrl}`);
+    res.json({ ok: true, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: code, magic_link: magic_link_path } : {}) });
+  } catch (e) {
+    // Technical detail stays in the server log; the client gets a safe, generic message.
+    console.error(`[email-auth] start failed: ${e.message}`);
+    res.status(503).json({
+      error: 'auth_temporarily_unavailable',
+      message: 'Login is temporarily unavailable. Please try again in a few minutes.',
+    });
+  }
+});
+
+// POST /api/auth/email/verify — accepts EITHER { token } (magic link, primary) OR
+// { email, code } (6-digit fallback). Validates first (no user on a bad token/code),
+// then resolves/creates the user and atomically consumes the secret.
+app.post('/api/auth/email/verify', emailAuthGate, async (req, res) => {
+  try {
+    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    let email = normalizeEmail(req.body?.email);
+    const code = String(req.body?.code || '');
+
+    let rec = null;
+    if (token) {
+      // magic link: the token IS the secret — look it up by hash (email comes from the record).
+      if (!/^[a-f0-9]{64}$/.test(token)) return res.status(400).json({ error: 'invalid_input' });
+      rec = await findUnconsumedCode({ purpose: 'login', codeHash: hashEmailCode(token) });
+      if (!rec) return res.status(401).json({ error: 'invalid_or_expired_token' });
+      email = rec.email;
+    } else {
+      // 6-digit fallback.
+      if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ error: 'invalid_input' });
+      if (rateLimited(`verify:${email}`, 10, 10 * 60 * 1000)) return res.status(429).json({ error: 'rate_limited' });
+      rec = await findUnconsumedCode({ email, purpose: 'login', codeHash: hashEmailCode(code) });
+      if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    }
+    const user = await resolveOrCreateEmailUser(email);
+    if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/auth/email/accept-invite — invited email user joins a business (no Telegram).
+// Body: { email, code }. The code (purpose='invite_accept') carries the business_invites code.
+app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const code = String(req.body?.code || '');
+    const inviteCode = String(req.body?.invite_code || '');
+    if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code) || !inviteCode) return res.status(400).json({ error: 'invalid_input' });
+    const { data: inv } = await supabase.from('business_invites')
+      .select('id, business_id, role, status').eq('code', inviteCode).limit(1);
+    const invite = inv?.[0];
+    if (!invite || invite.status !== 'active') return res.status(404).json({ error: 'invite_not_found' });
+    // validate OTP FIRST (no user created on a wrong code), then resolve/create + consume.
+    if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'invalid_input' });
+    const rec = await findUnconsumedCode({ email, purpose: 'invite_accept', codeHash: hashEmailCode(code) });
+    if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    const user = await resolveOrCreateEmailUser(email);
+    if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
+    // attach membership (idempotent on business_id+user_id)
+    await supabase.from('business_members')
+      .upsert({ business_id: invite.business_id, user_id: user.id, role: invite.role, status: 'active' },
+              { onConflict: 'business_id,user_id' });
+    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name }, business_id: invite.business_id, role: invite.role });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Personal Account shell — read/update the signed-in user's profile (identity only).
+app.get('/api/me/profile', emailAuthGate, auth, async (req, res) => {
+  try {
+    const { data } = await supabase.from('user_profiles').select('*').eq('user_id', req.user.userId).limit(1);
+    res.json({ profile: data?.[0] || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.patch('/api/me/profile', emailAuthGate, auth, async (req, res) => {
+  try {
+    const allowed = ['display_name', 'locale', 'timezone', 'avatar_url'];
+    const patch = {}; for (const k of allowed) if (k in (req.body || {})) patch[k] = req.body[k];
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
+
+    // Field validation (B4). Lengths bounded; locale allow-listed; avatar_url may only
+    // be cleared ('') or point at OUR public avatars bucket — arbitrary external URLs
+    // are rejected so a profile can never carry a foreign/tracking image address.
+    if ('display_name' in patch) {
+      patch.display_name = String(patch.display_name ?? '').trim().slice(0, 80);
+    }
+    if ('locale' in patch && patch.locale !== '' && !['en', 'ru', 'id'].includes(patch.locale)) {
+      return res.status(400).json({ error: 'invalid_locale' });
+    }
+    if ('timezone' in patch) {
+      patch.timezone = String(patch.timezone ?? '').trim().slice(0, 64);
+      if (patch.timezone && !/^[A-Za-z0-9_+\-/]+$/.test(patch.timezone)) {
+        return res.status(400).json({ error: 'invalid_timezone' });
+      }
+    }
+    if ('avatar_url' in patch && patch.avatar_url !== '' && patch.avatar_url != null) {
+      const ok = typeof patch.avatar_url === 'string'
+        && patch.avatar_url.length <= 500
+        && patch.avatar_url.includes(`/storage/v1/object/public/${AVATAR_BUCKET}/`);
+      if (!ok) return res.status(400).json({ error: 'invalid_avatar_url', message: 'Use the photo upload — external image URLs are not accepted.' });
+    }
+    const { data } = await supabase.from('user_profiles')
+      .upsert({ user_id: req.user.userId, ...patch }, { onConflict: 'user_id' }).select().single();
+    res.json({ profile: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Avatar upload (public `avatars` bucket) ───────────────────────────────────
+// POST /api/me/avatar — multipart image upload. Owner-only by construction: the
+// storage path is namespaced by req.user.userId, so a user can only ever write/
+// overwrite their OWN avatar. Image-only, 5 MB max. Stores to avatars/{userId}/
+// {uuid}.{ext} and persists the PUBLIC url into user_profiles.avatar_url.
+const AVATAR_BUCKET = process.env.AVATARS_BUCKET || 'avatars';
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const AVATAR_MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    // Accept only known raster image types we can serve back.
+    if (AVATAR_MIME_EXT[file.mimetype]) return cb(null, true);
+    cb(Object.assign(new Error('not_an_image'), { code: 'NOT_AN_IMAGE' }));
+  },
+});
+
+// Lazily ensure the public bucket exists (idempotent; service_role only).
+let _avatarBucketReady = false;
+async function ensureAvatarBucket() {
+  if (_avatarBucketReady) return;
+  const { data } = await supabase.storage.getBucket(AVATAR_BUCKET);
+  if (!data) {
+    await supabase.storage.createBucket(AVATAR_BUCKET, {
+      public: true, fileSizeLimit: AVATAR_MAX_BYTES,
+      allowedMimeTypes: Object.keys(AVATAR_MIME_EXT),
+    }).catch(() => { /* race: another request created it */ });
+  }
+  _avatarBucketReady = true;
+}
+
+// GET /api/me/login-methods — read-only "Login & Security" summary for the CURRENT user.
+// Shows which login methods are attached to this one account. NEVER exposes the internal
+// user id (normal-user UI must not show ids like -2); admins use /api/admin/users for ids.
+app.get('/api/me/login-methods', emailAuthGate, auth, async (req, res) => {
+  try {
+    const uid = req.user.userId;
+    const [{ data: emails }, { data: prof }] = await Promise.all([
+      supabase.from('user_email_identities').select('email, email_verified_at').eq('user_id', uid).order('email_verified_at', { ascending: true }),
+      supabase.from('user_profiles').select('display_name, avatar_url').eq('user_id', uid).limit(1),
+    ]);
+    const primary = (emails || [])[0] || null;
+    res.json({
+      email: primary?.email || null,
+      email_verified: !!primary?.email_verified_at,
+      telegram_linked: Number(uid) > 0,   // positive ids are Telegram-origin accounts
+      display_name: prof?.[0]?.display_name || null,
+      avatar_url: prof?.[0]?.avatar_url || null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
+app.post('/api/me/avatar', emailAuthGate, auth, (req, res) => {
+  avatarUpload.single('avatar')(req, res, async (err) => {
+    try {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'file_too_large', message: 'Image must be 5 MB or smaller.' });
+        if (err.code === 'NOT_AN_IMAGE')   return res.status(400).json({ error: 'not_an_image', message: 'Please choose an image file.' });
+        return res.status(400).json({ error: 'upload_failed', message: 'Could not read the uploaded file.' });
+      }
+      const file = req.file;
+      if (!file) return res.status(400).json({ error: 'no_file', message: 'No image was provided.' });
+      const ext = AVATAR_MIME_EXT[file.mimetype];
+      if (!ext) return res.status(400).json({ error: 'not_an_image', message: 'Please choose an image file.' });
+
+      const userId = req.user.userId;
+      // Storage-abuse guard: authenticated users can't loop 5MB uploads (10/hour).
+      if (rateLimited(`avatar:${userId}`, 10, 60 * 60 * 1000))
+        return res.status(429).json({ error: 'rate_limited', message: 'Too many uploads — try again later.' });
+
+      await ensureAvatarBucket();
+      // Remember the previous avatar path so we can delete the orphan after replacing.
+      const { data: prevRows } = await supabase.from('user_profiles')
+        .select('avatar_url').eq('user_id', userId).limit(1);
+      const prevUrl = prevRows?.[0]?.avatar_url || '';
+      const prevPath = (() => {
+        const m = prevUrl.match(new RegExp(`/${AVATAR_BUCKET}/(.+)$`));
+        // Only ever delete inside the caller's own folder — never trust a foreign path.
+        return m && m[1].startsWith(`${userId}/`) ? m[1] : null;
+      })();
+
+      const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET)
+        .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+      if (upErr) return res.status(502).json({ error: 'storage_error', message: 'Could not store the image. Please try again.' });
+
+      const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+      const avatar_url = pub?.publicUrl;
+      const { error: dbErr } = await supabase.from('user_profiles')
+        .upsert({ user_id: userId, avatar_url }, { onConflict: 'user_id' });
+      if (dbErr) return res.status(500).json({ error: 'save_failed', message: 'Image uploaded but could not be saved to your profile.' });
+
+      // Best-effort cleanup of the replaced file (profile already points at the new one).
+      if (prevPath && prevPath !== path) supabase.storage.from(AVATAR_BUCKET).remove([prevPath]).catch(() => {});
+
+      res.json({ ok: true, avatar_url });
+    } catch (e) {
+      res.status(500).json({ error: 'upload_failed', message: 'Could not upload the image.' });
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PERSONAL ACCOUNT v1 (dark behind PERSONAL_ACCOUNT_V1_ENABLED)
+// ─────────────────────────────────────────────────────────────────────────────
+// A personal workspace is a businesses row type='personal' owned by the caller.
+// Personal finance reuses wallets/transactions/cashflow_categories, ALWAYS scoped
+// by business_id = personal_workspace_id AND scope='personal' (never bare user_id).
+// Flag OFF → every route 404s and nothing is provisioned.
+
+// 404 when the feature is off (explicit JSON, not the SPA catch-all).
+function personalGate(req, res, next) {
+  if (!PERSONAL_ACCOUNT_V1_ENABLED) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Resolve (and optionally first-action provision) the caller's personal workspace.
+// Returns the workspace row, or null after sending an error response.
+async function loadPersonalWs(req, res, createIfMissing) {
+  try {
+    await PW.rejectBusinessWorkspaceId(supabase, req.headers['x-business-id'] || req.query?.business_id || null);
+    return await PW.resolvePersonalWorkspace(supabase, req.user.userId, { createIfMissing });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message || 'failed' });
+    return null;
+  }
+}
+
+// All personal transactions for the workspace (strict scope). Used by summary + balances.
+async function personalTxRows(wsId, extra = (q) => q) {
+  const { data } = await extra(supabase.from('transactions')
+    .select('id, type, amount_original, currency_original, wallet_id, category, description, transaction_date, source, created_at')
+    .eq('business_id', wsId).eq('scope', 'personal'));
+  return data || [];
+}
+
+// GET /api/personal/summary — first-action provisions. Balance, MTD income/expense,
+// net saved, recent tx, and a deterministic CFO-Lite insight (no business data).
+app.get('/api/personal/summary', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, true); if (!ws) return;
+  try {
+    const [{ data: wallets }, txAll] = await Promise.all([
+      supabase.from('wallets').select('id, name, type, currency, color, is_active, sort_order')
+        .eq('business_id', ws.id).eq('scope', 'personal').eq('is_active', true),
+      personalTxRows(ws.id),
+    ]);
+    const bal = PW.walletBalances(txAll);
+
+    // ── Currency correctness: NEVER sum across currencies. Totals/insights are computed
+    // in the workspace base currency only; other currencies are reported natively as
+    // separate lines (same rule as the business MoneyCard: no cross-asset sums).
+    const baseCur = (ws.base_currency || 'IDR').toUpperCase();
+    const walletCur = new Map((wallets || []).map(w => [w.id, (w.currency || baseCur).toUpperCase()]));
+    const totalBalance = (wallets || [])
+      .filter(w => (w.currency || baseCur).toUpperCase() === baseCur)
+      .reduce((s, w) => s + (bal.get(w.id) || 0), 0);
+    const otherMap = new Map();
+    for (const w of (wallets || [])) {
+      const cur = (w.currency || baseCur).toUpperCase();
+      if (cur === baseCur) continue;
+      otherMap.set(cur, (otherMap.get(cur) || 0) + (bal.get(w.id) || 0));
+    }
+    const other_currencies = [...otherMap.entries()].map(([currency, balance]) => ({ currency, balance }));
+
+    const inBase = (t) => ((t.currency_original || walletCur.get(t.wallet_id) || baseCur).toUpperCase() === baseCur);
+    // Balance corrections adjust wallet balances but are NOT income/spending — keep them
+    // out of monthly stats (otherwise a correction inflates income / savings rate).
+    const isCorrection = (t) => (t.category === 'Balance Correction');
+    const now = new Date();
+    const inMonth = (d, base) => { const t = new Date(d); return t.getFullYear() === base.getFullYear() && t.getMonth() === base.getMonth(); };
+    const realTx = txAll.filter(t => !PW.isTransferLeg(t) && !isCorrection(t) && inBase(t)); // base-currency cash flow only
+    const mtd = realTx.filter(t => inMonth(t.transaction_date || t.created_at, now));
+    const income_mtd = mtd.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount_original || 0), 0);
+    const expense_mtd = mtd.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount_original || 0), 0);
+
+    // Top expense categories MTD (base currency only).
+    const catMap = new Map();
+    mtd.filter(t => t.type === 'expense').forEach(t => { const k = t.category || 'Uncategorized'; catMap.set(k, (catMap.get(k) || 0) + Number(t.amount_original || 0)); });
+    const top_categories = [...catMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([name, amount]) => ({ name, amount }));
+
+    // Same-day-of-month spend last month → "spending faster?" + delta %.
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const dayCap = now.getDate();
+    const lastMonthToDate = realTx.filter(t => t.type === 'expense' && inMonth(t.transaction_date || t.created_at, lastMonth) && new Date(t.transaction_date || t.created_at).getDate() <= dayCap)
+      .reduce((s, t) => s + Number(t.amount_original || 0), 0);
+    const vs_last_month_pct = lastMonthToDate > 0 ? Math.round(((expense_mtd - lastMonthToDate) / lastMonthToDate) * 100) : null;
+
+    const recent = txAll.slice().sort((a, b) => new Date(b.transaction_date || b.created_at) - new Date(a.transaction_date || a.created_at)).slice(0, 7);
+
+    res.json({
+      workspace: { id: ws.id, base_currency: baseCur },
+      totals: { balance: totalBalance, income_mtd, expense_mtd, net_saved: income_mtd - expense_mtd, other_currencies },
+      recent,
+      // Safe-to-spend can never exceed what's actually in the base-currency wallets.
+      insight: { top_categories, vs_last_month_pct, safe_to_spend: Math.max(0, Math.min(totalBalance, income_mtd - expense_mtd)), spending_faster: expense_mtd > lastMonthToDate },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/personal/wallets — list with derived native balances.
+app.get('/api/personal/wallets', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: wallets } = await supabase.from('wallets')
+      .select('id, name, type, currency, color, is_active, sort_order')
+      .eq('business_id', ws.id).eq('scope', 'personal').eq('is_active', true).order('sort_order');
+    const bal = PW.walletBalances(await personalTxRows(ws.id));
+    res.json({ wallets: (wallets || []).map(w => ({ ...w, balance: bal.get(w.id) || 0 })) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/personal/wallets — first-action provisions the workspace.
+app.post('/api/personal/wallets', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, true); if (!ws) return;
+  try {
+    const { name, type, currency, color } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'name_required' });
+    if (!PW.WALLET_TYPES.includes(type)) return res.status(400).json({ error: 'invalid_type', message: `type must be one of ${PW.WALLET_TYPES.join(', ')}` });
+    const { data, error } = await supabase.from('wallets').insert({
+      user_id: req.user.userId, business_id: ws.id, scope: 'personal',
+      name: name.trim(), type, currency: (currency || ws.base_currency || 'IDR').toUpperCase(),
+      color: color || null, is_active: true, created_by_user_id: req.user.userId,
+    }).select().single();
+    if (error) return res.status(500).json({ error: 'wallet_create_failed' });
+    res.status(201).json({ wallet: { ...data, balance: 0 } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/personal/wallets/:id — owner-scoped (must belong to this personal ws).
+app.patch('/api/personal/wallets/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: own } = await supabase.from('wallets').select('id')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    if (!own?.length) return res.status(404).json({ error: 'wallet_not_found' });
+    const patch = { updated_at: new Date().toISOString() };
+    for (const k of ['name', 'color', 'sort_order', 'is_active']) if (k in (req.body || {})) patch[k] = req.body[k];
+    const { data, error } = await supabase.from('wallets').update(patch).eq('id', req.params.id).select().single();
+    if (error) return res.status(400).json({ error: 'wallet_update_failed' });
+    res.json({ wallet: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/personal/wallets/:id — blocked if it has transactions.
+app.delete('/api/personal/wallets/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: own } = await supabase.from('wallets').select('id')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    if (!own?.length) return res.status(404).json({ error: 'wallet_not_found' });
+    const { count } = await supabase.from('transactions').select('id', { count: 'exact', head: true })
+      .eq('business_id', ws.id).eq('scope', 'personal').eq('wallet_id', req.params.id);
+    if (count) return res.status(409).json({ error: 'wallet_not_empty', message: 'Move or delete its transactions first.' });
+    const { error } = await supabase.from('wallets').delete().eq('id', req.params.id);
+    if (error) return res.status(400).json({ error: 'wallet_delete_failed' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/personal/transactions — paged, strict scope.
+app.get('/api/personal/transactions', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Number(req.query.offset) || 0;
+    let q = supabase.from('transactions')
+      .select('id, type, amount_original, currency_original, wallet_id, category, description, transaction_date, source, created_at', { count: 'exact' })
+      .eq('business_id', ws.id).eq('scope', 'personal');
+    if (req.query.wallet_id) q = q.eq('wallet_id', req.query.wallet_id);
+    if (req.query.category) q = q.eq('category', req.query.category);
+    const { data, count } = await q.order('transaction_date', { ascending: false }).order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    res.json({ transactions: (data || []).map(t => ({ ...t, is_transfer: PW.isTransferLeg(t) })), total: count || 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/personal/transactions — income | expense | transfer (transfer = 2 legs).
+app.post('/api/personal/transactions', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const b = req.body || {};
+    if (!PW.TX_KINDS.includes(b.kind)) return res.status(400).json({ error: 'invalid_kind', message: `kind must be one of ${PW.TX_KINDS.join(', ')}` });
+    const amount = Number(b.amount);
+    if (!(amount > 0)) return res.status(400).json({ error: 'invalid_amount' });
+    const date = b.date || new Date().toISOString().slice(0, 10);
+
+    // Confirm a wallet belongs to THIS personal workspace.
+    const ownWallet = async (id) => {
+      if (!id) return null;
+      const { data } = await supabase.from('wallets').select('id, currency').eq('id', id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+      return data?.[0] || null;
+    };
+
+    // NOTE on amount_idr: for personal rows it mirrors amount_original (native value) —
+    // there is no FX engine yet. Business queries never read scope='personal' rows, and
+    // every personal read uses amount_original + currency_original, so no mixed math.
+    const idrOf = (cur, amt) => amt;
+
+    if (b.kind === 'transfer') {
+      if (!b.wallet_id || !b.to_wallet_id || b.wallet_id === b.to_wallet_id) return res.status(400).json({ error: 'invalid_transfer' });
+      const from = await ownWallet(b.wallet_id), to = await ownWallet(b.to_wallet_id);
+      if (!from || !to) return res.status(404).json({ error: 'wallet_not_found' });
+      // V1: transfers only between SAME-currency wallets — no silent 1:1 FX (a 500k IDR
+      // leg must never appear as "$500k"). Cross-currency needs a real rate (later).
+      if ((from.currency || '').toUpperCase() !== (to.currency || '').toUpperCase()) {
+        return res.status(400).json({ error: 'cross_currency_transfer_unsupported', message: `Transfers need matching currencies (${from.currency} → ${to.currency}). Multi-currency transfers are coming later.` });
+      }
+      const group = `xfer:${crypto.randomUUID()}`;
+      const base = { business_id: ws.id, user_id: req.user.userId, created_by_user_id: req.user.userId, scope: 'personal', category: 'Transfer', description: b.note || 'Transfer', transaction_date: date, source: group };
+      const { data, error } = await supabase.from('transactions').insert([
+        { ...base, type: 'expense', wallet_id: from.id, amount_original: amount, amount_idr: idrOf(from.currency, amount), currency_original: from.currency },
+        { ...base, type: 'income', wallet_id: to.id, amount_original: amount, amount_idr: idrOf(to.currency, amount), currency_original: to.currency },
+      ]).select();
+      if (error) return res.status(500).json({ error: 'transfer_failed' });
+      return res.status(201).json({ transactions: data });
+    }
+
+    const w = await ownWallet(b.wallet_id);
+    if (!w) return res.status(404).json({ error: 'wallet_not_found' });
+    const { data, error } = await supabase.from('transactions').insert({
+      business_id: ws.id, user_id: req.user.userId, created_by_user_id: req.user.userId, scope: 'personal',
+      type: b.kind, amount_original: amount, amount_idr: idrOf(w.currency, amount), currency_original: w.currency,
+      wallet_id: w.id, category: b.category || null, description: b.note || null, transaction_date: date,
+    }).select().single();
+    if (error) return res.status(500).json({ error: 'transaction_failed' });
+    res.status(201).json({ transaction: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/personal/transactions/:id — single legs only (transfer legs are immutable here).
+app.patch('/api/personal/transactions/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: rows } = await supabase.from('transactions').select('id, source, amount_original, currency_original, transaction_date')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: 'transaction_not_found' });
+    if (PW.isTransferLeg(row)) return res.status(400).json({ error: 'transfer_edit_unsupported', message: 'Delete and re-create the transfer instead.' });
+    const patch = {};
+    if ('amount' in req.body) {
+      const a = Number(req.body.amount);
+      if (!(a > 0)) return res.status(400).json({ error: 'invalid_amount' });
+      patch.amount_original = a;
+    }
+    if ('category' in req.body) patch.category = req.body.category || null;
+    if ('note' in req.body) patch.description = req.body.note || null;
+    if ('date' in req.body) patch.transaction_date = req.body.date;
+    if (req.body.wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, currency').eq('id', req.body.wallet_id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+      if (!w?.length) return res.status(404).json({ error: 'wallet_not_found' });
+      patch.wallet_id = req.body.wallet_id; patch.currency_original = w[0].currency;
+    }
+    if ('amount_original' in patch || 'currency_original' in patch || 'transaction_date' in patch) {
+      const amt = patch.amount_original ?? row.amount_original;
+      const cur = patch.currency_original ?? row.currency_original ?? 'IDR';
+      const d = patch.transaction_date ?? row.transaction_date;
+      const fxRes = await fx.toIdr(amt, cur, d);
+      patch.amount_idr = fxRes.amount_idr;
+      patch.booked_rate = fxRes.booked_rate;
+      patch.rate_source = fxRes.rate_source;
+    }
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
+    const { data, error } = await supabase.from('transactions').update(patch).eq('id', req.params.id).select().single();
+    if (error) return res.status(400).json({ error: 'transaction_update_failed' });
+    res.json({ transaction: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/personal/transactions/:id — a transfer leg deletes BOTH legs.
+app.delete('/api/personal/transactions/:id', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data: rows } = await supabase.from('transactions').select('id, source')
+      .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: 'transaction_not_found' });
+    if (PW.isTransferLeg(row)) {
+      await supabase.from('transactions').delete().eq('business_id', ws.id).eq('scope', 'personal').eq('source', row.source);
+    } else {
+      await supabase.from('transactions').delete().eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal');
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/personal/categories — seeded personal categories, grouped.
+app.get('/api/personal/categories', personalGate, auth, async (req, res) => {
+  const ws = await loadPersonalWs(req, res, false); if (!ws) return;
+  try {
+    const { data } = await supabase.from('cashflow_categories')
+      .select('id, name, group_type, activity_type, sort_order')
+      .eq('business_id', ws.id).order('sort_order');
+    const all = data || [];
+    res.json({
+      income: all.filter(c => c.group_type === 'inflow'),
+      expense: all.filter(c => c.group_type === 'outflow' && c.activity_type !== 'financing'),
+      business_related: all.filter(c => c.activity_type === 'financing'),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BUSINESS-SCOPED ACCESS MODEL
+// ─────────────────────────────────────────────────────────────────────────────
+// business_id = financial owner (the workspace)
+// user_id     = legacy owner reference (compatibility — see bizOrFilter)
+// created_by_user_id / approved_by_user_id = audit responsibility
+//
+// Never trust business_id from the client without a membership check.
+
+// ── Role access helpers ──────────────────────────────────────────────────────
+function canViewBusinessFinance(role)          { return ['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(role); }
+function canCreateFinancialRequest(role)       { return ['owner', 'ceo', 'admin', 'cfo', 'accountant', 'manager', 'employee'].includes(role); }
+function canCreateConfirmedFinancialRecord(role) { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
+function canApproveFinancialRecord(role)       { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canManagePayroll(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canManageWallets(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canUseAiCfo(role)                     { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
+// Category structure: who may create/edit/archive business categories.
+// Accountant may PROPOSE (create) but not restructure (edit/archive).
+function canManageCategories(role)            { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+function canProposeCategory(role)             { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
+// Classification rules (business memory) — same as structural management.
+function canManageClassificationRules(role)   { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+
+// ── Tax Engine Foundation helpers (PR1 — additive, no behaviour change) ──────
+// tax_rules / official_sources are a PLATFORM-LEVEL registry, not business-owned.
+// Only a platform admin (or a future dedicated tax_rule_editor) may manage them.
+// A business Owner can never create or activate a global tax rule.
+function canEditTaxRules(userId)              { return isAdminUser(userId); }  // isAdminUser hoisted
+
+// Append-only audit writer. Best-effort: auditing must never block the action.
+// business_id is null for platform-level entities (tax_rule, official_source).
+// Never pass secrets/tokens or unnecessary PII in before/after.
+async function recordAudit({ businessId = null, actorUserId = null, actorRole = null, channel = 'web',
+                             entityType, entityId = null, action, before = null, after = null, requestId = null }) {
+  try {
+    await supabase.from('audit_events').insert({
+      business_id: businessId, actor_user_id: actorUserId, actor_role: actorRole, channel,
+      entity_type: entityType, entity_id: entityId != null ? String(entityId) : null,
+      action, before_json: before, after_json: after, request_id: requestId,
+    });
+  } catch { /* audit best-effort */ }
+}
+
+// A tax rule only DRIVES obligations / AI / Decision Engine when it is active AND
+// backed by a verified official source. Unverified or under_review rules never
+// generate events or feed AI. `source` may be the joined official_sources row.
+function effectiveRuleActive(rule, source = null) {
+  if (!rule || rule.status !== 'active') return false;
+  if (!rule.last_verified_at) return false;            // rule itself must be verified
+  if (!rule.official_source_id) return false;          // must cite a source
+  const src = source || rule.official_sources || null;
+  if (src) {
+    if (['outdated', 'unavailable', 'replaced', 'draft'].includes(src.status)) return false;
+    if (!src.last_verified_at) return false;            // source must be verified
+  }
+  return true;
+}
+
+/**
+ * Resolve the active business for a request and validate membership.
+ * Selection priority: x-business-id header → ?business_id → body.business_id
+ * → user's default business (ensureDefaultBusiness).
+ * Returns { business, role, ownerUserId }.
+ * Throws { status, message } on access violation.
+ */
+function resolveActiveBusiness(req) {
+  // Delegates to the extracted, unit-tested helper (see server/lib/businessResolver.js
+  // and tests/integration/businessResolver.test.js). Behavior unchanged.
+  return _resolveActiveBusiness(supabase, ensureDefaultBusiness, req);
+}
+
+/**
+ * Supabase .or() filter string: rows belonging to the business OR legacy
+ * rows (business_id NULL) belonging to the business owner. After migration
+ * 017 backfill, the legacy branch only matters for rows created before a
+ * user's first business existed.
+ */
+function bizOrFilter(biz) {
+  // STRICT business scoping — every scoped financial read/write is filtered by
+  // business_id only. The legacy `business_id IS NULL` union was removed: migration
+  // 017 backfilled all NULL rows into the user's default business, so the union only
+  // risked leaking one business's (or orphaned) rows into another business the same
+  // user owns. Run migrations/audit_null_business_ids.sql before promotion to confirm
+  // zero NULL rows remain. (Kept as an `.or(...)` single-term string so every existing
+  // `.or(bizOrFilter(biz))` call site is unchanged.)
+  return `business_id.eq.${biz.business.id}`;
+}
+
+/**
+ * Standard write fields for new financial records:
+ * owned by the business, attributed to the acting user, user_id kept as the
+ * business owner for legacy compatibility (admin tooling, old queries).
+ */
+function bizWriteFields(biz, actingUserId) {
+  return {
+    business_id:        biz.business.id,
+    user_id:            biz.ownerUserId,
+    created_by_user_id: actingUserId,
+  };
+}
+
+/** Express-friendly wrapper: resolve business or send the right error. */
+async function requireBusiness(req, res) {
+  try {
+    return await resolveActiveBusiness(req);
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+    return null;
+  }
+}
+
+// ── Shared burn rate & runway helper ─────────────────────────────────────────
+//
+// Single source of truth for burn rate and runway across Pulse, AI CFO,
+// Radar and Hiring Readiness.
+//
+// Algorithm: rolling 30-day window (preferred) → falls back to all-time / actual days.
+// Why rolling 30-day?
+//   expenses_this_month / days_elapsed is volatile: a large payroll on day 1
+//   makes burn rate look 3–5× higher for the rest of the month.
+//   A fixed 30-day rolling window smooths out single-day spikes and gives
+//   a stable, representative daily burn rate.
+//
+// @param allTxs — all-time transactions array (must include `created_at`)
+const burnRunway = require('./lib/burnRunway');
+const computeBurnAndRunway = burnRunway.computeBurnAndRunway;
+
+
+// --- Pulse API -------------------------------------------------------------
+
+app.get('/api/pulse', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) {
+      return res.status(403).json({ error: 'Your role does not allow viewing the business dashboard' });
+    }
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const scope = req.query.scope || 'all';
+    const now = new Date();
+    const asOfDate = now.toISOString().slice(0, 10);
+    const calculatedAt = now.toISOString();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const bizOr = bizOrFilter(biz);
+
+    // ALL transactions ever · for total balance
+    let allTxQuery = supabase.from('transactions').select('*').or(bizOr);
+    if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
+    const { data: allTxs } = await allTxQuery;
+
+    // This month transactions · for the MTD KPIs.
+    // Derived from allTxs rather than re-queried on created_at: a back-dated entry
+    // belongs to the month the money moved, not the month it was entered. Filtering on
+    // created_at put every seeded or imported row into the current month.
+    const monthStartD = new Date(monthStart);
+    const txs = (allTxs || []).filter(t => {
+      const d = new Date(FININ.effectiveDate(t));
+      return !Number.isNaN(d.getTime())
+        && d.getFullYear() === monthStartD.getFullYear()
+        && d.getMonth() === monthStartD.getMonth();
+    });
+
+    // Debts — fetch all (including settled) so UI can show history; enrich with status
+    // Training records (tutorial test submissions) are never financial data.
+    const { data: rawDebts } = await supabase.from('debts')
+      .select('*').or(bizOr)
+      .or('is_training.is.null,is_training.eq.false')
+      .order('due_date', { ascending: true });
+    const debts = await enrichDebtsFor(biz.business.id, rawDebts);
+
+    // Reminders
+    const { data: reminders } = await supabase.from('reminders')
+      .select('*').or(bizOr).eq('is_done', false)
+      .order('due_date', { ascending: true });
+
+    // ── Cash impact model (Phase 1) ─────────────────────────────────────────
+    // Single source of truth for which transaction types affect cash.
+    // Used for BOTH totalBalance and per-account sourceMap so the two
+    // figures always agree.
+    //
+    // CASH_IN:  types that increase total cash / account balance
+    // CASH_OUT: types that decrease total cash / account balance
+    // NEUTRAL:  types with no net cash effect (Phase 1 limitation noted below)
+    //
+    // Phase 1 known limitation:
+    //   'transfer' is NEUTRAL for both total cash AND account balances.
+    //   Reason: we store only one transaction leg (source account), not
+    //   a double-entry from/to pair.  Without a reliable to_account field
+    //   we cannot credit the destination account, so we treat transfers
+    //   as cash-neutral to avoid phantom debits.
+    //   TODO: when from_account / to_account schema fields are added,
+    //         transfer should debit source account and credit destination.
+    const CASH_IN  = TX.CASH_IN_LEGACY;
+    const CASH_OUT = TX.CASH_OUT_LEGACY;
+    // 'transfer', 'correction', unknown types → NEUTRAL (no effect)
+
+    // Wallet-aware accounts:
+    // If user has real wallets → use them with computed balance (wallet_id match OR legacy source name).
+    // Otherwise fall back to virtual source-based accounts for full backward compatibility.
+    const { data: userWallets } = await supabase
+      .from('wallets').select('id, name, currency, type, entity_name, scope')
+      .or(bizOr).eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    // Filter wallets by scope if requested
+    const filteredWallets = (userWallets || []).filter(w =>
+      scope === 'all' || (w.scope || 'business') === scope
+    );
+
+    let accounts;
+    let totalBalance = 0;
+    let hasIncompleteBalance = false;
+    const unvaluedCurrencies = [];
+    if (userWallets && userWallets.length > 0) {
+      accounts = filteredWallets.map(w => {
+        const related = (allTxs || []).filter(t =>
+          t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
+        );
+        const balance = related.reduce((sum, t) => {
+          const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+          if (CASH_IN.includes(t.type))  return sum + amt;
+          if (CASH_OUT.includes(t.type)) return sum - amt;
+          if (t.type === 'correction')   return sum + amt; // signed delta
+          return sum;
+        }, 0);
+        const cur = (w.currency || 'IDR').toUpperCase();
+        const q = fx.getQuote(cur);
+        let rate = null;
+        let balance_idr = null;
+        let rateSource = null;
+        let rateEffectiveDate = null;
+        let isFixed = false;
+        let rateType = null;
+
+        if (cur === 'IDR') {
+          rate = 1;
+          balance_idr = balance;
+          rateSource = 'base_currency';
+          rateEffectiveDate = asOfDate;
+          isFixed = true;
+          rateType = 'base_currency';
+        } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+          rate = Number(q.rate);
+          balance_idr = Math.round(balance * rate);
+          rateSource = q.source;
+          rateEffectiveDate = q.rate_effective_date;
+          isFixed = !!q.is_fixed_accounting;
+          rateType = q.rate_type || 'market_api';
+        } else {
+          if (balance !== 0) {
+            hasIncompleteBalance = true;
+            if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+          }
+        }
+
+        return {
+          id: w.id,
+          name: w.name,
+          balance,
+          balance_idr,
+          rate_today: rate,
+          rate_source: rateSource,
+          rate_effective_date: rateEffectiveDate,
+          verified_at: rateEffectiveDate,
+          is_fixed_accounting: isFixed,
+          rate_type: rateType,
+          currency: cur,
+          type: w.type || 'bank',
+          entity_name: w.entity_name || null,
+          scope: w.scope || 'business',
+          is_unvalued: balance_idr === null && cur !== 'IDR',
+        };
+      });
+
+      // Sum of wallet balances in IDR at today's rate (exclude unvalued non-IDR)
+      const walletTotalIdr = accounts.reduce((sum, a) => sum + (a.balance_idr ?? (a.currency === 'IDR' ? a.balance : 0)), 0);
+      const walletNames = new Set(filteredWallets.map(w => w.name));
+      const unlinkedTxs = (allTxs || []).filter(t => !t.wallet_id && !walletNames.has(t.source));
+      const unlinkedTotal = unlinkedTxs.reduce((sum, t) => {
+        const amt = Number(t.amount_idr ?? t.amount_original ?? 0);
+        if (CASH_IN.includes(t.type)) return sum + amt;
+        if (CASH_OUT.includes(t.type)) return sum - amt;
+        if (t.type === 'correction') return sum + amt;
+        return sum;
+      }, 0);
+
+      totalBalance = walletTotalIdr + unlinkedTotal;
+    } else {
+      // Virtual accounts from transaction sources.
+      const sourceMap = {};
+      (allTxs || []).forEach(t => {
+        if (!t.source) return;
+        const src = t.source;
+        if (!sourceMap[src]) sourceMap[src] = { id: src, name: src, balance: 0, type: t.scope || 'personal' };
+        if      (CASH_IN.includes(t.type))  sourceMap[src].balance += Number(t.amount_original);
+        else if (CASH_OUT.includes(t.type)) sourceMap[src].balance -= Number(t.amount_original);
+        else if (t.type === 'correction')   sourceMap[src].balance += Number(t.amount_original);
+      });
+      accounts = Object.values(sourceMap)
+        .filter(a => a.balance !== 0 || true)
+        .sort((a, b) => b.balance - a.balance)
+        .slice(0, 10);
+      const allIncome      = (allTxs || []).filter(t => CASH_IN.includes(t.type)).reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+      const allExpenses    = (allTxs || []).filter(t => CASH_OUT.includes(t.type)).reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+      const allCorrections = (allTxs || []).filter(t => t.type === 'correction').reduce((s, t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+      totalBalance = allIncome - allExpenses + allCorrections;
+    }
+
+    // -- This month metrics (display only) -----------------------------------
+    // These use the SAME classifier as Advanced Insights, not raw CASH_IN / CASH_OUT
+    // by transaction type. A wallet opening balance is written as type='income', so the
+    // old type-only model reported it as revenue the business had earned; transfers,
+    // owner funding and balance corrections had the same problem.
+    //
+    // `income` and `expenses` keep their names because the client reads them, but they
+    // now mean OPERATING revenue and OPERATING cash out. Everything excluded is
+    // reported separately below rather than hidden.
+    const monthInsights = FININ.computeInsights(txs || []);
+    const income   = monthInsights.metrics.operating_revenue;
+    const expenses = monthInsights.metrics.operating_cash_out;
+
+    // -- Burn rate & runway via rolling 30-day window ----------------------
+    // allTxs has created_at (select('*')), so computeBurnAndRunway works here.
+    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance, asOfDate);
+    const burnRate = burnMetrics.burn_rate_daily;
+    const runway   = burnMetrics.runway_days; // null when cash flow positive, break-even or insufficient data
+
+    // Use remaining_amount (not original amount) and exclude paid/cancelled
+    // Only approved/confirmed debts count as real obligations/expected cash.
+    // pending_approval (Telegram drafts) are excluded from balance calculations.
+    const openDebts    = (debts || []).filter(d =>
+      !['paid', 'cancelled'].includes(d.status) &&
+      (d.approval_status === 'approved' || !d.approval_status)
+    );
+    const pendingDebts = (debts || []).filter(d =>
+      d.approval_status === 'pending_approval' && !['paid', 'cancelled'].includes(d.status)
+    );
+    const receivables  = openDebts.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
+    const payables     = openDebts.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
+    const pendingReceivables = pendingDebts.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
+    const pendingPayables    = pendingDebts.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0);
+    const netPosition = totalBalance + receivables - payables;
+
+    // -- AI status ----------------------------------------------------------
+    let aiStatus = 'healthy';
+    let aiText = '';
+    if (runway !== null && runway <= 7) {
+      aiStatus = 'critical';
+      aiText = `Only ${runway} days of runway left. Incoming payment needed.`;
+    } else if (runway !== null && runway <= 14) {
+      aiStatus = 'attention';
+      aiText = `Runway ${runway} days. Check receivables - some obligations may reduce the buffer.`;
+    } else {
+      aiStatus = 'healthy';
+      let runwayPart = '';
+      if (runway !== null) {
+        runwayPart = language === 'ru' ? `Запас денег: ${runway} дней.` : language === 'id' ? `Cadangan kas: ${runway} hari.` : `Runway ${runway} days.`;
+      } else if (burnMetrics.runway_reason === 'positive_cash_flow') {
+        runwayPart = language === 'ru' ? 'Денежный поток положительный.' : language === 'id' ? 'Arus kas positif.' : 'Positive cash flow.';
+      } else if (burnMetrics.runway_reason === 'break_even') {
+        runwayPart = language === 'ru' ? 'Операционный баланс в равновесии.' : language === 'id' ? 'Arus kas seimbang.' : 'Cash flow balanced.';
+      } else {
+        runwayPart = language === 'ru' ? 'Недостаточно данных для расчёта запаса.' : language === 'id' ? 'Data transaksi belum cukup.' : 'Insufficient data for runway calculation.';
+      }
+      const incomePart = cx(language, 'incomeCoversObligations');
+      const riskPart   = cx(language, 'noRisksDetected');
+      aiText = `${runwayPart} ${incomePart} ${riskPart}`.trim();
+    }
+
+    // -- Today's focus ------------------------------------------------------
+    const todayFocus = [];
+    (debts || []).slice(0, 2).forEach(d => {
+      const daysLeft = Math.round((new Date(d.due_date) - now) / 86400000);
+      if (daysLeft <= 14) {
+        todayFocus.push({
+          id: d.id,
+          title: d.type === 'receivable' ? `Remind ${d.counterparty} to pay` : `Pay ${d.counterparty}`,
+          meta: `${Number(d.amount).toLocaleString('en-US')} IDR · ${daysLeft > 0 ? daysLeft + ' days' : 'today'}`,
+          type: d.type === 'receivable' ? 'receivable' : 'payable',
+          done: false
+        });
+      }
+    });
+    (reminders || []).slice(0, 2).forEach(r => {
+      todayFocus.push({ id: r.id, title: r.title, meta: r.meta || '', type: 'reminder', done: false });
+    });
+
+    const serverRates = fx.getRatesMap(asOfDate, calculatedAt);
+    const ratesMetadata = fx.getProviderMetadata();
+
+    res.json({
+      scope, totalBalance, income, expenses, burnRate, runway,
+      daily_spend: burnMetrics.daily_spend,
+      daily_spend_window_days: burnMetrics.burn_window_days,
+      net_burn_daily: burnMetrics.net_burn_daily,
+      net_burn_monthly: burnMetrics.net_burn_monthly,
+      runway_days: burnMetrics.runway_days,
+      runway_reason: burnMetrics.runway_reason,
+      burn_rate_daily: burnMetrics.daily_spend,
+      window_start: burnMetrics.window_start,
+      window_end: burnMetrics.window_end,
+      operating_expenses: burnMetrics.operating_expenses,
+      operating_inflows: burnMetrics.operating_inflows,
+      has_unvalued_tx: burnMetrics.has_unvalued_tx,
+      unvalued_tx_count: burnMetrics.unvalued_tx_count,
+      as_of_date: asOfDate,
+      rates: serverRates,
+      rates_metadata: ratesMetadata,
+      has_incomplete_balance: hasIncompleteBalance,
+      unvalued_currencies: unvaluedCurrencies,
+      burnWindowDays: burnMetrics.burn_window_days,
+      receivables, payables, netPosition,
+      // Operating performance for the month, and the cash that moved but is NOT
+      // operating performance. Kept apart so neither can distort the other.
+      operating: {
+        revenue: income,
+        cash_out: expenses,
+        net_position: monthInsights.metrics.net_operating_position,
+      },
+      other_cash_movement: monthInsights.metrics.other_cash_movement,
+      needs_review_count: monthInsights.needs_review_count,
+      // Pending (Telegram drafts) — not in confirmed cash but visible in UI
+      pendingReceivables, pendingPayables,
+      aiStatus, aiText,
+      accounts,
+      debts: debts || [],
+      reminders: reminders || [],
+      todayFocus,
+      recentTxs: (allTxs || []).slice(0, 5)
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Debts API -------------------------------------------------------------
+
+// ── Debt status helpers ────────────────────────────────────────────────────────
+/**
+ * computeDebtStatus — derive status + extra fields from a debt row.
+ *
+ * Status rules:
+ *   cancelled   → stays cancelled
+ *   is_settled  → paid
+ *   paid_amount >= effective_amount → paid
+ *   paid_amount > 0                 → partial
+ *   due_date < today                → overdue
+ *   otherwise                      → open
+ *
+ * Returns plain object with extra derived fields merged into debt.
+ */
+function computeDebtStatus(debt) {
+  // remaining = amount − paid_amount − withholding allocations (DECISIONS.md, final decisions
+  // item 5). A bill with no withholding (withholding_allocated absent) is calculated exactly as
+  // before; see server/lib/debtWithholding.js and tests/debtWithholding.test.js.
+  return DW.debtStatusOf(debt, new Date());
+}
+
+/** Enrich an array of debts with computed status fields. */
+function enrichDebts(debts) {
+  return (debts || []).map(computeDebtStatus);
+}
+
+// Withholding allocations of one business: { [debt_id]: { amount, waiting_slip } }.
+// Read-only. Any read error (e.g. a database without 031) → {} so the old figures stand.
+async function loadWithholdings(businessId) {
+  if (!businessId) return {};
+  try {
+    // Paged: PostgREST returns at most 1,000 rows per request, and a silently cut list would
+    // leave some bills looking less settled than they are.
+    const allocs = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from('debt_settlement_allocations')
+        .select('debt_id, settlement_source_type, withholding_record_id, allocated_amount')
+        .eq('business_id', businessId).eq('settlement_source_type', 'withholding_record')
+        .order('debt_id', { ascending: true }).range(from, from + 999);
+      if (error) return {};
+      allocs.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    if (!allocs.length) return {};
+    const ids = [...new Set(allocs.map((a) => a.withholding_record_id).filter(Boolean))];
+    const recs = [];
+    for (let i = 0; i < ids.length; i += 100) { // keep each id list well under the URL limit
+      const { data } = await supabase.from('withholding_records')
+        .select('id, status, bukti_potong_document_id').eq('business_id', businessId).in('id', ids.slice(i, i + 100));
+      recs.push(...(data || []));
+    }
+    return DW.withholdingByDebt(allocs, recs);
+  } catch { return {}; }
+}
+
+async function loadDocumentDebtLinks(businessId) {
+  if (!businessId) return new Map();
+  try {
+    const { data } = await supabase.from('document_debt_links')
+      .select('id, debt_id, document_id')
+      .eq('business_id', businessId);
+    const map = new Map();
+    for (const row of (data || [])) {
+      const k = String(row.debt_id);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push({ link_id: row.id, document_id: row.document_id });
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+/** enrichDebts with this business's withholding allocations and document links taken into account. */
+async function enrichDebtsFor(businessId, debts) {
+  const [withholdings, docLinksMap] = await Promise.all([
+    loadWithholdings(businessId),
+    loadDocumentDebtLinks(businessId),
+  ]);
+  const enriched = enrichDebts(DW.attachWithholdings(debts || [], withholdings));
+  return enriched.map((d) => {
+    const links = docLinksMap.get(String(d.id)) || [];
+    return {
+      ...d,
+      document_links: links,
+      linked_documents_count: links.length,
+    };
+  });
+}
+
+app.get('/api/debts', auth, async (req, res) => {
+  const { type } = req.query;
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  let query = supabase.from('debts')
+    .select('*').or(bizOrFilter(biz))
+    .order('due_date', { ascending: true });
+  // Training (tutorial) records excluded by default; ?include_training=1 opts in
+  if (req.query.include_training !== '1') {
+    query = query.or('is_training.is.null,is_training.eq.false');
+  }
+  // Manager / employee see only their own submissions
+  if (!canViewBusinessFinance(biz.role)) {
+    query = query.eq('created_by_user_id', req.user.userId);
+  }
+  // Optional type filter (receivable / payable)
+  if (type) query = query.eq('type', type);
+  // By default include all (not just unsettled) so UI can show paid history
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(await enrichDebtsFor(biz.business.id, data));
+});
+
+app.post('/api/debts', auth, async (req, res) => {
+  const userId = req.user.userId;
+  // ── Plan limit: max_invoices_per_month (debts are the MVP invoice proxy) ──
+  try {
+    const access = await getCurrentAccess(userId);
+    if (access) {
+      const maxInvoices = access.limits.max_invoices_per_month;
+      if (maxInvoices !== null && maxInvoices !== undefined) {
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const { count: usedCount } = await supabase
+          .from('debts')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', monthStart.toISOString());
+        const used = usedCount || 0;
+        if (isLimitReached(maxInvoices, used)) {
+          return sendUpgradeRequired(res, 'invoices',
+            `Monthly invoice/debt limit reached (${maxInvoices}/month on ${access.accessState.effectivePlan} plan)`,
+            { limit: maxInvoices, usage: used, current_plan: access.accessState.effectivePlan }
+          );
+        }
+      }
+    }
+  } catch (limitErr) {
+    console.warn('[debts] limit check failed:', limitErr.message);
+  }
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  // Privileged roles create confirmed records; manager/employee → pending_approval
+  const confirmed = canCreateConfirmedFinancialRecord(biz.role);
+  const amount = Number(req.body.amount || 0);
+  const insertRow = {
+    // The bill checklist marks (migration 061) are set only through
+    // PATCH /api/debts/:id/checklist, which checks the role and writes an audit row.
+    ...CHECKLIST.withoutChecklistFields(req.body),
+    ...bizWriteFields(biz, userId),
+    original_amount: amount,  // lock original amount; never mutate this
+    paid_amount:     0,
+    status:          'open',
+    source_channel:   req.body.source_channel  || 'web',
+    approval_status:  confirmed ? (req.body.approval_status || 'approved') : 'pending_approval',
+    created_by_role:  biz.role,
+  };
+  const { data, error } = await supabase.from('debts')
+    .insert(insertRow).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(computeDebtStatus(data));
+});
+
+// ── PATCH /api/debts/:id — edit a debt's editable fields ─────────────────────
+// Used to fix details (counterparty / amount / due date / description / type)
+// before or after approval. Business-scoped; privileged roles only.
+// original_amount tracks the editable total so status/remaining recompute.
+app.patch('/api/debts/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow editing records' });
+
+    const { data: rows } = await supabase.from('debts')
+      .select('id, paid_amount').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const debt = rows?.[0];
+    if (!debt) return res.status(404).json({ error: 'Debt not found' });
+
+    const updates = {};
+    // null / empty clears the field. String(null) used to store the literal text "null".
+    const textOrNull = (v) => (v === null || v === undefined ? null : String(v).trim() || null);
+    if (req.body.counterparty !== undefined) updates.counterparty = textOrNull(req.body.counterparty);
+    if (req.body.description  !== undefined) updates.description  = textOrNull(req.body.description);
+    if (req.body.due_date     !== undefined) updates.due_date     = req.body.due_date || null;
+    if (req.body.scope        !== undefined) updates.scope        = req.body.scope;
+    if (req.body.type         !== undefined && ['receivable', 'payable'].includes(req.body.type))
+      updates.type = req.body.type;
+    if (req.body.amount !== undefined) {
+      const amt = Number(req.body.amount);
+      if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
+      if (amt < Number(debt.paid_amount || 0))
+        return res.status(400).json({ error: 'amount cannot be less than already paid' });
+      // A recorded withholding also settles part of the bill (batch 10).
+      const withheld = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
+      if (withheld > 0 && amt < Number(debt.paid_amount || 0) + withheld)
+        return res.status(400).json({ error: 'amount cannot be less than already paid plus tax withheld' });
+      updates.amount = amt;
+      updates.original_amount = amt;
+    }
+    if (Object.keys(updates).length === 0)
+      return res.status(400).json({ error: 'No editable fields provided' });
+
+    const { data, error } = await supabase.from('debts')
+      .update(updates).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/debts/:id/settle', auth, async (req, res) => {
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canCreateConfirmedFinancialRecord(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow settling records' });
+  // Fetch debt first to know original_amount (business-scoped)
+  const { data: debts } = await supabase.from('debts')
+    .select('*').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+  const debt = debts?.[0];
+  if (!debt) return res.status(404).json({ error: 'Debt not found' });
+  const fullAmount = Number(debt?.original_amount || debt?.amount || 0);
+  // A recorded withholding already settles its part: paid_amount covers only the rest, so
+  // paid_amount + withholding never exceeds the bill (batch 10). No withholding → as before.
+  const withheld = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
+  const { data, error } = await supabase.from('debts')
+    .update({
+      is_settled:   true,
+      settled_at:   new Date().toISOString(),
+      status:       'paid',
+      paid_amount:  Math.max(0, fullAmount - withheld),
+    })
+    .eq('id', debt.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({
+    businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+    entityType: 'debt', entityId: debt.id, action: 'debt_settled',
+    before: { status: debt.status, paid_amount: debt.paid_amount ?? null, is_settled: debt.is_settled ?? null },
+    after: { status: data.status, paid_amount: data.paid_amount, is_settled: true, withheld },
+  });
+  res.json(computeDebtStatus({ ...data, withholding_allocated: withheld }));
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TELEGRAM ROLE MODEL
+// ─────────────────────────────────────────────────────────────────────────────
+// Telegram is an operational channel — behaviour depends on the member's role:
+//   employee / manager  → INPUT channel: submissions become pending_approval
+//                         drafts; they never create confirmed cash-impact
+//                         records and cannot approve anything (incl. their own).
+//   admin / cfo / owner → also NOTIFICATION + APPROVAL channel: they receive
+//                         alerts about pending submissions and can approve /
+//                         reject / request info — through the SAME backend
+//                         endpoints the Web App uses (no Telegram-only logic).
+// Every approval stores: approved_by_user_id, approved_at, approved_via_channel.
+
+const ACTION_CHANNELS = ['web', 'telegram', 'mobile', 'api', 'whatsapp_future'];
+function normalizeChannel(ch) {
+  return ACTION_CHANNELS.includes(ch) ? ch : 'web';
+}
+
+// Send a Telegram message to all admin+ members of the business that owns
+// `ownerUserId`'s data. No-op if TELEGRAM_BOT_TOKEN is not configured
+// (the bot lives in a separate repo / may not be deployed yet).
+//
+// PR2.6: recipients are RESOLVED, not assumed. A legacy positive user id may stand in for its
+// own chat id, but only through the resolver; a negative platform id never becomes a chat id.
+// Unreachable members are dropped and reported in the return value rather than guessed at.
+// `buttons` — array of [{ text, url }] rows for an inline keyboard.
+// TODO: when the bot supports callback actions, switch url-buttons for
+//       callback_data buttons (Approve / Reject / Ask details) that call
+//       PATCH /api/debts/:id/approve|reject with channel='telegram'.
+// The transport. It decides NOTHING about who may receive a notification: recipients come from
+// the policy resolver, and the only judgement left here is how to put bytes on the wire. This
+// function used to hold the role list ['owner','ceo','admin','cfo'] inline, which made every
+// caller's audience a side effect of a literal buried in the send path.
+//
+// `category` and `businessId` are both required. A missing or unrecognised category resolves
+// to NOBODY, and so does a missing businessId — see resolveNotificationAudience.
+//
+// `ownerUserId` is retained for the call-site shape and for log context ONLY. It must never be
+// used to find the business again: that inference is what let a company B notification reach
+// company A recipients.
+async function notifyBusinessAdminsViaTelegram(ownerUserId, text, buttons = [], {
+  category = null, businessId = null, preferences = null, excludeUserIds = [],
+  allowLegacy = true,
+} = {}) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+  if (!botToken) return { sent: 0, skipped: 'no_bot_token' };
+  try {
+    // Gate 1 — permission and preference. Platform user ids only.
+    // Company-admin grants: load the enabled grants for THIS business when the flag is on.
+    // Returns null when the flag is off or the load fails, and the resolver reads null as
+    // owner-only — so a grant lookup failure narrows to the owner, it never adds a CEO/CFO.
+    const grants = await loadBusinessGrants({ supabase, businessId });
+    const audience = await resolveNotificationAudience({
+      supabase, category, businessId, preferences, excludeUserIds, grants,
+    });
+    if (!audience.userIds.length) return { sent: 0, dropped: audience.dropped };
+
+    // Gate 2 — reachability. Link revocation, the negative-chat-id guard and de-duplication on
+    // the RESOLVED chat id live here: two platform users can share one Telegram account during
+    // the migration, and de-duping on user ids would message that person twice.
+    //
+    // allowLegacy stays true while TELEGRAM_NOTIFY_REVERSE_RESOLVER_ENABLED is off: with that
+    // flag off a positive-id owner has no link row to resolve, and flipping this to false here
+    // would stop their notifications entirely. It should become false for financial categories
+    // once that flag is on and owners have linked — flagged in the report.
+    const { chatIds, dropped } = await resolveTelegramNotificationRecipients({
+      supabase, userIds: audience.userIds, reason: `policy:${category}`, allowLegacy,
+    });
+    if (!chatIds.length) return { sent: 0, dropped: [...audience.dropped, ...dropped] };
+
+    let sent = 0;
+    for (const chatId of chatIds) {
+      // Belt and braces: resolution already guarantees this, and the guarantee is re-checked
+      // at the wire because the cost of being wrong here is disclosure, not a retry.
+      if (!isSendableChatId(chatId)) continue;
+      try {
+        const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: 'HTML',
+            // buttons may be a flat array (one row) or an array of rows.
+            reply_markup: buttons.length
+              ? { inline_keyboard: Array.isArray(buttons[0]) ? buttons : [buttons] }
+              : undefined,
+          }),
+        });
+        if (resp.ok) sent++;
+      } catch (_) { /* one failed chat must not break the rest */ }
+    }
+    return { sent, dropped };
+  } catch (e) {
+    console.warn('[telegram-notify] failed:', e.message);
+    return { sent: 0, error: e.message };
+  }
+}
+
+// ── Single-chat Telegram DM helper (reused by creator notifications) ─────────
+// No-op if no bot token. `buttons` = array of rows for an inline keyboard.
+async function sendTelegramDM(chatId, text, buttons = []) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+  if (!botToken || !chatId) return { ok: false, skipped: true };
+  // Unconditional, outside every flag: a negative or malformed chat_id is never correct.
+  // Telegram reads a negative chat id as a GROUP, so the failure this prevents is not a
+  // dropped message — it is a company's financials arriving in an unrelated chat.
+  if (!isSendableChatId(chatId)) {
+    console.warn('[telegram-dm] refused an unsendable chat id');
+    return { ok: false, skipped: true, refused: 'unsendable_chat_id' };
+  }
+  try {
+    const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId, text, parse_mode: 'HTML',
+        reply_markup: buttons.length ? { inline_keyboard: buttons } : undefined,
+      }),
+    });
+    return { ok: resp.ok };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
+
+async function resolveUserDisplayName(userId) {
+  try {
+    const { data } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+    return data?.first_name || data?.username || String(userId);
+  } catch { return String(userId); }
+}
+
+// Creator notification templates. p: { type, counterparty, amount, approver, reason, note, raw }
+const CREATOR_TEMPLATES = {
+  request_approved_creator: {
+    ru: (p) => p.type === 'receivable'
+      ? `✅ Ожидаемая оплата подтверждена\n\nКлиент: ${p.counterparty}\nСумма: ${p.amount}\nПодтвердил: ${p.approver}\n\nЗапись стала активной дебиторкой.\nКэш изменится только после фактического получения оплаты.`
+      : `✅ Ваша заявка подтверждена\n\nКонтрагент: ${p.counterparty}\nСумма: ${p.amount}\nПодтвердил: ${p.approver}\n\nЗаявка стала активным обязательством компании.\nДеньги со счёта ещё не списаны.`,
+    en: (p) => p.type === 'receivable'
+      ? `✅ Expected payment approved\n\nClient: ${p.counterparty}\nAmount: ${p.amount}\nApproved by: ${p.approver}\n\nIt is now an active receivable.\nCash changes only when the money is actually received.`
+      : `✅ Your request was approved\n\nCounterparty: ${p.counterparty}\nAmount: ${p.amount}\nApproved by: ${p.approver}\n\nIt is now an active company obligation.\nNo money has left the account yet.`,
+    id: (p) => p.type === 'receivable'
+      ? `✅ Pembayaran yang diharapkan disetujui\n\nKlien: ${p.counterparty}\nJumlah: ${p.amount}\nDisetujui oleh: ${p.approver}\n\nKini menjadi piutang aktif.\nKas berubah hanya saat uang benar-benar diterima.`
+      : `✅ Permintaan Anda disetujui\n\nPemasok: ${p.counterparty}\nJumlah: ${p.amount}\nDisetujui oleh: ${p.approver}\n\nKini menjadi kewajiban aktif perusahaan.\nBelum ada uang yang keluar dari rekening.`,
+  },
+  request_rejected_creator: {
+    ru: (p) => `❌ Ваша заявка отклонена\n\nКонтрагент: ${p.counterparty}\nСумма: ${p.amount}\nОтклонил: ${p.approver}\n\nПричина: ${p.reason || 'Причина не указана.'}`,
+    en: (p) => `❌ Your request was rejected\n\nCounterparty: ${p.counterparty}\nAmount: ${p.amount}\nRejected by: ${p.approver}\n\nReason: ${p.reason || 'No reason provided.'}`,
+    id: (p) => `❌ Permintaan Anda ditolak\n\nPemasok: ${p.counterparty}\nJumlah: ${p.amount}\nDitolak oleh: ${p.approver}\n\nAlasan: ${p.reason || 'Alasan tidak diberikan.'}`,
+  },
+  request_info_creator: {
+    ru: (p) => `ℹ️ Нужна дополнительная информация\n\nПо вашей заявке запросили уточнение:\n${p.raw ? `\n"${p.raw}"\n` : ''}\nКомментарий:\n${p.note || 'Пожалуйста, уточните детали.'}\n\nОтветьте сообщением или откройте заявку в CFO AI.`,
+    en: (p) => `ℹ️ More information needed\n\nClarification was requested on your submission:\n${p.raw ? `\n"${p.raw}"\n` : ''}\nNote:\n${p.note || 'Please clarify the details.'}\n\nReply with a message or open the request in CFO AI.`,
+    id: (p) => `ℹ️ Perlu informasi tambahan\n\nKlarifikasi diminta untuk pengajuan Anda:\n${p.raw ? `\n"${p.raw}"\n` : ''}\nCatatan:\n${p.note || 'Mohon perjelas detailnya.'}\n\nBalas dengan pesan atau buka permintaan di CFO AI.`,
+  },
+};
+
+// When a resolver drop still permits the historical created_by_telegram_id to be used.
+//
+// A POSITIVE allowlist, not a denylist, and that is the whole design. These two reasons mean
+// "we have no link information for this person" — there is nothing to honour, so a validated
+// address recorded when they submitted the request is still the best evidence available.
+// Every other reason means something stronger: withdrawn, unreadable, or malformed. A new
+// reason added later therefore defaults to SUPPRESSION, which is the safe direction for a rule
+// whose failure mode is sending financial data to an address someone asked us to stop using.
+const FALLBACK_TO_HISTORICAL_TELEGRAM_ID_REASONS = new Set([
+  'not_linked',                      // resolver on, nothing on file for this user
+  'negative_user_id_unresolvable',   // resolver off, negative id — no link table was consulted
+]);
+
+// Notify the ORIGINAL CREATOR of a debt about a state change. Never throws —
+// the financial action must succeed even if Telegram delivery fails.
+//
+// PR2.6 changed three things here:
+//
+//   * created_by_telegram_id is the EXTERNAL account, validated before use. The old fallback
+//     to created_by_user_id treated a platform id as a chat id, which is safe only while the
+//     two are the same number.
+//   * self-suppression compared a CHAT id with a PLATFORM user id. For a linked user those
+//     differ, so an approver would start getting "your request was approved" about their own
+//     action. It now compares platform id to platform id.
+//   * the language lookup was keyed by chat id. A linked email-origin user's row lives under
+//     their negative platform id, so their language silently fell back to English.
+async function notifyRequestCreatorViaTelegram({ debt, event, actorUserId, actorRole, reason, note }) {
+  try {
+    const creatorUserId = debt.created_by_user_id ?? null;
+
+    // Don't notify the actor about their own action (e.g. owner self-approve). Platform id to
+    // platform id — the only comparison that stays true once identities are linked.
+    if (creatorUserId !== null && actorUserId !== null && actorUserId !== undefined
+        && String(creatorUserId) === String(actorUserId)) return;
+
+    // PR2.7: the RESOLVER decides, and created_by_telegram_id is a last resort.
+    //
+    // It used to be the other way round, which meant a validated historical id short-circuited
+    // the link table completely — so a revoked link was never noticed, and a user who relinked
+    // to a different Telegram account kept receiving notifications at the old one. The column
+    // is written once at submission and never updated: it is a cache with no invalidation, and
+    // it is not even reliably an external id (the training-submission writer stores a platform
+    // id when no telegram_id is present). Trusting it first meant trusting the weaker source.
+    let chatId = null;
+    if (creatorUserId !== null) {
+      const r = await resolveSingleTelegramRecipient({
+        supabase, userId: creatorUserId, reason: 'creator-notify',
+      });
+      if (r.chatId) {
+        chatId = r.chatId;
+      } else if (FALLBACK_TO_HISTORICAL_TELEGRAM_ID_REASONS.has(r.dropped)
+                 && isSendableChatId(debt.created_by_telegram_id)) {
+        // No link information — not a withdrawal, not a failure. The address they wrote from
+        // is still the best evidence we have.
+        chatId = String(debt.created_by_telegram_id);
+      } else {
+        // Revoked, unreadable or malformed: suppress. Falling back here would let a stale
+        // cache quietly overrule a decision the user made.
+        console.warn('[creator-notify] suppressed for debt', debt.id, 'reason=', r.dropped || 'unknown');
+        return;
+      }
+    } else if (isSendableChatId(debt.created_by_telegram_id)) {
+      // No platform identity on the row at all — there is nothing to resolve, so the validated
+      // historical id is the only address that exists.
+      chatId = String(debt.created_by_telegram_id);
+    }
+    if (!chatId) { console.warn('[creator-notify] no telegram identity for debt', debt.id); return; }
+
+    const tplKey = { approved: 'request_approved_creator', rejected: 'request_rejected_creator', request_info: 'request_info_creator' }[event];
+    if (!tplKey) return;
+
+    // Language belongs to the PLATFORM user, not to the chat.
+    const lang = await getUserLanguage(creatorUserId ?? chatId).catch(() => 'en');
+    let approver = actorUserId ? await resolveUserDisplayName(actorUserId) : '—';
+    if (actorRole) approver += ` · ${actorRole}`;
+    const tpl = CREATOR_TEMPLATES[tplKey];
+    const fn = tpl[lang] || tpl.en;
+    const text = fn({
+      type:         debt.type,
+      counterparty: debt.counterparty || '—',
+      amount:       `${Number(debt.original_amount || debt.amount || 0).toLocaleString('en-US')} ${debt.currency || 'IDR'}`,
+      approver,
+      reason:       reason || debt.rejected_reason || null,
+      note:         note || debt.info_request_note || null,
+      raw:          debt.raw_input_text || '',
+    });
+
+    // Public deep-link base. Prefer WEB_APP_URL; CLIENT_URL is the CORS origin
+    // and may point at a stale/non-public domain, so it is not used here.
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    const openUrl = `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}`;
+    const res = await sendTelegramDM(chatId, text, [[{ text: '🌐 Открыть заявку', url: openUrl }]]);
+    if (!res.ok && !res.skipped) console.warn('[creator-notify] delivery failed for debt', debt.id, res.error || '');
+  } catch (e) {
+    console.warn('[creator-notify] error:', e.message);
+  }
+}
+
+// ── PATCH /api/debts/:id/approve ─────────────────────────────────────────────
+// Owner / admin approves a pending_approval debt created from Telegram.
+async function approveDebtHandler(req, res) {
+  const userId = req.user.userId;
+  const channel = normalizeChannel(req.body?.channel);
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can approve' });
+
+    // Record must belong to the active business
+    const { data: rows } = await supabase.from('debts')
+      .select('id, created_by_user_id, approval_status').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const existing = rows?.[0];
+    if (!existing) return res.status(404).json({ error: 'Debt not found' });
+
+    // Self-approval guard: only the owner/ceo may approve a record they submitted
+    if (existing.created_by_user_id === userId && !['owner', 'ceo'].includes(biz.role))
+      return res.status(403).json({ error: 'You cannot approve your own submission' });
+
+    const { data, error } = await supabase.from('debts')
+      .update({
+        approval_status:      'approved',
+        approved_by_user_id:  userId,
+        approved_at:          new Date().toISOString(),
+        approved_via_channel: channel,
+        last_action_channel:  channel,
+        status:               'open',   // activate the record
+      })
+      .eq('id', existing.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    // Notify creator only on a real state change (pending → approved).
+    if (existing.approval_status !== 'approved')
+      notifyRequestCreatorViaTelegram({ debt: data, event: 'approved', actorUserId: userId, actorRole: biz.role });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+app.patch('/api/debts/:id/approve', auth, approveDebtHandler);
+app.post('/api/debts/:id/approve',  auth, approveDebtHandler); // Telegram bot calls POST
+
+// ── PATCH /api/debts/:id/reject ──────────────────────────────────────────────
+async function rejectDebtHandler(req, res) {
+  const userId = req.user.userId;
+  const { reason } = req.body || {};
+  const channel = normalizeChannel(req.body?.channel);
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can reject' });
+
+    const { data: rows } = await supabase.from('debts')
+      .select('id, approval_status').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    if (!rows?.length) return res.status(404).json({ error: 'Debt not found' });
+
+    const { data, error } = await supabase.from('debts')
+      .update({
+        approval_status:      'rejected',
+        approved_by_user_id:  userId,
+        approved_at:          new Date().toISOString(),
+        approved_via_channel: channel,
+        last_action_channel:  channel,
+        rejected_reason:      reason || null,
+        status:               'cancelled',
+      })
+      .eq('id', rows[0].id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (rows[0].approval_status !== 'rejected')
+      notifyRequestCreatorViaTelegram({ debt: data, event: 'rejected', actorUserId: userId, actorRole: biz.role, reason: reason || null });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+}
+app.patch('/api/debts/:id/reject', auth, rejectDebtHandler);
+app.post('/api/debts/:id/reject',  auth, rejectDebtHandler); // Telegram bot calls POST
+
+// ── POST /api/debts/:id/request-info ─────────────────────────────────────────
+// Admin+ asks the submitter for clarification instead of approving/rejecting.
+// Record stays pending_approval; note is stored for traceability.
+app.post('/api/debts/:id/request-info', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { note } = req.body || {};
+  const channel = normalizeChannel(req.body?.channel);
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can request info' });
+
+    const { data: rows } = await supabase.from('debts')
+      .select('id').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    if (!rows?.length) return res.status(404).json({ error: 'Debt not found' });
+
+    const { data, error } = await supabase.from('debts')
+      .update({
+        info_request_note:   note || null,
+        info_requested_at:   new Date().toISOString(),
+        info_requested_by:   userId,
+        last_action_channel: channel,
+      })
+      .eq('id', rows[0].id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'request_info', actorUserId: userId, actorRole: biz.role, note: note || null });
+    res.json(computeDebtStatus(data));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PATCH /api/debts/:id/checklist — bill checklist: accountant check (Design v2 P-05) ──
+// The withholding slip is NOT set here: it lives in withholding_records (migration 031)
+// and is read with GET /api/withholding-slips. Accountant role and above; audited.
+// Nothing closes on its own: this never pays, settles, approves or files anything.
+// Before migration 061 is applied the columns do not exist → 409, nothing written.
+app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!CHECKLIST.canEditChecklist(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can update the bill checklist' });
+
+    const { patch, error: vErr } = CHECKLIST.checklistPatchFromBody(req.body || {}, { userId: req.user.userId });
+    if (vErr) return res.status(400).json({ error: vErr });
+
+    const { data: rows, error: rErr } = await supabase.from('debts')
+      .select('id, business_id, accountant_checked_at, accountant_checked_by')
+      .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    if (rErr && TARGETS.isMissingColumn(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
+    if (rErr) return res.status(500).json({ error: rErr.message });
+    const before = rows?.[0];
+    if (!before) return res.status(404).json({ error: 'Debt not found' });
+
+    const { data, error } = await supabase.from('debts').update(patch)
+      .eq('id', before.id).eq('business_id', biz.business.id)
+      .select('id, accountant_checked_at, accountant_checked_by').single();
+    if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const pick = (r) => ({ accountant_checked_at: r.accountant_checked_at ?? null, accountant_checked_by: r.accountant_checked_by ?? null });
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'debt', entityId: before.id, action: 'debt_checklist_updated',
+      before: pick(before), after: pick(data),
+    });
+    res.json({ id: data.id, checklist: pick(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/debts/:id/withholding — record a withholding on a bill or invoice ─────
+// DECISIONS.md, final decisions item 5 (batch 10). Typical case: a customer pays our
+// invoice minus PPh 23. Creates a withholding_record (031) — status 'waiting_slip' until a
+// bukti potong is linked — and allocates it to the invoice (settlement_source_type =
+// 'withholding_record'), so the remaining balance (computeDebtStatus) drops by that amount.
+// Direction comes from debts.type. owner/ceo/admin/cfo/accountant; audited.
+// No money moves, paid_amount is untouched, migration 031 is unchanged. When the 031 guard
+// rejects the allocation, the record is removed again and the answer is 409 with the
+// message from DECISIONS.md — never a silent failure.
+app.post('/api/debts/:id/withholding', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!DW.canRecordWithholding(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can record a withholding' });
+
+    const { data: rows } = await supabase.from('debts').select('*')
+      .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    const raw = rows?.[0];
+    if (!raw) return res.status(404).json({ error: 'Debt not found' });
+    const withheldBefore = Number((await loadWithholdings(biz.business.id))[String(raw.id)]?.amount || 0);
+    const debt = { ...raw, withholding_allocated: withheldBefore };
+
+    const v = DW.withholdingFromBody(req.body || {}, debt);
+    if (v.error) return res.status(v.error === 'exceeds_remaining' ? 409 : 400).json(v);
+
+    if (v.slip) {
+      const { data: docs } = await supabase.from('financial_documents')
+        .select('id, business_id, document_type, archived_at').eq('id', v.slip).eq('business_id', biz.business.id).limit(1);
+      const doc = docs?.[0];
+      if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+      if (doc.archived_at) return res.status(400).json({ error: 'document_archived' });
+      if (doc.document_type !== 'bukti_potong') return res.status(400).json({ error: 'document_is_not_a_withholding_slip' });
+    }
+
+    const { data: rec, error: recErr } = await supabase.from('withholding_records').insert({
+      business_id: biz.business.id, debt_id: raw.id, tax_type: v.taxType,
+      withholding_amount: v.amount, bukti_potong_document_id: v.slip, status: v.status,
+      context_type: raw.type === 'payable' ? 'vendor_invoice' : 'other',
+    }).select('id, status, tax_type, withholding_amount, bukti_potong_document_id').single();
+    if (recErr) return res.status(500).json({ error: recErr.message });
+
+    const { data: alloc, error: aErr } = await supabase.from('debt_settlement_allocations').insert({
+      business_id: biz.business.id, debt_id: raw.id, settlement_source_type: 'withholding_record',
+      withholding_record_id: rec.id, allocated_amount: v.amount, created_by_user_id: req.user.userId,
+    }).select('id, allocated_amount').single();
+    if (aErr) {
+      // Undo the record so nothing half-written remains.
+      await supabase.from('withholding_records').delete().eq('id', rec.id).eq('business_id', biz.business.id);
+      if (DW.isGuardRejection(aErr)) return res.status(409).json({ error: 'settlement_guard_rejected', message: DW.GUARD_MESSAGE });
+      return res.status(500).json({ error: aErr.message });
+    }
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'debt', entityId: raw.id, action: 'debt_withholding_recorded',
+      before: { remaining_amount: DW.remainingOf(debt), withholding_allocated: withheldBefore },
+      after: { withholding_record_id: rec.id, allocation_id: alloc.id, amount: v.amount, tax_type: v.taxType, status: v.status,
+        remaining_amount: DW.remainingOf({ ...debt, withholding_allocated: withheldBefore + v.amount }) },
+    });
+    res.json({ withholding: rec, allocation: alloc,
+      debt: computeDebtStatus({ ...raw, withholding_allocated: withheldBefore + v.amount, withholding_waiting_slip: !v.slip }) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/withholding-slips — read-only: withholding records and their slips ──────
+// Design v2 P-05 option B: the bill checklist and the Accountant "Tax slips to make"
+// counter read the bukti potong from withholding_records.bukti_potong_document_id
+// (migration 031). Business-scoped, finance roles only, READ-ONLY. If the table is absent
+// the answer is an empty map with available:false, so the screens keep their old state.
+app.get('/api/withholding-slips', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing withholding records' });
+    const { data, error } = await supabase.from('withholding_records')
+      .select('id, debt_id, status, tax_type, withholding_amount, bukti_potong_document_id')
+      .eq('business_id', biz.business.id).not('debt_id', 'is', null).limit(2000);
+    if (error) return res.json({ by_debt: {}, available: false });
+    res.json({ by_debt: CHECKLIST.slipsByDebt(data), available: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TELEGRAM INLINE APPROVALS — bot-safe endpoints (x-bot-secret + telegram_id)
+// ─────────────────────────────────────────────────────────────────────────────
+// The web approve/reject/request-info endpoints above require a user JWT and
+// stay strict. These mirror them for the bot: identity proven by the shared
+// secret, the acting user resolved from telegram_id, all permission checks
+// done server-side. Approval NEVER moves cash — it only flips approval_status.
+
+// Resolve a Telegram approver against a debt: returns { debt, userId, role }
+// or { error }. Validates membership in the debt's business.
+async function resolveBotApprover(telegram_id, debtId) {
+  const { data: dRows } = await supabase.from('debts')
+    .select('id, business_id, user_id, created_by_user_id, approval_status, status, type, counterparty, amount, original_amount')
+    .eq('id', debtId).limit(1);
+  const debt = dRows?.[0];
+  if (!debt) return { error: 'not_found' };
+
+  // Determine the business: explicit business_id, else the business owned by
+  // the legacy debt.user_id (owner).
+  let businessId = debt.business_id;
+  if (!businessId) {
+    const { data: bRows } = await supabase.from('businesses')
+      .select('id').eq('owner_user_id', debt.user_id).order('created_at', { ascending: true }).limit(1);
+    businessId = bRows?.[0]?.id || null;
+  }
+  if (!businessId) return { error: 'forbidden' };
+
+  // PR2.5: membership is checked for the RESOLVED user, not for the raw Telegram id.
+  const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'telegram-debt-action' });
+  if (!actor.ok) return { actorError: true, error: actor.code, code: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
+
+  const { data: mem } = await supabase.from('business_members')
+    .select('role').eq('user_id', actor.userId).eq('business_id', businessId)
+    .eq('status', 'active').limit(1);
+  const role = mem?.[0]?.role;
+  if (!role) return { error: 'forbidden' };
+
+  return { debt, userId: actor.userId, role };
+}
+
+// POST /api/telegram/debts/:id/approve
+app.post('/api/telegram/debts/:id/approve', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    // An identity failure keeps its own status: 400 invalid, 403 not_linked/link_revoked,
+    // 503 lookup failed. Only a genuine membership refusal is 'forbidden'.
+    if (isActorError(r))         return sendTelegramActorError(res, r);
+    if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
+    const { debt, userId, role } = r;
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
+
+    if (!canApproveFinancialRecord(role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot approve requests.' });
+    if (debt.created_by_user_id === userId && !['owner', 'ceo'].includes(role))
+      return res.status(403).json({ error: 'forbidden', message: 'You cannot approve your own submission.' });
+
+    // Duplicate-click protection: report current state, never silently flip.
+    if (debt.approval_status === 'approved')
+      return res.json({ already: true, state: 'approved', debt: computeDebtStatus(debt) });
+    if (debt.approval_status === 'rejected')
+      return res.status(409).json({ error: 'already_rejected', message: 'This request was already rejected.' });
+
+    const { data, error } = await supabase.from('debts').update({
+      approval_status: 'approved', approved_by_user_id: userId,
+      approved_at: new Date().toISOString(),
+      approved_via_channel: 'telegram', last_action_channel: 'telegram', status: 'open',
+    }).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'approved', actorUserId: userId, actorRole: role });
+    res.json({ ok: true, state: 'approved', type: debt.type, debt: computeDebtStatus(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/debts/:id/reject
+app.post('/api/telegram/debts/:id/reject', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, reason } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    // An identity failure keeps its own status: 400 invalid, 403 not_linked/link_revoked,
+    // 503 lookup failed. Only a genuine membership refusal is 'forbidden'.
+    if (isActorError(r))         return sendTelegramActorError(res, r);
+    if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
+    const { debt, userId, role } = r;
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
+
+    if (!canApproveFinancialRecord(role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot reject requests.' });
+    if (debt.created_by_user_id === userId && !['owner', 'ceo'].includes(role))
+      return res.status(403).json({ error: 'forbidden', message: 'You cannot act on your own submission.' });
+
+    // Do not silently flip an already-approved record to rejected.
+    if (debt.approval_status === 'approved')
+      return res.status(409).json({ error: 'already_approved', message: 'This request was already approved.' });
+    if (debt.approval_status === 'rejected')
+      return res.json({ already: true, state: 'rejected', debt: computeDebtStatus(debt) });
+
+    const { data, error } = await supabase.from('debts').update({
+      approval_status: 'rejected', approved_by_user_id: userId,
+      approved_at: new Date().toISOString(),
+      approved_via_channel: 'telegram', last_action_channel: 'telegram',
+      rejected_reason: reason || 'Rejected from Telegram', status: 'cancelled',
+    }).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'rejected', actorUserId: userId, actorRole: role, reason: reason || 'Rejected from Telegram' });
+    res.json({ ok: true, state: 'rejected', debt: computeDebtStatus(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/debts/:id/request-info
+app.post('/api/telegram/debts/:id/request-info', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, note } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found', message: 'Request not found.' });
+    // An identity failure keeps its own status: 400 invalid, 403 not_linked/link_revoked,
+    // 503 lookup failed. Only a genuine membership refusal is 'forbidden'.
+    if (isActorError(r))         return sendTelegramActorError(res, r);
+    if (r.error)                 return res.status(403).json({ error: 'forbidden', message: 'You do not have access to this request.' });
+    const { debt, userId, role } = r;
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
+
+    if (!canApproveFinancialRecord(role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot request info.' });
+
+    const { data, error } = await supabase.from('debts').update({
+      info_request_note: note || 'Please provide more details',
+      info_requested_at: new Date().toISOString(),
+      info_requested_by: userId, last_action_channel: 'telegram',
+    }).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    notifyRequestCreatorViaTelegram({ debt: data, event: 'request_info', actorUserId: userId, actorRole: role, note: note || 'Please provide more details' });
+    res.json({ ok: true, state: 'info_requested', created_by_telegram_id: debt.created_by_telegram_id || null, debt: computeDebtStatus(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DECISION ENGINE ENDPOINTS — deterministic assessments (no data mutation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function loadBusinessDebt(biz, debtId) {
+  const { data } = await supabase.from('debts').select('*')
+    .eq('id', debtId).or(bizOrFilter(biz))
+    .or('is_training.is.null,is_training.eq.false').limit(1);
+  return data?.[0] ? (await enrichDebtsFor(biz.business.id, [data[0]]))[0] : null;
+}
+
+// GET /api/decisions/debts/:id/approval — assess approving a pending request
+app.get('/api/decisions/debts/:id/approval', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view decision analysis' });
+    const debt = await loadBusinessDebt(biz, req.params.id);
+    if (!debt) return res.status(404).json({ error: 'Debt not found' });
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const snap = await buildBusinessFinancialSnapshot(biz, language);
+    res.json(assessDebtApproval(snap, debt));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/decisions/debts/:id/payment — SIMULATE a payment/receipt (no writes)
+app.post('/api/decisions/debts/:id/payment', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view decision analysis' });
+    const debt = await loadBusinessDebt(biz, req.params.id);
+    if (!debt) return res.status(404).json({ error: 'Debt not found' });
+
+    const { amount, wallet_id } = req.body || {};
+    // Validate wallet belongs to the business if provided
+    if (wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!w?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+    }
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const snap = await buildBusinessFinancialSnapshot(biz, language);
+    res.json(assessDebtPayment(snap, debt, amount, wallet_id));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/decisions/payment-priority — ranked approved unpaid payables
+app.get('/api/decisions/payment-priority', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view decision analysis' });
+    const snap = await buildBusinessFinancialSnapshot(biz, 'en');
+    res.json({ items: buildPaymentPriority(snap) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/debts/:id/decision — bot-safe compact assessment
+app.post('/api/telegram/debts/:id/decision', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id } = req.body || {};
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveBotApprover(telegram_id, req.params.id);
+    if (r.error === 'not_found') return res.status(404).json({ error: 'not_found' });
+    if (isActorError(r))         return sendTelegramActorError(res, r);
+    if (r.error)                 return res.status(403).json({ error: 'forbidden' });
+    if (!canViewBusinessFinance(r.role)) return res.status(403).json({ error: 'forbidden' });
+
+    const { data: bizRow } = await supabase.from('businesses').select('*').eq('id', r.debt.business_id || null).limit(1);
+    let business = bizRow?.[0];
+    if (!business) {
+      const { data: ob } = await supabase.from('businesses').select('*').eq('owner_user_id', r.debt.user_id).order('created_at', { ascending: true }).limit(1);
+      business = ob?.[0];
+    }
+    if (!business) return res.status(404).json({ error: 'business_not_found' });
+    const gate = await telegramPaidGate(business.id);
+    if (gate) return res.status(402).json(gate);
+    const biz = { business, role: r.role, ownerUserId: business.owner_user_id };
+    const language = normalizeLanguage(await getUserLanguage(telegram_id).catch(() => 'en'));
+    const debt = await loadBusinessDebt(biz, req.params.id);
+    if (!debt) return res.status(404).json({ error: 'not_found' });
+    const snap = await buildBusinessFinancialSnapshot(biz, language);
+    res.json({ approval: assessDebtApproval(snap, debt), payment: assessDebtPayment(snap, debt, null, null), currency: snap.currency });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+const MAX_RECEIPTS = 5;
+
+// Resolve a Telegram submitter → { submitterUser, role, businessId, ownerId,
+// isPrivileged } using the same rules as from-telegram (single business).
+async function resolveTelegramMember(telegram_id, routeName = 'telegram') {
+  // PR2.5: the acting user is resolved BEFORE the users lookup, so a linked account reaches
+  // its own row rather than the row whose id happens to equal the Telegram id.
+  const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName });
+  if (!actor.ok) return { actorError: true, error: actor.code, code: actor.code, httpStatus: actor.httpStatus, safeMessage: actor.safeMessage };
+
+  const { data: rows } = await supabase.from('users').select('id, username, first_name').eq('id', actor.userId).limit(1);
+  const submitterUser = rows?.[0];
+  if (!submitterUser) return { error: 'not_linked' };
+  submitterUser.name = submitterUser.first_name || submitterUser.username || String(submitterUser.id);
+
+  const { data: mem } = await supabase.from('business_members')
+    .select('role, business_id, businesses(owner_user_id)')
+    .eq('user_id', submitterUser.id).eq('status', 'active').limit(2);
+  if (!mem?.length) return { error: 'not_member' };
+  if (mem.length > 1) return { error: 'multiple_businesses', businesses: mem.map(m => m.business_id) };
+
+  const role = mem[0].role;
+  return {
+    submitterUser, role,
+    businessId: mem[0].business_id,
+    ownerId: mem[0].businesses?.owner_user_id || submitterUser.id,
+    isPrivileged: ['owner', 'ceo', 'admin', 'cfo'].includes(role),
+  };
+}
+
+// ── Telegram active-business routing (gated by TELEGRAM_ACTIVE_BUSINESS_ENABLED) ──
+// The resolution itself lives in lib/telegramWorkspace.js (PR3). What used to be inline here
+// swallowed every Supabase error, so a failed membership query returned { status:'none' } and
+// the bot told a linked user to connect an account they had already connected.
+//
+// The wire shape the bot consumes — { status:'none' | 'auto' | 'active' | 'choose', business,
+// options } — is unchanged. Only failures look different, and they are new: previously there
+// were none, because failures were disguised as answers.
+
+// GET /api/telegram/active-business — bot-secret. 404 when the flag is off (no surface).
+app.get('/api/telegram/active-business', async (req, res) => {
+  if (!TELEGRAM_ACTIVE_BUSINESS_ENABLED) return res.status(404).json({ error: 'not_found' });
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const telegram_id = req.query?.telegram_id || req.body?.telegram_id;
+  if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+  try {
+    const r = await resolveTelegramActiveWorkspace({ supabase, telegram_id, routeName: 'active-business' });
+    // 400 invalid / 403 not_linked / 403 link_revoked / 503 lookup failed — each keeps its own
+    // status. The bot's verifyLinkage() treats anything it does not positively recognise as
+    // "unverified" and refuses to process, so a 503 here fails closed on its side too.
+    if (!r.ok) return sendTelegramActorError(res, r);
+    if (r.business) {
+      const gate = await telegramPaidGate(r.business.id);
+      if (gate) return res.status(402).json(gate);
+    }
+    // Exactly the legacy body: internal fields (userId, ok) are not part of the contract.
+    res.json(r.status === 'none'
+      ? { status: 'none' }
+      : { status: r.status, business: r.business, options: r.options });
+  }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/telegram/active-business — set the active business. bot-secret. 404 when off.
+app.post('/api/telegram/active-business', async (req, res) => {
+  if (!TELEGRAM_ACTIVE_BUSINESS_ENABLED) return res.status(404).json({ error: 'not_found' });
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, business_id } = req.body || {};
+  if (!telegram_id || !business_id) return res.status(400).json({ error: 'telegram_id and business_id required' });
+  try {
+    // Membership, personal and ARCHIVED checks happen inside the helper, against the same
+    // filtered list the selector offers — so a workspace that cannot be shown cannot be
+    // selected either, including by a client replaying an id from before it was archived.
+    const r = await setTelegramActiveWorkspace({ supabase, telegram_id, business_id, routeName: 'set-active-business' });
+    if (!r.ok) return sendTelegramActorError(res, r);
+    // The helper can succeed at everything EXCEPT storing the choice: with the identity
+    // resolver on and the 045 state store off, a linked email-origin user resolves to a
+    // negative id, and a negative id must never be written to telegram_user_state. There is
+    // nowhere to put the selection, so it does not persist.
+    //
+    // Answering ok:true there would be the worst possible outcome — the user is told they
+    // switched company, and their next message asks them to choose again. 503, not 403: this
+    // is a temporary limitation of how the platform is configured right now, not a statement
+    // about what this user is allowed to do.
+    if (r.persisted === false) {
+      return res.status(503).json({
+        error: 'workspace_state_not_persisted',
+        message: 'Workspace selection could not be saved. Please try again later.',
+      });
+    }
+    const gate = await telegramPaidGate(business_id);
+    if (gate) return res.status(402).json(gate);
+    res.json({ ok: true, business: r.business });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Download a Telegram file as a base64 buffer + mime via the Bot API.
+async function fetchTelegramFile(fileId) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+  if (!botToken) return null;
+  const meta = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`).then(r => r.json());
+  const filePath = meta?.result?.file_path;
+  if (!filePath) return null;
+  const resp = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  let mime = resp.headers.get('content-type') || '';
+  if (!mime || mime === 'application/octet-stream') {
+    mime = /\.pdf$/i.test(filePath) ? 'application/pdf' : 'image/jpeg';
+  }
+  return { base64: buf.toString('base64'), mime };
+}
+
+// Recognize amount + counterparty from a receipt image/PDF via Claude vision.
+// Returns { amount, counterparty, currency, date } or null on failure.
+async function recognizeReceipt(file) {
+  if (!process.env.ANTHROPIC_API_KEY || !file) return null;
+  try {
+    const isPdf = /pdf/i.test(file.mime);
+    const block = isPdf
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.base64 } }
+      : { type: 'image',    source: { type: 'base64', media_type: file.mime.startsWith('image/') ? file.mime : 'image/jpeg', data: file.base64 } };
+    const resp = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5', max_tokens: 300,
+      messages: [{ role: 'user', content: [block, { type: 'text', text:
+        'Это чек/счёт. Верни ТОЛЬКО JSON без markdown: {"amount":число_итоговой_суммы,"currency":"IDR","counterparty":"продавец/магазин или null","date":"YYYY-MM-DD или null"}. amount — итоговая сумма к оплате (total/grand total). Если не уверен — поставь null.' }] }],
+    });
+    const raw = (resp.content?.[0]?.text || '').trim().replace(/```json\n?/g, '').replace(/```/g, '').trim();
+    const j = JSON.parse(raw);
+    return { amount: Number(j.amount) || null, currency: j.currency || 'IDR', counterparty: j.counterparty || null, date: j.date || null };
+  } catch (e) { console.warn('[receipt-ocr] failed:', e.message); return null; }
+}
+
+// ── POST /api/telegram/debts/attach-receipt — creator sends a receipt ────────
+// Attaches a photo/PDF to the creator's open request, runs OCR to recognize the
+// amount + counterparty, recomputes the receipts total. Bot-safe. Up to 5.
+app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, file_id } = req.body || {};
+  if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
+  try {
+    // PR2.5: the two columns mean different things once identity is a row rather than an
+    // assumption — created_by_telegram_id holds the EXTERNAL account, created_by_user_id the
+    // platform user. With the flag off both resolve to the same value, as before.
+    const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'attach-receipt' });
+    if (!actor.ok) return sendTelegramActorError(res, actor);
+
+    const { data: candidates } = await supabase.from('debts')
+      .select('*')
+      .or(`created_by_telegram_id.eq.${actor.externalUserId},created_by_user_id.eq.${actor.userId}`)
+      .not('approval_status', 'in', '("rejected")')
+      .not('status', 'in', '("paid","cancelled")')
+      .order('info_requested_at', { ascending: false, nullsLast: true })
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const debt = candidates?.[0];
+    if (!debt) return res.status(404).json({ error: 'no_open_request', message: 'No open request to attach a receipt to.' });
+    const gate = await telegramPaidGate(debt.business_id);
+    if (gate) return res.status(402).json(gate);
+
+    const existing = Array.isArray(debt.attachments) ? debt.attachments : [];
+    if (existing.length >= MAX_RECEIPTS)
+      return res.status(400).json({ error: 'too_many', message: `Maximum ${MAX_RECEIPTS} receipts per request.`, count: existing.length });
+
+    // OCR (best-effort — never blocks the attach)
+    const file = await fetchTelegramFile(file_id).catch(() => null);
+    const ocr = await recognizeReceipt(file).catch(() => null);
+    const item = { file_id, mime: file?.mime || null, amount: ocr?.amount ?? null, counterparty: ocr?.counterparty ?? null, date: ocr?.date ?? null, recognized: !!ocr };
+    const attachments = [...existing, item];
+
+    // Recompute total from recognized receipt amounts (if any recognized).
+    const recognizedAmounts = attachments.map(a => Number(a.amount)).filter(n => isFinite(n) && n > 0);
+    const receiptsTotal = recognizedAmounts.reduce((s, n) => s + n, 0);
+
+    const updates = {
+      attachments,
+      attachment_url: `tg:${attachments[0].file_id}`, // legacy first-receipt pointer
+      last_action_channel: 'telegram',
+    };
+    // Use the receipts total as the obligation amount when we recognized values.
+    if (receiptsTotal > 0) { updates.amount = receiptsTotal; updates.original_amount = receiptsTotal; }
+    // Fill counterparty from a recognized receipt if the debt still has a placeholder.
+    const recogCp = attachments.find(a => a.counterparty)?.counterparty;
+    if (recogCp && (!debt.counterparty || debt.counterparty === debt.created_by_name || debt.counterparty === 'Reimbursement'))
+      updates.counterparty = recogCp;
+
+    const { data, error } = await supabase.from('debts').update(updates).eq('id', debt.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const ccy = data.currency || 'IDR';
+    const ownerId = debt.user_id;
+    const name = debt.created_by_name || String(telegram_id);
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    const lines = attachments.map((a, i) => `${i + 1}. ${a.amount ? Number(a.amount).toLocaleString('en-US') + ' ' + ccy : '— не распознано'}${a.counterparty ? ' · ' + a.counterparty : ''}`).join('\n');
+    notifyBusinessAdminsViaTelegram(ownerId,
+      `📎 Чек получен (${attachments.length}/${MAX_RECEIPTS}) по заявке\n\nОт: ${name}\n${lines}\n\nИтого по чекам: <b>${receiptsTotal.toLocaleString('en-US')} ${ccy}</b>`,
+      [[{ text: '🌐 Открыть заявку', url: `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}` }]],
+      // The debt's own business, never the notifier's. A legacy row with a null business_id
+      // resolves to no recipients rather than to a guess.
+      { category: 'payables_receivables', businessId: data.business_id || debt.business_id || null },
+    ).catch(() => {});
+
+    res.json({ ok: true, debt_id: data.id, counterparty: data.counterparty, count: attachments.length, receipts_total: receiptsTotal, recognized: !!ocr, item_amount: item.amount });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/telegram/debts/from-receipt — create a payable from an invoice ─
+// The creator sends an invoice photo/PDF (e.g. caption "нужно оплатить"). OCR
+// recognizes amount + counterparty, a payable is created and sent to approval,
+// and the file is attached. Bot-safe. Manager/employee → pending_approval.
+app.post('/api/telegram/debts/from-receipt', async (req, res) => {
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  const { telegram_id, file_id, caption, kind } = req.body || {};
+  if (!telegram_id || !file_id) return res.status(400).json({ error: 'telegram_id and file_id required' });
+  try {
+    let m;
+    if (TELEGRAM_ACTIVE_BUSINESS_ENABLED) {
+      // Active-business routing: ambiguous 2+ → 409 company_selection_required + options;
+      // never write a NULL business_id. Build the same member context the rest expects.
+      const r = await resolveTelegramActiveWorkspace({ supabase, telegram_id, routeName: 'from-receipt' });
+      if (!r.ok) return sendTelegramActorError(res, r);
+      if (r.status === 'choose') return res.status(409).json({ error: 'company_selection_required', options: r.options });
+      if (r.status === 'none') return res.status(403).json({ error: 'not_member' });
+      // PR3: the submitter row is fetched for the RESOLVED user. This line used to read
+      // .eq('id', telegram_id), so a linked email-origin account — whose user id is negative
+      // and never equals a Telegram id — could resolve a workspace and then be told
+      // 'not_linked' by the very next query.
+      const { data: urows, error: uErr } = await supabase.from('users')
+        .select('id, username, first_name').eq('id', r.userId).limit(1);
+      if (uErr) return res.status(503).json({ error: 'temporary_workspace_lookup_failed', message: 'Please try again.' });
+      const su = urows?.[0];
+      if (!su) return res.status(403).json({ error: 'not_linked' });
+      su.name = su.first_name || su.username || String(su.id);
+      const role = r.business.role;
+      m = { submitterUser: su, role, businessId: r.business.id, ownerId: r.business.owner_user_id || su.id, isPrivileged: ['owner', 'ceo', 'admin', 'cfo'].includes(role) };
+    } else {
+      m = await resolveTelegramMember(telegram_id);
+      if (isActorError(m)) return sendTelegramActorError(res, m);
+      if (m.error) return res.status(m.error === 'multiple_businesses' ? 409 : 403).json({ error: m.error });
+    }
+    const gate = await telegramPaidGate(m.businessId);
+    if (gate) return res.status(402).json(gate);
+
+    const file = await fetchTelegramFile(file_id).catch(() => null);
+    const ocr = await recognizeReceipt(file).catch(() => null);
+    if (!ocr || !ocr.amount)
+      return res.status(422).json({ error: 'amount_not_recognized', message: 'Не удалось распознать сумму на счёте.' });
+
+    // The SECOND Telegram door. An invoice photo carries its own currency, so a USD invoice
+    // reaches the same broken downstream as a USD text message. Gated identically, after
+    // membership and before any write. Patching only the text path would leave this open.
+    if (!isSupportedTelegramCurrency(ocr.currency)) {
+      return res.status(422).json(currencyNotSupported(ocr.currency));
+    }
+
+    // Reimbursement: the submitter paid (often from personal funds) and the
+    // company owes THEM, so the counterparty is the submitter — never the OCR
+    // counterparty from the payment proof.
+    const isReimbursement = kind === 'expense_request';
+    const amountNum = Number(ocr.amount);
+    const approvalStatus = m.isPrivileged ? 'approved' : 'pending_approval';
+    const counterparty = isReimbursement
+      ? m.submitterUser.name
+      : (ocr.counterparty || m.submitterUser.name || 'Invoice');
+    const item = { file_id, mime: file?.mime || null, amount: amountNum, counterparty: isReimbursement ? null : (ocr.counterparty || null), date: ocr.date || null, recognized: true };
+
+    const insertRow = {
+      user_id: m.ownerId, business_id: m.businessId, type: 'payable',
+      counterparty,
+      amount: amountNum, original_amount: amountNum, paid_amount: 0,
+      currency: normalizeCurrency(ocr.currency), due_date: isReimbursement ? null : (ocr.date || null),
+      description: isReimbursement
+        ? ((caption && caption.trim()) || 'Reimbursement (paid from personal funds)')
+        : ((caption && caption.trim()) || 'Invoice via Telegram'),
+      training_type: isReimbursement ? 'expense_request' : null,
+      status: 'open', source_channel: 'telegram',
+      raw_input_text: (caption && caption.trim()) || null,
+      created_by_user_id: m.submitterUser.id, created_by_telegram_id: Number(telegram_id),
+      created_by_name: m.submitterUser.name, created_by_role: m.role,
+      approval_status: approvalStatus,
+      approved_by_user_id: m.isPrivileged ? m.submitterUser.id : null,
+      approved_at: m.isPrivileged ? new Date().toISOString() : null,
+      approved_via_channel: m.isPrivileged ? 'telegram' : null,
+      last_action_channel: 'telegram',
+      attachments: [item], attachment_url: `tg:${file_id}`,
+    };
+    const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const ccy = data.currency || 'IDR';
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    if (!m.isPrivileged) {
+      const text = isReimbursement
+        ? `🧾 <b>Компенсация расхода (из Telegram)</b>\n\nВернуть: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Оплачено с личных средств · ⏳ ожидает подтверждения`
+        : `📤 <b>Счёт на оплату (из Telegram)</b>\n\nПоставщик: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСрок: ${data.due_date || '—'}\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Распознано со счёта · ⏳ ожидает подтверждения`;
+      notifyBusinessAdminsViaTelegram(m.ownerId, text, [
+        [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
+        [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` }, { text: '❌ Reject', callback_data: `debt_reject:${data.id}` } ],
+        [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` }, { text: '🌐 Open', url: `${webAppUrl}/payables` } ],
+      ], { category: 'team_approvals', businessId: m.businessId || null }).catch(() => {});
+    }
+
+    res.json({ ok: true, action: 'created', kind: isReimbursement ? 'expense_request' : 'payable', debt_id: data.id, amount: amountNum, counterparty: data.counterparty, needs_approval: !m.isPrivileged, currency: ccy });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/debts/:id/receipt — view an attached receipt ────────────────────
+// Image is opened via <a href> (no header), so the JWT may arrive as ?token=.
+// If attachment is a Telegram file (tg:<file_id>), proxy it via the Bot API.
+app.get('/api/debts/:id/receipt', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
+    try { req.user = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: rows } = await supabase.from('debts').select('attachment_url, attachments').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: 'No receipt' });
+
+    // ?i=<index> selects a specific receipt from the attachments array.
+    const idx = req.query.i !== undefined ? Number(req.query.i) : null;
+    let fileId = null, url = row.attachment_url;
+    if (idx !== null && Array.isArray(row.attachments) && row.attachments[idx]) {
+      const a = row.attachments[idx];
+      if (a.file_id) fileId = a.file_id; else if (a.url) url = a.url;
+    } else if (url && url.startsWith('tg:')) {
+      fileId = url.slice(3);
+    }
+    if (!fileId) {
+      if (!url) return res.status(404).json({ error: 'No receipt' });
+      if (!url.startsWith('tg:')) return res.redirect(url);
+      fileId = url.slice(3);
+    }
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+    if (!botToken) return res.status(503).json({ error: 'bot_not_configured' });
+    const meta = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${encodeURIComponent(fileId)}`).then(r => r.json());
+    const filePath = meta?.result?.file_path;
+    if (!filePath) return res.status(404).json({ error: 'File not found' });
+    const fileResp = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+    res.set('Content-Type', fileResp.headers.get('content-type') || 'image/jpeg');
+    res.set('Cache-Control', 'private, max-age=300');
+    const buf = Buffer.from(await fileResp.arrayBuffer());
+    res.send(buf);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AI ACCOUNTANT — foundation (Phase 1). Deterministic Tax Rules Registry +
+// business Tax Profile + Official Sources. The LLM never invents rates/dates;
+// every recommendation cites a versioned rule + official source.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const AI_ACCOUNTANT_DISCLAIMER = {
+  ru: 'Информация носит рекомендательный характер и не является юридической, налоговой или бухгалтерской консультацией. Перед налоговым платежом или подачей отчётности подтвердите расчёты у лицензированного специалиста.',
+  en: 'This information is advisory only and is not legal, tax or accounting advice. Confirm all calculations with a licensed professional before paying tax or filing.',
+  id: 'Informasi ini bersifat rekomendasi dan bukan nasihat hukum, pajak, atau akuntansi. Konfirmasikan semua perhitungan dengan profesional berlisensi sebelum membayar pajak atau melapor.',
+};
+
+// Entitlement: an active AI Accountant add-on, OR full access during trial/founder.
+async function hasAccountantAddon(biz) {
+  // Entitlement is per the ACTIVE business (honors its admin override / plan /
+  // trial), not the owner's arbitrary default business. Mirrors hasDocumentsAccess
+  // — fixes AI Accountant staying locked when the active business has a founder
+  // override but the default business's trial expired.
+  try {
+    const r = await getBusinessAccess(biz.ownerUserId, biz.business.id);
+    const plan = r?.access?.effective_plan;
+    if (plan === 'founder' || plan === 'enterprise') return true;
+    if (r?.access?.trial_status_effective === 'active') return true;
+  } catch { /* fall through to add-on check */ }
+  try {
+    const { data } = await supabase.from('business_addons')
+      .select('addon,status').eq('business_id', biz.business.id)
+      .like('addon', 'ai_accountant%').eq('status', 'active').limit(1);
+    return !!data?.length;
+  } catch { return false; }
+}
+
+// GET /api/accountant/status — entitlement + profile completeness + disclaimer
+app.get('/api/accountant/status', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const entitled = await hasAccountantAddon(biz);
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || null;
+    res.json({
+      entitled,
+      can_edit: canApproveFinancialRecord(biz.role),
+      profile_complete: !!(profile && profile.country && profile.legal_entity_type),
+      disclaimer: AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/profile
+app.get('/api/accountant/profile', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data, error } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    if (error) throw error;
+    const columns = await profileColumns(supabase, TAX_PROFILE_EXTENDED);
+    res.json({ profile: data?.[0] || null, extended_fields: columns.unsupported.length === 0,
+      supported_extended_fields: columns.supported, unsupported_fields: columns.unsupported,
+      can_edit: canApproveFinancialRecord(biz.role) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/accountant/profile — owner/admin/cfo edits the tax profile
+const TAX_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_residency','tax_regime','tax_identifier','npwp','nib','financial_year_start','financial_year_end','vat_status','pkp_status','employee_status','payroll_tax_status','withholding_tax_status','industry','business_activity_codes','accounting_method','reporting_currency','filing_frequency'];
+// Columns added by migration 040 (company name, KPP, KBLI, NIB date, employees, BPJS, per-field
+// verification). Until 040 is applied they are NOT saved, and the response says which ones.
+const TAX_PROFILE_EXTENDED = ['foreign_owned','company_legal_name','brand_name','kpp','pkp_effective_date','nib_issue_date','primary_kbli','additional_kbli','actual_business_activities','employee_count','local_employee_count','foreign_employee_count','payroll_frequency','bpjs_registered','transaction_types','field_verification'];
+const PROFILE_VERIFY_STATES = ['missing', 'user_declared', 'document_uploaded', 'extracted', 'accountant_verified', 'conflict'];
+const { profileColumns } = require('./lib/profileColumns');
+async function profileExtendedReady() {
+  return (await profileColumns(supabase, TAX_PROFILE_EXTENDED)).unsupported.length === 0;
+}
+// One 040 field from a request body → the stored value (types per migration 040).
+function extendedProfileValue(f, v, role, before) {
+  if (v === '' || v == null) return null;
+  if (['employee_count', 'local_employee_count', 'foreign_employee_count'].includes(f)) { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 ? n : null; }
+  if (f === 'bpjs_registered') return v === true || v === 'true' ? true : v === false || v === 'false' ? false : null;
+  if (['pkp_effective_date', 'nib_issue_date'].includes(f)) return /^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? String(v) : null;
+  if (['additional_kbli', 'transaction_types'].includes(f)) {
+    const arr = Array.isArray(v) ? v : String(v).split(/[,;\s]+/);
+    return arr.map((x) => String(x).trim()).filter(Boolean).slice(0, 40);
+  }
+  if (f === 'field_verification') {
+    // Per-field source. "accountant_verified" only from an accountant; the rest are sanitised.
+    const out = { ...((before && before.field_verification) || {}) };
+    for (const [k, st] of Object.entries(v || {})) {
+      if (![...TAX_PROFILE_FIELDS, ...TAX_PROFILE_EXTENDED].includes(k)) continue;
+      const state = typeof st === 'string' ? st : st?.state;
+      if (!PROFILE_VERIFY_STATES.includes(state)) continue;
+      if (state === 'accountant_verified' && role !== 'accountant') continue;
+      out[k] = typeof st === 'object' && st?.document_id ? { state, document_id: String(st.document_id).slice(0, 64) } : state;
+    }
+    return out;
+  }
+  return String(v).slice(0, 500);
+}
+// Minimum fields needed before any obligation can be generated.
+const { applicableProfileFields } = require('./lib/pkpStatus');
+const REQUIRED_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_regime','financial_year_start','financial_year_end','vat_status'];
+// Changing these re-opens verification and is always audited.
+const CRITICAL_PROFILE_FIELDS = ['country','legal_entity_type','tax_regime','tax_identifier','npwp','pkp_status','vat_status','financial_year_start','financial_year_end'];
+
+// Completeness is measured against the fields that APPLY to this profile. A company that
+// states it is NOT PKP is not missing `vat_status` — the question does not apply to it — so
+// demanding it would hold completeness below 100% and block the verify gate forever. Any
+// status other than a clear "non_pkp" keeps the full field list (unknown is not "no").
+function profileCompleteness(p) {
+  const required = applicableProfileFields(REQUIRED_PROFILE_FIELDS, p?.pkp_status);
+  if (!p) return { percent: 0, missing: [...required] };
+  const missing = required.filter(f => !p[f]);
+  return { percent: Math.round((required.length - missing.length) / required.length * 100), missing };
+}
+// tax_identifier (universal) vs npwp (Indonesia) — surface a mismatch, never pick.
+function profileWarnings(p) {
+  const w = [];
+  if (p?.tax_identifier && p?.npwp && p.tax_identifier !== p.npwp)
+    w.push({ field: 'tax_identifier_npwp_mismatch', message: 'tax_identifier and NPWP differ — please review which is correct.' });
+  return w;
+}
+
+// Deterministic applicability — never uses an LLM. Each verdict has a reason.
+function evaluateApplicableTaxRules({ taxProfile, activeRules, asOfDate = new Date() }) {
+  const applicable = [], excluded = [], warnings = [];
+  const missing = new Set();
+  const p = taxProfile || {};
+  const asOf = new Date(asOfDate);
+  for (const rule of (activeRules || [])) {
+    if (rule.effective_from && new Date(rule.effective_from) > asOf) { excluded.push({ rule_code: rule.rule_code, reason: `Not yet effective (from ${rule.effective_from}).` }); continue; }
+    if (rule.effective_to && new Date(rule.effective_to) < asOf) { excluded.push({ rule_code: rule.rule_code, reason: `No longer effective (until ${rule.effective_to}).` }); continue; }
+    const cond = rule.applies_when || rule.applicability_conditions_json || {};
+    let verdict = 'applicable', reason = '';
+    if (rule.legal_entity_type) {
+      if (!p.legal_entity_type) { verdict = 'unknown'; reason = 'legal_entity_type is missing'; missing.add('legal_entity_type'); }
+      else if (rule.legal_entity_type !== p.legal_entity_type) { verdict = 'excluded'; reason = `Requires entity type ${rule.legal_entity_type}; business is ${p.legal_entity_type}.`; }
+    }
+    if (verdict === 'applicable' && cond.vat_status) {
+      if (!p.vat_status) { verdict = 'unknown'; reason = 'vat_status is missing'; missing.add('vat_status'); }
+      else if (p.vat_status !== cond.vat_status) { verdict = 'excluded'; reason = `Requires vat_status ${cond.vat_status}; business is ${p.vat_status}.`; }
+    }
+    if (verdict === 'applicable' && cond.has_employees) {
+      if (!p.employee_status) { verdict = 'unknown'; reason = 'employee/payroll status is missing'; missing.add('employee_status'); }
+      else if (p.employee_status !== 'has_employees') { verdict = 'excluded'; reason = 'Business has no employees.'; }
+    }
+    if (verdict === 'applicable') applicable.push({ rule_code: rule.rule_code, rule_id: rule.id, version: rule.version, title: rule.title, obligation_type: rule.obligation_type, reason: reason || `Applies to ${p.legal_entity_type || 'this business'}.`, official_source: rule.official_sources || null });
+    else if (verdict === 'excluded') excluded.push({ rule_code: rule.rule_code, reason });
+    else warnings.push({ rule_code: rule.rule_code, reason: `Cannot determine — ${reason}.` });
+  }
+  return { applicable_rules: applicable, excluded_rules: excluded, missing_profile_fields: [...missing], warnings };
+}
+
+app.put('/api/accountant/profile', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can edit the tax profile' });
+    const { data: beforeRows, error: beforeError } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    if (beforeError) throw beforeError;
+    const before = beforeRows?.[0] || null;
+
+    const updates = { business_id: biz.business.id, updated_at: new Date().toISOString() };
+    for (const f of TAX_PROFILE_FIELDS) if (req.body[f] !== undefined) updates[f] = req.body[f] || null;
+    if (!before) updates.created_by_user_id = req.user.userId;
+    // 040 fields: saved only when the columns exist; otherwise reported back as not saved.
+    const extendedAsked = TAX_PROFILE_EXTENDED.filter((f) => req.body[f] !== undefined);
+    const columns = extendedAsked.length ? await profileColumns(supabase, TAX_PROFILE_EXTENDED) : { supported: [], unsupported: [] };
+    for (const f of extendedAsked) if (columns.supported.includes(f)) updates[f] = extendedProfileValue(f, req.body[f], biz.role, before);
+    const notSaved = extendedAsked.filter((f) => !columns.supported.includes(f));
+
+    // Recompute status from completeness. A critical change on a verified profile
+    // re-opens review (verification must be redone).
+    const merged = { ...(before || {}), ...updates };
+    const { missing } = profileCompleteness(merged);
+    const criticalChanged = CRITICAL_PROFILE_FIELDS.some(f => f in updates && (before?.[f] || null) !== (updates[f] || null));
+    if (missing.length) updates.profile_status = 'incomplete';
+    else if (before?.profile_status === 'verified' && criticalChanged) { updates.profile_status = 'needs_review'; updates.verified_at = null; updates.verified_by_user_id = null; }
+    else if (!before?.profile_status || before.profile_status === 'incomplete') updates.profile_status = 'active';
+
+    const { data, error } = await supabase.from('tax_profiles')
+      .upsert(updates, { onConflict: 'business_id' }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    if (!before || criticalChanged) {
+      const beforeCrit = {}, afterCrit = {};
+      for (const f of CRITICAL_PROFILE_FIELDS) { beforeCrit[f] = before?.[f] ?? null; afterCrit[f] = data[f] ?? null; }
+      await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role, entityType: 'tax_profile', entityId: data.id, action: before ? 'critical_fields_changed' : 'created', before: before ? beforeCrit : null, after: afterCrit });
+    }
+    res.json({ profile: data, completeness: profileCompleteness(data), warnings: profileWarnings(data),
+      not_saved: notSaved, unsupported_fields: notSaved, migration: notSaved.length ? '040_not_applied' : null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/accountant/profile/from-documents — what the company's own documents say.
+//
+// Reads the business's company documents (NPWP, NIB with KBLI, deed, SK, SPPKP, KPP, BPJS —
+// by their intake classification), one reading per document cached in
+// extracted_json.ai_profile (force re-reads), and merges them into one suggestion per profile
+// field with its source documents. Identifiers are kept only when printed in the text
+// (lib/profileFromDocuments). ZERO profile writes: applying is PUT /api/accountant/profile.
+app.post('/api/accountant/profile/from-documents', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const force = !!req.body?.force;
+    const { data: docs } = await supabase.from('financial_documents').select('*')
+      .eq('business_id', biz.business.id).is('archived_at', null).order('created_at', { ascending: false }).limit(300);
+    const company = (docs || []).filter((d) => profileDocs.PROFILE_DOC_TYPES.includes(((d.extracted_json || {}).ai_intake || {}).doc_type)).slice(0, 10);
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || {};
+    const readings = [], skipped = [];
+    for (const d of company) {
+      const docType = d.extracted_json.ai_intake.doc_type;
+      const cached = (d.extracted_json || {}).ai_profile;
+      const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name, mime_type')
+        .eq('id', d.file_id).eq('business_id', biz.business.id).limit(1);
+      const file = fileRows?.[0];
+      if (!file) { skipped.push({ document_id: d.id, reason: 'file_not_found' }); continue; }
+      if (cached?.v === 1 && !force) { readings.push({ document_id: d.id, file_name: file.file_name, doc_type: docType, fields: cached.fields || {} }); continue; }
+      const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+      if (dlErr || !blob) { skipped.push({ document_id: d.id, file_name: file.file_name, reason: 'document_unavailable' }); continue; }
+      const buf = Buffer.from(await blob.arrayBuffer());
+      const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+      const ex = isPdf ? extractPdfText(buf) : { text: '', text_available: false };
+      const r = await profileDocs.readDocument({ client: anthropic, text: ex.text_available ? ex.text : '', buffer: buf, mime_type: file.mime_type, file_name: file.file_name, docType });
+      if (!r.ok) { skipped.push({ document_id: d.id, file_name: file.file_name, reason: r.reason }); continue; }
+      readings.push({ document_id: d.id, file_name: file.file_name, doc_type: docType, fields: r.fields });
+      try {
+        await supabase.from('financial_documents')
+          .update({ extracted_json: { ...(d.extracted_json || {}), ai_profile: { v: 1, at: new Date().toISOString(), read: ex.text_available ? 'embedded_text' : 'file_to_model', fields: r.fields } } })
+          .eq('id', d.id).eq('business_id', biz.business.id);
+      } catch (e) { console.error(`[profile-docs] cache failed: ${e.message}`); }
+    }
+    const merged = profileDocs.mergeSuggestions(readings, profile);
+    res.json({ documents: readings.map(({ fields, ...r }) => r), skipped, ...merged,
+      extended_fields: await profileExtendedReady(), missing_document_types: profileDocs.PROFILE_DOC_TYPES.filter((t) => !company.some((d) => d.extracted_json.ai_intake.doc_type === t)) });
+  } catch (e) {
+    console.error(`[profile-docs] failed: ${e.message}`);
+    res.status(500).json({ error: 'profile_from_documents_failed' });
+  }
+});
+
+// POST /api/accountant/profile/verify — owner/admin/cfo confirms the profile.
+app.post('/api/accountant/profile/verify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const p = rows?.[0];
+    if (!p) return res.status(404).json({ error: 'No tax profile' });
+    const { missing } = profileCompleteness(p);
+    if (missing.length) return res.status(422).json({ error: 'Profile incomplete', missing });
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.from('tax_profiles')
+      .update({ profile_status: 'verified', verified_by_user_id: req.user.userId, verified_at: now, updated_at: now })
+      .eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role, entityType: 'tax_profile', entityId: data.id, action: 'verified' });
+    res.json({ profile: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/applicability — deterministic applicable-rule evaluation.
+// ── GET /api/audit/events — business-scoped audit trail (P3, premium module) ──
+// Read-only view over audit_events (023). Strictly scoped to the ACTIVE business;
+// restricted to oversight roles. before/after JSON payloads are intentionally NOT
+// returned (they may carry record snapshots) — only the who/what/when envelope.
+app.get('/api/audit/events', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!['owner', 'ceo', 'admin', 'cfo', 'auditor'].includes(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view the audit trail.' });
+
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Number(req.query.offset) || 0;
+    let q = supabase.from('audit_events')
+      .select('id, created_at, actor_user_id, actor_role, channel, entity_type, entity_id, action, request_id', { count: 'exact' })
+      .eq('business_id', biz.business.id);
+    if (req.query.entity_type) q = q.eq('entity_type', String(req.query.entity_type));
+    if (req.query.action) q = q.eq('action', String(req.query.action));
+    const { data, count, error } = await q.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+    if (error) return res.status(500).json({ error: 'audit_query_failed' });
+
+    // Resolve actor display names (best-effort, no PII beyond first name/username).
+    const ids = [...new Set((data || []).map(e => e.actor_user_id).filter(x => x != null))];
+    let names = {};
+    if (ids.length) {
+      const { data: users } = await supabase.from('users').select('id, first_name, username').in('id', ids);
+      names = Object.fromEntries((users || []).map(u => [u.id, u.first_name || u.username || String(u.id)]));
+    }
+    res.json({
+      events: (data || []).map(e => ({ ...e, actor_name: e.actor_user_id != null ? (names[e.actor_user_id] || String(e.actor_user_id)) : 'System' })),
+      total: count || 0,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/accountant/obligations — deterministic tax obligations (P3b) ─────
+// READ-ONLY. Numbers come ONLY from data the user actually recorded — never from an
+// invented rate. Engine reads; AI explains. No migrations, no 041.
+//   PPH 21/26 : sum of payroll deduction lines EXPLICITLY labelled as tax withholding
+//               (label/item_type matches pph|pajak|tax|withhold) for the last completed
+//               payroll month. No tax lines → insufficient_data (we never derive a
+//               progressive amount from gross — that is the un-built engine).
+//   PPH 23    : insufficient_data — no withholding rate / deterministic service
+//               classification exists in the product yet. Never a guessed %.
+//   PPN       : unavailable — needs invoice data (041 not applied / invoicing off).
+//   reserve   : sum of CALCULATED obligations only.
+app.get('/api/accountant/obligations', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(biz.role))
+      return res.status(403).json({ error: 'forbidden' });
+
+    const now = new Date();
+    // Obligations file for the LAST completed month (paid in the current month).
+    const period = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const periodStr = `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`;
+    // Pay-by dates from the general rule (PMK 81/2024: PPh by the 15th; PPN by the end of the next
+    // month) — the old "10th" came from PMK 242/2014, replaced on 1 January 2025.
+    const due10 = taxDeadlines.deadlinesFor('ID_PPH21_MONTHLY', periodStr).pay_by;
+    const dueEndNext = taxDeadlines.deadlinesFor('ID_PPN_MONTHLY', periodStr).pay_by;
+
+    // ── PPH 21/26 — recorded withholding lines only ──────────────────────────
+    const { data: pays } = await supabase.from('payroll_payments')
+      .select('id, currency, period_month, payment_date, status').or(bizOrFilter(biz));
+    const inPeriod = (pays || []).filter(p =>
+      (p.status === 'paid' || !p.status) &&
+      (p.period_month === periodStr || String(p.payment_date || '').slice(0, 7) === periodStr));
+    let pph21 = { amount: null, source_count: inPeriod.length, status: 'insufficient_data',
+      source_label: inPeriod.length ? `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} (no tax lines recorded)` : 'from Payroll · no payments in period' };
+    if (inPeriod.length) {
+      const ids = inPeriod.map(p => p.id);
+      const { data: items } = await supabase.from('payroll_payment_items')
+        .select('amount, direction, item_type, label, payroll_payment_id').in('payroll_payment_id', ids);
+      const taxLines = (items || []).filter(i => i.direction === 'deduction'
+        && /pph|pajak|\btax\b|withhold/i.test(`${i.label || ''} ${i.item_type || ''}`));
+      const amount = taxLines.reduce((s, i) => s + Number(i.amount || 0), 0);
+      if (taxLines.length && amount > 0) {
+        pph21 = { amount, source_count: inPeriod.length, status: 'calculated',
+          source_label: `from Payroll · ${inPeriod.length} payment${inPeriod.length === 1 ? '' : 's'} · ${taxLines.length} withholding line${taxLines.length === 1 ? '' : 's'}` };
+      }
+    }
+
+    const obligations = [
+      { obligation_type: 'pph_21_26', title: 'PPH 21/26', currency: 'IDR', period: periodStr, due_date: due10, ...pph21 },
+      { obligation_type: 'pph_23', title: 'PPH 23', amount: null, currency: 'IDR', period: periodStr, due_date: due10,
+        source_count: 0, status: 'insufficient_data', source_label: 'No withholding rate / service classification defined' },
+      { obligation_type: 'ppn', title: 'PPN', amount: null, currency: 'IDR', period: periodStr, due_date: dueEndNext,
+        source_count: 0, status: 'unavailable', source_label: 'PPN requires invoice data — invoicing not enabled' },
+    ];
+    const calc = obligations.filter(o => o.status === 'calculated');
+    res.json({
+      period: periodStr,
+      obligations,
+      reserve: { currency: 'IDR', amount: calc.reduce((s, o) => s + Number(o.amount || 0), 0),
+        lines: calc.map(o => ({ obligation_type: o.obligation_type, title: o.title, amount: o.amount, source_label: o.source_label })) },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/accountant/applicability', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = rows?.[0] || null;
+    const jur = profile?.jurisdiction || 'ID';
+    const { data: rules } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+    // Only rules with a verified source actually drive obligations.
+    const effective = (rules || []).filter(r => effectiveRuleActive(r, r.official_sources));
+    const result = evaluateApplicableTaxRules({ taxProfile: profile, activeRules: effective });
+    res.json({ ...result, completeness: profileCompleteness(profile), profile_warnings: profileWarnings(profile), active_unverified: (rules || []).length - effective.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Shared deterministic data the AI Accountant explains (never invents).
+async function buildAccountantData(biz) {
+  const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+  const profile = rows?.[0] || null;
+  const jur = profile?.jurisdiction || 'ID';
+  const { data: rules } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+  const effective = (rules || []).filter(r => effectiveRuleActive(r, r.official_sources));
+  const appl = evaluateApplicableTaxRules({ taxProfile: profile, activeRules: effective });
+  const today = new Date();
+  const { data: evRows } = await supabase.from('compliance_events')
+    .select('title, due_date, status, period, rule_code, rule_version, amount_status, source_verification_required')
+    .eq('business_id', biz.business.id).order('due_date', { ascending: true });
+  const events = (evRows || []).map(e => ({ ...e, days: Math.ceil((new Date(e.due_date) - today) / 86400000) }));
+  return {
+    profile, jurisdiction: jur,
+    completeness: profileCompleteness(profile),
+    profile_warnings: profileWarnings(profile),
+    applicable_rules: appl.applicable_rules, excluded_rules: appl.excluded_rules,
+    missing_profile_fields: appl.missing_profile_fields,
+    active_unverified: (rules || []).length - effective.length,
+    overdue: events.filter(e => e.days < 0 && !['paid', 'filed'].includes(e.status)),
+    upcoming: events.filter(e => e.days >= 0 && e.days <= 90),
+  };
+}
+
+// GET /api/accountant/summary — AI Accountant home (deterministic).
+app.get('/api/accountant/summary', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const data = await buildAccountantData(biz);
+    res.json({ ...data, entitled: await hasAccountantAddon(biz), disclaimer: AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/accountant/ask — AI explains compliance and financial status using ONLY
+// deterministic data. It never invents a rate/deadline/requirement/figure and always cites sources.
+app.post('/api/accountant/ask', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const question = String(req.body?.question || '').slice(0, 500);
+    if (!question) return res.status(400).json({ error: 'question required' });
+    const language = normalizeLanguage(req.body?.language || await getUserLanguage(req.user.userId));
+    const disclaimer = AI_ACCOUNTANT_DISCLAIMER[language] || AI_ACCOUNTANT_DISCLAIMER.en;
+    const data = await buildAccountantData(biz);
+
+    const bizOr = bizOrFilter(biz);
+
+    // Fetch wallets for financial context
+    const { data: rawWallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, name, currency, type, is_active')
+      .or(bizOr)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    // Fetch transactions for balances, counterparty summaries, and recent activity
+    const { data: rawTxs, error: tErr } = await supabase
+      .from('transactions')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original, category, counterparty_name, description, created_at, transaction_date, transfer_id')
+      .or(bizOr)
+      .order('created_at', { ascending: false });
+
+    // Fetch and enrich debts / invoices (payable and receivable)
+    const { data: rawDebts, error: dErr } = await supabase
+      .from('debts')
+      .select('*')
+      .or(bizOr)
+      .or('is_training.is.null,is_training.eq.false')
+      .order('created_at', { ascending: false });
+
+    // Fail gracefully with 500 if database facts cannot be retrieved
+    if (wErr || tErr || dErr) {
+      const err = wErr || tErr || dErr;
+      console.error('[accountant/ask] Failed to load company financial facts:', err.message);
+      return res.status(500).json({ error: 'failed_to_load_financial_facts', message: err.message });
+    }
+
+    const enrichedDebts = await enrichDebtsFor(biz.business.id, rawDebts || []);
+
+    const { company: companyFacts, counterpartiesMap, walletsWithBalance } = aiAccountantCore.buildAccountantCompanyFacts({
+      business: biz.business,
+      rawWallets,
+      rawTxs,
+      enrichedDebts,
+    });
+
+    // Only safe deterministic facts go to the model.
+    const facts = {
+      company: companyFacts,
+      jurisdiction: data.jurisdiction,
+      profile: data.profile ? { legal_entity_type: data.profile.legal_entity_type, tax_regime: data.profile.tax_regime, vat_status: data.profile.vat_status, employee_status: data.profile.employee_status, financial_year_start: data.profile.financial_year_start, financial_year_end: data.profile.financial_year_end } : null,
+      profile_completeness_percent: data.completeness.percent,
+      missing_profile_fields: data.missing_profile_fields,
+      applicable_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version, title: r.title, reason: r.reason, official_source: r.official_source ? { title: r.official_source.title, url: r.official_source.url, last_verified_at: r.official_source.last_verified_at } : null })),
+      upcoming_obligations: data.upcoming.map(e => ({ title: e.title, rule_code: e.rule_code, version: e.rule_version, period: e.period, due_date: e.due_date, status: e.status })),
+      overdue_obligations: data.overdue.map(e => ({ title: e.title, due_date: e.due_date })),
+      active_unverified_rules: data.active_unverified,
+    };
+
+    // Attach deterministic tax card facts if question asks about a supported topic
+    const qLower = question.toLowerCase();
+    let matchedTopic = null;
+    if (/\bpph\s*26\b/i.test(qLower)) matchedTopic = 'pph26';
+    else if (/\bpph\s*21\b/i.test(qLower)) matchedTopic = 'pph21';
+    else if (/\bpph\s*23\b/i.test(qLower)) matchedTopic = 'pph23';
+    else if (/\bpph\s*(?:final|sewa)\b/i.test(qLower)) matchedTopic = 'pph_final_rent';
+    else if (/\bpph\s*25\b/i.test(qLower)) matchedTopic = 'pph25';
+    else if (/\bpph\s*29\b/i.test(qLower)) matchedTopic = 'pph29';
+    else if (/\bppn\b/i.test(qLower)) matchedTopic = 'ppn';
+    else if (/\bpkp\b/i.test(qLower)) matchedTopic = 'pkp';
+    else if (/\b(?:npwp|nik)\b/i.test(qLower)) matchedTopic = 'npwp_nik';
+
+    let cardData = null;
+    if (matchedTopic) {
+      try {
+        const { getCard } = require('./lib/indonesiaTaxKnowledgeCards.cjs');
+        cardData = getCard({ topic_id: matchedTopic, language });
+        if (cardData) {
+          facts.tax_knowledge_card = {
+            topic_id: matchedTopic,
+            name: cardData.name,
+            what_is: (cardData.what_is || []).map(s => s.text).join(' '),
+            how_it_works: (cardData.how_it_works || []).map(s => s.text).join(' '),
+            main_condition: (cardData.main_condition || []).map(s => s.text).join(' '),
+            sources: aiAccountantCore.formatHumanSources(cardData, language),
+            unconfirmed_section: aiAccountantCore.formatUnconfirmedSection({ card: cardData, language }),
+          };
+        }
+      } catch (cErr) {
+        // Ignored
+      }
+    }
+
+    const prompt = aiAccountantCore.buildAccountantPrompt({
+      business: biz.business,
+      facts,
+      question,
+      language,
+    });
+
+    let answer;
+    if (anthropic && process.env.ANTHROPIC_API_KEY) {
+      try {
+        const resp = await anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 700, messages: [{ role: 'user', content: prompt }] });
+        answer = (resp.content?.[0]?.text || '').trim();
+      } catch (aiErr) {
+        console.warn('[accountant/ask] Anthropic API call failed, falling back to deterministic answer:', aiErr.message);
+      }
+    }
+
+    if (!answer) {
+      answer = aiAccountantCore.generateDeterministicFallbackAnswer({
+        question,
+        language,
+        counterpartiesMap,
+        walletsWithBalance,
+        taxData: data,
+      });
+    }
+
+    const diagnostics = cardData ? {
+      unconfirmed_reasons: aiAccountantCore.getBlockerReasons({ blockers: cardData.blockers, language }).reasons,
+      raw_blocker_codes: Array.from(new Set((cardData.blockers || []).map(b => b.code))),
+    } : null;
+
+    res.json({
+      answer,
+      disclaimer,
+      used_rules: data.applicable_rules.map(r => ({ rule_code: r.rule_code, version: r.version })),
+      diagnostics,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/rules — active rules for the profile's jurisdiction
+app.get('/api/accountant/rules', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: profRows } = await supabase.from('tax_profiles').select('jurisdiction').eq('business_id', biz.business.id).limit(1);
+    const jur = req.query.jurisdiction || profRows?.[0]?.jurisdiction || 'ID';
+    const { data: rules } = await supabase.from('tax_rules')
+      .select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active')
+      .order('obligation_type');
+    res.json({ jurisdiction: jur, rules: rules || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/sources — official sources (reference)
+app.get('/api/accountant/sources', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data } = await supabase.from('official_sources').select('*').order('jurisdiction');
+    res.json({ sources: data || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/tax-knowledge/cards — dynamic cards from PR #133 getCard()
+// Business research only; no calculations, no rule mutations, rates and TER blocked.
+app.get('/api/accountant/tax-knowledge/cards', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { getCard } = require('./lib/indonesiaTaxKnowledgeCards.cjs');
+    const lang = ['ru', 'en', 'id'].includes(req.query.language || req.query.lang)
+      ? (req.query.language || req.query.lang)
+      : 'ru';
+    const topicId = req.query.topic_id;
+
+    const TOPICS = [
+      'pph21', 'pph26', 'pph23', 'pph_final_rent',
+      'pph25', 'pph29', 'ppn', 'pkp', 'npwp_nik'
+    ];
+
+    if (topicId) {
+      if (!TOPICS.includes(topicId)) {
+        return res.status(400).json({ error: 'unsupported_topic', message: `Topic ${topicId} is not supported` });
+      }
+      const card = getCard({ topic_id: topicId, language: lang, intent: 'explanation' });
+      return res.json({ card });
+    }
+
+    const cards = TOPICS.map(t => getCard({ topic_id: t, language: lang, intent: 'explanation' }));
+    res.json({ cards });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+
+// ── Advanced Financial Insights V1 ───────────────────────────────────────────
+// GET /api/pulse/advanced-insights — cash-basis estimates over the transaction ledger.
+//
+// Read-only. Business-scoped through requireBusiness + bizOrFilter, exactly like every
+// other financial read, so a client-supplied business_id cannot widen the scope and a
+// personal workspace is refused outright.
+//
+// This does NOT produce audited accounting. Classification is keyword matching, anything
+// unrecognised stays `unknown` and is excluded from every metric, and each figure ships
+// with a status the UI must render instead of a bare number when it is not computable.
+app.get('/api/pulse/advanced-insights', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+
+    let q = supabase.from('transactions')
+      .select('id, type, amount_original, amount_idr, currency_original, category, description, transaction_date, created_at, scope')
+      .or(bizOrFilter(biz));
+    const scope = req.query.scope;
+    if (scope && scope !== 'all') q = q.eq('scope', scope);
+    const { data, error } = await q;
+    if (error) throw error;
+
+    const insights = FININ.computeInsights(data || [], {
+      from: req.query.from || null,
+      to: req.query.to || null,
+    });
+    res.json({ ok: true, business_id: biz.business.id, ...insights });
+  } catch (e) {
+    console.error(`[advanced-insights] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'advanced_insights_failed' });
+  }
+});
+
+
+// ── Invoice Payment Matching V1 ──────────────────────────────────────────────
+// Settlement state for one payable/receivable: what it totals, what has been paid
+// against it, what remains, which documents are attached, and whether it may be
+// closed. Business-scoped throughout.
+//
+// WHAT THESE ROUTES DO NOT DO:
+//   * They never pay anything, never contact a bank and never submit to Coretax.
+//   * They never close an invoice. /settlement REPORTS whether the gates are open;
+//     closing stays a deliberate human action.
+//   * /allocate does NOT move money. The money path is the existing
+//     POST /api/debts/:id/pay, which already validates against the remaining
+//     balance and writes the transaction. This records the AUDIT TRAIL that route
+//     never wrote: which transaction and which payment proof settled which invoice.
+
+// Settlement + closeout for ONE invoice (debt) in ONE business. Read-only. Returns null
+// when the invoice is not in this business. Shared by the route below and the MCP adapter;
+// the caller is responsible for the role gate.
+async function buildInvoiceSettlement(biz, debtId) {
+    const { data: debtRows } = await supabase.from('debts')
+      .select('*').eq('id', debtId).or(bizOrFilter(biz)).limit(1);
+    const debt = debtRows?.[0];
+    if (!debt) return null;
+
+    const [{ data: allocs }, { data: links }] = await Promise.all([
+      supabase.from('debt_settlement_allocations').select('*')
+        .eq('debt_id', debt.id).eq('business_id', biz.business.id),
+      supabase.from('document_debt_links').select('document_id')
+        .eq('debt_id', debt.id).eq('business_id', biz.business.id),
+    ]);
+
+    // Resolved with an explicit second query rather than a PostgREST embed: the join is
+    // then visible in the code, and the business_id filter is applied to the documents
+    // themselves instead of being inherited from the link row.
+    const docIds = (links || []).map((l) => l.document_id).filter(Boolean);
+    let docs = [];
+    if (docIds.length) {
+      const { data: docRows } = await supabase.from('financial_documents')
+        .select('id, document_type, document_number, commercial_base_amount, commercial_tax_amount, gross_amount, extracted_json')
+        .eq('business_id', biz.business.id).in('id', docIds);
+      docs = docRows || [];
+    }
+    const byType = (t) => docs.filter((d) => d && d.document_type === t);
+    const taxDocs = byType('tax_invoice');
+    const invoiceDoc = byType('vendor_invoice')[0] || byType('customer_invoice')[0] || null;
+
+    // Invoice total: prefer the linked invoice document, fall back to the debt itself.
+    const invoiceTotal = invoiceDoc && invoiceDoc.gross_amount != null
+      ? Number(invoiceDoc.gross_amount)
+      : Number(debt.original_amount || debt.amount || 0);
+    const baseAmount = invoiceDoc ? invoiceDoc.commercial_base_amount : null;
+    const taxAmount = invoiceDoc ? invoiceDoc.commercial_tax_amount
+      : (taxDocs[0] ? taxDocs[0].commercial_tax_amount : null);
+
+    // `debts.paid_amount` is the authority on money (POST /pay maintains it).
+    // Allocation rows are the audit trail and may lag behind it, so both are reported.
+    const allocationList = (allocs || []).map((a) => ({ allocated_amount: Number(a.allocated_amount) }));
+    const allocatedTotal = allocationList.reduce((x, a) => x + a.allocated_amount, 0);
+    const paidAmount = Number(debt.paid_amount || 0);
+    // Tax withheld by the customer (batch 10) settles its part too: without it a fully
+    // settled invoice with withholding would show the withheld amount as still open.
+    const withheldAmount = (allocs || []).filter((a) => a.settlement_source_type === 'withholding_record')
+      .reduce((x, a) => x + Number(a.allocated_amount || 0), 0);
+    const settlement = SETTLE.settlementOf({
+      invoice_total: invoiceTotal, base_amount: baseAmount, tax_amount: taxAmount,
+      allocations: [paidAmount, withheldAmount].filter((v) => v > 0).map((v) => ({ allocated_amount: v })),
+    });
+
+    const documents = {
+      invoice: !!invoiceDoc,
+      tax_invoice: taxDocs.length > 0,
+      payment_proof: byType('payment_proof').length > 0,
+      contract: byType('other').length > 0,
+      accountant_confirmation: debt.accountant_review_status === 'accountant_approved',
+    };
+
+    // Duplicate bank references among the attached payment proofs.
+    const proofs = byType('payment_proof').map((d) => ({
+      reference_number: d.extracted_json && d.extracted_json.reference_number,
+      bank_name: d.extracted_json && d.extracted_json.bank_name,
+    }));
+    const seen = new Set(); const duplicates = [];
+    for (const pr of proofs) {
+      const k = SETTLE.duplicateKeyOf(pr);
+      if (!k) continue;
+      if (seen.has(k)) duplicates.push(pr); else seen.add(k);
+    }
+
+    const closeout = SETTLE.closeoutState({
+      settlement, documents, duplicates,
+      accountant_review: debt.accountant_review_status || null,
+      has_tax: Number(taxAmount || 0) > 0 || taxDocs.length > 0,
+    });
+
+    return {
+      ok: true, business_id: biz.business.id,
+      invoice: {
+        debt_id: debt.id, type: debt.type, counterparty: debt.counterparty,
+        description: debt.description, due_date: debt.due_date,
+        currency: debt.currency || 'IDR',
+        document_number: invoiceDoc ? invoiceDoc.document_number : null,
+      },
+      settlement,
+      allocations: { count: allocationList.length, total: allocatedTotal,
+        matches_paid_amount: Math.abs(allocatedTotal - paidAmount) < 0.01 },
+      documents, closeout,
+      // The linked documents themselves, so the UI can show which figures are recorded
+      // and offer to fill the ones that are still empty.
+      linked_documents: docs.map((d) => ({
+        id: d.id, document_type: d.document_type, document_number: d.document_number,
+        commercial_base_amount: d.commercial_base_amount,
+        commercial_tax_amount: d.commercial_tax_amount,
+        gross_amount: d.gross_amount,
+      })),
+    };
+}
+
+// GET /api/invoices/:debtId/settlement — read-only.
+app.get('/api/invoices/:debtId/settlement', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    const out = await buildInvoiceSettlement(biz, req.params.debtId);
+    if (!out) return res.status(404).json({ error: 'invoice_not_found_in_this_business' });
+    res.json(out);
+  } catch (e) {
+    console.error(`[settlement] read failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'settlement_read_failed' });
+  }
+});
+
+// If a stored document is already attached to an invoice record, that invoice's REAL
+// settlement + closeout (first linked invoice). Null when it is not linked. Read-only.
+async function linkedInvoiceSettlement(biz, docId) {
+  if (!docId) return null;
+  const { data } = await supabase.from('document_debt_links').select('debt_id')
+    .eq('document_id', docId).eq('business_id', biz.business.id).limit(1);
+  const debtId = data?.[0]?.debt_id;
+  return debtId ? buildInvoiceSettlement(biz, debtId) : null;
+}
+
+// Readiness of a document AS IF it were entered now as a new invoice with nothing paid:
+// the SAME settlement + closeout engine as a stored invoice, fed the only facts known —
+// this document is the invoice, no payment is allocated, tax as the intake assessed it.
+// A preview for a caller deciding whether to enter it; never a stored state.
+function invoiceReadinessPreview(fields = {}, tax = {}) {
+  const settlement = SETTLE.settlementOf({
+    invoice_total: fields.gross_amount,
+    base_amount: fields.commercial_base_amount,
+    tax_amount: tax.ppn_detected ? tax.ppn_amount : null,
+    allocations: [],
+  });
+  const documents = { invoice: true };
+  const closeout = SETTLE.closeoutState({ settlement, documents, has_tax: !!tax.ppn_detected });
+  return { basis: 'preview_as_new_invoice', settlement, documents, closeout };
+}
+
+// POST /api/invoices/:debtId/allocate — record that a transaction settled this invoice.
+// Audit trail only: no money moves here, and no invoice is closed.
+app.post('/api/invoices/:debtId/allocate', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot record settlements' });
+
+    const b = req.body || {};
+    const amount = Number(b.allocated_amount);
+    if (!Number.isFinite(amount) || amount <= 0)
+      return res.status(400).json({ error: 'allocated_amount must be a positive number' });
+    if (!b.transaction_id)
+      return res.status(400).json({ error: 'transaction_id is required' });
+
+    const { data: debtRows } = await supabase.from('debts')
+      .select('*').eq('id', req.params.debtId).or(bizOrFilter(biz)).limit(1);
+    const debt = debtRows?.[0];
+    if (!debt) return res.status(404).json({ error: 'invoice_not_found_in_this_business' });
+
+    // Never trust a caller-supplied id: the transaction must be ours.
+    const { data: txRows } = await supabase.from('transactions')
+      .select('id').eq('id', b.transaction_id).or(bizOrFilter(biz)).limit(1);
+    if (!txRows?.length) return res.status(404).json({ error: 'transaction_not_found_in_this_business' });
+
+    let documentId = null;
+    if (b.document_id) {
+      const { data: docRows } = await supabase.from('financial_documents')
+        .select('id').eq('id', b.document_id).eq('business_id', biz.business.id).limit(1);
+      if (!docRows?.length) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+      documentId = b.document_id;
+    }
+
+    // Over-allocation guard, measured against the invoice total.
+    const { data: existing } = await supabase.from('debt_settlement_allocations')
+      .select('allocated_amount, transaction_id').eq('debt_id', debt.id).eq('business_id', biz.business.id);
+    const already = (existing || []).reduce((x, a) => x + Number(a.allocated_amount || 0), 0);
+    const total = Number(debt.original_amount || debt.amount || 0);
+    if (already + amount > total + SETTLE.DEFAULT_TOLERANCE) {
+      return res.status(400).json({ error: 'allocation_exceeds_invoice_total',
+        invoice_total: total, already_allocated: already, requested: amount });
+    }
+    // The DB also holds UNIQUE(debt_id, transaction_id); this is the friendly message.
+    if ((existing || []).some((a) => String(a.transaction_id) === String(b.transaction_id))) {
+      return res.status(409).json({ error: 'transaction_already_allocated_to_this_invoice' });
+    }
+
+    const { data: alloc, error } = await supabase.from('debt_settlement_allocations').insert({
+      business_id: biz.business.id, debt_id: debt.id,
+      settlement_source_type: 'transaction', transaction_id: b.transaction_id,
+      allocated_amount: amount, created_by_user_id: req.user.userId,
+    }).select().single();
+    if (error) {
+      console.error(`[settlement] allocate insert failed: ${error.message}`);
+      return res.status(500).json({ error: 'allocation_create_failed', detail: error.message });
+    }
+
+    // Attach the payment proof to both the invoice and the transaction it settled.
+    if (documentId) {
+      await supabase.from('document_debt_links').insert({
+        business_id: biz.business.id, document_id: documentId, debt_id: debt.id,
+        created_by_user_id: req.user.userId,
+      });
+      await supabase.from('document_transaction_links').insert({
+        business_id: biz.business.id, document_id: documentId, transaction_id: b.transaction_id,
+        created_by_user_id: req.user.userId,
+      });
+    }
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'debt_settlement_allocation', entityId: alloc.id,
+      action: 'settlement_allocated', after: alloc,
+    });
+    res.json({ ok: true, allocation: alloc });
+  } catch (e) {
+    console.error(`[settlement] allocate failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'settlement_allocate_failed' });
+  }
+});
+
+// ── AI Tax Split V1 ──────────────────────────────────────────────────────────
+// Suggests how an invoice splits between vendor payment and withheld tax, and records
+// the suggestion for accountant review. Business-scoped throughout.
+//
+// WHAT THESE ROUTES DO NOT DO:
+//   * They never pay anything, never contact a bank and never submit to Coretax/DJP.
+//   * /suggest performs NO writes at all.
+//   * /review only writes tax_treatments, which is an advisory table (migration 031).
+//     It never creates or edits a debt, a transaction or a tax rule. Payables are created
+//     by the caller through the existing POST /api/debts, so plan limits, approval rules
+//     and audit behave exactly as they do everywhere else.
+//   * Nothing here reads or writes `tax_rules`. The rate for rent comes from a knowledge-base
+//     candidate that is status=under_review and legal_verified=false, and every response says so.
+const TAXSPLIT = require('./lib/taxSplit');
+
+// POST /api/tax-split/suggest — pure computation. No writes.
+app.post('/api/tax-split/suggest', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot view business finance' });
+    const b = req.body || {};
+    const gross = Number(b.gross_amount);
+    if (b.gross_amount !== undefined && b.gross_amount !== null && b.gross_amount !== '' && !Number.isFinite(gross))
+      return res.status(400).json({ error: 'gross_amount must be a number' });
+    if (Number.isFinite(gross) && gross < 0)
+      return res.status(400).json({ error: 'gross_amount must not be negative' });
+
+    const split = TAXSPLIT.buildTaxSplit({
+      invoice_number: b.invoice_number, vendor_name: b.vendor_name, vendor_npwp: b.vendor_npwp,
+      invoice_date: b.invoice_date, due_date: b.due_date, description: b.description,
+      gross_amount: Number.isFinite(gross) ? gross : null, currency: b.currency || 'IDR',
+      document_id: b.document_id,
+    }, { treatment_key: b.treatment_key });
+
+    res.json({ split, business_id: biz.business.id });
+  } catch (e) {
+    console.error(`[tax-split] suggest failed: ${e.message}`);
+    res.status(500).json({ error: 'tax_split_suggest_failed' });
+  }
+});
+
+// POST /api/tax-split/review — record the suggestion + its review state in tax_treatments.
+// Advisory only: this row does not move money and does not change any debt.
+app.post('/api/tax-split/review', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot submit a tax review' });
+
+    const b = req.body || {};
+    const state = String(b.review_status || 'sent_to_accountant_review');
+    if (!TAXSPLIT.REVIEW_STATES.includes(state))
+      return res.status(400).json({ error: 'invalid_review_status', allowed: TAXSPLIT.REVIEW_STATES });
+
+    const split = TAXSPLIT.buildTaxSplit({
+      invoice_number: b.invoice_number, vendor_name: b.vendor_name, vendor_npwp: b.vendor_npwp,
+      invoice_date: b.invoice_date, due_date: b.due_date, description: b.description,
+      gross_amount: Number(b.gross_amount) || 0, currency: b.currency || 'IDR',
+      document_id: b.document_id,
+    }, { treatment_key: b.treatment_key });
+
+    // Only link a document that belongs to THIS business — never trust a caller-supplied id.
+    let invoiceDocumentId = null;
+    if (b.document_id) {
+      const { data: doc } = await supabase.from('financial_documents')
+        .select('id').eq('id', b.document_id).eq('business_id', biz.business.id).limit(1);
+      if (!doc || !doc.length) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+      invoiceDocumentId = b.document_id;
+    }
+    // Same for a debt the caller says this relates to.
+    let debtId = null;
+    if (b.debt_id) {
+      const { data: d } = await supabase.from('debts')
+        .select('id').eq('id', b.debt_id).or(bizOrFilter(biz)).limit(1);
+      if (!d || !d.length) return res.status(404).json({ error: 'debt_not_found_in_this_business' });
+      debtId = b.debt_id;
+    }
+
+    const row = {
+      business_id: biz.business.id,
+      debt_id: debtId,
+      invoice_document_id: invoiceDocumentId,
+      treatment_status: state,
+      tax_type: split.tax_type,
+      context_type: 'vendor_invoice',
+      commercial_base: split.gross_amount,
+      withholding_dpp: split.auto_calculated ? split.gross_amount : null,
+      withholding_rate: split.tax_rate,
+      withholding_amount: split.tax_payment_amount,
+      expected_vendor_net: split.vendor_payment_amount,
+      suggestion_source: 'ai_tax_split_v1',
+      // Confidence is a label in V1, not a probability; store only a real number.
+      confidence: split.confidence_score === 'High' ? 0.8
+        : split.confidence_score === 'Medium' ? 0.5 : null,
+    };
+
+    const { data, error } = await supabase.from('tax_treatments').insert(row).select().single();
+    if (error) {
+      console.error(`[tax-split] review insert failed: ${error.message}`);
+      return res.status(500).json({ error: 'tax_review_create_failed', detail: error.message });
+    }
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'tax_treatment', entityId: data.id, action: `tax_split_${state}`, after: data,
+    });
+    res.json({ treatment: data, split });
+  } catch (e) {
+    console.error(`[tax-split] review failed: ${e.message}`);
+    res.status(500).json({ error: 'tax_split_review_failed' });
+  }
+});
+
+// ── Compliance Calendar — deterministic generation from profile + rules ──────
+// Due dates come only from each rule (never invented). Applicability is decided
+// by the tax profile (PKP for VAT, PT for corporate tax, employees for PPh 21).
+const lastDayOfMonth = (y, m) => new Date(y, m + 1, 0); // m 0-based
+const iso = (d) => d.toISOString().slice(0, 10);
+
+function ruleApplies(rule, profile, hasEmployees) {
+  const w = rule.applies_when || {};
+  if (w.vat_status && (profile?.vat_status || '') !== w.vat_status) return false;
+  if (w.has_employees && !hasEmployees) return false;
+  if (rule.legal_entity_type && profile?.legal_entity_type && rule.legal_entity_type !== profile.legal_entity_type) return false;
+  return true;
+}
+
+// Returns [{ period, due_date }] for a rule over the relevant window.
+function ruleEvents(rule, profile, now) {
+  const out = [];
+  const y = now.getFullYear(), mo = now.getMonth();
+  if (rule.filing_frequency === 'monthly') {
+    // Last 2 completed months + current month → due in the following month.
+    for (let back = 2; back >= 0; back--) {
+      const pm = new Date(y, mo - back, 1);
+      const period = `${pm.getFullYear()}-${String(pm.getMonth() + 1).padStart(2, '0')}`;
+      let due;
+      if (rule.rule_code === 'ID_PPH21_MONTHLY') {
+        due = new Date(pm.getFullYear(), pm.getMonth() + 1, 20); // report by the 20th
+      } else { // PPN and other monthly → end of following month
+        due = lastDayOfMonth(pm.getFullYear(), pm.getMonth() + 1);
+      }
+      out.push({ period, due_date: iso(due) });
+    }
+  } else if (rule.filing_frequency === 'annual') {
+    // Most recent completed FY (assume Dec 31 end unless profile says otherwise).
+    const fyYear = mo >= 4 ? y : y - 1; // if before the deadline period, still last FY
+    const period = String(fyYear - (mo >= 4 ? 0 : 1));
+    const dueYear = Number(period) + 1;
+    out.push({ period, due_date: `${dueYear}-04-30` }); // 4 months after Dec 31 FY end
+  }
+  return out;
+}
+
+function eventStatus(dueDate, now) {
+  const d = Math.ceil((new Date(dueDate) - now) / 86400000);
+  if (d < 0) return 'overdue';
+  if (d <= 14) return 'due_soon';
+  return 'upcoming';
+}
+
+// Reporting periods a rule covers right now (start/end as YYYY-MM-DD).
+// Monthly: last 2 completed months + current. Annual: last completed FY
+// (from the profile's financial year; default Jan 1 – Dec 31).
+function periodsForRule(rule, profile, now) {
+  const out = [];
+  const y = now.getUTCFullYear(), m0 = now.getUTCMonth();
+  if (rule.filing_frequency === 'monthly') {
+    for (let back = 2; back >= 0; back--) {
+      const total = m0 - back;
+      const py = y + Math.floor(total / 12);
+      const pm0 = ((total % 12) + 12) % 12;
+      out.push({ period: `${py}-${String(pm0 + 1).padStart(2, '0')}`, period_start: ymd(py, pm0, 1), period_end: ymd(py, pm0, 31) });
+    }
+  } else if (rule.filing_frequency === 'annual') {
+    const [sm, sd] = (profile?.financial_year_start || '01-01').split('-').map(Number);
+    const [em, ed] = (profile?.financial_year_end || '12-31').split('-').map(Number);
+    const py = y - 1; // last completed calendar/financial year
+    out.push({ period: String(py), period_start: ymd(py, (sm || 1) - 1, sd || 1), period_end: ymd(py, (em || 12) - 1, ed || 31) });
+  }
+  return out;
+}
+
+// GET /api/accountant/calendar — deterministic generation from verified active
+// rules + applicability engine + structured due dates. Idempotent upsert.
+app.get('/api/accountant/calendar', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || null;
+    const jur = profile?.jurisdiction || 'ID';
+    const { data: allActive } = await supabase.from('tax_rules')
+      .select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+
+    // Only rules with a verified source drive obligations; the rest are surfaced.
+    const effective = (allActive || []).filter(r => effectiveRuleActive(r, r.official_sources));
+    const { applicable_rules, missing_profile_fields } = evaluateApplicableTaxRules({ taxProfile: profile, activeRules: effective });
+    const applicableCodes = new Set(applicable_rules.map(r => r.rule_code));
+
+    const now = new Date();
+    const warnings = [];
+    const generated = [];
+    for (const rule of effective) {
+      if (!applicableCodes.has(rule.rule_code)) continue;
+      for (const per of periodsForRule(rule, profile, now)) {
+        let due;
+        try { due = calculateDueDate(rule, per.period_start, per.period_end); }
+        catch { warnings.push(`${rule.rule_code}: no structured due_date_rule_json — skipped (never guessed).`); continue; }
+        generated.push({
+          business_id: biz.business.id, rule_id: rule.id, rule_code: rule.rule_code, rule_version: rule.version,
+          obligation_type: rule.obligation_type, title: rule.title,
+          period: per.period, period_start: per.period_start, period_end: per.period_end,
+          due_date: due, currency: profile?.reporting_currency || 'IDR',
+          status: eventStatus(due, now), amount_status: 'unknown',
+          source_verification_required: false,
+          source_snapshot_json: rule.official_sources ? { id: rule.official_sources.id, title: rule.official_sources.title, url: rule.official_sources.url, last_verified_at: rule.official_sources.last_verified_at } : null,
+          generated_at: new Date().toISOString(), generated_by: req.user.userId,
+        });
+      }
+    }
+
+    // Idempotent upsert. Do NOT touch confirmed/paid events (skip recompute).
+    const { data: stored0 } = await supabase.from('compliance_events').select('*').eq('business_id', biz.business.id);
+    const locked = new Set((stored0 || []).filter(s => ['paid', 'filed'].includes(s.payment_status) || ['paid', 'filed'].includes(s.status)).map(s => `${s.rule_code}|${s.period}`));
+    const toUpsert = generated.filter(g => !locked.has(`${g.rule_code}|${g.period}`));
+    if (toUpsert.length) {
+      await supabase.from('compliance_events')
+        // amount_status is left out: re-generating dates must not reset an amount someone recorded
+        // (a new row gets the column default 'unknown').
+        .upsert(toUpsert.map(({ amount_status, ...g }) => ({ ...g, updated_at: new Date().toISOString() })), { onConflict: 'business_id,rule_code,period' })
+        .then(() => {}, () => {});
+    }
+
+    const { data: stored } = await supabase.from('compliance_events').select('*').eq('business_id', biz.business.id);
+    const byKey = Object.fromEntries((stored || []).map(s => [`${s.rule_code}|${s.period}`, s]));
+    const events = generated.map(g => {
+      const s = byKey[`${g.rule_code}|${g.period}`] || {};
+      const rule = effective.find(r => r.rule_code === g.rule_code);
+      return {
+        ...g, id: s.id, status: eventStatus(g.due_date, now),
+        amount_status: s.amount_status || 'unknown',
+        professional_review_status: s.professional_review_status || 'not_started',
+        owner_approval_status: s.owner_approval_status || 'not_required',
+        payment_status: s.payment_status || 'unpaid',
+        official_source: rule?.official_sources || null,
+        calculation_method: rule?.calculation_method || null,
+        filing_frequency: rule?.filing_frequency || null,
+      };
+    }).sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+    res.json({
+      jurisdiction: jur, profile_complete: !missing_profile_fields.length && !!(profile && profile.country && profile.legal_entity_type),
+      events, warnings, missing_profile_fields,
+      active_unverified: (allActive || []).length - effective.length,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Localized compliance reminder text (Telegram).
+const COMPLIANCE_REMINDER = {
+  ru: (lines, overdue) => `🧮 <b>Налоговые сроки</b>\n\n${lines}${overdue ? `\n\n⚠️ Просрочено: ${overdue}` : ''}\n\nИнформация рекомендательная — подтвердите у бухгалтера.`,
+  en: (lines, overdue) => `🧮 <b>Tax deadlines</b>\n\n${lines}${overdue ? `\n\n⚠️ Overdue: ${overdue}` : ''}\n\nAdvisory only — confirm with your accountant.`,
+  id: (lines, overdue) => `🧮 <b>Tenggat pajak</b>\n\n${lines}${overdue ? `\n\n⚠️ Terlambat: ${overdue}` : ''}\n\nHanya rekomendasi — konfirmasikan dengan akuntan.`,
+};
+
+// Tax compliance notification templates (RU/EN/ID). Telegram never shows a full
+// tax return — only short alerts with deep links. Buttons added if WEB_APP_URL set.
+const TAX_TG_TEMPLATES = {
+  tax_profile_incomplete: {
+    ru: () => '🧾 <b>Налоговый профиль не заполнен</b>\nЗаполните обязательные поля, чтобы построить календарь обязательств.',
+    en: () => '🧾 <b>Tax profile incomplete</b>\nComplete the required fields to build your compliance calendar.',
+    id: () => '🧾 <b>Profil pajak belum lengkap</b>\nLengkapi bidang wajib untuk membuat kalender kepatuhan.',
+  },
+  tax_obligation_due_soon: {
+    ru: (x) => `⏰ <b>Скоро срок</b>\n${x || 'Налоговое обязательство приближается к сроку.'}\nИнформация рекомендательная — подтвердите у бухгалтера.`,
+    en: (x) => `⏰ <b>Obligation due soon</b>\n${x || 'A tax obligation is approaching its deadline.'}\nAdvisory only — confirm with your accountant.`,
+    id: (x) => `⏰ <b>Segera jatuh tempo</b>\n${x || 'Kewajiban pajak mendekati tenggat.'}\nHanya rekomendasi — konfirmasikan dengan akuntan.`,
+  },
+  tax_obligation_overdue: {
+    ru: (x) => `⚠️ <b>Просрочено</b>\n${x || 'Есть просроченные налоговые обязательства.'}\nПодтвердите у лицензированного специалиста.`,
+    en: (x) => `⚠️ <b>Overdue</b>\n${x || 'You have overdue tax obligations.'}\nConfirm with a licensed professional.`,
+    id: (x) => `⚠️ <b>Terlambat</b>\n${x || 'Ada kewajiban pajak yang terlambat.'}\nKonfirmasikan dengan profesional berlisensi.`,
+  },
+  tax_rule_source_outdated: {
+    ru: () => '📚 <b>Источник правила требует проверки</b>\nНекоторые налоговые правила ожидают проверки официального источника.',
+    en: () => '📚 <b>Rule source needs verification</b>\nSome tax rules are awaiting official source verification.',
+    id: () => '📚 <b>Sumber aturan perlu verifikasi</b>\nBeberapa aturan pajak menunggu verifikasi sumber resmi.',
+  },
+  professional_review_required: {
+    ru: () => '👤 <b>Нужна проверка специалистом</b>\nОбязательство ожидает профессиональной проверки.',
+    en: () => '👤 <b>Professional review required</b>\nAn obligation is awaiting professional review.',
+    id: () => '👤 <b>Perlu tinjauan profesional</b>\nKewajiban menunggu tinjauan profesional.',
+  },
+  owner_tax_approval_required: {
+    ru: () => '✅ <b>Нужно подтверждение владельца</b>\nНалоговое обязательство ожидает вашего решения.',
+    en: () => '✅ <b>Owner approval required</b>\nA tax obligation is awaiting your decision.',
+    id: () => '✅ <b>Perlu persetujuan pemilik</b>\nKewajiban pajak menunggu keputusan Anda.',
+  },
+};
+function taxTgButtons(lang) {
+  const base = process.env.WEB_APP_URL;
+  if (!base) return [];
+  const t = { ru: ['Профиль', 'Календарь'], en: ['Tax profile', 'Calendar'], id: ['Profil', 'Kalender'] }[lang] || ['Tax profile', 'Calendar'];
+  return [[{ text: t[0], url: `${base}/accountant/tax-profile` }, { text: t[1], url: `${base}/accountant/calendar` }]];
+}
+
+// POST /api/accountant/telegram/test — owner/admin manual test of a template.
+app.post('/api/accountant/telegram/test', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const tpl = String(req.body?.template || '');
+    if (!TAX_TG_TEMPLATES[tpl]) return res.status(400).json({ error: `Unknown template. One of: ${Object.keys(TAX_TG_TEMPLATES).join(', ')}` });
+    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const fn = TAX_TG_TEMPLATES[tpl][language] || TAX_TG_TEMPLATES[tpl].en;
+    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(req.body?.detail || ''), taxTgButtons(language),
+      { category: 'tax_compliance', businessId: biz.business?.id || null });
+    res.json({ ok: true, sent: r.sent ?? 0, template: tpl });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/accountant/calendar/remind — send a compliance reminder to admins
+// (Telegram reminder foundation; owner-triggered now, scheduler is future work).
+app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const language = normalizeLanguage(await getUserLanguage(req.user.userId));
+    const { data: evs } = await supabase.from('compliance_events')
+      .select('title, due_date').eq('business_id', biz.business.id).order('due_date', { ascending: true });
+    const today = new Date();
+    const soon = (evs || []).filter(e => { const d = Math.ceil((new Date(e.due_date) - today) / 86400000); return d >= -30 && d <= 30; });
+    if (!soon.length) return res.json({ ok: true, sent: 0, message: 'No deadlines within the window.' });
+    const lines = soon.slice(0, 8).map(e => `• ${e.title} — ${e.due_date}`).join('\n');
+    const overdue = soon.filter(e => new Date(e.due_date) < today).length;
+    const fn = COMPLIANCE_REMINDER[language] || COMPLIANCE_REMINDER.en;
+    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(lines, overdue || null), [],
+      { category: 'tax_compliance', businessId: biz.business?.id || null });
+    res.json({ ok: true, sent: r.sent ?? 0 });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TAX RULES REGISTRY & OFFICIAL SOURCES — platform-level admin (PR2)
+// tax_rules / official_sources are a GLOBAL platform registry (no business_id).
+// Only a platform admin may manage them. Active rules are immutable and require
+// a verified official source. A change creates a NEW version (old stays).
+// ═════════════════════════════════════════════════════════════════════════════
+
+function requireTaxRuleEditor(req, res) {
+  if (!canEditTaxRules(req.user.userId)) { res.status(403).json({ error: 'Platform tax-rule editor access required' }); return false; }
+  return true;
+}
+const TAX_RULE_EDITABLE = ['jurisdiction','country','legal_entity_type','legal_entity_types','tax_regime','tax_regimes','obligation_type','title','description','calculation_method','parameters','parameters_status','filing_frequency','payment_frequency','due_date_rule','due_date_rule_json','applies_when','official_source_id','effective_from','effective_to','interpretation_notes','exceptions','required_profile_fields'];
+const SOURCE_EDITABLE = ['jurisdiction','authority','title','url','source_type','document_number','publication_date','effective_from','effective_to','language','content_hash','notes','status','relevant_sections','quoted_section_reference','interpretation_notes','superseded_documents','known_amendments','accessed_at'];
+// The deterministic gate + transitions live in a unit-tested module.
+// computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition
+// are imported below (see require at the top of the file).
+
+// The single EFFECTIVE approved review for a rule's CURRENT version (or null).
+async function loadEffectiveApprovedReview(rule) {
+  const { data } = await supabase.from('tax_rule_reviews')
+    .select('*').eq('tax_rule_id', rule.id).eq('review_status', 'approved')
+    .order('reviewed_at', { ascending: false }).limit(5);
+  return (data || []).find(r => isEffectiveApprovedReview(r, rule)) || null;
+}
+
+// ── Professional review records (PR1: model + read; full workflow in PR3) ─────
+app.get('/api/admin/tax-rules/:id/reviews', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data, error } = await supabase.from('tax_rule_reviews')
+    .select('*').eq('tax_rule_id', req.params.id).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ reviews: data || [] });
+});
+
+// Create a review request (queue entry). Starts as 'pending' — NOT approved.
+app.post('/api/admin/tax-rules/:id/reviews', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: rule } = await supabase.from('tax_rules').select('id, version').eq('id', req.params.id).single();
+  if (!rule) return res.status(404).json({ error: 'Rule not found' });
+  const allowed = ['reviewer_name', 'reviewer_role', 'license_number', 'license_type', 'issuing_authority', 'review_scope', 'review_notes'];
+  const body = { tax_rule_id: rule.id, rule_version: rule.version, review_status: 'pending', license_verification_status: 'unverified' };
+  for (const k of allowed) if (req.body[k] !== undefined) body[k] = req.body[k];
+  const { data, error } = await supabase.from('tax_rule_reviews').insert(body).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule_review', entityId: data.id, action: 'review_requested', after: data });
+  res.json({ review: data });
+});
+
+// Update a review. Approving REQUIRES recorded license + manual verification —
+// you cannot mark a rule professionally reviewed without a real, license-checked
+// reviewer (spec §8/§29). Approval is the gate the activation step depends on.
+app.patch('/api/admin/tax-rule-reviews/:reviewId', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rule_reviews').select('*').eq('id', req.params.reviewId).single();
+  if (!before) return res.status(404).json({ error: 'Review not found' });
+  // License verification is a SEPARATE, audited action (verify-license) — it
+  // cannot be set here, so a reviewer cannot self-verify their own license.
+  const allowed = ['reviewer_user_id', 'reviewer_name', 'reviewer_role', 'license_number', 'license_type', 'issuing_authority', 'review_status', 'review_scope', 'review_notes', 'changes_requested_json', 'expires_at'];
+  const updates = { updated_at: new Date().toISOString() };
+  for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+
+  // Enforce valid status transitions.
+  if (updates.review_status && !validReviewTransition(before.review_status, updates.review_status))
+    return res.status(409).json({ error: `Invalid transition ${before.review_status} → ${updates.review_status}` });
+
+  const finalStatus = updates.review_status || before.review_status;
+  if (finalStatus === 'approved') {
+    const name = updates.reviewer_name || before.reviewer_name;
+    const licNo = updates.license_number || before.license_number;
+    if (before.license_verification_status !== 'verified' || !name || !licNo)
+      return res.status(422).json({ error: 'Approval requires a named reviewer with a recorded license whose license_verification_status is verified (use /verify-license first)' });
+    updates.reviewed_at = updates.reviewed_at || new Date().toISOString();
+  }
+  const { data, error } = await supabase.from('tax_rule_reviews').update(updates).eq('id', req.params.reviewId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule_review', entityId: data.id, action: `review_${finalStatus}`, before, after: data });
+  res.json({ review: data });
+});
+
+// POST /api/admin/tax-rule-reviews/:reviewId/verify-license — a separate
+// platform-admin action that records license verification (never self-service
+// by the reviewer). Audited. Method stored separately from the status value.
+app.post('/api/admin/tax-rule-reviews/:reviewId/verify-license', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rule_reviews').select('*').eq('id', req.params.reviewId).single();
+  if (!before) return res.status(404).json({ error: 'Review not found' });
+  const status = req.body?.status === 'failed' ? 'failed' : 'verified';
+  if (status === 'verified' && (!before.license_number || !before.reviewer_name))
+    return res.status(422).json({ error: 'Cannot verify: reviewer_name and license_number must be recorded first' });
+  // The verifier must not be the reviewer themselves.
+  if (before.reviewer_user_id && String(before.reviewer_user_id) === String(req.user.userId))
+    return res.status(403).json({ error: 'A reviewer cannot verify their own license' });
+  const { data, error } = await supabase.from('tax_rule_reviews')
+    .update({ license_verification_status: status, verification_method: req.body?.method || 'manual', updated_at: new Date().toISOString() })
+    .eq('id', req.params.reviewId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule_review', entityId: data.id, action: `license_${status}`, before, after: data });
+  res.json({ review: data });
+});
+
+// ── Official sources ─────────────────────────────────────────────────────────
+app.get('/api/admin/official-sources', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data, error } = await supabase.from('official_sources').select('*').order('jurisdiction').order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ sources: data || [] });
+});
+
+app.post('/api/admin/official-sources', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const body = {}; for (const k of SOURCE_EDITABLE) if (req.body[k] !== undefined) body[k] = req.body[k];
+  if (!body.jurisdiction || !body.authority || !body.title || !body.url) return res.status(400).json({ error: 'jurisdiction, authority, title, url required' });
+  body.status = body.status || 'draft';
+  const { data, error } = await supabase.from('official_sources').insert(body).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'created', after: data });
+  res.json({ source: data });
+});
+
+app.patch('/api/admin/official-sources/:id', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const updates = { updated_at: new Date().toISOString() };
+  for (const k of SOURCE_EDITABLE) if (req.body[k] !== undefined) updates[k] = req.body[k];
+  const { data, error } = await supabase.from('official_sources').update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'updated', before, after: data });
+  res.json({ source: data });
+});
+
+// Verify a source: marks it verified + sets last_verified_at + verifier.
+// When a source goes outdated/replaced OR its content changes, any rule that
+// cites it must NOT silently stay active — return such rules to under_review and
+// flag their compliance events for re-verification. Audited per rule.
+async function returnRulesToReviewForSource(sourceId, reason, actorUserId) {
+  const { data: rules } = await supabase.from('tax_rules')
+    .select('id, rule_code').eq('official_source_id', sourceId).eq('status', 'active');
+  for (const r of (rules || [])) {
+    await supabase.from('tax_rules').update({ status: 'under_review', updated_at: new Date().toISOString() }).eq('id', r.id);
+    await supabase.from('compliance_events').update({ source_verification_required: true, updated_at: new Date().toISOString() }).eq('rule_code', r.rule_code);
+    await recordAudit({ actorUserId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: r.id, action: 'returned_to_review', before: { status: 'active' }, after: { status: 'under_review', reason } });
+  }
+  return (rules || []).length;
+}
+
+// Verify (or re-verify) a source: records last_verified_at, verifier, optional
+// content_hash + notes + accessed_at. If the content hash CHANGED, dependent
+// active rules are returned to review (no silent active rule after a change).
+app.post('/api/admin/official-sources/:id/verify', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const newHash = req.body?.content_hash != null ? String(req.body.content_hash) : before.content_hash;
+  const hashChanged = !!(before.content_hash && newHash && newHash !== before.content_hash);
+  const updates = {
+    status: 'verified', last_verified_at: new Date().toISOString(), verified_by_user_id: req.user.userId,
+    content_hash: newHash, updated_at: new Date().toISOString(),
+  };
+  if (req.body?.notes != null) updates.notes = req.body.notes;
+  if (req.body?.accessed_at != null) updates.accessed_at = req.body.accessed_at;
+  const { data, error } = await supabase.from('official_sources').update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  let returned = 0;
+  if (hashChanged) returned = await returnRulesToReviewForSource(req.params.id, 'source_content_changed', req.user.userId);
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: hashChanged ? 'reverified_content_changed' : 'verified', before, after: data });
+  res.json({ source: data, content_changed: hashChanged, rules_returned_to_review: returned });
+});
+
+// Mark a source outdated — dependent active rules return to review.
+app.post('/api/admin/official-sources/:id/mark-outdated', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const { data } = await supabase.from('official_sources').update({ status: 'outdated', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  const returned = await returnRulesToReviewForSource(req.params.id, 'source_outdated', req.user.userId);
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'marked_outdated', before, after: data });
+  res.json({ source: data, rules_returned_to_review: returned });
+});
+
+// Mark a source replaced (optionally record the superseding document).
+app.post('/api/admin/official-sources/:id/mark-replaced', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const superseded = Array.isArray(before.superseded_documents) ? before.superseded_documents : [];
+  if (req.body?.replaced_by) superseded.push({ replaced_by: req.body.replaced_by, at: new Date().toISOString() });
+  const { data } = await supabase.from('official_sources').update({ status: 'replaced', superseded_documents: superseded, updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  const returned = await returnRulesToReviewForSource(req.params.id, 'source_replaced', req.user.userId);
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'marked_replaced', before, after: data });
+  res.json({ source: data, rules_returned_to_review: returned });
+});
+
+// Append a known amendment (audited; does not auto-return rules — the editor
+// decides whether the amendment is material and re-verifies / marks outdated).
+app.post('/api/admin/official-sources/:id/amendment', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Source not found' });
+  const note = String(req.body?.note || '').trim();
+  if (!note) return res.status(400).json({ error: 'note required' });
+  const amendments = Array.isArray(before.known_amendments) ? before.known_amendments : [];
+  amendments.push({ note, document_number: req.body?.document_number || null, at: new Date().toISOString(), by_user_id: req.user.userId });
+  const { data } = await supabase.from('official_sources').update({ known_amendments: amendments, updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'official_source', entityId: data.id, action: 'amendment_added', before, after: data });
+  res.json({ source: data });
+});
+
+// ── Tax rules (versioned) ────────────────────────────────────────────────────
+app.get('/api/admin/tax-rules', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  let q = supabase.from('tax_rules').select('*, official_sources(*)').order('rule_code').order('version', { ascending: false });
+  if (req.query.jurisdiction) q = q.eq('jurisdiction', req.query.jurisdiction);
+  if (req.query.status) q = q.eq('status', req.query.status);
+  const { data, error } = await q;
+  if (error) return res.status(500).json({ error: error.message });
+  const rules = data || [];
+  // Attach the latest professional review + computed activation blockers per rule.
+  const ids = rules.map(r => r.id);
+  let reviewsByRule = {};
+  if (ids.length) {
+    const { data: revs } = await supabase.from('tax_rule_reviews').select('*').in('tax_rule_id', ids).order('created_at', { ascending: false });
+    for (const rv of (revs || [])) (reviewsByRule[rv.tax_rule_id] ||= []).push(rv);
+  }
+  const now = new Date();
+  const enriched = rules.map(r => {
+    const reviews = reviewsByRule[r.id] || [];
+    // effective_approved_review drives the gate; latest_review is for UI/history.
+    const effective = reviews.find(rv => isEffectiveApprovedReview(rv, r, now)) || null;
+    return {
+      ...r,
+      latest_review: reviews[0] || null,
+      effective_approved_review: effective,
+      activation_blockers: computeActivationBlockers(r, r.official_sources, effective, now),
+    };
+  });
+  res.json({ rules: enriched });
+});
+
+app.post('/api/admin/tax-rules', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const body = { status: 'draft', version: 1, created_by_user_id: req.user.userId };
+  for (const k of TAX_RULE_EDITABLE) if (req.body[k] !== undefined) body[k] = req.body[k];
+  if (!body.rule_code || !body.jurisdiction || !body.country || !body.obligation_type || !body.title)
+    return res.status(400).json({ error: 'rule_code, jurisdiction, country, obligation_type, title required' });
+  // New rule_code starts at v1; if rule_code exists, require the new-version flow.
+  const { data: existing } = await supabase.from('tax_rules').select('id').eq('rule_code', body.rule_code).limit(1);
+  if (existing?.length) return res.status(409).json({ error: 'rule_code exists — use "new version" instead' });
+  const { data, error } = await supabase.from('tax_rules').insert(body).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'created', after: data });
+  res.json({ rule: data });
+});
+
+app.patch('/api/admin/tax-rules/:id', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  // Only draft / under_review rules are editable. Active rules are immutable.
+  if (!['draft', 'under_review', 'rejected'].includes(before.status))
+    return res.status(409).json({ error: `Cannot edit a ${before.status} rule — create a new version` });
+  const updates = { updated_at: new Date().toISOString() };
+  for (const k of TAX_RULE_EDITABLE) if (req.body[k] !== undefined) updates[k] = req.body[k];
+  const { data, error } = await supabase.from('tax_rules').update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'updated', before, after: data });
+  res.json({ rule: data });
+});
+
+// Lifecycle: submit (→under_review), activate (→active, requires verified
+// source), deprecate (→deprecated), new-version (clone as draft).
+app.post('/api/admin/tax-rules/:id/submit', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  if (before.status !== 'draft') return res.status(409).json({ error: 'Only a draft can be submitted for review' });
+  const { data, error } = await supabase.from('tax_rules').update({ status: 'under_review', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'submitted', before, after: data });
+  res.json({ rule: data });
+});
+
+app.post('/api/admin/tax-rules/:id/activate', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  if (before.status === 'active') return res.status(409).json({ error: 'Already active' });
+  // ENFORCE the full activation gate (§15). Backend is the source of truth.
+  const approvedReview = await loadEffectiveApprovedReview(before);
+  const blockers = computeActivationBlockers(before, before.official_sources, approvedReview);
+  if (blockers.length) return res.status(422).json({ error: 'Activation blocked', blockers });
+  const now = new Date().toISOString();
+  const { data, error } = await supabase.from('tax_rules')
+    .update({ status: 'active', last_verified_at: now, reviewed_by_user_id: req.user.userId, reviewed_at: now, updated_at: now })
+    .eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'activated', before, after: data });
+  res.json({ rule: data });
+});
+
+app.post('/api/admin/tax-rules/:id/deprecate', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!before) return res.status(404).json({ error: 'Rule not found' });
+  const { data, error } = await supabase.from('tax_rules').update({ status: 'deprecated', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'deprecated', before, after: data });
+  res.json({ rule: data });
+});
+
+// Create a new version: old row stays immutable, new draft has version+1 and
+// supersedes_rule_id → old. Activating the new version later supersedes the old.
+app.post('/api/admin/tax-rules/:id/new-version', auth, async (req, res) => {
+  if (!requireTaxRuleEditor(req, res)) return;
+  const { data: old } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
+  if (!old) return res.status(404).json({ error: 'Rule not found' });
+  // Highest existing version for this rule_code.
+  const { data: versions } = await supabase.from('tax_rules').select('version').eq('rule_code', old.rule_code).order('version', { ascending: false }).limit(1);
+  const nextVersion = (versions?.[0]?.version || old.version || 1) + 1;
+  const clone = {};
+  for (const k of TAX_RULE_EDITABLE) clone[k] = old[k];
+  for (const k of TAX_RULE_EDITABLE) if (req.body[k] !== undefined) clone[k] = req.body[k];
+  clone.rule_code = old.rule_code; clone.version = nextVersion; clone.status = 'draft';
+  clone.supersedes_rule_id = old.id; clone.created_by_user_id = req.user.userId;
+  clone.last_verified_at = null; clone.reviewed_by_user_id = null; clone.reviewed_at = null;
+  const { data, error } = await supabase.from('tax_rules').insert(clone).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'tax_rule', entityId: data.id, action: 'new_version', before: { from: old.id, version: old.version }, after: data });
+  res.json({ rule: data });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BANK STATEMENT IMPORT & RECONCILIATION V1 (AI Accountant — Module F)
+// Client parses the file (CSV/XLSX) and posts normalized rows. The backend does
+// the deterministic work: dedup, matching against existing transactions, import
+// (each imported row creates a real transaction), and ending-balance reconcile.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const CASH_IN_TYPES = TX.CASH_IN_LEGACY;
+
+function normalizeDesc(s) {
+  return String(s || '').toLowerCase().replace(/\s+/g, ' ').replace(/[^a-z0-9а-яё ]/gi, '').trim();
+}
+function rowDedupHash(businessId, walletId, r) {
+  const parts = [businessId, walletId || '', r.tx_date || '', Math.abs(Number(r.amount) || 0).toFixed(2), r.direction || '', normalizeDesc(r.description), (r.bank_reference || '')].join('|');
+  return crypto.createHash('sha256').update(parts).digest('hex').slice(0, 32);
+}
+
+// ── Atomic bank statement confirm (migration 069) ─────────────────────────────
+// Both confirm routes validate EVERY requested row first (nothing is written when any row is
+// bad), price FX outside the transaction, then hand the whole decision list to
+// rpc_confirm_bank_import, which re-checks under a per-business lock and writes transactions,
+// row links, feedback, reconciliation and batch status in ONE database transaction.
+// There is deliberately no row-by-row fallback: without migration 069 the confirm refuses.
+
+// A statement date must be a real calendar date in a sane range. Corrupt uploads (e.g. a title
+// line read as the header) produced periods like 2000-12-31…2032-12-31 and garbage row dates.
+function isValidStatementDate(v) {
+  if (v === null || v === undefined || v === '') return false;
+  const str = v instanceof Date ? (Number.isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10)) : String(v).trim().slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (!m) return false;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (y < 1990 || y > 2099) return false;
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() + 1 === mo && dt.getUTCDate() === d;
+}
+
+// Batch-level corruption check: null when the statement period is usable.
+function statementPeriodProblem(batch) {
+  const s = batch.statement_start, e = batch.statement_end;
+  if (s && !isValidStatementDate(s)) return 'Statement start is not a valid date';
+  if (e && !isValidStatementDate(e)) return 'Statement end is not a valid date';
+  if (s && e) {
+    const days = (Date.parse(String(e).slice(0, 10)) - Date.parse(String(s).slice(0, 10))) / 86400000;
+    if (days < 0) return 'Statement start is after its end';
+    if (days > 366 * 5) return 'Statement spans more than 5 years';
+  }
+  return null;
+}
+
+// Row-level corruption check for a row that will touch the ledger.
+function statementRowProblem(row, action) {
+  const amt = Number(row.amount);
+  if (row.amount === null || row.amount === undefined || String(row.amount).trim() === '' || !Number.isFinite(amt) || amt <= 0)
+    return 'Row amount is missing or not a positive number';
+  if (action === 'create' && !isValidStatementDate(row.tx_date)) return 'Row date is missing or not a valid date';
+  return null;
+}
+
+// Statement lines already in the ledger, from prior bank_import_rows that carry a link: how many
+// copies of each dedup_hash are backed by an EXISTING transaction, and the set of transaction ids
+// already backing a statement row (such a transaction cannot back a second row).
+async function importedStatementLines(biz, priorRows) {
+  const ids = [...new Set((priorRows || []).map(r => Number(r.linked_transaction_id)).filter(Number.isFinite))];
+  const live = new Set();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data } = await supabase.from('transactions').select('id').eq('business_id', biz.business.id).in('id', ids.slice(i, i + 500));
+    for (const t of (data || [])) live.add(Number(t.id));
+  }
+  const importedCopies = new Map();
+  for (const r of (priorRows || [])) {
+    if (!r.dedup_hash || !live.has(Number(r.linked_transaction_id))) continue;
+    importedCopies.set(r.dedup_hash, (importedCopies.get(r.dedup_hash) || 0) + 1);
+  }
+  return { importedCopies, backedTxIds: live };
+}
+
+// 400 body for rows that failed validation. `error` is what the client shows to the person.
+function invalidRowsBody(problems) {
+  const first = problems[0];
+  const where = first.row_index === null || first.row_index === undefined ? 'Statement row' : `Statement row ${first.row_index + 1}`;
+  const more = problems.length > 1 ? ` (and ${problems.length - 1} more)` : '';
+  return { error: `${where}: ${first.error}${more}. Nothing was imported.`, code: 'invalid_rows', rows: problems };
+}
+
+const BANK_CONFIRM_ERROR_STATUS = [
+  [/^batch_not_found/, 404],
+  [/^isolation_violation/, 403],
+  [/^(batch_closed|row_changed|duplicate_of_imported_row|link_conflict)/, 409],
+  [/^(invalid_plan|invalid_row|invalid_import_provenance|row_not_in_batch|link_mismatch|link_target_not_found|wallet_not_found)/, 400],
+];
+
+// Calls the atomic RPC and maps its outcome to { status, body }.
+async function runAtomicBankConfirm({ biz, batch, plan, actorUserId, flow }) {
+  const { data, error } = await supabase.rpc('rpc_confirm_bank_import', {
+    p_business_id: biz.business.id, p_batch_id: batch.id,
+    p_owner_user_id: biz.ownerUserId, p_actor_user_id: actorUserId,
+    p_plan: plan, p_flow: flow,
+  });
+  if (error) {
+    const msg = String(error.message || '');
+    if (error.code === 'PGRST202' || error.code === '42883' || /rpc_confirm_bank_import/.test(msg) && /(does not exist|Could not find)/i.test(msg)) {
+      console.error('[bank-import] rpc_confirm_bank_import missing — migration 069 not applied');
+      return { status: 503, body: { error: 'Bank import is temporarily unavailable (database update 069 missing). Nothing was imported.', code: 'database_schema_mismatch' } };
+    }
+    const m = /^([a-z_]+):\s*(.*)$/.exec(msg);
+    const hit = BANK_CONFIRM_ERROR_STATUS.find(([re]) => re.test(msg));
+    if (!hit) console.error(`[bank-import] atomic confirm failed: ${msg}`);
+    return hit
+      ? { status: hit[1], body: { error: `${m ? m[2] : msg}. Nothing was imported.`, code: m ? m[1] : 'bank_import_confirm_failed' } }
+      : { status: 500, body: { error: 'Bank import confirm failed. Nothing was imported.', code: 'bank_import_confirm_failed' } };
+  }
+  // data.already_processed = every requested row was already in the ledger: nothing written.
+  return { status: 200, body: data };
+}
+
+// System transaction types — cash logic. Kept separate from business categories.
+const VALID_SYSTEM_TX_TYPES = ['income', 'expense', 'transfer', 'payroll', 'owner_injection', 'owner_withdrawal', 'correction'];
+
+// Build a Map(categoryId → name) for the business's active categories.
+// The ledger stores category as TEXT, so we resolve ids → names on import.
+async function loadBusinessCategoryMap(biz) {
+  const { data } = await supabase.from('cashflow_categories')
+    .select('id, name').or(bizOrFilter(biz));
+  const map = new Map();
+  for (const c of (data || [])) map.set(c.id, c.name);
+  return map;
+}
+
+// ── Incoming Payments Foundation (migration 048, PR1) ────────────────────────
+//
+// Provider-agnostic STAGING for money that arrived — gateway settlements (Midtrans, DOKU,
+// Xendit, HitPay, …), bank statement imports, manual entry. Gated by
+// INCOMING_PAYMENTS_ENABLED: with the flag off the feature does not exist and every route
+// answers 404, so a stray client sees exactly what production sees — nothing.
+//
+// LEDGER-INERT (decision D22). These routes NEVER insert a transaction, never move a wallet
+// balance, never mark accounting or tax final. A row is cash evidence awaiting human review.
+// business_id is ALWAYS the active workspace and never read from the body.
+const IP = require('./lib/incomingPayments');
+const GSI = require('./lib/gatewaySettlementImport');
+const IPM = require('./lib/incomingPaymentMatching');
+function isIncomingPaymentsEnabled() { return process.env.INCOMING_PAYMENTS_ENABLED === 'true'; }
+
+// Columns returned to the client. raw_provider_payload is deliberately excluded from LIST
+// responses (it can be large and may carry payer PII); the detail route returns it.
+const INCOMING_PAYMENT_LIST_COLS =
+  'id, business_id, wallet_id, source_type, provider, provider_account_id, provider_transaction_id, ' +
+  'provider_order_id, provider_settlement_id, settlement_batch_reference, payment_method, ' +
+  'gross_amount, fee_amount, tax_or_withholding_amount, net_amount, currency, transaction_at, ' +
+  'settled_at, payer_name, payer_reference, description, status, reconciliation_status, ' +
+  'linked_transaction_id, linked_debt_id, idempotency_key, created_by_user_id, ' +
+  'reviewed_by_user_id, reviewed_at, created_at, updated_at, ' +
+  // Provenance (049): which statement line this receipt came from.
+  'bank_import_batch_id, bank_import_row_id';
+
+// GET /api/incoming-payments — list for the ACTIVE business only.
+app.get('/api/incoming-payments', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    let q = supabase.from('incoming_payments')
+      .select(INCOMING_PAYMENT_LIST_COLS)
+      .eq('business_id', biz.business.id);
+
+    // Filters are validated against the known vocabularies — an unknown value is a 400, not a
+    // silently empty list that reads as "no money arrived".
+    const { status, reconciliation_status, source_type, provider } = req.query || {};
+    if (status) {
+      if (!IP.STATUSES.includes(status)) return res.status(400).json({ error: 'invalid_status' });
+      q = q.eq('status', status);
+    }
+    if (reconciliation_status) {
+      if (!IP.RECONCILIATION_STATUSES.includes(reconciliation_status))
+        return res.status(400).json({ error: 'invalid_reconciliation_status' });
+      q = q.eq('reconciliation_status', reconciliation_status);
+    }
+    if (source_type) {
+      if (!IP.SOURCE_TYPES.includes(source_type)) return res.status(400).json({ error: 'invalid_source_type' });
+      q = q.eq('source_type', source_type);
+    }
+    if (provider) q = q.eq('provider', String(provider).toLowerCase());
+
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 100, 1), 500);
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+    res.json({ business_id: biz.business.id, payments: data || [] });
+  } catch { res.status(500).json({ error: 'incoming_payments_read_failed' }); }
+});
+
+// POST /api/incoming-payments — record one receipt. Creates NO transaction and NO debt.
+app.post('/api/incoming-payments', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot record incoming payments.' });
+
+    const businessId = biz.business.id;
+    const parsed = IP.validateCreate(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+    const v = parsed.value;
+
+    // The receiving wallet must belong to THIS business. A wallet id from another workspace
+    // is a cross-company leak, not a bad request to be tolerated.
+    let walletId = null;
+    if (req.body?.wallet_id) {
+      const { data: wallet, error: wErr } = await supabase.from('wallets')
+        .select('id, business_id').eq('id', req.body.wallet_id).maybeSingle();
+      if (wErr) return res.status(500).json({ error: 'wallet_lookup_failed' });
+      if (!wallet || wallet.business_id !== businessId)
+        return res.status(403).json({ error: 'wallet_not_in_business', message: 'That wallet does not belong to this workspace.' });
+      walletId = wallet.id;
+    }
+
+    // Idempotency: the same receipt submitted twice returns the FIRST row instead of
+    // double-counting the money. Checked here for a clear answer, and again below via the
+    // unique index for the concurrent case.
+    const dupQuery = () => supabase.from('incoming_payments')
+      .select(INCOMING_PAYMENT_LIST_COLS)
+      .eq('business_id', businessId)
+      .eq('source_type', v.source_type)
+      .eq('idempotency_key', v.idempotency_key);
+    const { data: existingRows } = await dupQuery();
+    const sameProvider = (r) => (r.provider || null) === (v.provider || null);
+    const existing = (existingRows || []).find(sameProvider);
+    if (existing) return res.status(200).json({ payment: existing, idempotent_replay: true });
+
+    const row = {
+      ...v,
+      business_id: businessId,
+      wallet_id: walletId,
+      created_by_user_id: req.user.userId,
+      // Explicit, not merely omitted: PR1 performs no matching and books no ledger row.
+      linked_transaction_id: null,
+      linked_debt_id: null,
+    };
+
+    const { data: inserted, error: iErr } = await supabase.from('incoming_payments')
+      .insert(row).select(INCOMING_PAYMENT_LIST_COLS).single();
+    if (iErr) {
+      // 23505 = the unique index fired: another request won the race with the same key.
+      if (String(iErr.code) === '23505' || /duplicate key|unique constraint/i.test(iErr.message || '')) {
+        const { data: raceRows } = await dupQuery();
+        const raced = (raceRows || []).find(sameProvider);
+        if (raced) return res.status(200).json({ payment: raced, idempotent_replay: true });
+        return res.status(409).json({ error: 'duplicate_payment', message: 'That payment has already been recorded.' });
+      }
+      console.warn(`[incoming-payments] insert failed business=${businessId}: ${iErr.message}`);
+      return res.status(500).json({ error: 'incoming_payment_create_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment', entityId: inserted?.id, action: 'created',
+      // audit_events is append-only with a DB guard, so nothing written here can be corrected
+      // or redacted later. Payer identifiers stay out; idempotency_key goes in because it is
+      // non-PII and it is what you actually search on during a duplicate investigation.
+      after: { source_type: v.source_type, provider: v.provider, gross_amount: v.gross_amount,
+               fee_amount: v.fee_amount, net_amount: v.net_amount, currency: v.currency,
+               status: v.status, idempotency_key: v.idempotency_key },
+    });
+
+    res.status(201).json({ payment: inserted });
+  } catch { res.status(500).json({ error: 'incoming_payment_create_failed' }); }
+});
+
+// GET /api/incoming-payments/providers — the gateway providers this build recognises.
+// Advisory only: an unrecognised provider still imports (see gatewaySettlementImport.js).
+app.get('/api/incoming-payments/providers', auth, async (req, res) => {
+  if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+  res.json({ providers: GSI.KNOWN_GATEWAY_PROVIDERS, source_type: GSI.SETTLEMENT_SOURCE_TYPE,
+             max_rows: GSI.MAX_ROWS, note: 'Unrecognised providers are accepted, not refused.' });
+});
+
+// POST /api/incoming-payments/gateway-import — import one parsed settlement report.
+//
+// The client parses the export (as it already does for bank statements) and posts a
+// settlement header plus rows. NO EXTERNAL API IS CALLED and no gateway credential exists
+// anywhere in this path — the data comes from a file a human downloaded.
+//
+// Ledger-inert like every other path here: rows become draft/unmatched evidence, never
+// transactions, never revenue.
+app.post('/api/incoming-payments/gateway-import', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot import settlements.' });
+
+    const businessId = biz.business.id;
+    const parsed = GSI.validateSettlementBatch(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error, message: parsed.message,
+                                    ...(parsed.row_index !== undefined ? { row_index: parsed.row_index } : {}) });
+    }
+
+    // The settlement lands in one wallet — typically the `payment_gateway` wallet for this
+    // provider. Same-business ownership is checked once for the batch.
+    let walletId = null;
+    if (req.body?.wallet_id) {
+      const { data: wallet, error: wErr } = await supabase.from('wallets')
+        .select('id, business_id').eq('id', req.body.wallet_id).maybeSingle();
+      if (wErr) return res.status(500).json({ error: 'wallet_lookup_failed' });
+      if (!wallet || wallet.business_id !== businessId)
+        return res.status(403).json({ error: 'wallet_not_in_business', message: 'That wallet does not belong to this workspace.' });
+      walletId = wallet.id;
+    }
+
+    const summary = { total: parsed.value.rows.length, created: 0, duplicates: 0, failed: 0 };
+    const created = [];
+    for (const v of parsed.value.rows) {
+      const row = {
+        ...v, business_id: businessId, wallet_id: walletId,
+        created_by_user_id: req.user.userId,
+        linked_transaction_id: null, linked_debt_id: null,
+      };
+      // Existing row wins: a re-uploaded settlement report reports duplicates rather than
+      // recording the same gateway transaction twice.
+      const { data: existingRows } = await supabase.from('incoming_payments')
+        .select('id, idempotency_key, provider, provider_transaction_id')
+        .eq('business_id', businessId).eq('source_type', v.source_type)
+        .eq('idempotency_key', v.idempotency_key);
+      if ((existingRows || []).some((e) => (e.provider || null) === (v.provider || null))) {
+        summary.duplicates++; continue;
+      }
+
+      const { data: ins, error } = await supabase.from('incoming_payments')
+        .insert(row).select(INCOMING_PAYMENT_LIST_COLS).single();
+      if (error) {
+        // Either unique index may fire: the idempotency key, or the provider-transaction guard.
+        if (String(error.code) === '23505' || /duplicate key|unique constraint/i.test(error.message || '')) {
+          summary.duplicates++;
+        } else {
+          summary.failed++;
+          console.warn(`[incoming-payments] settlement insert failed business=${businessId}: ${error.message}`);
+        }
+        continue;
+      }
+      summary.created++;
+      created.push(ins);
+      await recordAudit({
+        businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+        entityType: 'incoming_payment', entityId: ins?.id, action: 'created_from_gateway_import',
+        after: { source_type: v.source_type, provider: v.provider,
+                 provider_settlement_id: v.provider_settlement_id,
+                 gross_amount: v.gross_amount, fee_amount: v.fee_amount, net_amount: v.net_amount,
+                 currency: v.currency, idempotency_key: v.idempotency_key },
+      });
+    }
+
+    res.status(summary.created ? 201 : 200).json({
+      provider: parsed.value.provider,
+      provider_known: parsed.value.provider_known,
+      summary,
+      payments: created,
+    });
+  } catch { res.status(500).json({ error: 'gateway_import_failed' }); }
+});
+
+// GET /api/incoming-payments/review-queue
+app.get('/api/incoming-payments/review-queue', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    const businessId = biz.business.id;
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 100, 1), 500);
+
+    const { data: rows, error } = await supabase.from('incoming_payments')
+      .select(INCOMING_PAYMENT_LIST_COLS)
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+
+    // Unresolved = still needs a human. A receipt is RESOLVED when:
+    //   - it was deliberately set aside (`ignored`), or
+    //   - a reviewer rejected it — a terminal decision that this is not valid evidence, and
+    //     one that does not require a match to be meaningful, or
+    //   - it is both matched and reviewed, i.e. fully done.
+    // Rejected must count on its own: leaving a rejected receipt in the queue forever gives
+    // the reviewer no way to clear it except mislabelling it `ignored`, which means something
+    // different and would corrupt the one signal this queue exists to produce.
+    const isResolved = (p) =>
+      p.reconciliation_status === 'ignored'
+      || p.status === 'rejected'
+      || (p.reconciliation_status === 'matched' && p.status === 'reviewed');
+    const outstanding = (rows || []).filter((p) => !isResolved(p));
+
+    const { data: cands, error: cErr } = await supabase.from('incoming_payment_match_candidates')
+      .select('*').eq('business_id', businessId).eq('status', 'suggested');
+    // Same rule as candidate generation: if the candidate read fails, say so. Rendering the
+    // queue with every row showing "no candidate" would tell a reviewer the system found
+    // nothing, when in fact it never looked.
+    if (cErr) {
+      console.warn(`[incoming-payments] queue candidate read failed business=${businessId}: ${cErr.message}`);
+      return res.status(500).json({ error: 'candidate_read_failed' });
+    }
+    const byPayment = new Map();
+    for (const c of (cands || [])) {
+      if (!byPayment.has(c.incoming_payment_id)) byPayment.set(c.incoming_payment_id, []);
+      byPayment.get(c.incoming_payment_id).push(c);
+    }
+
+    const items = outstanding.map((p) => {
+      const candidates = (byPayment.get(p.id) || []).sort((a, b) => Number(b.score) - Number(a.score));
+      return {
+        payment: p,
+        candidates,
+        // Named states rather than a bare count, so the client does not re-derive meaning.
+        // Matched wins over leftover suggestions: a payment that already has an accepted
+        // match must not be presented as still needing one, or a reviewer is invited to
+        // accept a second match for the same money.
+        queue_state: p.reconciliation_status === 'matched' ? 'matched_awaiting_review'
+          : (candidates.length ? 'candidates_pending_review' : 'no_candidate'),
+      };
+    });
+
+    // Totals describe cash, so they use the NET that actually landed, and only within one
+    // currency — summing mixed currencies would produce a meaningless number.
+    const currencies = [...new Set(outstanding.map((p) => p.currency))];
+    const unresolved_total = currencies.length === 1
+      ? outstanding.reduce((s, p) => s + Math.round(Number(p.net_amount || 0) * 100), 0) / 100
+      : null;
+
+    res.json({
+      business_id: businessId,
+      counts: {
+        outstanding: items.length,
+        no_candidate: items.filter((i) => i.queue_state === 'no_candidate').length,
+        candidates_pending_review: items.filter((i) => i.queue_state === 'candidates_pending_review').length,
+        matched_awaiting_review: items.filter((i) => i.queue_state === 'matched_awaiting_review').length,
+      },
+      unresolved_total,
+      unresolved_total_currency: currencies.length === 1 ? (currencies[0] || null) : null,
+      unresolved_total_note: currencies.length > 1 ? 'mixed currencies — not summed' : null,
+      items,
+    });
+  } catch { res.status(500).json({ error: 'review_queue_failed' }); }
+});
+
+// GET /api/incoming-payments/:id — one receipt, scoped to the active business.
+app.get('/api/incoming-payments/:id', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    // Filtered by business_id in the QUERY, so a row from another workspace is simply not
+    // found — the id itself never confirms or denies existence across tenants.
+    const { data, error } = await supabase.from('incoming_payments')
+      .select(`${INCOMING_PAYMENT_LIST_COLS}, raw_provider_payload`)
+      .eq('id', req.params.id).eq('business_id', biz.business.id).maybeSingle();
+    if (error) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+    if (!data) return res.status(404).json({ error: 'not_found' });
+    res.json({ payment: data });
+  } catch { res.status(500).json({ error: 'incoming_payments_read_failed' }); }
+});
+
+// ── Review queue (PR5) ───────────────────────────────────────────────────────
+//
+// The one screen an accountant needs: money that arrived and has not been resolved, each row
+// carrying its proposed matches so a decision can be made without a second lookup.
+//
+// Read-only. It books nothing, resolves nothing, and hides nothing: a receipt with no
+// candidate is shown as exactly that rather than omitted, because unexplained cash is the
+// thing the queue exists to surface.
+//
+// PATCH /api/incoming-payments/:id/reconciliation — set a receipt aside.
+//
+// 'ignored' is the ONLY value settable here. It means "a human looked and decided this needs
+// no match" (a refund, a transfer between own accounts, a duplicate the bank reported twice).
+// It is a review outcome, not an accounting one: it books nothing and can be undone by
+// re-running matching.
+app.patch('/api/incoming-payments/:id/reconciliation', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot resolve incoming payments.' });
+
+    const businessId = biz.business.id;
+    const next = String(req.body?.reconciliation_status || '').trim();
+    if (next !== 'ignored') {
+      return res.status(400).json({ error: 'invalid_reconciliation_status',
+        message: 'Only "ignored" can be set here. A match is made by accepting a candidate.' });
+    }
+
+    const { data: current } = await supabase.from('incoming_payments')
+      .select('id, reconciliation_status').eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+    if (!current) return res.status(404).json({ error: 'not_found' });
+    if (current.reconciliation_status === 'matched')
+      return res.status(409).json({ error: 'already_matched', message: 'A matched payment cannot be ignored.' });
+
+    const { data: updated, error } = await supabase.from('incoming_payments')
+      .update({ reconciliation_status: 'ignored' })
+      .eq('id', current.id).eq('business_id', businessId).select(INCOMING_PAYMENT_LIST_COLS).single();
+    if (error) return res.status(500).json({ error: 'incoming_payment_update_failed' });
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment', entityId: current.id, action: 'reconciliation_ignored',
+      before: { reconciliation_status: current.reconciliation_status },
+      after: { reconciliation_status: 'ignored' },
+    });
+
+    res.json({ payment: updated });
+  } catch { res.status(500).json({ error: 'incoming_payment_update_failed' }); }
+});
+
+// ── Match candidates (PR4, migration 050) ────────────────────────────────────
+//
+// A candidate is a PROPOSAL, never a decision. The engine scores receivables and income
+// transactions against a receipt and explains why; a human with approval rights accepts one.
+// Accepting writes the link on the PAYMENT side only — it does not settle the debt, does not
+// change the transaction, does not book revenue, and does not close any period.
+
+// Load the payment or answer for it. Every candidate route is scoped this way, so a payment
+// from another workspace is a 404 rather than a cross-tenant probe.
+async function loadScopedPayment(req, res, businessId) {
+  const { data, error } = await supabase.from('incoming_payments')
+    .select('id, business_id, gross_amount, net_amount, currency, transaction_at, settled_at, '
+          + 'payer_name, payer_reference, description, status, reconciliation_status')
+    .eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+  if (error) { res.status(500).json({ error: 'incoming_payments_read_failed' }); return null; }
+  if (!data) { res.status(404).json({ error: 'not_found' }); return null; }
+  return data;
+}
+
+// POST /api/incoming-payments/:id/candidates — (re)generate proposals for one receipt.
+app.post('/api/incoming-payments/:id/candidates', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot match incoming payments.' });
+
+    const businessId = biz.business.id;
+    const payment = await loadScopedPayment(req, res, businessId); if (!payment) return;
+
+    // Both target sets are queried WITH the business filter, so nothing from another
+    // workspace can even reach the scorer.
+    const [debtRes, txRes] = await Promise.all([
+      supabase.from('debts').select('*').eq('business_id', businessId).eq('type', 'receivable'),
+      supabase.from('transactions').select('*').eq('business_id', businessId).eq('type', 'income'),
+    ]);
+    // A failed source read must NOT fall through to an empty list. Doing so would answer
+    // "no matches found" — a confident, wrong financial statement — when the truth is that
+    // we could not look. Surface it instead.
+    if (debtRes.error || txRes.error) {
+      console.warn(`[incoming-payments] candidate sources unavailable business=${businessId}: `
+        + `${debtRes.error?.message || ''} ${txRes.error?.message || ''}`);
+      return res.status(500).json({ error: 'candidate_sources_unavailable',
+        message: 'Could not read receivables or transactions, so no matches were calculated.' });
+    }
+
+    // Withholdings reduce what the customer still has to pay (batch 10), so a net payment matches.
+    const debtsWithWh = DW.attachWithholdings(debtRes.data || [], await loadWithholdings(businessId));
+    const proposals = IPM.buildCandidates(payment, { debts: debtsWithWh, transactions: txRes.data || [] });
+
+    const saved = [];
+    for (const p of proposals) {
+      const row = { ...p, business_id: businessId, incoming_payment_id: payment.id, status: 'suggested' };
+      // One proposal per (payment, target): re-running refreshes rather than accumulating.
+      const { data: existing } = await supabase.from('incoming_payment_match_candidates')
+        .select('id, status').eq('incoming_payment_id', payment.id)
+        .eq('target_type', p.target_type)
+        .eq(p.target_type === 'debt' ? 'target_debt_id' : 'target_transaction_id',
+            p.target_type === 'debt' ? p.target_debt_id : p.target_transaction_id)
+        .maybeSingle();
+
+      if (existing) {
+        // A human decision is never overwritten by a re-run of the engine.
+        if (existing.status !== 'suggested') { saved.push(existing); continue; }
+        const { data: upd } = await supabase.from('incoming_payment_match_candidates')
+          .update({ score: p.score, match_reasons: p.match_reasons })
+          .eq('id', existing.id).select('*').single();
+        saved.push(upd); continue;
+      }
+      const { data: ins, error } = await supabase.from('incoming_payment_match_candidates')
+        .insert(row).select('*').single();
+      if (error) { console.warn(`[incoming-payments] candidate insert failed: ${error.message}`); continue; }
+      saved.push(ins);
+    }
+
+    // Reflect that proposals exist, without claiming a match. 'candidate' is still unmatched
+    // for every reporting purpose.
+    if (saved.length && payment.reconciliation_status === 'unmatched') {
+      await supabase.from('incoming_payments').update({ reconciliation_status: 'candidate' })
+        .eq('id', payment.id).eq('business_id', businessId);
+    }
+
+    res.json({ incoming_payment_id: payment.id, count: saved.length, candidates: saved });
+  } catch { res.status(500).json({ error: 'candidate_generation_failed' }); }
+});
+
+// GET /api/incoming-payments/:id/candidates — list proposals for one receipt.
+app.get('/api/incoming-payments/:id/candidates', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view incoming payments.' });
+
+    const businessId = biz.business.id;
+    const payment = await loadScopedPayment(req, res, businessId); if (!payment) return;
+    const { data } = await supabase.from('incoming_payment_match_candidates')
+      .select('*').eq('business_id', businessId).eq('incoming_payment_id', payment.id)
+      .order('score', { ascending: false });
+    res.json({ incoming_payment_id: payment.id, candidates: data || [] });
+  } catch { res.status(500).json({ error: 'candidate_read_failed' }); }
+});
+
+// PATCH /api/incoming-payments/:id/candidates/:candidateId — accept or reject a proposal.
+//
+// Accepting is the ONLY way a payment becomes matched, and it always requires a human with
+// approval rights. It writes linked_debt_id / linked_transaction_id and sets
+// reconciliation_status='matched' on the PAYMENT. It deliberately does NOT:
+//   - mark the debt paid or change its remaining amount,
+//   - modify the transaction in any way,
+//   - book revenue, set a tax treatment, or close a period.
+// Those remain separate, later, explicitly-approved steps.
+app.patch('/api/incoming-payments/:id/candidates/:candidateId', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot accept a match.' });
+
+    const businessId = biz.business.id;
+    const payment = await loadScopedPayment(req, res, businessId); if (!payment) return;
+
+    const decision = String(req.body?.status || '').trim();
+    if (!['accepted', 'rejected'].includes(decision))
+      return res.status(400).json({ error: 'invalid_decision', message: 'status must be accepted or rejected.' });
+
+    const { data: cand } = await supabase.from('incoming_payment_match_candidates')
+      .select('*').eq('id', req.params.candidateId)
+      .eq('business_id', businessId).eq('incoming_payment_id', payment.id).maybeSingle();
+    if (!cand) return res.status(404).json({ error: 'candidate_not_found' });
+    if (cand.status !== 'suggested')
+      return res.status(409).json({ error: 'already_decided', message: `This candidate was already ${cand.status}.` });
+    if (decision === 'accepted' && payment.reconciliation_status === 'matched')
+      return res.status(409).json({ error: 'already_matched', message: 'This payment is already matched.' });
+
+    const stamp = { decided_by_user_id: req.user.userId, decided_at: new Date().toISOString() };
+    const { data: updated, error: uErr } = await supabase.from('incoming_payment_match_candidates')
+      .update({ status: decision, ...stamp }).eq('id', cand.id).select('*').single();
+    if (uErr) return res.status(500).json({ error: 'candidate_update_failed' });
+
+    if (decision === 'accepted') {
+      await supabase.from('incoming_payments').update({
+        reconciliation_status: 'matched',
+        linked_debt_id: cand.target_type === 'debt' ? cand.target_debt_id : null,
+        linked_transaction_id: cand.target_type === 'transaction' ? cand.target_transaction_id : null,
+      }).eq('id', payment.id).eq('business_id', businessId);
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment_match_candidate', entityId: cand.id,
+      action: `candidate_${decision}`,
+      before: { status: cand.status },
+      after: { status: decision, incoming_payment_id: payment.id, target_type: cand.target_type,
+               target_debt_id: cand.target_debt_id, target_transaction_id: cand.target_transaction_id,
+               score: cand.score },
+    });
+
+    res.json({ candidate: updated });
+  } catch { res.status(500).json({ error: 'candidate_update_failed' }); }
+});
+
+// PATCH /api/incoming-payments/:id/status — a human review decision.
+// Review only: 'matched' is NOT settable here because PR1 performs no reconciliation, and a
+// status claiming a match with no link behind it would be a lie in the data.
+app.patch('/api/incoming-payments/:id/status', auth, async (req, res) => {
+  try {
+    if (!isIncomingPaymentsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot review incoming payments.' });
+
+    const businessId = biz.business.id;
+    const { data: current, error: cErr } = await supabase.from('incoming_payments')
+      .select('id, status, reconciliation_status').eq('id', req.params.id)
+      .eq('business_id', businessId).maybeSingle();
+    if (cErr) return res.status(500).json({ error: 'incoming_payments_read_failed' });
+    if (!current) return res.status(404).json({ error: 'not_found' });
+
+    const decision = IP.validateStatusChange(current.status, req.body?.status);
+    if (!decision.ok) return res.status(400).json({ error: decision.error, message: decision.message });
+
+    // Reviewer and timestamp move together (the DB check enforces the same pairing). Both
+    // settable statuses are review decisions, so the stamp is always written and never
+    // cleared — there is no client path back to 'draft' that could erase it.
+    const patch = {
+      status: decision.value,
+      reviewed_by_user_id: req.user.userId,
+      reviewed_at: new Date().toISOString(),
+    };
+    const { data: updated, error: uErr } = await supabase.from('incoming_payments')
+      .update(patch).eq('id', current.id).eq('business_id', businessId)
+      .select(INCOMING_PAYMENT_LIST_COLS).single();
+    if (uErr) return res.status(500).json({ error: 'incoming_payment_update_failed' });
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'incoming_payment', entityId: current.id, action: `status_${decision.value}`,
+      before: { status: current.status }, after: { status: decision.value },
+    });
+
+    res.json({ payment: updated });
+  } catch { res.status(500).json({ error: 'incoming_payment_update_failed' }); }
+});
+
+// ── Bank import → incoming payments bridge (PR2, migration 049) ──────────────
+//
+// Called at the end of the bank-import confirm flow. Records one incoming_payment per
+// confirmed CREDIT line. Debits are skipped — they are expenses and belong to the payables
+// path, never to a table about money arriving.
+//
+// Ledger-inert: this creates no transaction and no debt. The confirm flow's own transaction
+// write is unchanged and happens before this runs. The payment is left draft/unmatched so
+// the matching step proposes the link for a human rather than asserting it here.
+//
+// Returns null when the flag is off (so the response shape is unchanged), otherwise a small
+// summary. Never throws: a bridge failure must not fail an import that already succeeded.
+//
+// INTENT: it walks EVERY confirmed credit row in the batch, not only the ones this confirm
+// call imported. That is deliberate — a batch confirmed before the flag was switched on would
+// otherwise have no evidence for ever, and re-confirming is the natural way to backfill it.
+// Idempotency (the partial unique index on bank_import_row_id) makes the repeat safe.
+const IPB = require('./lib/incomingPaymentsBridge');
+async function bridgeBankBatchToIncomingPayments({ batch, rows, biz, actingUserId }) {
+  if (!isIncomingPaymentsEnabled()) return null;
+  const businessId = biz?.business?.id;
+  if (!businessId || !batch) return null;
+
+  // The batch's wallet must belong to this workspace before it can be stamped onto evidence.
+  // A batch carrying another business's wallet id yields payments with no wallet rather than
+  // a cross-company link.
+  let walletOk = false;
+  if (batch.wallet_id) {
+    const { data: w } = await supabase.from('wallets').select('id, business_id').eq('id', batch.wallet_id).maybeSingle();
+    walletOk = !!w && w.business_id === businessId;
+  }
+  const scopedBatch = walletOk ? batch : { ...batch, wallet_id: null };
+
+  const summary = { created: 0, skipped: 0, duplicates: 0, failed: 0 };
+  for (const row of (rows || [])) {
+    const built = IPB.buildPaymentFromBankRow(row, scopedBatch, { businessId, actingUserId });
+    if (!built.ok) { summary.skipped++; continue; }
+    try {
+      // One payment per statement line. Checked here for a clean skip; the partial unique
+      // index on (business_id, bank_import_row_id) is the actual guarantee.
+      const { data: existing } = await supabase.from('incoming_payments')
+        .select('id').eq('business_id', businessId).eq('bank_import_row_id', row.id).maybeSingle();
+      if (existing) { summary.duplicates++; continue; }
+
+      const { data: created, error } = await supabase.from('incoming_payments')
+        .insert(built.value).select('id').single();
+      if (error) {
+        if (String(error.code) === '23505' || /duplicate key|unique constraint/i.test(error.message || '')) {
+          summary.duplicates++;
+        } else {
+          summary.failed++;
+          console.warn(`[incoming-payments] bank bridge insert failed row=${row.id}: ${error.message}`);
+        }
+        continue;
+      }
+      summary.created++;
+      await recordAudit({
+        businessId, actorUserId: actingUserId, actorRole: biz.role, channel: 'web',
+        entityType: 'incoming_payment', entityId: created?.id, action: 'created_from_bank_import',
+        after: { source_type: 'bank_statement_import', bank_import_batch_id: batch.id,
+                 bank_import_row_id: row.id, gross_amount: built.value.gross_amount,
+                 net_amount: built.value.net_amount, currency: built.value.currency,
+                 idempotency_key: built.value.idempotency_key },
+      });
+    } catch (e) {
+      summary.failed++;
+      console.warn(`[incoming-payments] bank bridge error row=${row?.id}: ${e.message}`);
+    }
+  }
+  return summary;
+}
+
+// ── Payment provider connections (migration 051) ─────────────────────────────
+//
+// Records which provider a business receives money through and where it should be routed
+// for accounting. Gated by PAYMENT_CONNECTIONS_ENABLED: with the flag off the feature does
+// not exist and every route answers 404 BEFORE any database access, so the code is safe to
+// deploy before 051 is applied.
+//
+// NO CREDENTIALS, NO SYNC, NO LEDGER EFFECT. These routes accept no secret (a request
+// carrying one is refused, not silently stripped), call no provider API, create no
+// incoming_payment, and never touch transactions, debts or wallet balances. A connection
+// is configuration; it moves no money and asserts no live session.
+const PC = require('./lib/paymentConnections');
+function isPaymentConnectionsEnabled() { return process.env.PAYMENT_CONNECTIONS_ENABLED === 'true'; }
+// Express-middleware form, so the flag can be checked ahead of requireAdmin.
+function paymentConnectionsFlagGuard(req, res, next) {
+  if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Server-owned observability columns are returned but never client-writable.
+const PAYMENT_CONNECTION_COLS =
+  'id, business_id, provider, environment, status, display_name, provider_account_id, ' +
+  'linked_wallet_id, last_sync_at, last_webhook_at, last_error, created_by_user_id, ' +
+  'created_at, updated_at';
+
+// Resolve a wallet that must belong to the ACTIVE business. Returns
+// { ok:true, walletId } or { ok:false } after already answering on `res`.
+async function resolveConnectionWallet(rawId, businessId, res) {
+  if (rawId === null || rawId === undefined || rawId === '') return { ok: true, walletId: null };
+  const { data: wallet, error } = await supabase.from('wallets')
+    .select('id, business_id').eq('id', rawId).maybeSingle();
+  if (error) { res.status(500).json({ error: 'wallet_lookup_failed' }); return { ok: false }; }
+  if (!wallet || wallet.business_id !== businessId) {
+    res.status(403).json({ error: 'wallet_not_in_business',
+      message: 'That wallet does not belong to this workspace.' });
+    return { ok: false };
+  }
+  return { ok: true, walletId: wallet.id };
+}
+
+// GET /api/payment-connections — connections for the ACTIVE business.
+app.get('/api/payment-connections', auth, async (req, res) => {
+  try {
+    if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view payment connections.' });
+
+    const { data, error } = await supabase.from('payment_provider_connections')
+      .select(PAYMENT_CONNECTION_COLS)
+      .eq('business_id', biz.business.id)
+      .order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: 'payment_connections_read_failed' });
+    res.json({ business_id: biz.business.id, providers: PC.PROVIDERS, connections: data || [] });
+  } catch { res.status(500).json({ error: 'payment_connections_read_failed' }); }
+});
+
+// POST /api/payment-connections — record a connection. Stores no secret and syncs nothing.
+app.post('/api/payment-connections', auth, async (req, res) => {
+  try {
+    if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    // Same gate as wallets: deciding where company money is routed is a structural change.
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment connections.' });
+
+    const businessId = biz.business.id;
+    const parsed = PC.validateCreate(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error, message: parsed.message,
+                                    ...(parsed.fields ? { fields: parsed.fields } : {}) });
+    }
+    const v = parsed.value;
+
+    const w = await resolveConnectionWallet(v.linked_wallet_id, businessId, res);
+    if (!w.ok) return;
+
+    const { data: inserted, error: iErr } = await supabase.from('payment_provider_connections')
+      .insert({ ...v, linked_wallet_id: w.walletId, business_id: businessId,
+                created_by_user_id: req.user.userId })
+      .select(PAYMENT_CONNECTION_COLS).single();
+    if (iErr) {
+      if (String(iErr.code) === '23505' || /duplicate key|unique constraint/i.test(iErr.message || '')) {
+        return res.status(409).json({ error: 'connection_exists',
+          message: 'That provider account is already connected for this environment.' });
+      }
+      console.warn(`[payment-connections] insert failed business=${businessId}: ${iErr.message}`);
+      return res.status(500).json({ error: 'payment_connection_create_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_connection', entityId: inserted?.id, action: 'created',
+      // provider_account_id is a public merchant identifier, not a secret. No credential
+      // exists to leak here because none is ever accepted.
+      after: { provider: v.provider, environment: v.environment, status: v.status,
+               provider_account_id: v.provider_account_id, linked_wallet_id: w.walletId },
+    });
+
+    res.status(201).json({ connection: inserted });
+  } catch { res.status(500).json({ error: 'payment_connection_create_failed' }); }
+});
+
+// PATCH /api/payment-connections/:id — update a connection.
+// provider and environment are immutable: changing them would silently re-point accounting
+// routing for everything already attributed to the connection.
+app.patch('/api/payment-connections/:id', auth, async (req, res) => {
+  try {
+    if (!isPaymentConnectionsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment connections.' });
+
+    const businessId = biz.business.id;
+    const parsed = PC.validatePatch(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: parsed.error, message: parsed.message,
+                                    ...(parsed.fields ? { fields: parsed.fields } : {}) });
+    }
+
+    // Filtered by business_id in the QUERY, so another workspace's connection is simply not
+    // found -- the id never confirms existence across tenants.
+    const { data: current, error: cErr } = await supabase.from('payment_provider_connections')
+      .select('id, business_id, provider, environment, status')
+      .eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+    if (cErr) return res.status(500).json({ error: 'payment_connections_read_failed' });
+    if (!current) return res.status(404).json({ error: 'not_found' });
+
+    const patch = { ...parsed.value };
+    if ('linked_wallet_id' in patch) {
+      const w = await resolveConnectionWallet(patch.linked_wallet_id, businessId, res);
+      if (!w.ok) return;
+      patch.linked_wallet_id = w.walletId;
+    }
+
+    const { data: updated, error: uErr } = await supabase.from('payment_provider_connections')
+      .update(patch).eq('id', current.id).eq('business_id', businessId)
+      .select(PAYMENT_CONNECTION_COLS).single();
+    if (uErr) {
+      if (String(uErr.code) === '23505' || /duplicate key|unique constraint/i.test(uErr.message || '')) {
+        return res.status(409).json({ error: 'connection_exists',
+          message: 'That provider account is already connected for this environment.' });
+      }
+      return res.status(500).json({ error: 'payment_connection_update_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_connection', entityId: current.id, action: 'updated',
+      before: { status: current.status },
+      after: { ...patch, provider: current.provider, environment: current.environment },
+    });
+
+    res.json({ connection: updated });
+  } catch { res.status(500).json({ error: 'payment_connection_update_failed' }); }
+});
+
+// GET /api/admin/payment-connections — platform-wide READ-ONLY monitor.
+// Follows the existing admin pattern (auth + requireAdmin). No write endpoint exists here:
+// an admin observes connections, they do not reconfigure a customer's routing.
+// The flag guard sits BEFORE requireAdmin deliberately: with the feature off the route must
+// not exist for anyone, so a non-admin and an admin both get 404 rather than the 403 that
+// would reveal the endpoint is there.
+app.get('/api/admin/payment-connections', auth, paymentConnectionsFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 200, 1), 500);
+    const { data: rows, error } = await supabase.from('payment_provider_connections')
+      .select(PAYMENT_CONNECTION_COLS).order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'payment_connections_read_failed' });
+
+    const conns = rows || [];
+    // Resolve business and wallet labels so the monitor shows names rather than raw uuids.
+    const bizIds = [...new Set(conns.map(c => c.business_id).filter(Boolean))];
+    const walletIds = [...new Set(conns.map(c => c.linked_wallet_id).filter(Boolean))];
+    const [{ data: bizRows }, { data: walletRows }] = await Promise.all([
+      bizIds.length ? supabase.from('businesses').select('id, name, business_code').in('id', bizIds)
+                    : Promise.resolve({ data: [] }),
+      walletIds.length ? supabase.from('wallets').select('id, name').in('id', walletIds)
+                       : Promise.resolve({ data: [] }),
+    ]);
+    const bizById = Object.fromEntries((bizRows || []).map(b => [b.id, b]));
+    const walletById = Object.fromEntries((walletRows || []).map(w => [w.id, w]));
+
+    res.json({
+      connections: conns.map(c => ({
+        id: c.id,
+        business_id: c.business_id,
+        business_name: bizById[c.business_id]?.name || null,
+        business_code: bizById[c.business_id]?.business_code || null,
+        provider: c.provider,
+        environment: c.environment,
+        status: c.status,
+        display_name: c.display_name,
+        provider_account_id: c.provider_account_id,
+        linked_wallet_id: c.linked_wallet_id,
+        linked_wallet_name: walletById[c.linked_wallet_id]?.name || null,
+        last_sync_at: c.last_sync_at,
+        last_webhook_at: c.last_webhook_at,
+        last_error: c.last_error,
+        created_at: c.created_at,
+      })),
+    });
+  } catch { res.status(500).json({ error: 'payment_connections_read_failed' }); }
+});
+
+// ── Payment credential vault (migration 052) ─────────────────────────────────
+//
+// Stores provider secrets as AES-256-GCM ciphertext. Gated by
+// PAYMENT_CREDENTIALS_VAULT_ENABLED: with the flag off every route answers 404 BEFORE any
+// database access.
+//
+// NO PLAINTEXT LEAVES THIS FILE. No route returns a secret, an ciphertext, an IV or a tag;
+// no code path logs one; no error message contains one. The only decrypt function in the
+// codebase (credentialVault.decrypt) is called by nothing here -- it exists for a later,
+// separately-reviewed provider-integration phase.
+//
+// SANDBOX ONLY. A credential cannot be stored against a production connection.
+// INERT. No provider is contacted, no webhook exists, and no incoming_payment, transaction,
+// debt or wallet balance is created or changed.
+const VAULT = require('./lib/credentialVault');
+const PCRED = require('./lib/paymentCredentials');
+function isCredentialVaultEnabled() { return process.env.PAYMENT_CREDENTIALS_VAULT_ENABLED === 'true'; }
+function credentialVaultFlagGuard(req, res, next) {
+  if (!isCredentialVaultEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+// Every column EXCEPT the ciphertext triple. Read paths never pull key material out of the
+// database at all, so it cannot leak through a response, a log, or a debugger session.
+const CREDENTIAL_METADATA_COLS =
+  'id, connection_id, business_id, provider, environment, credential_type, status, ' +
+  'value_last4, value_fingerprint, created_by_user_id, revoked_by_user_id, revoked_at, ' +
+  'created_at, updated_at';
+
+// Load a connection scoped to the ACTIVE business. Answers on `res` and returns null when
+// absent, so another workspace's connection id is a 404 and never an existence oracle.
+async function loadScopedConnection(req, res, businessId) {
+  const { data, error } = await supabase.from('payment_provider_connections')
+    .select('id, business_id, provider, environment, display_name, status')
+    .eq('id', req.params.id).eq('business_id', businessId).maybeSingle();
+  if (error) { res.status(500).json({ error: 'payment_connections_read_failed' }); return null; }
+  if (!data) { res.status(404).json({ error: 'not_found' }); return null; }
+  return data;
+}
+
+// GET /api/payment-connections/:id/credentials — METADATA ONLY.
+app.get('/api/payment-connections/:id/credentials', auth, credentialVaultFlagGuard, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot view payment credentials.' });
+
+    const connection = await loadScopedConnection(req, res, biz.business.id); if (!connection) return;
+
+    const { data, error } = await supabase.from('payment_provider_credentials')
+      .select(CREDENTIAL_METADATA_COLS)
+      .eq('business_id', biz.business.id).eq('connection_id', connection.id)
+      .order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: 'payment_credentials_read_failed' });
+
+    res.json({
+      connection_id: connection.id,
+      environment: connection.environment,
+      credential_types: PCRED.CREDENTIAL_TYPES,
+      // toMetadata is the single place that decides what a client may see.
+      credentials: (data || []).map(PCRED.toMetadata),
+    });
+  } catch { res.status(500).json({ error: 'payment_credentials_read_failed' }); }
+});
+
+// POST /api/payment-connections/:id/credentials — store an encrypted sandbox credential.
+// Rotating replaces the active credential of that type: the previous one is REVOKED, not
+// deleted, so the history of what existed and when survives an incident review.
+app.post('/api/payment-connections/:id/credentials', auth, credentialVaultFlagGuard, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    // Same gate as wallets and connections: handing the system a provider key is a
+    // structural change, not day-to-day finance work.
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment credentials.' });
+
+    // Fail closed BEFORE reading anything: with no usable key there is no safe way to
+    // accept a secret, and accepting one to store in plaintext is never the fallback.
+    if (!VAULT.isVaultConfigured()) {
+      console.warn('[credential-vault] write refused: encryption key missing or wrong length');
+      return res.status(500).json({ error: 'credential_vault_not_configured',
+        message: 'The credential vault is not configured on this deployment.' });
+    }
+
+    const businessId = biz.business.id;
+    const connection = await loadScopedConnection(req, res, businessId); if (!connection) return;
+
+    const parsed = PCRED.validateCreate(req.body, connection);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+    const { credential_type, plaintext } = parsed.value;
+
+    let sealed;
+    try {
+      // AAD binds the ciphertext to this exact business/connection/type, so a row copied
+      // elsewhere fails authentication rather than decrypting cleanly.
+      sealed = VAULT.encrypt(plaintext, {
+        business_id: businessId, connection_id: connection.id, credential_type });
+    } catch (e) {
+      console.warn(`[credential-vault] encrypt failed: ${e.code || 'unknown'}`);   // never the value
+      return res.status(500).json({ error: 'credential_vault_not_configured' });
+    }
+
+    // Revoke the current active credential of this type FIRST. The partial unique index
+    // permits only one active row per (connection, type), so this ordering is what makes a
+    // rotation possible at all -- and if the insert then fails, the worst outcome is a
+    // revoked credential and no active one, which is safe. The reverse order could leave
+    // two live keys.
+    const nowIso = new Date().toISOString();
+    const { data: superseded, error: rErr } = await supabase.from('payment_provider_credentials')
+      .update({ status: 'revoked', revoked_at: nowIso, revoked_by_user_id: req.user.userId })
+      .eq('business_id', businessId).eq('connection_id', connection.id)
+      .eq('credential_type', credential_type).eq('status', 'active')
+      .select('id');
+    if (rErr) return res.status(500).json({ error: 'payment_credential_create_failed' });
+    const rotated = (superseded || []).length > 0;
+
+    const { data: inserted, error: iErr } = await supabase.from('payment_provider_credentials')
+      .insert({
+        connection_id: connection.id,
+        business_id: businessId,
+        provider: connection.provider,
+        environment: connection.environment,
+        credential_type,
+        ...sealed,
+        status: 'active',
+        created_by_user_id: req.user.userId,
+      })
+      .select(CREDENTIAL_METADATA_COLS).single();
+    if (iErr) {
+      console.warn(`[credential-vault] insert failed business=${businessId} type=${credential_type}`);
+      return res.status(500).json({ error: 'payment_credential_create_failed' });
+    }
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_credential', entityId: inserted?.id,
+      action: rotated ? 'credential_rotated' : 'credential_created',
+      // audit_events is append-only, so nothing written here can ever be redacted. Only
+      // non-reversible metadata goes in: no value, no ciphertext, no fingerprint.
+      after: { connection_id: connection.id, provider: connection.provider,
+               environment: connection.environment, credential_type,
+               value_last4: sealed.value_last4 },
+    });
+
+    res.status(201).json({ credential: PCRED.toMetadata(inserted), rotated });
+  } catch { res.status(500).json({ error: 'payment_credential_create_failed' }); }
+});
+
+// DELETE /api/payment-connections/:id/credentials/:credentialId — REVOKE, never hard-delete.
+// The ciphertext stays; only its status changes. Knowing a key existed and when it was
+// retired is exactly what an incident review needs.
+app.delete('/api/payment-connections/:id/credentials/:credentialId', auth, credentialVaultFlagGuard, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'forbidden', message: 'Your role cannot manage payment credentials.' });
+
+    const businessId = biz.business.id;
+    const connection = await loadScopedConnection(req, res, businessId); if (!connection) return;
+
+    const { data: current, error: cErr } = await supabase.from('payment_provider_credentials')
+      .select('id, status, credential_type')
+      .eq('id', req.params.credentialId)
+      .eq('business_id', businessId).eq('connection_id', connection.id).maybeSingle();
+    if (cErr) return res.status(500).json({ error: 'payment_credentials_read_failed' });
+    if (!current) return res.status(404).json({ error: 'not_found' });
+    if (current.status === 'revoked')
+      return res.status(409).json({ error: 'already_revoked', message: 'That credential is already revoked.' });
+
+    const { data: updated, error: uErr } = await supabase.from('payment_provider_credentials')
+      .update({ status: 'revoked', revoked_at: new Date().toISOString(),
+                revoked_by_user_id: req.user.userId })
+      .eq('id', current.id).eq('business_id', businessId)
+      .select(CREDENTIAL_METADATA_COLS).single();
+    if (uErr) return res.status(500).json({ error: 'payment_credential_update_failed' });
+
+    await recordAudit({
+      businessId, actorUserId: req.user.userId, actorRole: biz.role, channel: 'web',
+      entityType: 'payment_provider_credential', entityId: current.id, action: 'credential_revoked',
+      before: { status: 'active' },
+      after: { status: 'revoked', connection_id: connection.id,
+               credential_type: current.credential_type },
+    });
+
+    res.json({ credential: PCRED.toMetadata(updated) });
+  } catch { res.status(500).json({ error: 'payment_credential_update_failed' }); }
+});
+
+// GET /api/admin/payment-credentials — platform-wide READ-ONLY metadata monitor.
+// Deliberately never selects the ciphertext triple: an admin needs to know a credential
+// exists, of what type, and whether it is live. Nothing more, and there is no admin write.
+app.get('/api/admin/payment-credentials', auth, credentialVaultFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 300, 1), 500);
+    const { data: rows, error } = await supabase.from('payment_provider_credentials')
+      .select(CREDENTIAL_METADATA_COLS).order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'payment_credentials_read_failed' });
+
+    const creds = rows || [];
+    const bizIds = [...new Set(creds.map(c => c.business_id).filter(Boolean))];
+    const connIds = [...new Set(creds.map(c => c.connection_id).filter(Boolean))];
+    const [{ data: bizRows }, { data: connRows }] = await Promise.all([
+      bizIds.length ? supabase.from('businesses').select('id, name, business_code').in('id', bizIds)
+                    : Promise.resolve({ data: [] }),
+      connIds.length ? supabase.from('payment_provider_connections').select('id, display_name').in('id', connIds)
+                     : Promise.resolve({ data: [] }),
+    ]);
+    const bizById = Object.fromEntries((bizRows || []).map(b => [b.id, b]));
+    const connById = Object.fromEntries((connRows || []).map(c => [c.id, c]));
+
+    res.json({
+      credentials: creds.map(c => ({
+        id: c.id,
+        business_id: c.business_id,
+        business_name: bizById[c.business_id]?.name || null,
+        business_code: bizById[c.business_id]?.business_code || null,
+        connection_id: c.connection_id,
+        connection_display_name: connById[c.connection_id]?.display_name || null,
+        provider: c.provider,
+        environment: c.environment,
+        credential_type: c.credential_type,
+        status: c.status,
+        value_last4: c.value_last4,
+        created_at: c.created_at,
+        revoked_at: c.revoked_at,
+      })),
+    });
+  } catch { res.status(500).json({ error: 'payment_credentials_read_failed' }); }
+});
+
+// ── Support Center (migration 053) ───────────────────────────────────────────
+//
+// In-app support conversations. Gated by SUPPORT_CENTER_ENABLED: with the flag off every
+// route answers 404 BEFORE any database access.
+//
+// FOUNDATION ONLY. No AI is called, no email is sent, no websocket is opened, no external
+// helpdesk is contacted. `ai_mode`/`ai_confidence` stay at their defaults.
+//
+// NO FINANCIAL EFFECT. Nothing in this block reads or writes transactions, wallets, debts,
+// incoming_payments, payment connections or credentials. A support thread can describe
+// money; it can never move it.
+//
+// ⚠ Message bodies are stored in plaintext and are NOT redacted. Secrets must never be
+// posted into a support thread -- see the header of migration 053.
+const SUP = require('./lib/supportCenter');
+function isSupportCenterEnabled() { return process.env.SUPPORT_CENTER_ENABLED === 'true'; }
+function supportFlagGuard(req, res, next) {
+  if (!isSupportCenterEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+const SUPPORT_CONVERSATION_COLS =
+  'id, business_id, created_by_user_id, assigned_to_user_id, channel, status, priority, ' +
+  'category, subject, ai_mode, ai_confidence, last_message_at, closed_at, created_at, updated_at';
+const SUPPORT_MESSAGE_COLS =
+  'id, conversation_id, business_id, sender_type, sender_user_id, body, metadata, ' +
+  'is_internal, created_at';
+
+// The active business, or null.
+//
+// Deliberately does NOT use resolveActiveBusiness. That helper falls back to
+// ensureDefaultBusiness, which for a legacy positive-id user with no workspace CREATES a
+// business and starts a 7-day trial. Contacting support must never provision a workspace or
+// start a billing clock as a side effect -- so this resolves read-only: an explicit
+// x-business-id is honoured only if the caller is an active member of it, and anything else
+// yields null. Support must also work for a user with no business at all, which is precisely
+// the person most likely to need it.
+async function supportBusinessContext(req) {
+  const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+  if (!requested) return { businessId: null, role: null };
+  const { data } = await supabase.from('business_members')
+    .select('role, status, business_id, businesses(type)')
+    .eq('user_id', req.user.userId).eq('business_id', requested).eq('status', 'active').limit(1);
+  const m = data?.[0];
+  // Personal workspaces are not a support scope; a personal thread is just the user's own.
+  if (!m || m.businesses?.type === 'personal') return { businessId: null, role: null };
+  return { businessId: m.business_id, role: m.role };
+}
+
+// Load a conversation the caller is entitled to see, or answer 404. Filtered in code rather
+// than the query because access has two independent grounds (creator, or same business).
+async function loadUserConversation(req, res, userId, businessId) {
+  const { data, error } = await supabase.from('support_conversations')
+    .select(SUPPORT_CONVERSATION_COLS).eq('id', req.params.id).maybeSingle();
+  if (error) { res.status(500).json({ error: 'support_read_failed' }); return null; }
+  if (!SUP.canUserAccessConversation(data, { userId, businessId })) {
+    // 404, never 403: a conversation id must not confirm its own existence to someone who
+    // cannot see it.
+    res.status(404).json({ error: 'not_found' });
+    return null;
+  }
+  return data;
+}
+
+// GET /api/support/conversations — the caller's threads.
+app.get('/api/support/conversations', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+
+    // Two reads rather than one `.or()`: the creator branch and the business branch are
+    // independent, and combining them into a PostgREST or-filter makes the tenancy rule much
+    // harder to read and to prove.
+    const [mine, ofBusiness] = await Promise.all([
+      supabase.from('support_conversations').select(SUPPORT_CONVERSATION_COLS)
+        .eq('created_by_user_id', userId).order('created_at', { ascending: false }).limit(200),
+      businessId
+        ? supabase.from('support_conversations').select(SUPPORT_CONVERSATION_COLS)
+            .eq('business_id', businessId).order('created_at', { ascending: false }).limit(200)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (mine.error || ofBusiness.error) return res.status(500).json({ error: 'support_read_failed' });
+
+    const byId = new Map();
+    for (const c of [...(mine.data || []), ...(ofBusiness.data || [])]) byId.set(c.id, c);
+    const conversations = [...byId.values()]
+      .sort((a, b) => new Date(b.last_message_at || b.created_at) - new Date(a.last_message_at || a.created_at))
+      .map(SUP.toConversationDto);
+
+    res.json({ business_id: businessId, categories: SUP.CATEGORIES, conversations });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// POST /api/support/conversations — open a thread, optionally with a first message.
+app.post('/api/support/conversations', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+
+    const parsed = SUP.validateCreateConversation(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+    const { firstMessage, ...conv } = parsed.value;
+
+    const { data: created, error: cErr } = await supabase.from('support_conversations')
+      .insert({ ...conv, business_id: businessId, created_by_user_id: userId })
+      .select(SUPPORT_CONVERSATION_COLS).single();
+    if (cErr) {
+      console.warn(`[support] conversation insert failed user=${userId}: ${cErr.message}`);
+      return res.status(500).json({ error: 'support_create_failed' });
+    }
+
+    if (firstMessage) {
+      // The 053 trigger sets last_message_at and writes the timeline event.
+      const { error: mErr } = await supabase.from('support_messages').insert({
+        conversation_id: created.id, business_id: businessId,
+        sender_type: 'user', sender_user_id: userId, body: firstMessage, is_internal: false,
+      });
+      // The thread exists and is usable even if the first message failed; losing the whole
+      // conversation would be the worse outcome for someone asking for help.
+      if (mErr) console.warn(`[support] first message failed conversation=${created.id}`);
+    }
+
+    res.status(201).json({ conversation: SUP.toConversationDto(created) });
+  } catch { res.status(500).json({ error: 'support_create_failed' }); }
+});
+
+// GET /api/support/conversations/:id
+app.get('/api/support/conversations/:id', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, req.user.userId, businessId); if (!conv) return;
+    res.json({ conversation: SUP.toConversationDto(conv) });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// GET /api/support/conversations/:id/messages — INTERNAL NOTES ARE EXCLUDED.
+app.get('/api/support/conversations/:id/messages', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, req.user.userId, businessId); if (!conv) return;
+
+    // Filtered in the QUERY as well as in the projection. Two layers on purpose: this is the
+    // one place where a mistake shows staff-only notes to a customer.
+    const { data, error } = await supabase.from('support_messages')
+      .select(SUPPORT_MESSAGE_COLS)
+      .eq('conversation_id', conv.id).eq('is_internal', false)
+      .order('created_at', { ascending: true });
+    if (error) return res.status(500).json({ error: 'support_read_failed' });
+
+    res.json({ conversation_id: conv.id, messages: SUP.visibleMessagesForUser(data || []) });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// POST /api/support/conversations/:id/messages — reply as the user.
+app.post('/api/support/conversations/:id/messages', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, userId, businessId); if (!conv) return;
+    if (conv.status === 'closed') {
+      return res.status(409).json({ error: 'conversation_closed',
+        message: 'This conversation is closed. Please open a new one.' });
+    }
+
+    const parsed = SUP.validateMessage(req.body, { allowInternal: false });
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+
+    const { data: msg, error } = await supabase.from('support_messages').insert({
+      conversation_id: conv.id, business_id: conv.business_id,
+      sender_type: 'user', sender_user_id: userId,
+      body: parsed.value.body, is_internal: false,
+    }).select(SUPPORT_MESSAGE_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_message_failed' });
+
+    res.status(201).json({ message: SUP.toMessageDto(msg) });
+  } catch { res.status(500).json({ error: 'support_message_failed' }); }
+});
+
+// POST /api/support/conversations/:id/escalate — ask for a human.
+app.post('/api/support/conversations/:id/escalate', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, userId, businessId); if (!conv) return;
+
+    const parsed = SUP.validateEscalation(req.body, 'user');
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+
+    const { data: esc, error } = await supabase.from('support_escalations').insert({
+      ...parsed.value, conversation_id: conv.id, business_id: conv.business_id,
+    }).select('*').single();
+    if (error) return res.status(500).json({ error: 'support_escalation_failed' });
+
+    // Mark the thread as needing a person. Deliberately not done by a DB trigger: whether an
+    // escalation changes the thread status is a policy decision, and a closed thread should
+    // not silently reopen.
+    if (conv.status !== 'closed') {
+      await supabase.from('support_conversations')
+        .update({ status: 'human_needed' }).eq('id', conv.id);
+    }
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: conv.business_id, actor_user_id: userId,
+      event_type: 'escalation_requested', event_payload: { escalation_id: esc?.id, requested_by: 'user' },
+    });
+
+    res.status(201).json({ escalation: esc });
+  } catch { res.status(500).json({ error: 'support_escalation_failed' }); }
+});
+
+// PATCH /api/support/conversations/:id/close
+app.patch('/api/support/conversations/:id/close', auth, supportFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await supportBusinessContext(req);
+    const conv = await loadUserConversation(req, res, userId, businessId); if (!conv) return;
+    if (conv.status === 'closed') {
+      return res.status(409).json({ error: 'already_closed' });
+    }
+
+    // status and closed_at move together -- the 053 CHECK enforces the same pairing.
+    const { data: updated, error } = await supabase.from('support_conversations')
+      .update({ status: 'closed', closed_at: new Date().toISOString() })
+      .eq('id', conv.id).select(SUPPORT_CONVERSATION_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_update_failed' });
+
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: conv.business_id, actor_user_id: userId,
+      event_type: 'conversation_closed', event_payload: { closed_by: 'user' },
+    });
+
+    res.json({ conversation: SUP.toConversationDto(updated) });
+  } catch { res.status(500).json({ error: 'support_update_failed' }); }
+});
+
+// ── Admin ────────────────────────────────────────────────────────────────────
+// The flag guard precedes requireAdmin so that with the feature off nobody -- admin or not --
+// learns the routes exist.
+
+// GET /api/admin/support/conversations — every thread, with filters.
+app.get('/api/admin/support/conversations', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 200, 1), 500);
+    let q = supabase.from('support_conversations').select(SUPPORT_CONVERSATION_COLS);
+
+    // Unknown filter values are a 400, not a silently empty list that reads as "no tickets".
+    const { status, priority, category } = req.query || {};
+    if (status) {
+      if (!SUP.STATUSES.includes(status)) return res.status(400).json({ error: 'invalid_status' });
+      q = q.eq('status', status);
+    }
+    if (priority) {
+      if (!SUP.PRIORITIES.includes(priority)) return res.status(400).json({ error: 'invalid_priority' });
+      q = q.eq('priority', priority);
+    }
+    if (category) {
+      if (!SUP.CATEGORIES.includes(category)) return res.status(400).json({ error: 'invalid_category' });
+      q = q.eq('category', category);
+    }
+
+    const { data: rows, error } = await q.order('last_message_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'support_read_failed' });
+
+    const convs = rows || [];
+    const bizIds = [...new Set(convs.map(c => c.business_id).filter(Boolean))];
+    const { data: bizRows } = bizIds.length
+      ? await supabase.from('businesses').select('id, name, business_code').in('id', bizIds)
+      : { data: [] };
+    const bizById = Object.fromEntries((bizRows || []).map(b => [b.id, b]));
+
+    res.json({
+      statuses: SUP.STATUSES, priorities: SUP.PRIORITIES, categories: SUP.CATEGORIES,
+      conversations: convs.map(c => ({
+        ...SUP.toConversationDto(c),
+        business_name: bizById[c.business_id]?.name || null,
+        business_code: bizById[c.business_id]?.business_code || null,
+      })),
+    });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// GET /api/admin/support/conversations/:id — full thread INCLUDING internal notes.
+app.get('/api/admin/support/conversations/:id', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const { data: conv, error } = await supabase.from('support_conversations')
+      .select(SUPPORT_CONVERSATION_COLS).eq('id', req.params.id).maybeSingle();
+    if (error) return res.status(500).json({ error: 'support_read_failed' });
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    const [{ data: msgs }, { data: escs }] = await Promise.all([
+      supabase.from('support_messages').select(SUPPORT_MESSAGE_COLS)
+        .eq('conversation_id', conv.id).order('created_at', { ascending: true }),
+      supabase.from('support_escalations').select('*')
+        .eq('conversation_id', conv.id).order('created_at', { ascending: false }),
+    ]);
+
+    res.json({
+      conversation: SUP.toConversationDto(conv),
+      // Staff see internal notes -- that is the difference between this route and the user one.
+      messages: (msgs || []).map(SUP.toMessageDto),
+      escalations: escs || [],
+    });
+  } catch { res.status(500).json({ error: 'support_read_failed' }); }
+});
+
+// PATCH /api/admin/support/conversations/:id/assign
+app.patch('/api/admin/support/conversations/:id/assign', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const raw = req.body?.assigned_to_user_id;
+    // null explicitly unassigns; anything else must be a real user id.
+    const assignee = (raw === null || raw === undefined || raw === '') ? null : Number(raw);
+    if (assignee !== null && !Number.isFinite(assignee)) {
+      return res.status(400).json({ error: 'invalid_assignee' });
+    }
+
+    const { data: conv } = await supabase.from('support_conversations')
+      .select('id, status').eq('id', req.params.id).maybeSingle();
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    const patch = { assigned_to_user_id: assignee };
+    // Assigning an open thread moves it to 'assigned'; a closed one stays closed, because
+    // assigning someone to review it must not silently reopen it for the customer.
+    if (assignee !== null && !['closed', 'assigned'].includes(conv.status)) patch.status = 'assigned';
+
+    const { data: updated, error } = await supabase.from('support_conversations')
+      .update(patch).eq('id', conv.id).select(SUPPORT_CONVERSATION_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_update_failed' });
+
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: updated.business_id, actor_user_id: req.user.userId,
+      event_type: 'conversation_assigned', event_payload: { assigned_to_user_id: assignee },
+    });
+
+    res.json({ conversation: SUP.toConversationDto(updated) });
+  } catch { res.status(500).json({ error: 'support_update_failed' }); }
+});
+
+// PATCH /api/admin/support/conversations/:id/status
+app.patch('/api/admin/support/conversations/:id/status', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const decision = SUP.validateStatusChange(req.body?.status);
+    if (!decision.ok) return res.status(400).json({ error: decision.error, message: decision.message });
+
+    const { data: conv } = await supabase.from('support_conversations')
+      .select('id, status, business_id').eq('id', req.params.id).maybeSingle();
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    // closed_at is written and cleared alongside status so the 053 CHECK always holds.
+    const patch = { status: decision.value };
+    if (decision.value === 'closed') patch.closed_at = new Date().toISOString();
+    else if (conv.status === 'closed') patch.closed_at = null;   // reopening
+
+    const { data: updated, error } = await supabase.from('support_conversations')
+      .update(patch).eq('id', conv.id).select(SUPPORT_CONVERSATION_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_update_failed' });
+
+    await supabase.from('support_events').insert({
+      conversation_id: conv.id, business_id: conv.business_id, actor_user_id: req.user.userId,
+      event_type: 'status_changed', event_payload: { from: conv.status, to: decision.value },
+    });
+
+    res.json({ conversation: SUP.toConversationDto(updated) });
+  } catch { res.status(500).json({ error: 'support_update_failed' }); }
+});
+
+// POST /api/admin/support/conversations/:id/internal-note — staff-only, never user-visible.
+app.post('/api/admin/support/conversations/:id/internal-note', auth, supportFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const { data: conv } = await supabase.from('support_conversations')
+      .select('id, business_id').eq('id', req.params.id).maybeSingle();
+    if (!conv) return res.status(404).json({ error: 'not_found' });
+
+    const parsed = SUP.validateMessage(req.body, { allowInternal: true });
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error, message: parsed.message });
+
+    const { data: msg, error } = await supabase.from('support_messages').insert({
+      conversation_id: conv.id, business_id: conv.business_id,
+      sender_type: 'manager', sender_user_id: req.user.userId,
+      body: parsed.value.body,
+      // Forced true regardless of the body: this endpoint exists only for internal notes, and
+      // a caller omitting the flag must not accidentally publish to the customer.
+      is_internal: true,
+    }).select(SUPPORT_MESSAGE_COLS).single();
+    if (error) return res.status(500).json({ error: 'support_message_failed' });
+
+    res.status(201).json({ message: SUP.toMessageDto(msg) });
+  } catch { res.status(500).json({ error: 'support_message_failed' }); }
+});
+
+// ── Onboarding (migration 054) ───────────────────────────────────────────────
+//
+// Two modes: a short quick setup after registration, and a manually launched full product
+// tour. Gated by ONBOARDING_ENABLED: with the flag off every route answers 404 BEFORE any
+// database access.
+//
+// FOUNDATION ONLY. No guided-tour UI, no AI call, no email, no Telegram.
+//
+// NO FINANCIAL EFFECT and NO PROVISIONING. Nothing here reads or writes transactions,
+// wallets, debts, incoming_payments, payment connections, credentials or support threads --
+// and, critically, opening onboarding never creates a business or starts a trial. See
+// onboardingBusinessContext.
+//
+// LOCALE: ?locale=en|id|ru. Anything else falls back to English, as does any untranslated
+// string, so a partially translated flow always renders.
+const ONB = require('./lib/onboarding');
+function isOnboardingEnabled() { return process.env.ONBOARDING_ENABLED === 'true'; }
+function onboardingFlagGuard(req, res, next) {
+  if (!isOnboardingEnabled()) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+
+const FLOW_COLS = 'id, flow_key, title, description, title_i18n, description_i18n, mode, ' +
+  'audience, is_active, sort_order, metadata, created_at, updated_at';
+const STEP_COLS = 'id, flow_id, step_key, title, description, title_i18n, description_i18n, ' +
+  'instructions_i18n, page_path, target_selector, action_type, product_area, required, ' +
+  'skippable, sort_order, metadata';
+const PROGRESS_COLS = 'id, user_id, business_id, flow_id, status, started_at, completed_at, ' +
+  'dismissed_at, current_step_id, progress_percent, metadata, created_at, updated_at';
+const STEP_PROGRESS_COLS = 'id, progress_id, step_id, status, first_viewed_at, completed_at, ' +
+  'skipped_at, completion_source, metadata';
+
+// Read-only business context.
+//
+// Deliberately NOT resolveActiveBusiness: that falls back to ensureDefaultBusiness, which for
+// a legacy positive-id user with no workspace CREATES a business and starts a 7-day trial.
+// Opening onboarding -- which by definition happens before a user has set anything up --
+// must never provision a workspace or start a billing clock.
+async function onboardingBusinessContext(req) {
+  const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+  if (!requested) return { businessId: null };
+  const { data } = await supabase.from('business_members')
+    .select('business_id, status, businesses(type)')
+    .eq('user_id', req.user.userId).eq('business_id', requested).eq('status', 'active').limit(1);
+  const m = data?.[0];
+  if (!m || m.businesses?.type === 'personal') return { businessId: null };
+  return { businessId: m.business_id };
+}
+
+async function loadFlowByKey(flowKey) {
+  const { data } = await supabase.from('onboarding_flows')
+    .select(FLOW_COLS).eq('flow_key', flowKey).maybeSingle();
+  return data || null;
+}
+
+async function loadFlowSteps(flowId) {
+  const { data } = await supabase.from('onboarding_steps')
+    .select(STEP_COLS).eq('flow_id', flowId).order('sort_order', { ascending: true });
+  return data || [];
+}
+
+// The caller's progress row for a flow, honouring the null-business scope.
+async function loadProgress(userId, businessId, flowId) {
+  let q = supabase.from('onboarding_progress').select(PROGRESS_COLS)
+    .eq('user_id', userId).eq('flow_id', flowId);
+  q = businessId ? q.eq('business_id', businessId) : q.is('business_id', null);
+  const { data } = await q.maybeSingle();
+  return data || null;
+}
+
+async function loadStepProgress(progressId) {
+  const { data } = await supabase.from('onboarding_step_progress')
+    .select(STEP_PROGRESS_COLS).eq('progress_id', progressId);
+  return data || [];
+}
+
+async function writeOnboardingEvent({ userId, businessId, flowId, stepId, eventType, payload = {} }) {
+  try {
+    await supabase.from('onboarding_events').insert({
+      user_id: userId ?? null, business_id: businessId ?? null,
+      flow_id: flowId ?? null, step_id: stepId ?? null,
+      event_type: eventType, event_payload: payload,
+    });
+  } catch { /* analytics must never fail the user's action */ }
+}
+
+// Recompute percent + current step after any step change, and close the flow when done.
+async function recalcProgress(progress, steps) {
+  const stepProgress = await loadStepProgress(progress.id);
+  const calc = ONB.computeProgress(steps, stepProgress);
+  const patch = {
+    progress_percent: calc.progress_percent,
+    current_step_id: ONB.nextStepId(steps, stepProgress),
+  };
+  // A dismissed flow stays dismissed: finishing a step inside it must not silently revive it.
+  if (progress.status !== 'dismissed') {
+    if (calc.completed) {
+      patch.status = 'completed';
+      patch.completed_at = progress.completed_at || new Date().toISOString();
+    } else {
+      patch.status = 'in_progress';
+      patch.completed_at = null;
+    }
+  }
+  const { data } = await supabase.from('onboarding_progress')
+    .update(patch).eq('id', progress.id).select(PROGRESS_COLS).single();
+  return { progress: data, calc };
+}
+
+// GET /api/onboarding/flows — active flows, resolved for the requested locale.
+app.get('/api/onboarding/flows', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const locale = ONB.resolveLocale(req.query?.locale);
+    const { data, error } = await supabase.from('onboarding_flows')
+      .select(FLOW_COLS).eq('is_active', true).order('sort_order', { ascending: true });
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+    res.json({
+      locale, supported_locales: ONB.SUPPORTED_LOCALES,
+      flows: (data || []).map(f => ONB.toFlowDto(f, locale)),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/onboarding/flows/:flowKey — one flow with its steps and the caller's progress.
+app.get('/api/onboarding/flows/:flowKey', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const locale = ONB.resolveLocale(req.query?.locale);
+    const { businessId } = await onboardingBusinessContext(req);
+
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+    const steps = await loadFlowSteps(flow.id);
+    const progress = await loadProgress(req.user.userId, businessId, flow.id);
+    const stepProgress = progress ? await loadStepProgress(progress.id) : [];
+    const byStep = Object.fromEntries(stepProgress.map(p => [p.step_id, p]));
+
+    res.json({
+      locale,
+      flow: ONB.toFlowDto(flow, locale),
+      progress: progress || null,
+      steps: steps.map(s => ({
+        ...ONB.toStepDto(s, locale),
+        progress: byStep[s.id]
+          ? { status: byStep[s.id].status, completed_at: byStep[s.id].completed_at,
+              first_viewed_at: byStep[s.id].first_viewed_at, skipped_at: byStep[s.id].skipped_at }
+          : { status: 'not_started' },
+      })),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/onboarding/progress — every flow the caller has started, in this scope.
+app.get('/api/onboarding/progress', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const { businessId } = await onboardingBusinessContext(req);
+    let q = supabase.from('onboarding_progress').select(PROGRESS_COLS).eq('user_id', req.user.userId);
+    q = businessId ? q.eq('business_id', businessId) : q.is('business_id', null);
+    const { data, error } = await q.order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+    res.json({ business_id: businessId, progress: data || [] });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// POST /api/onboarding/flows/:flowKey/start
+app.post('/api/onboarding/flows/:flowKey/start', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await onboardingBusinessContext(req);
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+
+    const steps = await loadFlowSteps(flow.id);
+    let progress = await loadProgress(userId, businessId, flow.id);
+
+    if (!progress) {
+      const { data, error } = await supabase.from('onboarding_progress').insert({
+        user_id: userId, business_id: businessId, flow_id: flow.id,
+        status: 'in_progress', started_at: new Date().toISOString(),
+        current_step_id: steps[0]?.id || null, progress_percent: 0,
+      }).select(PROGRESS_COLS).single();
+      if (error) return res.status(500).json({ error: 'onboarding_start_failed' });
+      progress = data;
+
+      // One step-progress row per step up front, so the client never has to distinguish
+      // "not started" from "row missing".
+      if (steps.length) {
+        await supabase.from('onboarding_step_progress').insert(
+          steps.map(s => ({ progress_id: progress.id, step_id: s.id, status: 'not_started' })));
+      }
+    } else if (['dismissed', 'completed'].includes(progress.status)) {
+      // Re-opening a dismissed or finished flow resumes it rather than wiping history.
+      const { data } = await supabase.from('onboarding_progress')
+        .update({ status: 'in_progress', dismissed_at: null })
+        .eq('id', progress.id).select(PROGRESS_COLS).single();
+      progress = data;
+    }
+
+    await writeOnboardingEvent({ userId, businessId, flowId: flow.id, eventType: 'flow_started' });
+    res.status(201).json({ progress });
+  } catch { res.status(500).json({ error: 'onboarding_start_failed' }); }
+});
+
+// Shared handler for view / complete / skip. Loads the step, proves the caller owns the
+// progress row, applies the transition, recalculates, and records the event.
+async function handleStepAction(req, res, action) {
+  const userId = req.user.userId;
+  const { businessId } = await onboardingBusinessContext(req);
+
+  const { data: step } = await supabase.from('onboarding_steps')
+    .select(STEP_COLS).eq('id', req.params.stepId).maybeSingle();
+  if (!step) return res.status(404).json({ error: 'not_found' });
+
+  const progress = await loadProgress(userId, businessId, step.flow_id);
+  // No progress row means this caller never started the flow -- 404 rather than starting it
+  // implicitly, so a stray step id cannot create state.
+  if (!progress) return res.status(404).json({ error: 'flow_not_started' });
+
+  const { data: current } = await supabase.from('onboarding_step_progress')
+    .select(STEP_PROGRESS_COLS).eq('progress_id', progress.id).eq('step_id', step.id).maybeSingle();
+
+  const nowIso = new Date().toISOString();
+  const nextStatus = action === 'view' ? 'viewed' : action === 'complete' ? 'completed' : 'skipped';
+  const currentStatus = current?.status || 'not_started';
+
+  if (!ONB.canTransitionStep(currentStatus, nextStatus)) {
+    // Viewing an already-resolved step is a no-op, not an error: the UI may legitimately
+    // re-render it.
+    return res.json({ step_progress: current, progress, unchanged: true });
+  }
+  if (action === 'skip' && step.skippable === false) {
+    return res.status(400).json({ error: 'step_not_skippable',
+      message: 'This step is required and cannot be skipped.' });
+  }
+
+  const patch = { status: nextStatus };
+  if (nextStatus === 'viewed') patch.first_viewed_at = current?.first_viewed_at || nowIso;
+  if (nextStatus === 'completed') { patch.completed_at = nowIso; patch.completion_source = 'user'; }
+  if (nextStatus === 'skipped') patch.skipped_at = nowIso;
+
+  let stepProgressRow;
+  if (current) {
+    const { data } = await supabase.from('onboarding_step_progress')
+      .update(patch).eq('id', current.id).select(STEP_PROGRESS_COLS).single();
+    stepProgressRow = data;
+  } else {
+    const { data } = await supabase.from('onboarding_step_progress')
+      .insert({ progress_id: progress.id, step_id: step.id, ...patch })
+      .select(STEP_PROGRESS_COLS).single();
+    stepProgressRow = data;
+  }
+
+  const steps = await loadFlowSteps(step.flow_id);
+  const { progress: updated } = await recalcProgress(progress, steps);
+
+  await writeOnboardingEvent({
+    userId, businessId, flowId: step.flow_id, stepId: step.id,
+    eventType: `step_${nextStatus === 'viewed' ? 'viewed' : nextStatus}`,
+    payload: { step_key: step.step_key },
+  });
+
+  res.json({ step_progress: stepProgressRow, progress: updated });
+}
+
+app.post('/api/onboarding/steps/:stepId/view', auth, onboardingFlagGuard, async (req, res) => {
+  try { await handleStepAction(req, res, 'view'); }
+  catch { res.status(500).json({ error: 'onboarding_step_failed' }); }
+});
+app.post('/api/onboarding/steps/:stepId/complete', auth, onboardingFlagGuard, async (req, res) => {
+  try { await handleStepAction(req, res, 'complete'); }
+  catch { res.status(500).json({ error: 'onboarding_step_failed' }); }
+});
+app.post('/api/onboarding/steps/:stepId/skip', auth, onboardingFlagGuard, async (req, res) => {
+  try { await handleStepAction(req, res, 'skip'); }
+  catch { res.status(500).json({ error: 'onboarding_step_failed' }); }
+});
+
+// POST /api/onboarding/flows/:flowKey/dismiss — hide the flow, keep the history.
+app.post('/api/onboarding/flows/:flowKey/dismiss', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await onboardingBusinessContext(req);
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+
+    let progress = await loadProgress(userId, businessId, flow.id);
+    if (!progress) {
+      // Dismissing without starting is legitimate -- "I do not want this tour" -- and is
+      // recorded so the UI stops offering it.
+      const { data } = await supabase.from('onboarding_progress').insert({
+        user_id: userId, business_id: businessId, flow_id: flow.id,
+        status: 'dismissed', dismissed_at: new Date().toISOString(),
+      }).select(PROGRESS_COLS).single();
+      progress = data;
+    } else {
+      const { data } = await supabase.from('onboarding_progress')
+        .update({ status: 'dismissed', dismissed_at: new Date().toISOString() })
+        .eq('id', progress.id).select(PROGRESS_COLS).single();
+      progress = data;
+    }
+
+    await writeOnboardingEvent({ userId, businessId, flowId: flow.id, eventType: 'flow_dismissed' });
+    res.json({ progress });
+  } catch { res.status(500).json({ error: 'onboarding_update_failed' }); }
+});
+
+// POST /api/onboarding/flows/:flowKey/reset — start the flow over for this caller.
+// Step progress is reset in place; the event history is NOT deleted, so analytics keep the
+// record that the flow was attempted before.
+app.post('/api/onboarding/flows/:flowKey/reset', auth, onboardingFlagGuard, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { businessId } = await onboardingBusinessContext(req);
+    const flow = await loadFlowByKey(req.params.flowKey);
+    if (!flow) return res.status(404).json({ error: 'not_found' });
+
+    const progress = await loadProgress(userId, businessId, flow.id);
+    if (!progress) return res.status(404).json({ error: 'flow_not_started' });
+
+    const steps = await loadFlowSteps(flow.id);
+    await supabase.from('onboarding_step_progress').update({
+      status: 'not_started', first_viewed_at: null, completed_at: null,
+      skipped_at: null, completion_source: null,
+    }).eq('progress_id', progress.id);
+
+    const { data: updated, error } = await supabase.from('onboarding_progress').update({
+      status: 'in_progress', progress_percent: 0, completed_at: null, dismissed_at: null,
+      started_at: new Date().toISOString(), current_step_id: steps[0]?.id || null,
+    }).eq('id', progress.id).select(PROGRESS_COLS).single();
+    if (error) return res.status(500).json({ error: 'onboarding_update_failed' });
+
+    await writeOnboardingEvent({ userId, businessId, flowId: flow.id, eventType: 'flow_reset' });
+    res.json({ progress: updated });
+  } catch { res.status(500).json({ error: 'onboarding_update_failed' }); }
+});
+
+// ── Admin ────────────────────────────────────────────────────────────────────
+// Flag guard precedes requireAdmin so the feature does not exist for anyone when off.
+
+// GET /api/admin/onboarding/flows — content management view, with RAW i18n maps.
+app.get('/api/admin/onboarding/flows', auth, onboardingFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const locale = ONB.resolveLocale(req.query?.locale);
+    const { data: flows, error } = await supabase.from('onboarding_flows')
+      .select(FLOW_COLS).order('sort_order', { ascending: true });
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+
+    const { data: steps } = await supabase.from('onboarding_steps')
+      .select(STEP_COLS).order('sort_order', { ascending: true });
+    const byFlow = new Map();
+    for (const s of (steps || [])) {
+      if (!byFlow.has(s.flow_id)) byFlow.set(s.flow_id, []);
+      byFlow.get(s.flow_id).push(ONB.toStepDto(s, locale, { includeRaw: true }));
+    }
+
+    res.json({
+      locale, supported_locales: ONB.SUPPORTED_LOCALES,
+      flows: (flows || []).map(f => ({
+        ...ONB.toFlowDto(f, locale, { includeRaw: true }),
+        steps: byFlow.get(f.id) || [],
+      })),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/admin/onboarding/progress — aggregate completion across all users.
+app.get('/api/admin/onboarding/progress', auth, onboardingFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 300, 1), 500);
+    const { data: rows, error } = await supabase.from('onboarding_progress')
+      .select(PROGRESS_COLS).order('updated_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+
+    const progress = rows || [];
+    const flowIds = [...new Set(progress.map(p => p.flow_id).filter(Boolean))];
+    const { data: flows } = flowIds.length
+      ? await supabase.from('onboarding_flows').select('id, flow_key, mode').in('id', flowIds)
+      : { data: [] };
+    const flowById = Object.fromEntries((flows || []).map(f => [f.id, f]));
+
+    // Per-flow rollup so an admin sees adoption at a glance rather than counting rows.
+    const summary = {};
+    for (const p of progress) {
+      const key = flowById[p.flow_id]?.flow_key || 'unknown';
+      summary[key] = summary[key] || { started: 0, completed: 0, dismissed: 0, in_progress: 0 };
+      summary[key].started++;
+      if (p.status === 'completed') summary[key].completed++;
+      if (p.status === 'dismissed') summary[key].dismissed++;
+      if (p.status === 'in_progress') summary[key].in_progress++;
+    }
+
+    res.json({
+      summary,
+      progress: progress.map(p => ({ ...p, flow_key: flowById[p.flow_id]?.flow_key || null })),
+    });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// GET /api/admin/onboarding/events — raw analytics stream.
+app.get('/api/admin/onboarding/events', auth, onboardingFlagGuard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 300, 1), 500);
+    let q = supabase.from('onboarding_events')
+      .select('id, user_id, business_id, flow_id, step_id, event_type, event_payload, created_at');
+    if (req.query?.event_type) q = q.eq('event_type', String(req.query.event_type));
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(limit);
+    if (error) return res.status(500).json({ error: 'onboarding_read_failed' });
+    res.json({ events: data || [] });
+  } catch { res.status(500).json({ error: 'onboarding_read_failed' }); }
+});
+
+// POST /api/bank-import/batches — create a batch from client-parsed rows
+app.post('/api/bank-import/batches', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot import bank statements' });
+
+    const { wallet_id, file_name, file_type, currency, opening_balance, closing_balance, rows, document_id, statement_start, statement_end } = req.body || {};
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'rows required' });
+    if (rows.length > 2000) return res.status(400).json({ error: 'Too many rows (max 2000 per import)' });
+
+    // Wallet must belong to the business
+    let wallet = null;
+    if (wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, name').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!w?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+      wallet = w[0];
+    }
+
+    // Date range of the statement
+    const dates = rows.map(r => r.tx_date).filter(Boolean).sort();
+    const statementStart = statement_start || dates[0] || null;
+    const statementEnd = statement_end || dates[dates.length - 1] || null;
+
+    // Existing transactions for the wallet in range — for duplicate/matching.
+    let existing = [];
+    if (wallet) {
+      const { data: txs } = await supabase.from('transactions')
+        .select('id, type, amount_original, transaction_date, created_at, description')
+        .or(bizOrFilter(biz))
+        .or(`wallet_id.eq.${wallet_id},source.eq.${JSON.stringify(wallet.name)}`);
+      existing = txs || [];
+    }
+    const toIsoDate = (v) => {
+      if (!v) return '';
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).slice(0, 10);
+    };
+    const txKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+
+    // Already-imported statement lines (avoid re-importing the same statement). Only rows whose
+    // ledger transaction still exists count — abandoned review batches (re-uploaded for another
+    // pass) and deleted transactions must NOT mark a fresh upload as duplicate.
+    const { data: priorRows } = await supabase.from('bank_import_rows')
+      .select('dedup_hash, linked_transaction_id').eq('business_id', biz.business.id)
+      .not('linked_transaction_id', 'is', null);
+    const { importedCopies, backedTxIds } = await importedStatementLines(biz, priorRows);
+
+    // Ledger transactions a row could be linked to: one transaction backs at most one statement
+    // row, so a transaction already behind a statement row is not offered again, and each one is
+    // offered to a single row of this upload (two identical lines are two operations).
+    const existingIndex = new Map();
+    for (const t of existing) {
+      if (backedTxIds.has(Number(t.id))) continue;
+      const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
+      const k = txKey(d, t.amount_original, t.type);
+      if (!existingIndex.has(k)) existingIndex.set(k, []);
+      existingIndex.get(k).push(t.id);
+    }
+    // Copies of a line already in the ledger: that many copies of it in this upload are
+    // duplicates, any further copy is a genuine new operation (same rule as migration 069).
+    const dupLeft = new Map(importedCopies);
+
+    // If document_id is provided, verify it exists and strictly belongs to the current business
+    if (document_id) {
+      const { data: docRow, error: docErr } = await supabase.from('financial_documents')
+        .select('id, business_id').eq('id', document_id).limit(1);
+      if (docErr || !docRow?.length) {
+        return res.status(404).json({ error: 'Original document not found' });
+      }
+      if (String(docRow[0].business_id) !== String(biz.business.id)) {
+        return res.status(403).json({ error: 'Document belongs to another business' });
+      }
+    }
+
+    // Create batch
+    const batchPayload = {
+      business_id: biz.business.id, wallet_id: wallet_id || null,
+      uploaded_by_user_id: req.user.userId, source_channel: 'web',
+      file_name: file_name || null, file_type: file_type || null,
+      document_id: document_id || null,
+      currency: currency || 'IDR',
+      statement_start: statementStart, statement_end: statementEnd,
+      opening_balance: opening_balance ?? null, closing_balance: closing_balance ?? null,
+      row_count: rows.length, status: 'review_required',
+    };
+    const { data: batch, error: bErr } = await supabase.from('bank_import_batches').insert(batchPayload).select().single();
+    if (bErr) {
+      if (/column "document_id" of relation "bank_import_batches" does not exist/i.test(bErr.message)) {
+        return res.status(500).json({
+          error: 'database_schema_mismatch',
+          message: 'Database schema is missing bank_import_batches.document_id. Migration 068 required.',
+        });
+      }
+      if (/isolation: bank_import_batches document_id belongs to another business/i.test(bErr.message)) {
+        return res.status(403).json({ error: 'isolation_violation', message: 'Document belongs to another business' });
+      }
+      return res.status(500).json({ error: bErr.message });
+    }
+
+    // Build rows with dedup + matching + suggestions
+    let matched = 0, dup = 0;
+    const rowInserts = rows.map((r, i) => {
+      const amount = Math.abs(Number(r.amount) || 0);
+      const direction = r.direction || (Number(r.amount) >= 0 ? 'in' : 'out');
+      const suggestedType = direction === 'in' ? 'income' : 'expense';
+      const hash = rowDedupHash(biz.business.id, wallet_id, { ...r, amount, direction });
+      let status = 'review_required', matchId = null;
+      if ((dupLeft.get(hash) || 0) > 0) { dupLeft.set(hash, dupLeft.get(hash) - 1); status = 'duplicate'; dup++; }
+      else {
+        matchId = existingIndex.get(txKey(r.tx_date, amount, suggestedType))?.shift() || null;
+        if (matchId) { status = 'matched'; matched++; }  // already in ledger
+      }
+      return {
+        batch_id: batch.id, business_id: biz.business.id, row_index: r.row_index ?? i,
+        raw: r.raw || {}, tx_date: r.tx_date || null, description: r.description || null,
+        amount, direction, bank_reference: r.bank_reference || null,
+        balance_after: r.balance_after ?? null, dedup_hash: hash,
+        suggested_type: suggestedType, suggested_category: null, suggested_counterparty: null,
+        match_status: status, matched_transaction_id: matchId,
+      };
+    });
+    const { error: rErr } = await supabase.from('bank_import_rows').insert(rowInserts);
+    if (rErr) return res.status(500).json({ error: rErr.message });
+
+    await supabase.from('bank_import_batches').update({ matched_count: matched, duplicate_count: dup, updated_at: new Date().toISOString() }).eq('id', batch.id);
+
+    const { data: storedRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).order('row_index');
+    res.json({ batch: { ...batch, matched_count: matched, duplicate_count: dup }, rows: storedRows || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/bank-import/batches — list batches
+// POST /api/bank-import/read — read an UPLOADED statement document into rows (design w2/H1–H2).
+// Engine first (lib/statementParsers: BCA CSV, Permata PDF text); the model only for a format no
+// engine knows, and its rows get the same checks. Writes nothing: the rows go to
+// POST /api/bank-import/batches once the user has chosen the account.
+app.post('/api/bank-import/read', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Your role cannot import bank statements' });
+    const documentId = req.body?.document_id;
+    if (!documentId) return res.status(400).json({ error: 'document_id required' });
+    const doc = await loadDocumentScoped(biz, documentId);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name, mime_type')
+      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(502).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+    const name = file.file_name || '';
+    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(name);
+    const isSheet = /\.(xlsx|xls)$/i.test(name);
+    let text = '';
+    if (isPdf) { const ex = extractPdfText(buf); text = ex.text_available ? ex.text : '' }
+    else if (!isSheet) text = buf.toString('utf8');
+    else if (typeof req.body?.sheet_text === 'string') text = req.body.sheet_text.slice(0, 500000);   // the browser's CSV of the first sheet
+    let parsed = text ? statementParsers.parseStatement({ text, file_name: name }) : { ok: false, reason: 'no_text' };
+    let method = parsed.ok ? parsed.format : null;
+    if (!parsed.ok && anthropic && process.env.ANTHROPIC_API_KEY && (!isSheet || text)) {
+      // A format no engine knows (or a scan): the model reads it; the engine still checks it.
+      const block = text ? null : docIdentify.fileBlock(buf, file.mime_type, name);
+      if (text || block) {
+        try {
+          const resp = await Promise.race([
+            anthropic.messages.create({ model: docIdentify.MODEL, max_tokens: 8000,
+              messages: [{ role: 'user', content: block ? [block, { type: 'text', text: statementParsers.MODEL_PROMPT }] : `${statementParsers.MODEL_PROMPT}\n\nStatement text:\n"""\n${text.slice(0, 60000)}\n"""` }] }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('statement_read_timeout')), 90000)),
+          ]);
+          const raw = String(resp?.content?.[0]?.text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+          parsed = statementParsers.normalizeModelStatement(JSON.parse(raw));
+          method = parsed.ok ? (text ? 'model_text' : 'model_file') : null;
+        } catch (e) { parsed = { ok: false, reason: /timeout/.test(e.message) ? 'ai_timeout' : 'ai_unreadable' } }
+      }
+    }
+    if (!parsed.ok) return res.json({ ok: false, reason: parsed.reason || 'unknown_format', file_name: name, is_sheet: isSheet });
+    const { data: wallets } = await supabase.from('wallets').select('id, name, entity_name, currency, type').eq('business_id', biz.business.id).eq('is_active', true);
+    const suggested = docIdentify.matchWallet(wallets || [], { bank_name: parsed.bank, account_number: parsed.account_number, currency: parsed.currency });
+    // Same account + period already imported → say so before anything is written.
+    let earlier = [];
+    if (parsed.period_start && parsed.period_end) {
+      const { data: b } = await supabase.from('bank_import_batches').select('id, wallet_id, statement_start, statement_end, status, created_at')
+        .eq('business_id', biz.business.id).lte('statement_start', parsed.period_end).gte('statement_end', parsed.period_start);
+      earlier = b || [];
+    }
+    res.json({ ok: true, method, file_name: name, document_id: doc.id, statement: parsed, suggested_wallet_id: suggested?.id || null, overlapping_batches: earlier });
+  } catch (e) {
+    console.error(`[bank-import/read] ${e.message}`);
+    res.status(500).json({ error: 'statement_read_failed' });
+  }
+});
+
+app.get('/api/bank-import/batches', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data } = await supabase.from('bank_import_batches').select('*').eq('business_id', biz.business.id).order('created_at', { ascending: false }).limit(50);
+    const batches = data || [];
+    if (batches.length > 0) {
+      const batchIds = batches.map(b => b.id);
+      const { data: recons } = await supabase.from('bank_reconciliations').select('*').in('batch_id', batchIds);
+      const reconByBatch = new Map();
+      for (const r of (recons || [])) {
+        if (!reconByBatch.has(String(r.batch_id))) reconByBatch.set(String(r.batch_id), r);
+      }
+      for (const b of batches) {
+        const r = reconByBatch.get(String(b.id));
+        if (r) {
+          b.reconciliation = r;
+          b.reconciliation_status = r.status;
+          b.difference = r.difference;
+        }
+      }
+    }
+    res.json({ batches });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/bank-import/batches/:id — batch + rows
+app.get('/api/bank-import/batches/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: batch } = await supabase.from('bank_import_batches').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    const { data: rows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).order('row_index');
+    const { data: recon } = await supabase.from('bank_reconciliations').select('*').eq('batch_id', batch.id).limit(1);
+    res.json({ batch, rows: rows || [], reconciliation: recon?.[0] || null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/bank-import/rows/:id — edit a row before import
+app.patch('/api/bank-import/rows/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const allowed = ['suggested_type', 'suggested_category', 'suggested_counterparty', 'description', 'match_status'];
+    const updates = {};
+    for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+    if (req.body.amount !== undefined) updates.amount = Math.abs(Number(req.body.amount) || 0);
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'No editable fields' });
+    const { data, error } = await supabase.from('bank_import_rows').update(updates)
+      .eq('id', req.params.id).eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ row: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-import/batches/:id/confirm — import confirmed rows + reconcile
+app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { data: batch } = await supabase.from('bank_import_batches').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
+    if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
+    const periodProblem = statementPeriodProblem(batch);
+    if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
+
+    const { data: rows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
+    // Import rows the user confirmed (not duplicates, not rejected). review_status
+    // 'confirmed' (new review queue) OR legacy match_status 'confirmed'.
+    const isConfirmed = (r) => (r.review_status === 'confirmed' || r.match_status === 'confirmed') && r.review_status !== 'excluded';
+    const toImport = (rows || []).filter(r => isConfirmed(r) && !r.linked_transaction_id);
+
+    // Bridge (PR2, migration 049): confirmed CREDIT lines also become incoming-payment
+    // evidence. Entirely inside the flag — with INCOMING_PAYMENTS_ENABLED off this call is
+    // not made, nothing is read. Failures here never fail the import: the ledger write already
+    // committed and is the user's actual outcome. It is idempotent, so a repeated confirm
+    // (nothing left to import) still re-runs it — that is how missing evidence is recovered.
+    const respond = async (out) => {
+      const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
+      const incoming_payments = await bridgeBankBatchToIncomingPayments({ batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
+      res.json({ ok: true, imported: out.imported, status: out.status, reconciliation: out.reconciliation,
+                 ...(incoming_payments ? { incoming_payments } : {}) });
+    };
+    // Repeat confirm: nothing to write. Unlike before, no empty reconciliation snapshot is stored.
+    if (!toImport.length) return respond({ imported: 0, status: batch.status, reconciliation: null });
+
+    // Resolve category ids → names (ledger is TEXT). Prefer the user's FINAL choice.
+    const catMap = await loadBusinessCategoryMap(biz);
+    let walletCurrency = null;
+    if (batch.wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('currency').eq('id', batch.wallet_id).limit(1);
+      walletCurrency = w?.[0]?.currency || null;
+    }
+    const txCurrency = (batch.currency || walletCurrency || 'IDR').toUpperCase();
+
+    // 1) Validate every row before anything is written.
+    const problems = [];
+    const prepared = [];
+    for (const r of toImport) {
+      let txType = r.final_transaction_type || r.suggested_type || 'expense';
+      if (!VALID_SYSTEM_TX_TYPES.includes(txType)) txType = r.suggested_type || 'expense';
+      const problem = !VALID_SYSTEM_TX_TYPES.includes(txType) ? `Invalid transaction type: ${txType}` : statementRowProblem(r, 'create');
+      if (problem) { problems.push({ row_id: r.id, row_index: r.row_index, error: problem }); continue; }
+      prepared.push({ r, txType });
+    }
+    if (problems.length) return res.status(400).json(invalidRowsBody(problems));
+
+    // 2) FX outside the database transaction.
+    const plan = [];
+    try {
+      for (const { r, txType } of prepared) {
+        const fxRes = await fx.toIdr(r.amount, txCurrency, String(r.tx_date).slice(0, 10));
+        plan.push({
+          row_id: r.id, action: 'create', type: txType,
+          category_id: r.final_category_id || null,
+          category_name: r.final_category_id ? null
+            : (r.suggested_category_id ? (catMap.get(r.suggested_category_id) || null) : (r.suggested_category || null)),
+          counterparty_name: r.suggested_counterparty || null,
+          scope: r.final_scope || null,
+          // What the FX valuation was computed from — the database refuses if any of it changed.
+          expected_amount: Number(r.amount), expected_date: String(r.tx_date).slice(0, 10), currency: txCurrency,
+          amount_idr: fxRes.amount_idr, booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source,
+          normalized_desc: normalizeDesc(r.description),
+        });
+      }
+    } catch (e) {
+      console.error(`[bank-import] FX valuation failed: ${e.message}`);
+      return res.status(502).json({ error: 'Could not value the statement in IDR. Nothing was imported.', code: 'fx_unavailable' });
+    }
+
+    // 3) One transaction.
+    const result = await runAtomicBankConfirm({ biz, batch, plan, actorUserId: req.user.userId, flow: 'legacy' });
+    if (result.status !== 200) return res.status(result.status).json(result.body);
+    return respond(result.body);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  AI CATEGORIZATION — Phase 2: deterministic suggestion cascade (no AI, no
+//  ledger change). Levels 1–4 run before any AI call (Phase 3). Confidence and
+//  review_status are written to bank_import_rows for the review queue.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Confidence → review bucket. Special-risk types always force manual review.
+const SPECIAL_RISK_TYPES = ['transfer', 'owner_injection', 'owner_withdrawal', 'correction'];
+function reviewBucket(confidence, type, scope, hasMatch) {
+  if (hasMatch) return 'matched_existing';
+  if (SPECIAL_RISK_TYPES.includes(type) || scope === 'personal') return 'needs_review';
+  if (confidence >= 0.90) return 'high_confidence';
+  if (confidence >= 0.70) return 'suggested';
+  return 'needs_review';
+}
+
+// Safe system-type keyword hints (Level 4). Never bound to a user category.
+const KEYWORD_HINTS = [
+  { re: /\b(bank fee|admin fee|biaya adm|adm fee|service charge)\b/i, type: 'expense', conf: 0.6 },
+  { re: /\b(interest|bunga|interest credit)\b/i,                       type: 'income',  conf: 0.6 },
+  { re: /\b(transfer between own|own account|antar rekening)\b/i,      type: 'transfer', conf: 0.55 },
+];
+
+// Run the deterministic cascade for one row against preloaded business context.
+function classifyRowDeterministic(row, ctx) {
+  const desc = normalizeDesc(row.description);
+  const dir = row.direction; // 'in' | 'out'
+  const baseType = dir === 'in' ? 'income' : 'expense';
+  const out = {
+    suggested_transaction_type: baseType, suggested_category_id: null,
+    suggested_counterparty_id: null, suggested_scope: 'business',
+    suggested_match_type: null, suggested_match_id: null,
+    suggestion_source: 'none', suggestion_confidence: 0, suggestion_reason: null,
+  };
+
+  // ── Level 1: exact business rule ───────────────────────────────────────────
+  for (const rule of ctx.rules) {
+    const hit = rule.match_type === 'equals' ? desc === rule.normalized_value
+              : rule.match_type === 'starts_with' ? desc.startsWith(rule.normalized_value)
+              : desc.includes(rule.normalized_value);
+    if (rule.normalized_value && hit) {
+      out.suggested_transaction_type = rule.transaction_type || baseType;
+      out.suggested_category_id = rule.category_id || null;
+      out.suggested_counterparty_id = rule.counterparty_id || null;
+      out.suggested_scope = rule.scope || 'business';
+      out.suggestion_source = 'rule';
+      out.suggestion_confidence = 0.95;
+      out.suggestion_reason = `Matched rule "${rule.rule_name || rule.match_value}".`;
+      return out; // rule wins
+    }
+  }
+
+  // ── Level 2: existing counterparty + its previously confirmed category ──────
+  for (const cp of ctx.counterparties) {
+    if (cp.normalized && desc.includes(cp.normalized)) {
+      out.suggested_counterparty_id = cp.id;
+      const hist = ctx.cpCategoryHistory.get(cp.normalized);
+      if (hist && hist.count >= 2 && hist.categoryId) {
+        out.suggested_category_id = hist.categoryId;
+        out.suggestion_source = 'counterparty';
+        out.suggestion_confidence = 0.85;
+        out.suggestion_reason = `${cp.name} was previously categorized as ${ctx.catNameById.get(hist.categoryId) || 'this category'} ${hist.count}×.`;
+        return out;
+      }
+      break; // counterparty found but no strong history → continue to matches/keyword
+    }
+  }
+
+  // ── Level 3: existing financial match (no new transaction should be created) ─
+  const amt = Math.abs(Number(row.amount) || 0);
+  // 3a. Existing imported/manual transaction (duplicate of ledger)
+  const exTx = ctx.findExistingTx(row.tx_date, amt, baseType);
+  if (exTx) {
+    out.suggested_match_type = 'existing_tx'; out.suggested_match_id = String(exTx.id);
+    out.suggestion_source = 'match'; out.suggestion_confidence = 0.9;
+    out.suggestion_reason = 'Matches an existing ledger transaction (same date/amount).';
+    return out;
+  }
+  // 3b. Payable (outgoing) / Receivable (incoming)
+  const debt = ctx.findDebt(dir === 'out' ? 'payable' : 'receivable', amt);
+  if (debt) {
+    out.suggested_match_type = dir === 'out' ? 'payable' : 'receivable';
+    out.suggested_match_id = String(debt.id);
+    out.suggestion_source = 'match'; out.suggestion_confidence = 0.85;
+    out.suggestion_reason = `Possible ${out.suggested_match_type} payment to ${debt.counterparty || 'a counterparty'}.`;
+    return out;
+  }
+  // 3c. Payroll (outgoing salary)
+  if (dir === 'out') {
+    const pay = ctx.findPayroll(row.tx_date, amt);
+    if (pay) {
+      out.suggested_transaction_type = 'payroll';
+      out.suggested_match_type = 'payroll'; out.suggested_match_id = String(pay.id);
+      out.suggestion_source = 'match'; out.suggestion_confidence = 0.85;
+      out.suggestion_reason = `Possible payroll payment to ${pay.employee_name}.`;
+      return out;
+    }
+  }
+  // 3d. Transfer — a matching OPPOSITE-direction row of the same amount exists
+  // in this batch (one IN + one OUT). Same-direction duplicates (e.g. two equal
+  // admin fees) are NOT transfers.
+  const dirs = ctx.transferAmounts.get(amt);
+  if (dirs && dirs.has('in') && dirs.has('out')) {
+    out.suggested_transaction_type = 'transfer';
+    out.suggested_match_type = 'transfer';
+    out.suggestion_source = 'match'; out.suggestion_confidence = 0.5;
+    out.suggestion_reason = 'Possible transfer — an opposite row of the same amount exists in this statement.';
+    return out;
+  }
+
+  // ── Level 4: safe keyword hint (system type only) ──────────────────────────
+  for (const k of KEYWORD_HINTS) {
+    if (k.re.test(row.description || '')) {
+      out.suggested_transaction_type = k.type;
+      out.suggestion_source = 'keyword';
+      out.suggestion_confidence = k.conf;
+      out.suggestion_reason = 'Matched a safe keyword hint (system type only, no category).';
+      return out;
+    }
+  }
+
+  // Nothing deterministic → leave for AI (Phase 3) / manual review.
+  return out;
+}
+
+// AI Level 5 — batch-suggest categories for rows the cascade couldn't resolve.
+// Sends ONLY: business categories, known counterparties, and per-row
+// description/amount/direction/date/reference + a few safe historical examples.
+// Never sends balances, employee lists, secrets, or another business's data.
+// AI must pick category_id ONLY from the provided list; unknown → discarded.
+async function aiSuggestRows(biz, rows, cats, cps, examples, batchId, userId) {
+  const result = new Map();
+  if (!process.env.ANTHROPIC_API_KEY || !rows.length) return result;
+  const catIds = new Set(cats.map(c => c.id));
+  const cpIds = new Set(cps.map(c => c.id));
+  const CHUNK = 30;
+
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const payload = {
+      business_categories: cats.map(c => ({ id: c.id, name: c.name })),
+      known_counterparties: cps.map(c => ({ id: c.id, name: c.name })),
+      historical_examples: examples.slice(0, 15),
+      transactions: chunk.map(r => ({
+        row_id: r.id, description: r.description, amount: r.amount,
+        direction: r.direction, date: r.tx_date, bank_reference: r.bank_reference || null,
+      })),
+    };
+    const prompt = `You categorize bank statement rows for ONE business.
+
+Allowed system transaction_type values: ${VALID_SYSTEM_TX_TYPES.join(', ')}.
+
+STRICT RULES:
+- Choose category_id ONLY from business_categories below. If none fits, set category_id to null.
+- Choose counterparty_id ONLY from known_counterparties, else null.
+- NEVER invent a category. NEVER create one.
+- confidence is 0..1. Use <0.7 when unsure.
+- scope is "business" or "personal".
+
+Return ONLY a JSON array, no prose, no markdown:
+[{"row_id":"...","transaction_type":"expense","category_id":"id-or-null","counterparty_id":"id-or-null","scope":"business","confidence":0.0,"reason":"short"}]
+
+DATA:
+${JSON.stringify(payload)}`;
+
+    try {
+      const resp = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5', max_tokens: 1800,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const raw = (resp.content?.[0]?.text || '').trim().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const arr = JSON.parse(raw);
+      for (const s of (Array.isArray(arr) ? arr : [])) {
+        const row = chunk.find(r => String(r.id) === String(s.row_id));
+        if (!row) continue;
+        const type = VALID_SYSTEM_TX_TYPES.includes(s.transaction_type) ? s.transaction_type : (row.direction === 'in' ? 'income' : 'expense');
+        const categoryId = (s.category_id && catIds.has(s.category_id)) ? s.category_id : null; // unknown → discard
+        const cpId = (s.counterparty_id && cpIds.has(s.counterparty_id)) ? s.counterparty_id : null;
+        let conf = Number(s.confidence);
+        if (!(conf >= 0 && conf <= 1)) conf = 0;
+        if (!categoryId) conf = Math.min(conf, 0.69); // no valid category → force needs_review
+        result.set(String(row.id), {
+          suggested_transaction_type: type, suggested_category_id: categoryId,
+          suggested_counterparty_id: cpId, suggested_scope: s.scope === 'personal' ? 'personal' : 'business',
+          suggestion_source: 'ai', suggestion_confidence: conf,
+          suggestion_reason: typeof s.reason === 'string' ? s.reason.slice(0, 300) : null,
+        });
+      }
+      await supabase.from('ai_usage_events').insert({
+        business_id: biz.business.id, feature: 'bank_categorization_ai', batch_id: batchId,
+        rows_processed: chunk.length, model: 'claude-sonnet-4-5',
+        input_tokens: resp.usage?.input_tokens ?? null, output_tokens: resp.usage?.output_tokens ?? null,
+        created_by_user_id: userId,
+      });
+    } catch (e) {
+      // AI unavailable or bad JSON → leave these rows for manual review (no block).
+    }
+  }
+  return result;
+}
+
+// POST /api/bank-imports/:batchId/suggest — run deterministic cascade, then AI
+// for the remainder. Does NOT touch the ledger.
+app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot classify bank statements' });
+
+    const { data: batch } = await supabase.from('bank_import_batches')
+      .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    const { data: allRows } = await supabase.from('bank_import_rows')
+      .select('*').eq('batch_id', batch.id).order('row_index');
+    // Only rows still open for review (skip duplicates, imported, excluded).
+    const rows = (allRows || []).filter(r =>
+      !r.linked_transaction_id && r.match_status !== 'duplicate' && r.review_status !== 'excluded');
+
+    // ── Preload business context (one query each) ─────────────────────────────
+    const [{ data: cats }, { data: cps }, { data: rulesRaw }] = await Promise.all([
+      supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz)).eq('is_active', true),
+      supabase.from('counterparties').select('id, name').or(bizOrFilter(biz)).eq('is_active', true),
+      supabase.from('classification_rules').select('*').eq('business_id', biz.business.id).eq('is_enabled', true).order('priority'),
+    ]);
+    const catNameById = new Map((cats || []).map(c => [c.id, c.name]));
+    const counterparties = (cps || []).map(c => ({ id: c.id, name: c.name, normalized: normalizeDesc(c.name) }))
+      .filter(c => c.normalized.length >= 3); // avoid matching very short names
+    const rules = (rulesRaw || []);
+
+    // Counterparty → most-frequent confirmed category, from prior ledger rows.
+    const { data: priorTx } = await supabase.from('transactions')
+      .select('counterparty_name, category').or(bizOrFilter(biz))
+      .not('counterparty_name', 'is', null).not('category', 'is', null).limit(2000);
+    const catIdByName = new Map((cats || []).map(c => [c.name, c.id]));
+    const cpHist = new Map(); // normalizedCpName → { categoryId, count }
+    const cpTally = new Map();
+    for (const t of (priorTx || [])) {
+      const key = normalizeDesc(t.counterparty_name);
+      if (!key) continue;
+      const m = cpTally.get(key) || new Map();
+      m.set(t.category, (m.get(t.category) || 0) + 1);
+      cpTally.set(key, m);
+    }
+    for (const [key, m] of cpTally) {
+      let best = null, bestN = 0;
+      for (const [cat, n] of m) if (n > bestN) { best = cat; bestN = n; }
+      if (best) cpHist.set(key, { categoryId: catIdByName.get(best) || null, count: bestN });
+    }
+
+    // Existing ledger transactions for the wallet (duplicate / match detection).
+    let existing = [];
+    if (batch.wallet_id) {
+      const { data: txs } = await supabase.from('transactions')
+        .select('id, type, amount_original, transaction_date, created_at')
+        .or(bizOrFilter(biz)).eq('wallet_id', batch.wallet_id);
+      existing = txs || [];
+    }
+    const toIsoDate = (v) => {
+      if (!v) return '';
+      if (v instanceof Date) return v.toISOString().slice(0, 10);
+      return String(v).slice(0, 10);
+    };
+    const exKey = (d, amt, type) => `${toIsoDate(d)}|${Math.abs(Number(amt) || 0).toFixed(2)}|${type}`;
+    // A ledger transaction backs at most one statement row: transactions already behind a row
+    // (of any batch) are not suggested, and each one is suggested to a single row of this batch.
+    const { data: linkedRows } = await supabase.from('bank_import_rows')
+      .select('dedup_hash, linked_transaction_id').eq('business_id', biz.business.id)
+      .not('linked_transaction_id', 'is', null);
+    const { backedTxIds } = await importedStatementLines(biz, linkedRows);
+    const exIndex = new Map();
+    for (const t of existing) {
+      if (backedTxIds.has(Number(t.id))) continue;
+      const d = t.transaction_date || (t.created_at ? toIsoDate(t.created_at) : null);
+      const k = exKey(d, t.amount_original, t.type);
+      if (!exIndex.has(k)) exIndex.set(k, []);
+      exIndex.get(k).push(t.id);
+    }
+    const findExistingTx = (date, amt, type) => {
+      const base = new Date(date);
+      for (const off of [0, -1, 1]) {
+        const d = isNaN(base) ? date : new Date(base.getTime() + off * 86400000).toISOString().slice(0, 10);
+        const id = exIndex.get(exKey(d, amt, type))?.shift();
+        if (id) return { id };
+      }
+      return null;
+    };
+
+    // Open debts (payables / receivables) for matching.
+    const { data: debts } = await supabase.from('debts')
+      .select('id, type, counterparty, amount, original_amount, paid_amount, status')
+      .or(bizOrFilter(biz)).neq('status', 'paid');
+    const findDebt = (type, amt) => (debts || []).find(d => d.type === type &&
+      Math.abs(Number(d.original_amount ?? d.amount) - amt) < 1) || null;
+
+    // Payroll payments for matching (by amount + close date).
+    const { data: payrolls } = await supabase.from('payroll_payments')
+      .select('id, employee_name, amount, payment_date').eq('user_id', biz.ownerUserId);
+    const findPayroll = (date, amt) => (payrolls || []).find(p => {
+      if (Math.abs(Number(p.amount) - amt) >= 1) return false;
+      if (!p.payment_date || !date) return true;
+      return Math.abs(new Date(p.payment_date) - new Date(date)) <= 2 * 86400000;
+    }) || null;
+
+    // Transfer detection: track which directions each absolute amount appears
+    // with. A transfer needs the same amount with BOTH 'in' and 'out'.
+    const transferAmounts = new Map(); // amount → Set<direction>
+    for (const r of rows) {
+      const a = Math.abs(Number(r.amount) || 0);
+      const set = transferAmounts.get(a) || new Set();
+      set.add(r.direction);
+      transferAmounts.set(a, set);
+    }
+
+    const ctx = {
+      rules, counterparties, catNameById, cpCategoryHistory: cpHist,
+      findExistingTx, findDebt, findPayroll, transferAmounts,
+    };
+
+    // ── Level 1-4: deterministic classification (in memory) ───────────────────
+    const detResults = rows.map(r => ({ row: r, s: classifyRowDeterministic(r, ctx) }));
+    // Only rows the cascade couldn't resolve go to AI (cost control).
+    const aiCandidates = detResults.filter(x => x.s.suggestion_source === 'none').map(x => x.row);
+
+    // Safe historical examples for AI (this business only): desc → confirmed category.
+    const { data: fb } = await supabase.from('classification_feedback')
+      .select('normalized_desc, final_category_id').eq('business_id', biz.business.id)
+      .not('final_category_id', 'is', null).order('created_at', { ascending: false }).limit(60);
+    const seenEx = new Set();
+    const examples = [];
+    for (const f of (fb || [])) {
+      const name = catNameById.get(f.final_category_id);
+      if (!name || !f.normalized_desc || seenEx.has(f.normalized_desc)) continue;
+      seenEx.add(f.normalized_desc);
+      examples.push({ description: f.normalized_desc, category: name });
+    }
+
+    // ── Level 5: AI for the remainder ─────────────────────────────────────────
+    const aiMap = await aiSuggestRows(biz, aiCandidates, cats || [], cps || [], examples, batch.id, req.user.userId);
+
+    // ── Merge + persist ───────────────────────────────────────────────────────
+    let high = 0, needs = 0, matched = 0, suggested = 0, aiUsed = 0;
+    for (const { row, s } of detResults) {
+      const sug = aiMap.has(String(row.id)) ? { ...s, ...aiMap.get(String(row.id)) } : s;
+      if (aiMap.has(String(row.id))) aiUsed++;
+      const bucket = reviewBucket(sug.suggestion_confidence, sug.suggested_transaction_type, sug.suggested_scope, !!sug.suggested_match_type);
+      if (bucket === 'high_confidence') high++;
+      else if (bucket === 'matched_existing') matched++;
+      else if (bucket === 'suggested') suggested++;
+      else needs++;
+      await supabase.from('bank_import_rows').update({ ...sug, review_status: bucket }).eq('id', row.id);
+    }
+
+    res.json({
+      ok: true, processed: rows.length, ai_rows: aiUsed,
+      summary: { high_confidence: high, suggested, matched_existing: matched, needs_review: needs },
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/bank-imports/:batchId/review — review queue: rows + suggestions +
+// business categories + counterparties + summary. Read-only.
+app.get('/api/bank-imports/:batchId/review', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+
+    const { data: batch } = await supabase.from('bank_import_batches')
+      .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+
+    const [{ data: rows }, { data: cats }, { data: cps }, { data: recon }] = await Promise.all([
+      supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).order('row_index'),
+      supabase.from('cashflow_categories').select('id, name, group_type').or(bizOrFilter(biz)).eq('is_active', true).order('name'),
+      supabase.from('counterparties').select('id, name, type').or(bizOrFilter(biz)).eq('is_active', true).order('name'),
+      supabase.from('bank_reconciliations').select('*').eq('batch_id', batch.id).limit(1),
+    ]);
+
+    const all = rows || [];
+    const count = (pred) => all.filter(pred).length;
+    const summary = {
+      total: all.length,
+      high_confidence: count(r => r.review_status === 'high_confidence'),
+      suggested: count(r => r.review_status === 'suggested'),
+      needs_review: count(r => r.review_status === 'needs_review'),
+      matched_existing: count(r => r.review_status === 'matched_existing'),
+      possible_duplicate: count(r => r.match_status === 'duplicate'),
+      uncategorized: count(r => !r.final_category_id && !r.suggested_category_id),
+      confirmed: count(r => r.review_status === 'confirmed'),
+      excluded: count(r => r.review_status === 'excluded'),
+    };
+
+    res.json({
+      batch, rows: all,
+      categories: cats || [], counterparties: cps || [],
+      reconciliation: recon?.[0] || null, summary,
+      canManageCategories: canManageCategories(biz.role),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-imports/:batchId/confirm — confirm rows with FINAL decisions,
+// then create transactions. The user's choice always overrides the suggestion.
+// Records classification_feedback (suggestion vs final) for audit + rule promotion.
+app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role cannot confirm bank imports' });
+
+    const { data: batch } = await supabase.from('bank_import_batches')
+      .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
+    if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
+    const periodProblem = statementPeriodProblem(batch);
+    if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
+
+    const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
+    const ids = payloadRows.map(p => p?.row_id);
+    if (ids.some(id => typeof id !== 'string' || !id)) return res.status(400).json({ error: 'Every row needs row_id', code: 'invalid_rows' });
+    if (new Set(ids).size !== ids.length) return res.status(400).json({ error: 'The same row is listed twice', code: 'invalid_rows' });
+
+    // Ownership validation sets (category / counterparty must belong to business).
+    const [{ data: cats }, { data: cps }, { data: rowList }] = await Promise.all([
+      supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz)),
+      supabase.from('counterparties').select('id, name').or(bizOrFilter(biz)),
+      supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id).in('id', ids),
+    ]);
+    const catNameById = new Map((cats || []).map(c => [c.id, c.name]));
+    const cpNameById = new Map((cps || []).map(c => [c.id, c.name]));
+    const rowById = new Map((rowList || []).map(r => [r.id, r]));
+
+    let wallet = null;
+    if (batch.wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id, name, scope, currency').eq('id', batch.wallet_id).limit(1);
+      wallet = w?.[0] || null;
+    }
+    const txCurrency = (batch.currency || wallet?.currency || 'IDR').toUpperCase();
+
+    // 1) Validate EVERY row before anything is written. One bad row rejects the whole request.
+    const problems = [];
+    const prepared = [];
+    for (const p of payloadRows) {
+      const row = rowById.get(p.row_id);
+      const bad = (error) => problems.push({ row_id: p.row_id, row_index: row?.row_index ?? null, error });
+      if (!row) { bad('Row does not belong to this batch'); continue; }
+      if (row.linked_transaction_id) continue;   // already in the ledger — repeat confirm
+
+      const action = p.match_action === 'link' ? 'link' : p.match_action === 'exclude' ? 'exclude' : 'create';
+      const type = p.transaction_type || row.suggested_transaction_type || row.suggested_type || (row.direction === 'in' ? 'income' : 'expense');
+      if (!VALID_SYSTEM_TX_TYPES.includes(type)) { bad(`Invalid transaction_type: ${type}`); continue; }
+      const categoryId = p.category_id || null;
+      if (categoryId && !catNameById.has(categoryId)) { bad('category_id does not belong to this business'); continue; }
+      const counterpartyId = p.counterparty_id || null;
+      if (counterpartyId && !cpNameById.has(counterpartyId)) { bad('counterparty_id does not belong to this business'); continue; }
+      if (action !== 'exclude') {
+        const problem = statementRowProblem(row, action);
+        if (problem) { bad(problem); continue; }
+      }
+
+      let matchTxId = null;
+      if (action === 'link') {
+        matchTxId = p.matched_transaction_id || (row.suggested_match_type === 'existing_tx' ? Number(row.suggested_match_id) : row.matched_transaction_id);
+        if (!matchTxId) { bad('Matched transaction ID required for linking'); continue; }
+        const { data: txList, error: txErr } = await supabase.from('transactions')
+          .select('id, business_id, wallet_id, amount_original, type, currency_original')
+          .eq('id', matchTxId).limit(1);
+        const txObj = txList?.[0] || null;
+        if (txErr || !txObj) { bad('Matched transaction not found'); continue; }
+        if (String(txObj.business_id) !== String(biz.business.id))
+          return res.status(403).json({ error: 'isolation_violation', message: 'Matched transaction belongs to another business' });
+        if (batch.wallet_id && txObj.wallet_id && String(txObj.wallet_id) !== String(batch.wallet_id)) { bad('Matched transaction belongs to a different wallet'); continue; }
+        if (txObj.type && txObj.type !== type) { bad(`Matched transaction type (${txObj.type}) does not match row type (${type})`); continue; }
+        if (Math.abs(Number(txObj.amount_original) - Number(row.amount)) >= 0.01) { bad('Matched transaction amount does not match statement row amount'); continue; }
+        const { data: alreadyLinked } = await supabase.from('bank_import_rows')
+          .select('id').eq('linked_transaction_id', matchTxId).neq('id', row.id).limit(1);
+        if (alreadyLinked?.length) { bad('Matched transaction is already linked to another statement row'); continue; }
+        const twin = prepared.find(x => x.action === 'link' && x.item.matched_transaction_id === Number(matchTxId));
+        if (twin) { bad(`Statement row ${twin.row.row_index + 1} already links to the same transaction; choose Create for one of them`); continue; }
+      }
+
+      prepared.push({
+        row, action,
+        item: {
+          row_id: row.id, action, type,
+          category_id: categoryId, counterparty_id: counterpartyId,
+          scope: p.scope || row.suggested_scope || wallet?.scope || 'business',
+          matched_transaction_id: matchTxId ? Number(matchTxId) : null,
+          // What validation and the FX valuation used — the database refuses if any of it changed.
+          expected_amount: action === 'exclude' ? undefined : Number(row.amount),
+          expected_date: action === 'create' ? String(row.tx_date).slice(0, 10) : undefined,
+          currency: action === 'create' ? txCurrency : undefined,
+          normalized_desc: normalizeDesc(row.description),
+        },
+      });
+    }
+    if (problems.length) return res.status(400).json(invalidRowsBody(problems));
+    // Bridge (PR2). THIS is the confirm the Bank Import screen actually calls
+    // (client/src/pages/BankImport.jsx → upload → /suggest → /review → this route), so the
+    // bridge has to run here or a real statement import produces no evidence at all. It runs
+    // after the ledger transaction committed, never fails the import, and is idempotent — a
+    // repeated confirm re-runs it so evidence missed by an earlier failure is recovered.
+    // Rows are re-read because the confirm just changed their review_status to 'imported'.
+    const respond = async (out) => {
+      const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
+      const incoming_payments = await bridgeBankBatchToIncomingPayments({
+        batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
+      res.json({ ok: true, imported: out.imported, linked: out.linked, status: out.status, reconciliation: out.reconciliation,
+                 ...(incoming_payments ? { incoming_payments } : {}) });
+    };
+    // Every requested row is already in the ledger (repeat / double click): nothing is written —
+    // unlike before, not even an empty reconciliation snapshot.
+    if (!prepared.length) return respond({ imported: 0, linked: 0, status: batch.status, reconciliation: null });
+
+    // 2) FX outside the database transaction (may call a rate provider).
+    try {
+      for (const pr of prepared) {
+        if (pr.action !== 'create') continue;
+        const fxRes = await fx.toIdr(pr.row.amount, txCurrency, String(pr.row.tx_date).slice(0, 10));
+        Object.assign(pr.item, { amount_idr: fxRes.amount_idr, booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source });
+      }
+    } catch (e) {
+      console.error(`[bank-import] FX valuation failed: ${e.message}`);
+      return res.status(502).json({ error: 'Could not value the statement in IDR. Nothing was imported.', code: 'fx_unavailable' });
+    }
+
+    // 3) One transaction: transactions, row links, feedback, reconciliation, batch status.
+    const result = await runAtomicBankConfirm({ biz, batch, plan: prepared.map(pr => pr.item), actorUserId: req.user.userId, flow: 'review' });
+    if (result.status !== 200) return res.status(result.status).json(result.body);
+    return respond(result.body);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-imports/:batchId/rows/:rowId/exclude — drop a row from import.
+app.post('/api/bank-imports/:batchId/rows/:rowId/exclude', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data, error } = await supabase.from('bank_import_rows')
+      .update({ review_status: 'excluded' })
+      .eq('id', req.params.rowId).eq('batch_id', req.params.batchId).eq('business_id', biz.business.id)
+      .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Row not found' });
+    res.json({ row: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bank-imports/:batchId/rows/:rowId/link — link to an existing record
+// instead of creating a transaction (avoids double cash impact).
+app.post('/api/bank-imports/:batchId/rows/:rowId/link', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { match_type, match_id } = req.body || {};
+    if (!match_id) return res.status(400).json({ error: 'match_id required' });
+    const updates = {
+      review_status: 'matched_existing',
+      suggested_match_type: match_type || 'existing_tx',
+      suggested_match_id: String(match_id),
+    };
+    if ((match_type || 'existing_tx') === 'existing_tx') updates.matched_transaction_id = Number(match_id);
+    const { data, error } = await supabase.from('bank_import_rows')
+      .update(updates)
+      .eq('id', req.params.rowId).eq('batch_id', req.params.batchId).eq('business_id', biz.business.id)
+      .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Row not found' });
+    res.json({ row: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CLASSIFICATION RULES — business memory (Phase 5). Created only from confirmed
+//  user corrections, never automatically. Owner/Admin/CFO manage; everyone with
+//  finance view can read. Used by the cascade Level 1.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Detect promotable patterns: a normalized description confirmed to the SAME
+// category >= threshold times, with no existing enabled rule. Returns candidates.
+async function promotionCandidates(biz, threshold = 3) {
+  const { data: fb } = await supabase.from('classification_feedback')
+    .select('normalized_desc, final_category_id, final_transaction_type')
+    .eq('business_id', biz.business.id).not('final_category_id', 'is', null).limit(3000);
+  const tally = new Map(); // `${desc}|${catId}` → { desc, catId, type, count }
+  for (const f of (fb || [])) {
+    if (!f.normalized_desc) continue;
+    const key = `${f.normalized_desc}|${f.final_category_id}`;
+    const cur = tally.get(key) || { desc: f.normalized_desc, catId: f.final_category_id, type: f.final_transaction_type, count: 0 };
+    cur.count++; tally.set(key, cur);
+  }
+  const promotable = [...tally.values()].filter(c => c.count >= threshold);
+  if (!promotable.length) return [];
+  const { data: rules } = await supabase.from('classification_rules')
+    .select('normalized_value').eq('business_id', biz.business.id);
+  const existing = new Set((rules || []).map(r => r.normalized_value));
+  const { data: cats } = await supabase.from('cashflow_categories').select('id, name').or(bizOrFilter(biz));
+  const catName = new Map((cats || []).map(c => [c.id, c.name]));
+  return promotable
+    .filter(c => !existing.has(c.desc))
+    .map(c => ({ match_value: c.desc, normalized_value: c.desc, category_id: c.catId,
+                 category_name: catName.get(c.catId) || null, transaction_type: c.type, count: c.count }));
+}
+
+// GET /api/classification-rules — list (+ promotion candidates)
+app.get('/api/classification-rules', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data } = await supabase.from('classification_rules')
+      .select('*').eq('business_id', biz.business.id).order('priority').order('created_at', { ascending: false });
+    let candidates = [];
+    if (canManageClassificationRules(biz.role)) { try { candidates = await promotionCandidates(biz); } catch { candidates = []; } }
+    res.json({ rules: data || [], candidates, canManage: canManageClassificationRules(biz.role) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/classification-rules — create (manual or accepted promotion)
+app.post('/api/classification-rules', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageClassificationRules(biz.role)) return res.status(403).json({ error: 'Your role cannot manage rules' });
+    const { rule_name, match_type, match_value, transaction_type, category_id, counterparty_id, scope, priority, created_from } = req.body || {};
+    if (!match_value || !String(match_value).trim()) return res.status(400).json({ error: 'match_value required' });
+    // Validate ownership of referenced category / counterparty
+    if (category_id) {
+      const { data: c } = await supabase.from('cashflow_categories').select('id').eq('id', category_id).or(bizOrFilter(biz)).limit(1);
+      if (!c?.length) return res.status(400).json({ error: 'category_id does not belong to this business' });
+    }
+    if (counterparty_id) {
+      const { data: cp } = await supabase.from('counterparties').select('id').eq('id', counterparty_id).or(bizOrFilter(biz)).limit(1);
+      if (!cp?.length) return res.status(400).json({ error: 'counterparty_id does not belong to this business' });
+    }
+    if (transaction_type && !VALID_SYSTEM_TX_TYPES.includes(transaction_type))
+      return res.status(400).json({ error: 'Invalid transaction_type' });
+    const { data, error } = await supabase.from('classification_rules').insert({
+      business_id: biz.business.id, rule_name: rule_name || null,
+      match_type: ['contains', 'equals', 'starts_with'].includes(match_type) ? match_type : 'contains',
+      match_value: String(match_value).trim(), normalized_value: normalizeDesc(match_value),
+      transaction_type: transaction_type || null, category_id: category_id || null,
+      counterparty_id: counterparty_id || null, scope: scope || null,
+      priority: Number.isFinite(+priority) ? +priority : 100,
+      created_by_user_id: req.user.userId, created_from: created_from || 'manual',
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ rule: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/classification-rules/:id — edit / enable / disable
+app.patch('/api/classification-rules/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageClassificationRules(biz.role)) return res.status(403).json({ error: 'Your role cannot manage rules' });
+    const allowed = ['rule_name', 'match_type', 'match_value', 'transaction_type', 'category_id', 'counterparty_id', 'scope', 'priority', 'is_enabled'];
+    const updates = { updated_at: new Date().toISOString() };
+    for (const k of allowed) if (req.body[k] !== undefined) updates[k] = req.body[k];
+    if (updates.match_value !== undefined) updates.normalized_value = normalizeDesc(updates.match_value);
+    if (updates.transaction_type && !VALID_SYSTEM_TX_TYPES.includes(updates.transaction_type))
+      return res.status(400).json({ error: 'Invalid transaction_type' });
+    const { data, error } = await supabase.from('classification_rules')
+      .update(updates).eq('id', req.params.id).eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Rule not found' });
+    res.json({ rule: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/classification-rules/:id — soft-disable (preferred) or hard delete
+app.delete('/api/classification-rules/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageClassificationRules(biz.role)) return res.status(403).json({ error: 'Your role cannot manage rules' });
+    if (req.query.hard === '1') {
+      const { error } = await supabase.from('classification_rules').delete().eq('id', req.params.id).eq('business_id', biz.business.id);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ ok: true, deleted: true });
+    }
+    const { data, error } = await supabase.from('classification_rules')
+      .update({ is_enabled: false, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id).eq('business_id', biz.business.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Rule not found' });
+    res.json({ rule: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/debts/from-telegram ────────────────────────────────────────────
+// Called by the Telegram bot to create a draft receivable / payable.
+// Requires telegram_id → users.id mapping.
+// Role check: employee creates pending_approval; owner/admin creates approved directly.
+app.post('/api/debts/from-telegram', async (req, res) => {
+  try {
+    // ── Bot authentication ───────────────────────────────────────────────────
+    // This endpoint has no user JWT (called by the bot, not a browser).
+    // The bot must prove its identity with a shared secret header:
+    //   x-bot-secret: <TELEGRAM_WEBHOOK_SECRET>
+    // Without this check, anyone who knows a telegram_id could inject records.
+    //
+    // PR0.5: this used to inline its own copy of the chain, so there were two definitions of
+    // bot authentication to keep in sync. It now calls the single shared one.
+    if (!requireBotSecret(req)) {
+      return res.status(401).json({ error: 'Invalid bot credentials' });
+    }
+
+    const {
+      telegram_id,
+      type,              // 'receivable' | 'payable'
+      counterparty,
+      amount,
+      currency = 'IDR',
+      due_date,
+      description,
+      raw_input_text,
+      raw_input_language,
+      confidence_score,
+      attachment_url,
+      business_owner_telegram_id, // owner's telegram id (to resolve user_id)
+      business_id,                // optional: explicit business (validated below)
+    } = req.body;
+
+    if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+    if (!type || !['receivable', 'payable'].includes(type))
+      return res.status(400).json({ error: 'type must be receivable or payable' });
+    if (!amount || isNaN(Number(amount)))
+      return res.status(400).json({ error: 'amount required' });
+
+    // Resolve the submitting user. A LEGACY positive account has users.id equal to its
+    // Telegram id, which is why matching on id works today — but that equality is a historical
+    // artefact, not a rule: email-origin accounts (042) have negative ids that are not Telegram
+    // ids at all. PR2.5 resolves the acting user before this lookup so the id used here is the
+    // platform user, whichever way it was created.
+    // Table columns: id, username, first_name, role (no name/last_name/telegram_id).
+    // PR2.5: resolve the acting user first. With the flag off this is Number(telegram_id),
+    // identical to the previous inline behaviour.
+    const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'from-telegram' });
+    if (!actor.ok) return sendTelegramActorError(res, actor);
+
+    const { data: submitterRows, error: subErr } = await supabase.from('users')
+      .select('id, username, first_name').eq('id', actor.userId).limit(1);
+    const submitterUser = submitterRows?.[0];
+    if (submitterUser) {
+      submitterUser.name = submitterUser.first_name || submitterUser.username || String(submitterUser.id);
+    }
+    if (subErr) console.warn('[from-telegram] user lookup error:', subErr.message);
+    if (!submitterUser)
+      return res.status(403).json({
+        error: 'not_linked',
+        message: 'Your Telegram is not linked to CFO AI. Contact your administrator.',
+      });
+
+    // ── Resolve target business + submitter role ────────────────────────────
+    // Priority: explicit business_id (membership validated) → submitter's
+    // single active membership → legacy owner-telegram-id path.
+    let memberRole = null;
+    let targetBusinessId = null;
+    let ownerId = submitterUser.id;
+
+    if (business_id) {
+      const { data: mem } = await supabase.from('business_members')
+        .select('role, business_id, businesses(owner_user_id)')
+        .eq('user_id', submitterUser.id).eq('business_id', business_id)
+        .eq('status', 'active').limit(1);
+      if (!mem?.length)
+        return res.status(403).json({ error: 'not_member', message: 'You are not a member of this business.' });
+      memberRole       = mem[0].role;
+      targetBusinessId = mem[0].business_id;
+      ownerId          = mem[0].businesses?.owner_user_id || submitterUser.id;
+    } else {
+      const { data: mem } = await supabase.from('business_members')
+        .select('role, business_id, businesses(owner_user_id)')
+        .eq('user_id', submitterUser.id).eq('status', 'active').limit(2);
+      if (mem?.length > 1) {
+        // Multiple businesses — bot must ask which one and resend with business_id
+        return res.status(409).json({
+          error: 'multiple_businesses',
+          message: 'User belongs to multiple businesses; specify business_id.',
+          businesses: mem.map(m => m.business_id),
+        });
+      }
+      if (mem?.length === 1) {
+        memberRole       = mem[0].role;
+        targetBusinessId = mem[0].business_id;
+        ownerId          = mem[0].businesses?.owner_user_id || submitterUser.id;
+      }
+    }
+
+    // Membership is REQUIRED — only people tied to a company may submit.
+    // A users row without an active business_members row is an orphan
+    // (e.g. someone who messaged the bot but was never invited): reject.
+    if (!memberRole) {
+      return res.status(403).json({
+        error: 'not_member',
+        message: 'You are not a member of any business in CFO AI. Ask an owner or admin to invite you.',
+      });
+    }
+
+    // ── Currency gate ───────────────────────────────────────────────────────
+    // Placed AFTER the bot secret and after membership resolution, so it can never be used
+    // as an unauthenticated oracle, and BEFORE anything else happens — no approval decision,
+    // no debt row, no transaction, no notification. Everything above is read-only, so a
+    // refused request leaves the database exactly as it found it.
+    if (!isSupportedTelegramCurrency(currency)) {
+      return res.status(422).json(currencyNotSupported(currency));
+    }
+
+    // Owner/admin/CFO → approved immediately; others → pending_approval
+    const isPrivileged = ['owner', 'ceo', 'admin', 'cfo'].includes(memberRole);
+    const approvalStatus = isPrivileged ? 'approved' : 'pending_approval';
+    const status         = isPrivileged ? 'open' : 'open'; // always open; pending shown via approval_status
+
+    const amountNum = Number(amount);
+    const insertRow = {
+      user_id:               ownerId,
+      business_id:           targetBusinessId || null,
+      type,
+      // counterparty is NOT NULL in DB. For a reimbursement (expense_request)
+      // there is no external party — the company owes the submitter, so default
+      // to the submitter's name; otherwise fall back to a safe placeholder.
+      counterparty:          counterparty || submitterUser.name || 'Reimbursement',
+      amount:                amountNum,
+      original_amount:       amountNum,
+      paid_amount:           0,
+      // Canonical form: the gate above has already guaranteed this is IDR, so this only
+      // stops a lowercase 'idr' from being stored as a second spelling.
+      currency:              normalizeCurrency(currency),
+      due_date:              due_date || null,
+      description:           description || null,
+      status,
+      // Telegram / approval metadata
+      source_channel:            'telegram',
+      raw_input_text:            raw_input_text || null,
+      raw_input_language:        raw_input_language || null,
+      confidence_score:          confidence_score ? Number(confidence_score) : null,
+      attachment_url:            attachment_url || null,
+      created_by_user_id:        submitterUser.id,
+      created_by_telegram_id:    Number(telegram_id),
+      created_by_name:           submitterUser.name || null,
+      created_by_role:           memberRole,
+      approval_status:           approvalStatus,
+      approved_by_user_id:       isPrivileged ? submitterUser.id : null,
+      approved_at:               isPrivileged ? new Date().toISOString() : null,
+      approved_via_channel:      isPrivileged ? 'telegram' : null,
+      last_action_channel:       'telegram',
+    };
+
+    const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    // Notify admin+ members about a pending submission (fire-and-forget)
+    if (!isPrivileged) {
+      const ownerLang = await getUserLanguage(ownerId).catch(() => 'en');
+      const text = notificationText(
+        type === 'receivable' ? 'telegram_receivable_submitted' : 'telegram_payable_submitted',
+        ownerLang,
+        {
+          counterparty: counterparty || '—',
+          amount:       `${amountNum.toLocaleString('en-US')} ${currency || 'IDR'}`,
+          due:          due_date || '—',
+          createdBy:    submitterUser.name || String(telegram_id),
+          role:         memberRole,
+          raw:          raw_input_text || '',
+        }
+      );
+      // Public deep-link base. Prefer WEB_APP_URL; CLIENT_URL is the CORS origin
+    // and may point at a stale/non-public domain, so it is not used here.
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+      const openUrl = `${webAppUrl}/${type === 'receivable' ? 'receivables' : 'payables'}`;
+      // Inline approval keyboard. callback_data `debt_*:<uuid>` ≤ 49 bytes (limit 64).
+      // The bot owns these callbacks and calls /api/telegram/debts/:id/* with x-bot-secret.
+      notifyBusinessAdminsViaTelegram(ownerId, text, [
+        [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
+        [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` },
+          { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
+        [ { text: 'ℹ️ Ask details', callback_data: `debt_info:${data.id}` },
+          { text: '🌐 Open', url: openUrl } ],
+      ], { category: 'team_approvals', businessId: targetBusinessId || null }).catch(() => {});
+    }
+
+    res.json({
+      debt:            computeDebtStatus(data),
+      approval_status: approvalStatus,
+      needs_approval:  !isPrivileged,
+      created_by:      submitterUser.name || telegram_id,
+      role:            memberRole,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── MCP write: pending payable draft from an invoice ─────────────────────────
+// Called ONLY by the MCP tool submit_invoice_draft (server/mcp/tools.js), behind
+// MCP_WRITE_TOOLS_ENABLED. It creates a payable in the SAME draft state the Telegram
+// input channel uses for non-privileged members: approval_status = 'pending_approval'.
+//
+// The rule that makes this safe: an AI client never creates a confirmed record, whatever
+// the caller's role. Even the owner's own submission lands as a draft. Pending drafts are
+// excluded from cash, payables, runway and Radar (see the openDebts filter in the Pulse
+// builder), so nothing changes the company's numbers until a human approves the draft in
+// Payables or via the Telegram Approve button — the existing approve endpoints, unchanged.
+//
+// The amount, counterparty and currency arrive already validated by the MCP layer against
+// the CFO extraction pipeline. This function owns only persistence: plan limit, duplicate
+// guard, insert, audit, notification. Returns { debt } or { error, ...details }.
+async function createPendingPayableDraft(biz, actingUserId, draft) {
+  const businessId = biz.business.id;
+
+  // Plan limit — same rule as POST /api/debts (debts are the MVP invoice proxy).
+  try {
+    const access = await getCurrentAccess(actingUserId, businessId);
+    const maxInvoices = access && access.limits ? access.limits.max_invoices_per_month : null;
+    if (maxInvoices !== null && maxInvoices !== undefined) {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const { count } = await supabase.from('debts')
+        .select('id', { count: 'exact', head: true })
+        .eq('business_id', businessId)
+        .gte('created_at', monthStart.toISOString());
+      if (isLimitReached(maxInvoices, count || 0)) {
+        return { error: 'plan_limit_reached', limit: maxInvoices, usage: count || 0 };
+      }
+    }
+  } catch (limitErr) {
+    console.warn('[mcp-draft] limit check failed:', limitErr.message);
+  }
+
+  // Duplicate guard: an open (non-rejected, unpaid) payable for the same supplier and
+  // amount in this company. Re-sending the same invoice must not create a second draft.
+  const { data: similar } = await supabase.from('debts')
+    .select('id, counterparty, amount, due_date, approval_status, status')
+    .eq('business_id', businessId)
+    .eq('type', 'payable')
+    .eq('amount', draft.amount)
+    .ilike('counterparty', String(draft.counterparty).replace(/[\\%_]/g, (c) => `\\${c}`))
+    .not('status', 'in', '("paid","cancelled")')
+    .neq('approval_status', 'rejected')
+    .limit(1);
+  if (similar && similar.length) {
+    const d = similar[0];
+    return { error: 'duplicate_payable', existing: {
+      id: d.id, counterparty: d.counterparty, amount: Number(d.amount),
+      due_date: d.due_date || null, approval_status: d.approval_status,
+    } };
+  }
+
+  const { data: userRows } = await supabase.from('users')
+    .select('id, username, first_name').eq('id', actingUserId).limit(1);
+  const u = userRows && userRows[0];
+  const actorName = (u && (u.first_name || u.username)) || null;
+
+  const insertRow = {
+    ...bizWriteFields(biz, actingUserId),
+    type:                 'payable',
+    counterparty:         draft.counterparty,
+    amount:               draft.amount,
+    original_amount:      draft.amount,   // locked; never mutated
+    paid_amount:          0,
+    currency:             draft.currency,
+    due_date:             draft.due_date || null,
+    description:          draft.description || null,
+    notes:                'Submitted via AI assistant (CFO AI connector). Awaiting approval.',
+    status:               'open',
+    source_channel:       'mcp',
+    raw_input_text:       draft.raw_input_text || null,
+    confidence_score:     draft.confidence_score ?? null,
+    created_by_name:      actorName,
+    created_by_role:      biz.role,
+    approval_status:      'pending_approval',   // ALWAYS — never auto-approved from MCP
+    approved_by_user_id:  null,
+    approved_at:          null,
+    approved_via_channel: null,
+    last_action_channel:  'mcp',
+  };
+  const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+  if (error) {
+    console.error('[mcp-draft] insert failed:', error.message);
+    return { error: 'insert_failed' };
+  }
+
+  await recordAudit({
+    businessId, actorUserId: actingUserId, actorRole: biz.role, channel: 'mcp',
+    entityType: 'debt', entityId: data.id, action: 'mcp_payable_draft_created',
+    after: {
+      type: 'payable', counterparty: data.counterparty, amount: Number(data.amount),
+      currency: data.currency, due_date: data.due_date || null,
+      approval_status: 'pending_approval', invoice_number: draft.invoice_number || null,
+      amount_source: draft.amount_source || null,
+    },
+  });
+
+  // Approval request to the people who may approve (owner included — this is how the
+  // founder gets the one-tap Approve for a draft they asked their AI assistant to file).
+  let notified = { sent: 0 };
+  try {
+    const lang = await getUserLanguage(biz.ownerUserId).catch(() => 'en');
+    const text = notificationText('mcp_payable_submitted', lang, {
+      counterparty: data.counterparty,
+      amount: `${Number(data.amount).toLocaleString('en-US')} ${data.currency || 'IDR'}`,
+      due: data.due_date || '—',
+      createdBy: actorName || '—',
+      invoice: draft.invoice_number || '—',
+    });
+    const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
+    notified = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, text, [
+      [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
+      [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` },
+        { text: '❌ Reject',  callback_data: `debt_reject:${data.id}` } ],
+      [ { text: '🌐 Open', url: `${webAppUrl}/payables` } ],
+    ], { category: 'team_approvals', businessId: businessId }) || { sent: 0 };
+  } catch (e) {
+    console.warn('[mcp-draft] notify failed:', e.message);
+  }
+
+  return { debt: computeDebtStatus(data), telegram_notified: (notified && notified.sent) || 0 };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEAM & INVITE SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generateInviteCode() {
+  return Math.random().toString(36).slice(2, 8).toUpperCase(); // e.g. "A3K9PZ"
+}
+
+// ── GET /api/team ─────────────────────────────────────────────────────────────
+// List all members of the caller's business.
+app.get('/api/team', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    // Active business from x-business-id (NOT the first membership) — Team must be
+    // scoped to the selected workspace, never the user's default business.
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const business_id = biz.business.id, myRole = biz.role;
+
+    if (!['owner', 'ceo', 'admin', 'cfo'].includes(myRole))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can view team' });
+
+    // Fetch all members + their user info
+    const { data: members, error } = await supabase.from('business_members')
+      .select('id, user_id, role, status, display_name, joined_at, invited_by, invite_code')
+      .eq('business_id', business_id)
+      .neq('status', 'removed')
+      .order('joined_at', { ascending: true });
+    if (error) throw error;
+
+    // Enrich with user names
+    const userIds = members.map(m => m.user_id);
+    const { data: users } = await supabase.from('users')
+      .select('id, first_name, username')
+      .in('id', userIds);
+    const userMap = Object.fromEntries((users || []).map(u => [u.id, u]));
+
+    const enriched = members.map(m => {
+      const u = userMap[m.user_id] || {};
+      return {
+        ...m,
+        name: m.display_name || u.first_name || u.username || `User ${m.user_id}`,
+        telegram_id: u.id || null,
+      };
+    });
+
+    // Also fetch active invites
+    const { data: invites } = await supabase.from('business_invites')
+      .select('id, code, role, label, max_uses, uses_count, expires_at, status, created_at')
+      .eq('business_id', business_id).eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    res.json({ members: enriched, invites: invites || [], my_role: myRole, business_id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/team/invite ─────────────────────────────────────────────────────
+// ── Company Admin: notification grants (migration 046) ───────────────────────
+// Owner-only, business-scoped. An owner grants specific financial categories to a CEO/CFO of
+// the SAME business. Both endpoints are gated by COMPANY_NOTIFICATION_GRANTS_ENABLED: when the
+// flag is off the feature does not exist, and they answer 404 so a stray client sees exactly
+// what production sees — nothing. business_id NEVER comes from the request; it is the active
+// workspace, resolved the same way Team is.
+
+// GET /api/team/notification-grants — the grant matrix for the active business.
+app.get('/api/team/notification-grants', auth, async (req, res) => {
+  try {
+    if (!isGrantsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (biz.role !== 'owner')
+      return res.status(403).json({ error: 'forbidden', message: 'Only the owner can manage notification access.' });
+
+    const businessId = biz.business.id;
+    const { data: members, error: mErr } = await supabase.from('business_members')
+      .select('id, user_id, role, status, display_name')
+      .eq('business_id', businessId)
+      .eq('status', 'active')
+      .order('joined_at', { ascending: true });
+    if (mErr) return res.status(500).json({ error: 'team_lookup_failed' });
+
+    const grantsMap = await loadBusinessGrants({ supabase, businessId }) || {};
+    const { data: users } = await supabase.from('users')
+      .select('id, first_name, username').in('id', (members || []).map(m => m.user_id));
+    const nameOf = Object.fromEntries((users || []).map(u => [u.id, u.first_name || u.username]));
+
+    // Key rows by the opaque member id the Team page already uses; describe eligibility rather
+    // than leaking user_id.
+    const rows = (members || []).map(m => ({
+      member_id: m.id,
+      name: m.display_name || nameOf[m.user_id] || 'Member',
+      role: m.role,
+      is_owner: m.role === 'owner',
+      grantable: isGrantableRole(m.role),
+      granted: isGrantableRole(m.role)
+        ? Object.fromEntries(GRANTABLE_CATEGORIES.map(c => [c, (grantsMap[m.user_id] || {})[c] === true]))
+        : {},
+    }));
+    res.json({ business_id: businessId, categories: GRANTABLE_CATEGORIES, members: rows });
+  } catch (e) { res.status(500).json({ error: 'grants_read_failed' }); }
+});
+
+// PUT /api/team/members/:memberId/notification-grants — set a member's grants.
+// Body: { grants: { <category>: boolean, … } }. Omitted categories are left unchanged; false
+// revokes.
+app.put('/api/team/members/:memberId/notification-grants', auth, async (req, res) => {
+  try {
+    if (!isGrantsEnabled()) return res.status(404).json({ error: 'not_found' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (biz.role !== 'owner')
+      return res.status(403).json({ error: 'forbidden', message: 'Only the owner can manage notification access.' });
+
+    const businessId = biz.business.id;
+    const body = req.body?.grants;
+    if (!body || typeof body !== 'object' || Array.isArray(body))
+      return res.status(400).json({ error: 'invalid_grants', message: 'Expected a grants object.' });
+
+    // Validate every category BEFORE touching the database. An unknown category is a 400, not a
+    // silently ignored key.
+    const entries = Object.entries(body);
+    for (const [category, value] of entries) {
+      if (!isGrantableCategory(category))
+        return res.status(400).json({ error: 'unknown_category', message: 'That notification category cannot be granted.' });
+      if (typeof value !== 'boolean')
+        return res.status(400).json({ error: 'invalid_value', message: 'Each grant must be true or false.' });
+    }
+
+    // The target member must belong to the ACTIVE business — resolved by member id scoped to
+    // this business, never by any id from the body.
+    const { data: target, error: tErr } = await supabase.from('business_members')
+      .select('id, user_id, role, status')
+      .eq('id', req.params.memberId)
+      .eq('business_id', businessId)
+      .maybeSingle();
+    if (tErr) return res.status(500).json({ error: 'member_lookup_failed' });
+    if (!target) return res.status(404).json({ error: 'member_not_found', message: 'No such member in this business.' });
+    if (target.status !== 'active')
+      return res.status(409).json({ error: 'member_inactive', message: 'That member is not active.' });
+    if (!isGrantableRole(target.role))
+      return res.status(409).json({ error: 'role_not_grantable', message: 'Only a CEO or CFO can be granted company notifications.' });
+
+    const before = Object.fromEntries((await supabase.from('business_member_notification_grants')
+      .select('category, enabled').eq('business_id', businessId).eq('user_id', target.user_id))
+      .data?.map(r => [r.category, r.enabled === true]) || []);
+
+    // Atomic: the grant change AND its audit rows commit together, or not at all. The old code
+    // upserted then audited in a second call that swallowed its error, so a permission could move
+    // with no audit trail. The RPC does both in one transaction and returns a confirming JSONB;
+    // anything else — an error, a null, a non-object — is treated as failure and claims nothing.
+    const { data: rpc, error: rpcErr } = await supabase.rpc('apply_notification_grants', {
+      p_business_id: businessId, p_user_id: target.user_id, p_granted_by: req.user.userId,
+      p_actor_role: biz.role, p_changes: Object.fromEntries(entries),
+    });
+    if (rpcErr || !rpc || typeof rpc.changed !== 'number') {
+      // Log the technical detail server-side; return a safe, detail-free error.
+      console.warn(`[grants] apply failed business=${businessId} member=${target.id}: ${rpcErr?.message || 'unconfirmed result'}`);
+      return res.status(500).json({ error: 'grant_write_failed', message: 'Could not update notification access. Please try again.' });
+    }
+
+    res.json({ member_id: target.id, role: target.role, changed: rpc.changed,
+      granted: { ...before, ...Object.fromEntries(entries) } });
+  } catch (e) {
+    console.warn(`[grants] write exception: ${e && e.message}`);
+    res.status(500).json({ error: 'grants_write_failed', message: 'Could not update notification access. Please try again.' });
+  }
+});
+
+// ── POST /api/team/invite ─────────────────────────────────────────────────────
+// Generate a new invite code/link.
+app.post('/api/team/invite', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { role = 'employee', label, max_uses = 1, expires_days = 7 } = req.body;
+
+  // accountant and auditor are full roles everywhere else (access checks, notification grants);
+  // company setup offers "Invite an accountant", so they can be invited too.
+  const VALID_ROLES = ['employee', 'auditor', 'manager', 'accountant', 'cfo', 'admin', 'ceo'];
+  if (!VALID_ROLES.includes(role))
+    return res.status(400).json({ error: `role must be one of: ${VALID_ROLES.join(', ')}` });
+
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const business_id = biz.business.id, myRole = biz.role;
+
+    if (!['owner', 'ceo', 'admin'].includes(myRole))
+      return res.status(403).json({ error: 'Only owner, CEO or admin can create invites' });
+
+    // Cannot invite higher/equal role than yourself (only owner can invite admin)
+    const ROLE_RANK = { employee: 1, auditor: 1, manager: 2, accountant: 3, cfo: 3, admin: 4, ceo: 5, owner: 6 };
+    if (ROLE_RANK[role] >= ROLE_RANK[myRole])
+      return res.status(403).json({ error: `You cannot invite someone with role "${role}" — your role is "${myRole}"` });
+
+    // Generate unique code
+    let code, exists = true;
+    while (exists) {
+      code = generateInviteCode();
+      const { data: check } = await supabase.from('business_invites').select('id').eq('code', code).single();
+      exists = !!check;
+    }
+
+    const expiresAt = new Date(Date.now() + expires_days * 86400000).toISOString();
+    const { data: invite, error } = await supabase.from('business_invites').insert({
+      business_id,
+      invited_by: userId,
+      code,
+      role,
+      label: label || null,
+      max_uses: Number(max_uses) || 1,
+      expires_at: expiresAt,
+    }).select().single();
+    if (error) throw error;
+
+    // Optional email invite (Phase 1, gated): issue an accept-OTP for the email so the
+    // invitee can join WITHOUT Telegram. The invite code links the membership target.
+    let email_invited = null, email_invite_failed = false;
+    if (EMAIL_AUTH_ENABLED && req.body?.email) {
+      const email = normalizeEmail(req.body.email);
+      if (EMAIL_RE.test(email)) {
+        // The invite row already exists; if the accept-OTP cannot be stored, report that
+        // honestly instead of failing the whole request (the invite link still works).
+        try {
+          const otp = await issueEmailCode(email, 'invite_accept');
+          email_invited = { email, ...(EMAIL_AUTH_DEV_RETURN_CODE ? { dev_code: otp } : {}) };
+        } catch (e) {
+          if (e?.code !== 'secret_not_persisted') throw e;
+          email_invite_failed = true;
+        }
+      }
+    }
+
+    res.json({ invite, invite_url: `/invite/${code}`, ...(email_invited ? { email_invited } : {}), ...(email_invite_failed ? { email_invite_failed: true } : {}) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── DELETE /api/team/invites/:code ────────────────────────────────────────────
+// Revoke an invite (owner/admin only).
+app.delete('/api/team/invites/:code', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!['owner', 'admin'].includes(biz.role))
+      return res.status(403).json({ error: 'Only owner/admin can revoke invites' });
+
+    // Scope strictly to the active business — an invite from another business is not
+    // revocable here (returns 404 rather than silently affecting nothing).
+    const { data: revoked } = await supabase.from('business_invites')
+      .update({ status: 'revoked' })
+      .eq('code', req.params.code)
+      .eq('business_id', biz.business.id)
+      .select('id');
+    if (!revoked?.length) return res.status(404).json({ error: 'Invite not found in this business' });
+
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PATCH /api/team/members/:memberId ────────────────────────────────────────
+// Update role or status.
+app.patch('/api/team/members/:memberId', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { role, status } = req.body;
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!['owner', 'admin'].includes(biz.role))
+      return res.status(403).json({ error: 'Only owner/admin can change roles' });
+
+    const update = {};
+    if (role)   update.role   = role;
+    if (status) update.status = status;
+
+    // The target member MUST belong to the active business — never mutate a member of another
+    // workspace via its id. Stale-grant cleanup is NOT done here: it is enforced in the database
+    // by a trigger on business_members (migration 046), so it happens in the SAME transaction as
+    // this update — atomic, race-free, and covering every route that changes a role or status,
+    // not just this one. If the trigger's audit write fails, this update rolls back and throws.
+    const { data, error } = await supabase.from('business_members')
+      .update(update)
+      .eq('id', req.params.memberId)
+      .eq('business_id', biz.business.id)
+      .select();
+    if (error) throw error;
+    if (!data?.length) return res.status(404).json({ error: 'Member not found in this business' });
+    res.json(data[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── DELETE /api/team/members/:memberId ───────────────────────────────────────
+// Remove a member (soft: status = removed).
+app.delete('/api/team/members/:memberId', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!['owner', 'admin'].includes(biz.role))
+      return res.status(403).json({ error: 'Only owner/admin can remove members' });
+
+    // Target must belong to the ACTIVE business — never remove a member of another
+    // workspace via its id.
+    const { data: targetRows } = await supabase.from('business_members')
+      .select('user_id, role').eq('id', req.params.memberId).eq('business_id', biz.business.id).limit(1);
+    const target = targetRows?.[0];
+    if (!target) return res.status(404).json({ error: 'Member not found in this business' });
+    if (target.user_id === userId)
+      return res.status(400).json({ error: 'Cannot remove yourself' });
+    if (target.role === 'owner')
+      return res.status(403).json({ error: 'Cannot remove business owner' });
+
+    // Removal ends eligibility. Grant cleanup is enforced by the database trigger on
+    // business_members (migration 046) in the same transaction as this status change — so a
+    // re-invite later starts from all-off, with no separate cleanup step to race or forget.
+    await supabase.from('business_members')
+      .update({ status: 'removed' })
+      .eq('id', req.params.memberId)
+      .eq('business_id', biz.business.id);
+
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/invite/:code  (PUBLIC — no auth) ─────────────────────────────────
+// Returns invite info so the join page can show company name + role.
+app.get('/api/invite/:code', async (req, res) => {
+  try {
+    // C5: public endpoint — throttle per IP so invite codes can't be enumerated.
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+    if (rateLimited(`invite-lookup:${ip}`, 60, 60 * 60 * 1000))
+      return res.status(429).json({ error: 'rate_limited', message: 'Too many requests — try again later.' });
+
+    const { data: invite, error } = await supabase.from('business_invites')
+      .select('id, code, role, label, max_uses, uses_count, expires_at, status, business_id')
+      .eq('code', req.params.code.toUpperCase()).single();
+    if (error || !invite) return res.status(404).json({ error: 'Invite not found' });
+    if (invite.status !== 'active') return res.status(410).json({ error: 'Invite has been revoked or expired', status: invite.status });
+    if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'Invite has expired' });
+    if (invite.uses_count >= invite.max_uses) return res.status(410).json({ error: 'Invite has reached its use limit' });
+
+    // Fetch business name
+    const { data: biz } = await supabase.from('businesses').select('name').eq('id', invite.business_id).single();
+    res.json({
+      code:          invite.code,
+      role:          invite.role,
+      label:         invite.label,
+      business_name: biz?.name || 'CFO AI',
+      expires_at:    invite.expires_at,
+      uses_left:     invite.max_uses - invite.uses_count,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/invite/:code/accept  (auth required) ───────────────────────────
+// Accept invite → create/update business_members row.
+// Called after user authenticates with Telegram on the invite page.
+app.post('/api/invite/:code/accept', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const code = req.params.code.toUpperCase();
+    const { data: invite, error: iErr } = await supabase.from('business_invites')
+      .select('*').eq('code', code).single();
+    if (iErr || !invite) return res.status(404).json({ error: 'Invite not found' });
+    if (invite.status !== 'active') return res.status(410).json({ error: 'Invite is no longer active' });
+    if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'Invite has expired' });
+    if (invite.uses_count >= invite.max_uses) return res.status(410).json({ error: 'Invite limit reached' });
+
+    // Check if user already a member
+    const { data: existing } = await supabase.from('business_members')
+      .select('id, role, status').eq('user_id', userId).eq('business_id', invite.business_id).single();
+
+    if (existing) {
+      if (existing.status === 'active')
+        return res.json({ ok: true, already_member: true, role: existing.role, message: 'Already a member of this business' });
+      // Reactivate if removed
+      await supabase.from('business_members')
+        .update({ status: 'active', role: invite.role, invite_code: code })
+        .eq('id', existing.id);
+    } else {
+      // Get user display name
+      const { data: u } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+      const displayName = u?.first_name || u?.username || null;
+
+      await supabase.from('business_members').insert({
+        business_id:  invite.business_id,
+        user_id:      userId,
+        role:         invite.role,
+        status:       'active',
+        display_name: displayName,
+        joined_at:    new Date().toISOString(),
+        invited_by:   invite.invited_by,
+        invite_code:  code,
+      });
+    }
+
+    // Increment uses_count; mark exhausted if max reached
+    const newCount = invite.uses_count + 1;
+    await supabase.from('business_invites').update({
+      uses_count: newCount,
+      status: newCount >= invite.max_uses ? 'exhausted' : 'active',
+    }).eq('id', invite.id);
+
+    res.json({ ok: true, role: invite.role, business_id: invite.business_id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEAM ONBOARDING & TELEGRAM ACTIVATION (training mode)
+// ─────────────────────────────────────────────────────────────────────────────
+// Training records (debts.is_training = true) NEVER affect cash, Pulse totals
+// or AI CFO analysis. They exist only for the tutorial and can be reset.
+
+const TRAINING_STEPS = ['telegram_connected', 'test_payable', 'test_receivable', 'test_expense_request'];
+
+// Short signed token for Telegram deep links — proves the start payload was
+// generated by us for this member, without exposing any secret.
+function signOnboardingToken(memberId) {
+  return crypto.createHmac('sha256', JWT_SECRET)
+    .update(`onboard:${memberId}`).digest('hex').slice(0, 10);
+}
+function buildStartPayload(memberId) {
+  // Telegram /start payload max 64 chars: "cfo_<uuid-no-dashes>_<sig10>" = 47
+  return `cfo_${String(memberId).replace(/-/g, '')}_${signOnboardingToken(memberId)}`;
+}
+function parseStartPayload(payload) {
+  const m = /^cfo_([0-9a-f]{32})_([0-9a-f]{10})$/i.exec(payload || '');
+  if (!m) return null;
+  const memberId = `${m[1].slice(0,8)}-${m[1].slice(8,12)}-${m[1].slice(12,16)}-${m[1].slice(16,20)}-${m[1].slice(20)}`;
+  if (signOnboardingToken(memberId) !== m[2].toLowerCase()) return null;
+  return memberId;
+}
+
+/**
+ * The ONE place a Telegram bot request is authenticated.
+ *
+ * PR0.5: `TELEGRAM_WEBHOOK_SECRET` only. The `|| BOT_TOKEN` fallback is gone — it made
+ * backend authentication depend on the Telegram bot token, so revoking or regenerating that
+ * token in BotFather silently broke the API, and it reused a credential that is far more
+ * exposed (BotFather, every Telegram API URL, webhook config) as an API secret.
+ *
+ * The explicit `!botSecret` check matters: without it, an unset secret and a missing header
+ * both compare as undefined and the guard would authenticate everyone. Fail closed.
+ *
+ * `TELEGRAM_WEBHOOK_SECRET` is in REQUIRED_ENV, so a missing value stops the server at boot
+ * rather than at the first bot request.
+ */
+function requireBotSecret(req) {
+  const botSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!botSecret) return false;
+  const provided = req.headers['x-bot-secret'];
+  return Boolean(provided) && provided === botSecret;
+}
+
+// ── Telegram = paid add-on (V4.1) ────────────────────────────────────────────
+// When TELEGRAM_PAID_GATE_ENABLED=true, bot-facing endpoints refuse businesses whose
+// EFFECTIVE plan is 'free' (active trials pass — trial grants full product access).
+// Returns a 402 payload the bot can relay, or null when allowed. Default OFF so the
+// rollout is dark; enabling is an explicit Railway env step (owner action).
+const TELEGRAM_PAID_GATE_ENABLED = process.env.TELEGRAM_PAID_GATE_ENABLED === 'true';
+async function telegramPaidGate(businessId) {
+  if (!TELEGRAM_PAID_GATE_ENABLED || !businessId) return null;
+  const { data } = await supabase.from('businesses').select('*').eq('id', businessId).limit(1);
+  const business = data?.[0];
+  if (!business) return null; // let the route's own not-found handling answer
+  if (computeBusinessAccess(business).effective_plan !== 'free') return null;
+  return {
+    error: 'telegram_paid_plan_required',
+    message: 'The Telegram assistant is a paid add-on. Upgrade your plan in CFO AI (app.cfo-ai.site → Settings) to keep using it.',
+    upgrade_url: 'https://app.cfo-ai.site/business/settings',
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PR4a — Telegram account linking
+//
+// Four endpoints with a deliberate auth asymmetry that is the security boundary here:
+//
+//   * the three /api/account/integrations/telegram/* routes are JWT ONLY. If a bot secret
+//     could reach them, anyone holding it could mint a connection link for any user.
+//   * /api/telegram/link-token/consume is BOT SECRET ONLY. If a JWT could reach it, a user
+//     could consume someone else's token from a browser.
+//
+// Neither route family falls back to the other. `auth` rejects a bot secret because it only
+// reads Authorization; the consume route never inspects Authorization at all.
+//
+// Nothing here writes users, business_members, telegram_user_state or user_channel_state.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const telegramBotUsername = () =>
+  (process.env.TELEGRAM_BOT_USERNAME || process.env.VITE_BOT_USERNAME || '').replace(/^@/, '') || null;
+
+// GET /api/account/integrations/telegram — the signed-in user's connection state.
+app.get('/api/account/integrations/telegram', auth, async (req, res) => {
+  try {
+    const r = await telegramLink.getTelegramLinkStatus({ supabase, userId: req.user.userId });
+    if (!r.ok) return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'status_failed' }); }
+});
+
+// POST /api/account/integrations/telegram/link-token — mint a one-time deep link.
+app.post('/api/account/integrations/telegram/link-token', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    // Reuses the existing in-memory limiter. Best-effort and per-instance, but it bounds how
+    // fast one account can mint tokens, which is the abuse that matters here.
+    if (rateLimited(`tglink:${userId}`, 5, 15 * 60 * 1000)) {
+      return res.status(429).json({ error: 'rate_limited', message: 'Too many attempts. Please wait a few minutes.' });
+    }
+    const r = await telegramLink.createTelegramLinkToken({
+      supabase, userId, botUsername: telegramBotUsername(),
+    });
+    if (!r.ok) return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    // The audit records THAT a token was created, never the token or its hash.
+    recordAudit({ actorUserId: userId, entityType: 'telegram_link', action: 'link_token_created' });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'link_token_failed' }); }
+});
+
+// POST /api/account/integrations/telegram/unlink — withdraw the active link.
+app.post('/api/account/integrations/telegram/unlink', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const r = await telegramLink.revokeTelegramLink({ supabase, userId });
+    if (!r.ok) return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    recordAudit({ actorUserId: userId, entityType: 'telegram_link', action: 'telegram_link_revoked' });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'unlink_failed' }); }
+});
+
+// POST /api/telegram/link-token/consume — the bot redeems a token for a link.
+app.post('/api/telegram/link-token/consume', async (req, res) => {
+  // Authentication first, before the token is even hashed: an unauthenticated caller must not
+  // be able to use this endpoint as an oracle for which tokens exist.
+  if (!requireBotSecret(req)) return res.status(401).json({ error: 'Invalid bot credentials' });
+  try {
+    const { token, telegram_id, username, first_name } = req.body || {};
+    const r = await telegramLink.consumeTelegramLinkToken({
+      supabase, token, telegramId: telegram_id, username, first_name,
+    });
+    if (!r.ok) {
+      // Conflicts are worth an audit trail — they are how a stolen or mistaken link attempt
+      // would look. The token never appears in it.
+      if (r.httpStatus === 409) {
+        recordAudit({ channel: 'telegram', entityType: 'telegram_link',
+          action: 'telegram_link_conflict', after: { code: r.code } });
+      }
+      return res.status(r.httpStatus).json({ error: r.code, message: r.message });
+    }
+    recordAudit({ actorUserId: r.linkedUserId ?? null, channel: 'telegram',
+      entityType: 'telegram_link', action: 'telegram_link_consumed' });
+    res.json(r.body);
+  } catch (e) { res.status(500).json({ error: 'link_failed' }); }
+});
+
+// ── GET /api/telegram/config — PUBLIC (no auth) ──────────────────────────────
+// Returns only non-secret bot config. Never exposes any token/secret.
+app.get('/api/telegram/config', (req, res) => {
+  const raw = process.env.TELEGRAM_BOT_USERNAME || process.env.VITE_BOT_USERNAME || null;
+  const botUsername = raw ? raw.replace(/^@/, '') : null;
+  res.json({
+    bot_username:       botUsername,
+    bot_url:            botUsername ? `https://t.me/${botUsername}` : null,
+    bot_deep_link_base: botUsername ? `https://t.me/${botUsername}` : null,
+    is_configured:      Boolean(botUsername),
+  });
+});
+
+// ── POST /api/team/onboarding/test-ceo-notification ──────────────────────────
+// Owner/admin/cfo sends themselves a test Telegram alert to confirm the
+// notification channel works. Requires an active membership + connected Telegram.
+app.post('/api/team/onboarding/test-ceo-notification', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can send a CEO test notification' });
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
+    if (!botToken)
+      return res.status(503).json({ error: 'bot_not_ready', message: 'Telegram notifications will be available after bot setup.' });
+
+    const { data: memRows } = await supabase.from('business_members')
+      .select('telegram_connected_at').eq('business_id', biz.business.id)
+      .eq('user_id', userId).eq('status', 'active').limit(1);
+    if (!memRows?.[0]?.telegram_connected_at)
+      return res.status(400).json({ error: 'not_connected', message: 'Connect your Telegram first.' });
+
+    // PR2.6: telegram_connected_at records that onboarding ticked a box; it does not prove a
+    // reachable Telegram identity exists. For this route the resolver is the authority —
+    // answering ok:true after sending nowhere is exactly what a "test your notifications"
+    // button must never do. (The column's own semantics are untouched; it still gates above.)
+    const rec = await resolveSingleTelegramRecipient({ supabase, userId, reason: 'ceo-test' });
+    if (!rec.chatId) {
+      if (rec.dropped === 'identity_lookup_failed' || rec.dropped === 'resolver_exception') {
+        return res.status(503).json({ error: 'temporary_notification_lookup_failed',
+          message: 'Cannot verify your Telegram connection right now. Please try again.' });
+      }
+      return res.status(400).json({ error: 'telegram_not_linked',
+        message: 'No Telegram account is linked to this user. Connect Telegram first.' });
+    }
+
+    const lang = normalizeLanguage(await getUserLanguage(userId));
+    const text = {
+      ru: '✅ CFO AI test alert\n\nTelegram уведомления подключены.\nТеперь вы сможете получать approvals, cash alerts и daily pulse здесь.',
+      id: '✅ Notifikasi tes CFO AI\n\nNotifikasi Telegram sudah terhubung.\nAnda akan menerima persetujuan, peringatan kas dan ringkasan harian di sini.',
+      en: '✅ CFO AI test alert\n\nTelegram notifications are connected.\nYou will receive approvals, cash alerts and daily pulse here.',
+    }[lang] || '✅ CFO AI test alert\n\nTelegram notifications are connected.';
+
+    const resp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: rec.chatId, text }),
+    });
+    if (!resp.ok) return res.status(502).json({ error: 'send_failed' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/team/onboarding — owner/admin/cfo: full team progress ──────────
+app.get('/api/team/onboarding', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can view team onboarding' });
+
+    const { data: members } = await supabase.from('business_members')
+      .select('id, user_id, role, status, display_name, joined_at, onboarding_status, onboarding_step, telegram_connected_at, telegram_test_completed_at, last_onboarding_event_at')
+      .eq('business_id', biz.business.id).eq('status', 'active')
+      .order('joined_at', { ascending: true });
+
+    const userIds = (members || []).map(m => m.user_id);
+    const { data: users } = userIds.length
+      ? await supabase.from('users').select('id, first_name, username').in('id', userIds)
+      : { data: [] };
+    const userMap = Object.fromEntries((users || []).map(u => [u.id, u]));
+
+    // Training submissions per member (which test types are done)
+    const { data: trainingRows } = await supabase.from('debts')
+      .select('created_by_user_id, training_type')
+      .eq('business_id', biz.business.id).eq('is_training', true);
+    const trainingByUser = {};
+    (trainingRows || []).forEach(r => {
+      (trainingByUser[r.created_by_user_id] ||= new Set()).add(r.training_type);
+    });
+
+    res.json({
+      members: (members || []).map(m => {
+        const u = userMap[m.user_id] || {};
+        const done = trainingByUser[m.user_id] || new Set();
+        return {
+          member_id:                  m.id,
+          user_id:                    m.user_id,
+          name:                       m.display_name || u.first_name || u.username || String(m.user_id),
+          role:                       m.role,
+          status:                     m.status,
+          // NOTE (PR2.6): for a legacy account this happens to be the Telegram id; for an
+          // email-origin member it is a negative platform id and NOT a Telegram id. It is
+          // reported to the team-onboarding UI only — it must never be used as a chat id, and
+          // outbound sends resolve recipients through lib/telegramNotifications.js instead.
+          // Correcting this field belongs to PR4, with the UI that consumes it.
+          telegram_id:                m.user_id,
+          telegram_connected_at:      m.telegram_connected_at,
+          onboarding_status:          m.onboarding_status || 'not_started',
+          onboarding_step:            m.onboarding_step,
+          telegram_test_completed_at: m.telegram_test_completed_at,
+          last_onboarding_event_at:   m.last_onboarding_event_at,
+          tests: {
+            payable:         done.has('payable'),
+            receivable:      done.has('receivable'),
+            expense_request: done.has('expense_request'),
+          },
+        };
+      }),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── GET /api/team/onboarding/me — current member's tutorial state ───────────
+app.get('/api/team/onboarding/me', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+
+    const { data: memRows } = await supabase.from('business_members')
+      .select('*').eq('business_id', biz.business.id).eq('user_id', userId)
+      .eq('status', 'active').limit(1);
+    const member = memRows?.[0];
+    if (!member) return res.status(403).json({ error: 'Not a member of this business' });
+
+    const { data: trainingRows } = await supabase.from('debts')
+      .select('training_type')
+      .eq('business_id', biz.business.id).eq('is_training', true)
+      .eq('created_by_user_id', userId);
+    const done = new Set((trainingRows || []).map(r => r.training_type));
+
+    const completedSteps = [];
+    if (member.telegram_connected_at) completedSteps.push('telegram_connected');
+    if (done.has('payable'))          completedSteps.push('test_payable');
+    if (done.has('receivable'))       completedSteps.push('test_receivable');
+    if (done.has('expense_request'))  completedSteps.push('test_expense_request');
+
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || null;
+    const startPayload = buildStartPayload(member.id);
+
+    res.json({
+      business:           { id: biz.business.id, name: biz.business.name },
+      member:             { id: member.id, onboarding_status: member.onboarding_status || 'not_started', onboarding_step: member.onboarding_step },
+      role:               biz.role,
+      telegram_connected: !!member.telegram_connected_at,
+      bot_username:       botUsername,
+      deep_link:          botUsername ? `https://t.me/${botUsername}?start=${startPayload}` : null,
+      start_payload:      startPayload,
+      required_steps:     TRAINING_STEPS,
+      completed_steps:    completedSteps,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/team/onboarding/mark-step — member marks own progress ─────────
+app.post('/api/team/onboarding/mark-step', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { step } = req.body || {};
+    if (!TRAINING_STEPS.includes(step) && step !== 'welcome_seen')
+      return res.status(400).json({ error: 'Invalid step' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+
+    await supabase.from('business_members')
+      .update({
+        onboarding_step:          step,
+        onboarding_status:        'in_progress',
+        last_onboarding_event_at: new Date().toISOString(),
+      })
+      .eq('business_id', biz.business.id).eq('user_id', userId).eq('status', 'active');
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/team/onboarding/:memberId/reset — owner/admin/cfo ─────────────
+// Clears progress and deletes that member's training records (safe: training only).
+app.post('/api/team/onboarding/:memberId/reset', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Only owner, admin or CFO can reset onboarding' });
+
+    const { data: memRows } = await supabase.from('business_members')
+      .select('id, user_id').eq('id', req.params.memberId)
+      .eq('business_id', biz.business.id).limit(1);
+    const member = memRows?.[0];
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+
+    // Delete ONLY training records of this member in this business
+    await supabase.from('debts').delete()
+      .eq('business_id', biz.business.id)
+      .eq('created_by_user_id', member.user_id)
+      .eq('is_training', true);
+
+    await supabase.from('business_members').update({
+      onboarding_status:          'not_started',
+      onboarding_step:            null,
+      telegram_test_completed_at: null,
+      last_onboarding_event_at:   new Date().toISOString(),
+    }).eq('id', member.id);
+
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/telegram/connect — bot marks member as connected ──────────────
+// Protected by x-bot-secret. start_payload is the signed deep-link payload.
+app.post('/api/telegram/connect', async (req, res) => {
+  try {
+    if (!requireBotSecret(req))
+      return res.status(401).json({ error: 'Invalid bot credentials' });
+
+    const { telegram_id, start_payload, member_id, business_id } = req.body || {};
+    if (!telegram_id) return res.status(400).json({ error: 'telegram_id required' });
+
+    // Resolve member: signed payload preferred; raw member_id allowed but verified
+    let memberId = parseStartPayload(start_payload) || member_id || null;
+    if (!memberId) return res.status(400).json({ error: 'start_payload or member_id required' });
+
+    const { data: memRows } = await supabase.from('business_members')
+      .select('id, user_id, business_id, status').eq('id', memberId).limit(1);
+    const member = memRows?.[0];
+    if (!member || member.status !== 'active')
+      return res.status(404).json({ error: 'Member not found or inactive' });
+    if (business_id && member.business_id !== business_id)
+      return res.status(403).json({ error: 'Member does not belong to this business' });
+
+    // A member may only connect their OWN Telegram account — never bind a foreign
+    // telegram_id. The equality check below works because a legacy account's users.id is its
+    // Telegram id; PR4 replaces this with an explicit user_channel_links row, at which point
+    // the comparison stops being an id coincidence and becomes a real lookup.
+    if (String(member.user_id) !== String(telegram_id))
+      return res.status(403).json({ error: 'telegram_id does not match this member' });
+
+    const gate = await telegramPaidGate(member.business_id);
+    if (gate) return res.status(402).json(gate);
+
+    await supabase.from('business_members').update({
+      telegram_connected_at:    new Date().toISOString(),
+      onboarding_status:        'in_progress',
+      onboarding_step:          'telegram_connected',
+      last_onboarding_event_at: new Date().toISOString(),
+    }).eq('id', member.id);
+
+    res.json({ ok: true, member_id: member.id, business_id: member.business_id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── POST /api/team/onboarding/training-submission ────────────────────────────
+// Web auth OR x-bot-secret (Telegram bot). Creates a TRAINING debt record:
+// is_training = true → zero cash impact, excluded from all financial totals.
+app.post('/api/team/onboarding/training-submission', async (req, res) => {
+  try {
+    const {
+      business_id, member_id, training_type,
+      raw_input_text, amount, currency, counterparty, due_date, telegram_id,
+    } = req.body || {};
+
+    if (!['payable', 'receivable', 'expense_request'].includes(training_type))
+      return res.status(400).json({ error: 'training_type must be payable | receivable | expense_request' });
+
+    // ── Resolve acting user: JWT (web) or bot secret + telegram_id ──────────
+    let actingUserId = null;
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      try { actingUserId = jwt.verify(token, JWT_SECRET).userId; } catch { /* fall through */ }
+    }
+    if (!actingUserId && requireBotSecret(req) && telegram_id) {
+      // PR2.5: resolved rather than assumed. Flag off ⇒ Number(telegram_id), as before.
+      const actor = await resolveTelegramActorForRoute({ supabase, telegram_id, routeName: 'training-submission' });
+      if (!actor.ok) return sendTelegramActorError(res, actor);
+      actingUserId = actor.userId;
+    }
+    if (!actingUserId) return res.status(401).json({ error: 'Unauthorized' });
+
+    // ── Validate membership in the target business ──────────────────────────
+    let memQuery = supabase.from('business_members')
+      .select('id, user_id, business_id, role, display_name, telegram_connected_at')
+      .eq('user_id', actingUserId).eq('status', 'active');
+    if (business_id) memQuery = memQuery.eq('business_id', business_id);
+    if (member_id)   memQuery = memQuery.eq('id', member_id);
+    const { data: memRows } = await memQuery.limit(1);
+    const member = memRows?.[0];
+    if (!member) return res.status(403).json({ error: 'Not a member of this business' });
+
+    const { data: u } = await supabase.from('users')
+      .select('first_name, username').eq('id', actingUserId).single();
+    const displayName = member.display_name || u?.first_name || u?.username || String(actingUserId);
+
+    const amountNum = Number(amount) || 0;
+    const { data: business } = await supabase.from('businesses')
+      .select('owner_user_id').eq('id', member.business_id).single();
+
+    // ── Create the training record (never cash-impacting) ───────────────────
+    const { data: debt, error } = await supabase.from('debts').insert({
+      user_id:                business?.owner_user_id || actingUserId,
+      business_id:            member.business_id,
+      type:                   training_type === 'receivable' ? 'receivable' : 'payable',
+      counterparty:           counterparty || (training_type === 'expense_request' ? 'Expense request (training)' : 'Training counterparty'),
+      amount:                 amountNum,
+      original_amount:        amountNum,
+      paid_amount:            0,
+      currency:               currency || 'IDR',
+      due_date:               due_date || null,
+      description:            `TRAINING · ${training_type}`,
+      status:                 'open',
+      is_training:            true,
+      training_type,
+      source_channel:         'telegram',
+      raw_input_text:         raw_input_text || null,
+      created_by_user_id:     actingUserId,
+      created_by_telegram_id: Number(telegram_id || actingUserId),
+      created_by_name:        displayName,
+      created_by_role:        member.role,
+      approval_status:        'pending_approval',
+      last_action_channel:    'telegram',
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    // ── Progress update; completed when all 3 test types exist ──────────────
+    const { data: doneRows } = await supabase.from('debts')
+      .select('training_type').eq('business_id', member.business_id)
+      .eq('created_by_user_id', actingUserId).eq('is_training', true);
+    const doneTypes = new Set((doneRows || []).map(r => r.training_type));
+    const allDone = ['payable', 'receivable', 'expense_request'].every(t => doneTypes.has(t));
+
+    await supabase.from('business_members').update({
+      onboarding_status:          allDone ? 'completed' : 'in_progress',
+      onboarding_step:            `test_${training_type}`,
+      telegram_test_completed_at: allDone ? new Date().toISOString() : null,
+      last_onboarding_event_at:   new Date().toISOString(),
+      ...(member.telegram_connected_at ? {} : { telegram_connected_at: new Date().toISOString() }),
+    }).eq('id', member.id);
+
+    res.json({
+      ok:               true,
+      training:         true,
+      debt_id:          debt.id,
+      completed_types:  [...doneTypes],
+      onboarding_done:  allDone,
+      message:          'This is only a test and will not affect company cash.',
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- Transactions API ------------------------------------------------------
+
+app.get('/api/transactions', auth, async (req, res) => {
+  const { scope, period = 'month', type } = req.query;
+  const now = new Date();
+
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canViewBusinessFinance(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow viewing business transactions' });
+
+  let query = supabase.from('transactions').select('*')
+    .or(bizOrFilter(biz))
+    .order('created_at', { ascending: false });
+
+  // Period filter — 'all' skips date filter entirely (used by Payroll page)
+  if (period !== 'all') {
+    let from;
+    if (period === 'today') from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    else if (period === 'week') { from = new Date(now); from.setDate(now.getDate() - 7); }
+    else from = new Date(now.getFullYear(), now.getMonth(), 1); // default: this month
+    query = query.gte('created_at', from.toISOString());
+  }
+
+  // Scope filter
+  if (scope && scope !== 'all') query = query.eq('scope', scope);
+
+  // Type filter — allows Payroll page to fetch only payroll transactions
+  if (type && type !== 'all') query = query.eq('type', type);
+
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Enrich bank-statement linking metadata for returned transactions
+  if (Array.isArray(data) && data.length > 0) {
+    const txIds = data.map(t => t.id).filter(Boolean);
+    if (txIds.length > 0) {
+      try {
+        const { data: linkRows } = await supabase.from('bank_import_rows')
+          .select('id, batch_id, linked_transaction_id')
+          .eq('business_id', biz.business.id)
+          .in('linked_transaction_id', txIds);
+        if (Array.isArray(linkRows) && linkRows.length > 0) {
+          const linkMap = new Map();
+          for (const lr of linkRows) {
+            if (lr.linked_transaction_id != null) {
+              linkMap.set(String(lr.linked_transaction_id), lr);
+            }
+          }
+          for (const t of data) {
+            const lr = linkMap.get(String(t.id));
+            if (lr) {
+              t.linked_statement_row_id = lr.id;
+              t.statement_batch_id = lr.batch_id;
+            } else {
+              t.linked_statement_row_id = null;
+              t.statement_batch_id = null;
+            }
+          }
+        } else {
+          for (const t of data) {
+            t.linked_statement_row_id = null;
+            t.statement_batch_id = null;
+          }
+        }
+      } catch (e) {
+        // Fallback gracefully without breaking transactions retrieval
+      }
+    }
+  }
+
+  res.json(data);
+});
+
+// PATCH /api/transactions/:id — edit category (post-import categorization)
+app.patch('/api/transactions/:id', auth, async (req, res) => {
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canCreateConfirmedFinancialRecord(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow editing transactions' });
+
+  const { data: existing, error: existingErr } = await supabase.from('transactions')
+    .select('id, amount_original, currency_original, transaction_date, source, wallet_id, description, business_id, balance_version')
+    .eq('id', req.params.id)
+    .or(bizOrFilter(biz))
+    .single();
+
+  if (existingErr && (existingErr.code === '42703' || /balance_version.*(does not exist|schema cache)/i.test(existingErr.message || '')))
+    return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic transaction update requires migration 070' });
+  if (existingErr || !existing) return res.status(404).json({ error: 'Transaction not found' });
+  const expectedVersion = req.body.expected_version ?? existing.balance_version;
+  if (req.body.expected_version != null && (!Number.isSafeInteger(Number(req.body.expected_version)) || Number(req.body.expected_version)<0))
+    return res.status(400).json({ error: 'invalid_transaction_version' });
+
+  // Boundary check: opening balance financial treatment is protected against any modification of amount, wallet, date, or currency
+  if (existing.source === 'wallet_opening_balance') {
+    if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
+      return res.status(400).json({
+        error: 'opening_balance_cannot_be_modified',
+        message: 'Opening balance transactions cannot be modified directly',
+      });
+    }
+  }
+
+  // Boundary check: if transaction is created by debt payment, financial fields (amount, wallet, date, currency) must be edited via original bill
+  const { data: linkedDebts } = await supabase.from('debts')
+    .select('id, invoice_number, counterparty')
+    .eq('linked_transaction_id', existing.id)
+    .or(bizOrFilter(biz))
+    .limit(1);
+  if (Array.isArray(linkedDebts) && linkedDebts.length > 0) {
+    if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
+      return res.status(400).json({
+        error: 'debt_payment_amount_immutable',
+        message: 'Payment financial fields (amount, wallet, date) must be edited through the linked invoice or debt record',
+      });
+    }
+  }
+
+  if ('type' in req.body) return res.status(400).json({ error: 'transaction_type_not_editable' });
+  // Boundary check: a transaction that came from a bank statement keeps the bank's amount, account
+  // and date — a wrong one is corrected with an opposite entry, not edited (design w2/D1).
+  if ('amount' in req.body || 'wallet_id' in req.body || 'transaction_date' in req.body || 'date' in req.body || 'currency' in req.body) {
+    const { data: stmtRows } = await supabase.from('bank_import_rows').select('id')
+      .eq('business_id', biz.business.id).eq('linked_transaction_id', existing.id).limit(1);
+    if (Array.isArray(stmtRows) && stmtRows.length > 0) {
+      return res.status(409).json({
+        error: 'statement_transaction_locked',
+        message: 'Amount, account and date of a bank statement transaction come from the bank and cannot be edited',
+      });
+    }
+  }
+
+  const updates = {};
+  if ('category' in req.body) {
+    const c = req.body.category;
+    if (c !== null && typeof c !== 'string')
+      return res.status(400).json({ error: 'category must be a string or null' });
+    updates.category = c ? String(c).trim().slice(0, 120) || null : null;
+  }
+  if ('description' in req.body) {
+    const d = req.body.description;
+    if (d !== null && typeof d !== 'string')
+      return res.status(400).json({ error: 'description must be a string or null' });
+    updates.description = d ? String(d).trim().slice(0, 500) || null : null;
+  }
+  if ('wallet_id' in req.body) {
+    const wid = req.body.wallet_id;
+    if (!wid) return res.status(400).json({ error: 'wallet_id cannot be empty' });
+    const { data: w } = await supabase.from('wallets')
+      .select('id, currency')
+      .eq('id', wid)
+      .or(bizOrFilter(biz))
+      .limit(1);
+    if (!w || w.length === 0)
+      return res.status(404).json({ error: 'wallet_not_found', message: 'Target wallet not found in business' });
+    const targetWalletCurrency = (w[0].currency || 'IDR').toUpperCase();
+    const existingCurrency = (existing.currency_original || 'IDR').toUpperCase();
+    if (targetWalletCurrency !== existingCurrency) {
+      return res.status(400).json({
+        error: 'currency_mismatch',
+        message: `Moving transactions between accounts with different currencies (${existingCurrency} -> ${targetWalletCurrency}) is not permitted without conversion`,
+      });
+    }
+    updates.wallet_id = wid;
+  }
+  const dVal = req.body.transaction_date || req.body.date;
+  if (dVal) {
+    updates.transaction_date = dVal;
+  }
+  if ('amount' in req.body) {
+    const a = Number(req.body.amount);
+    if (!nativeInputIsExact(req.body.amount)) return res.status(400).json({ error: 'invalid_amount_precision', message: 'Amount cannot be represented exactly by the API' });
+    if (!Number.isFinite(a) || a <= 0) return res.status(400).json({ error: 'invalid_amount' });
+    updates.amount_original = a;
+  }
+  if ('currency' in req.body) {
+    updates.currency_original = String(req.body.currency).toUpperCase().trim();
+  }
+  if ('amount_original' in updates || 'currency_original' in updates || 'transaction_date' in updates) {
+    const amt = updates.amount_original ?? existing.amount_original;
+    const cur = updates.currency_original ?? existing.currency_original ?? 'IDR';
+    const d = updates.transaction_date ?? existing.transaction_date;
+    const fxRes = await fx.toIdr(amt, cur, d);
+    updates.amount_idr = fxRes.amount_idr;
+    updates.booked_rate = fxRes.booked_rate;
+    updates.rate_source = fxRes.rate_source;
+  }
+  if (Object.keys(updates).length === 0)
+    return res.status(400).json({ error: 'No editable fields provided' });
+
+  // Version of the row used to derive amount/FX/date: RPC re-reads under the
+  // ledger gate and refuses a stale version. No direct-write fallback.
+  if (existing.balance_version == null || typeof supabase.rpc !== 'function') {
+    return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic transaction update requires migration 070' });
+  }
+  const financial = ['amount','wallet_id','transaction_date','date','currency'].some(k => k in req.body);
+  const { data, error } = await supabase.rpc('rpc_patch_business_transaction', {
+    p_business_id: biz.business.id, p_user_id: req.user.userId,
+    p_transaction_id: existing.id, p_expected_version: expectedVersion,
+    p_updates: updates, p_financial: financial,
+  });
+  if (error) {
+    if (balanceFailure(res, error)) return;
+    if (error.code === 'PGRST202' || /function.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
+      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic transaction update requires migration 070' });
+    return res.status(500).json({ error: error.message });
+  }
+  if (!data) return res.status(404).json({ error: 'Transaction not found' });
+
+  // Record post-import categorization as feedback (business memory). Does not
+  // change historical rows; feeds rule promotion the next time rules are viewed.
+  if ('category' in updates && updates.category) {
+    try {
+      const { data: cat } = await supabase.from('cashflow_categories')
+        .select('id').eq('name', updates.category).or(bizOrFilter(biz)).limit(1);
+      await supabase.from('classification_feedback').insert({
+        business_id: biz.business.id, normalized_desc: normalizeDesc(data.description),
+        final_category_id: cat?.[0]?.id || null, final_transaction_type: data.type,
+        source: 'post_import_edit', reviewed_by_user_id: req.user.userId,
+      });
+    } catch { /* feedback is best-effort */ }
+  }
+  res.json(data);
+});
+
+// --- Reminders API ---------------------------------------------------------
+
+// Business-scoped, like every other write. `business_id` is decided by the server from
+// the membership-verified active business — requireBusiness honours x-business-id, 403s
+// an inaccessible or stale id, refuses personal workspaces, and 409s when the user has no
+// business yet. A client-supplied business_id in the body is overwritten, never trusted.
+//
+// This also repairs a silent bug: GET /api/pulse reads reminders with a strict
+// business_id filter, so rows written without one (the web form sends no business_id)
+// were invisible. See server/lib/reminderScope.js for why user_id stays the actor.
+app.post('/api/reminders', auth, async (req, res) => {
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  const { data, error } = await supabase.from('reminders')
+    .insert(buildReminderRow(req.body, biz, req.user.userId)).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.patch('/api/reminders/:id/done', auth, async (req, res) => {
+  const { data, error } = await supabase.from('reminders')
+    .update({ is_done: true }).eq('id', req.params.id)
+    .eq('user_id', req.user.userId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.patch('/api/reminders/:id/snooze', auth, async (req, res) => {
+  const { days, until } = req.body;
+  let snoozedUntil;
+
+  if (until !== undefined) {
+    const d = new Date(until);
+    if (isNaN(d.getTime())) return res.status(400).json({ error: 'Invalid date format' });
+    if (d <= new Date()) return res.status(400).json({ error: 'Snooze date must be in the future' });
+    snoozedUntil = d.toISOString();
+  } else if (days !== undefined) {
+    const n = Number(days);
+    if (![1, 3, 7].includes(n)) return res.status(400).json({ error: 'days must be 1, 3, or 7' });
+    snoozedUntil = new Date(Date.now() + n * 86400000).toISOString();
+  } else {
+    return res.status(400).json({ error: 'Provide days (1, 3, or 7) or until (ISO date string)' });
+  }
+
+  const { data, error } = await supabase.from('reminders')
+    .update({ snoozed_until: snoozedUntil })
+    .eq('id', req.params.id)
+    .eq('user_id', req.user.userId)
+    .select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// --- Parse API (AI) --------------------------------------------------------
+
+app.post('/api/parse', auth, async (req, res) => {
+  try {
+    const { text } = req.body;
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 1000,
+      messages: [{
+        role: 'user',
+        content: `Ты финансовый ассистент. Найди ВСЕ транзакции в тексте.
+
+Верни ТОЛЬКО JSON массив без markdown, без пояснений:
+[{"type":"expense или income или payroll или transfer","amount":число,"currency":"IDR по умолчанию","description":"краткое описание","source":"счёт или null","scope":"personal или business","project":"проект или null","category":"категория или null"}]
+
+Правила:
+- Суммы всегда положительные. Тип определяет знак.
+- type="payroll" если это зарплата, salary, gaji, bonus сотруднику, commission, payroll — даже если написано как expense. Используй payroll, не expense.
+- type="transfer" если деньги переводятся между своими счётами.
+- type="income" если деньги поступают извне.
+- type="expense" для обычных расходов (еда, транспорт, сервисы, аренда и т.д.).
+- source: название счёта/кошелька если упомянуто, иначе null.
+- scope: "business" если упомянут сотрудник, компания, бизнес-расход. "personal" если не ясно.
+- Валюта: IDR если не указана.
+
+Текст: "${text}"`
+      }]
+    });
+    const raw = response.content[0].text.trim().replace(/\`\`\`json\n?/g, '').replace(/\`\`\`\n?/g, '').trim();
+    const transactions = JSON.parse(raw);
+    res.json({ transactions: Array.isArray(transactions) ? transactions : [transactions] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/transactions/batch', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { transactions } = req.body;
+
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow creating confirmed transactions. Submit a request instead.' });
+
+    // ── Input validation ─────────────────────────────────────────────────────
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({ error: 'transactions must be a non-empty array' });
+    }
+    const VALID_TX_TYPES = ['income', 'expense', 'transfer', 'correction', 'payroll'];
+    for (const t of transactions) {
+      if (!VALID_TX_TYPES.includes(t.type)) {
+        return res.status(400).json({ error: `Invalid transaction type: ${t.type}` });
+      }
+      if (!nativeInputIsExact(t.amount)) return res.status(400).json({ error: 'invalid_amount_precision' });
+      const amt = Number(t.amount);
+      if (isNaN(amt)) return res.status(400).json({ error: 'amount must be a number' });
+      // correction is a signed delta (may be negative, never zero);
+      // all other types must be strictly positive
+      if (t.type === 'correction' ? amt === 0 : amt <= 0) {
+        return res.status(400).json({ error: `amount must be ${t.type === 'correction' ? 'non-zero' : 'positive'} for type ${t.type}` });
+      }
+      if (t.scope && !['business', 'personal'].includes(t.scope)) {
+        return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
+      }
+    }
+
+    // ── Plan limit: max_transactions_per_month ───────────────────────────────
+    // Corrections by type are counted but super-admin bypass is handled by
+    // the /api/admin/ path which uses requireAdmin middleware.
+    try {
+      const access = await getCurrentAccess(userId);
+      if (access) {
+        const maxTx = access.limits.max_transactions_per_month;
+        if (maxTx !== null && maxTx !== undefined) {
+          // Count non-correction transactions this calendar month
+          const monthStart = new Date();
+          monthStart.setDate(1);
+          monthStart.setHours(0, 0, 0, 0);
+          const { count: usedCount } = await supabase
+            .from('transactions')
+            .select('id', { count: 'exact', head: true })
+            .or(bizOrFilter(biz))
+            .gte('created_at', monthStart.toISOString());
+          const used = usedCount || 0;
+          const batchSize = (transactions || []).length;
+          if (isLimitReached(maxTx, used)) {
+            return sendUpgradeRequired(res, 'transactions',
+              `Monthly transaction limit reached (${maxTx}/month on ${access.accessState.effectivePlan} plan)`,
+              { limit: maxTx, usage: used, current_plan: access.accessState.effectivePlan }
+            );
+          }
+          // Partial batch: reject entire batch if it would exceed limit
+          if (used + batchSize > maxTx) {
+            return sendUpgradeRequired(res, 'transactions',
+              `This batch of ${batchSize} would exceed your monthly limit. You have ${maxTx - used} transaction${maxTx - used === 1 ? '' : 's'} remaining this month.`,
+              { limit: maxTx, usage: used, remaining: maxTx - used, current_plan: access.accessState.effectivePlan }
+            );
+          }
+        }
+      }
+    } catch (limitErr) {
+      // Fail open — don't block transactions if limit check itself errors
+      console.warn('[transactions/batch] limit check failed:', limitErr.message);
+    }
+
+    // ── Wallet validation ────────────────────────────────────────────────────
+    // Collect distinct wallet_ids supplied in this batch (including transfer targets)
+    const requestedWalletIds = [...new Set(
+      transactions.flatMap(t => [t.wallet_id, t.to_wallet_id]).filter(Boolean)
+    )];
+
+    let walletMap = {}; // id → { id, name, currency }
+    if (requestedWalletIds.length > 0) {
+      const { data: ownedWallets, error: wErr } = await supabase
+        .from('wallets')
+        .select('id, name, currency, type')
+        .or(bizOrFilter(biz))
+        .in('id', requestedWalletIds);
+      if (wErr) throw wErr;
+
+      // All supplied wallet_ids must belong to this business
+      const ownedIds = new Set((ownedWallets || []).map(w => w.id));
+      const invalidId = requestedWalletIds.find(id => !ownedIds.has(id));
+      if (invalidId) {
+        return res.status(400).json({ error: `Invalid or inaccessible wallet_id: ${invalidId}` });
+      }
+
+      walletMap = Object.fromEntries((ownedWallets || []).map(w => [w.id, w]));
+    }
+
+    // ── Check replay for transfers in batch ───────────────────────────────────
+    const transferIdsInBatch = [...new Set(transactions.map(t => t.transfer_id).filter(Boolean))];
+    let existingTransferIds = new Set();
+    if (transferIdsInBatch.length > 0) {
+      const { data: existingTransferTxs } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(bizOrFilter(biz))
+        .in('transfer_id', transferIdsInBatch);
+      if (existingTransferTxs && existingTransferTxs.length > 0) {
+        existingTransferIds = new Set(existingTransferTxs.map(x => x.transfer_id));
+        for (const t of transactions.filter(t => t.transfer_id && existingTransferIds.has(t.transfer_id))) {
+          const legs = existingTransferTxs.filter(x => x.transfer_id === t.transfer_id);
+          const debit = legs.find(x => x.type === 'expense');
+          const credit = legs.find(x => x.type === 'income');
+          if (legs.length !== 2 || t.type !== 'transfer' || !debit || !credit
+            || debit.wallet_id !== t.wallet_id || credit.wallet_id !== t.to_wallet_id
+            || String(debit.currency_original).toUpperCase() !== String(walletMap[t.wallet_id]?.currency).toUpperCase()
+            || String(credit.currency_original).toUpperCase() !== String(walletMap[t.to_wallet_id]?.currency).toUpperCase()
+            || TX.cmpDec(debit.amount_original, t.amount) !== 0
+            || (t.target_amount != null && TX.cmpDec(credit.amount_original, t.target_amount) !== 0)
+            || debit.transaction_date !== (t.transaction_date || new Date().toISOString().slice(0, 10))) {
+            return res.status(409).json({ error: 'idempotency_key_mismatch', message: 'Transfer id already used with different parameters' });
+          }
+        }
+        if (transactions.every(t => t.transfer_id && existingTransferIds.has(t.transfer_id))) {
+          return res.status(200).json({ saved: existingTransferTxs.length, is_replay: true });
+        }
+      }
+    }
+
+    // ── No manual outflow below zero: the batch's outflows per wallet, net of its inflows ──
+    {
+      const net = {};
+      for (const t of transactions) {
+        if (!t.wallet_id || !walletMap[t.wallet_id]) continue;
+        if (t.transfer_id && existingTransferIds.has(t.transfer_id)) continue; // already recorded
+        const amt = Number(t.amount);
+        const d = TX.CASH_OUT_LEGACY.includes(t.type) || t.type === 'transfer' ? -amt
+          : TX.CASH_IN_LEGACY.includes(t.type) || t.type === 'correction' ? amt : 0;
+        net[t.wallet_id] = (net[t.wallet_id] || 0) + d;
+        if (t.type === 'transfer' && t.to_wallet_id && walletMap[t.to_wallet_id] && walletMap[t.to_wallet_id].currency === walletMap[t.wallet_id].currency) {
+          net[t.to_wallet_id] = (net[t.to_wallet_id] || 0) + amt;
+        }
+      }
+      for (const [wid, d] of Object.entries(net)) {
+        if (d < 0 && await refuseNegativeOutflow(res, biz, walletMap[wid], -d)) return;
+      }
+    }
+
+    // ── Build rows ───────────────────────────────────────────────────────────
+    const rowBatches = await Promise.all(transactions.map(async t => {
+      if (t.transfer_id && existingTransferIds.has(t.transfer_id)) {
+        return []; // skip already recorded transfer leg
+      }
+      const wallet   = t.wallet_id ? walletMap[t.wallet_id] : null;
+      const toWallet = t.to_wallet_id ? walletMap[t.to_wallet_id] : null;
+      const txDate   = t.transaction_date || new Date().toISOString().slice(0, 10);
+
+      // Complete atomic double-entry transfer (TASK 30)
+      if (t.type === 'transfer' && toWallet && wallet) {
+        const transferId = t.transfer_id || crypto.randomUUID();
+        const transferRef = `xfer:${transferId}`;
+        const fromCur = String(wallet.currency || t.currency || 'IDR').toUpperCase().trim();
+        const toCur   = String(toWallet.currency || 'IDR').toUpperCase().trim();
+        const sourceAmt = Number(t.amount);
+        const desc = t.description || `Transfer: ${wallet.name} → ${toWallet.name}`;
+
+        const fxFrom = await fx.toIdr(sourceAmt, fromCur, txDate);
+        let targetAmt;
+        let fxTo;
+
+        if (fromCur === toCur) {
+          targetAmt = sourceAmt;
+          fxTo = fxFrom;
+        } else {
+          if (t.target_amount && Number(t.target_amount) > 0) {
+            targetAmt = Number(t.target_amount);
+          } else if (t.booked_rate || t.rate) {
+            targetAmt = Math.round(sourceAmt * Number(t.booked_rate || t.rate) * 100) / 100;
+          } else {
+            if (fromCur === 'IDR') {
+              const qTo = await fx.toIdr(1, toCur, txDate);
+              targetAmt = Math.round((sourceAmt / (qTo.booked_rate || 1)) * 100) / 100;
+            } else if (toCur === 'IDR') {
+              targetAmt = fxFrom.amount_idr;
+            } else {
+              const qTo = await fx.toIdr(1, toCur, txDate);
+              targetAmt = Math.round((fxFrom.amount_idr / (qTo.booked_rate || 1)) * 100) / 100;
+            }
+          }
+
+          if (toCur === 'IDR') {
+            fxTo = { amount_idr: targetAmt, booked_rate: 1, rate_source: 'base_currency' };
+          } else {
+            fxTo = await fx.toIdr(targetAmt, toCur, txDate, {
+              rate: t.booked_rate || t.rate,
+              source: t.rate_source || 'transfer_cross_currency',
+              actor: userId,
+            });
+          }
+        }
+
+        const debitLeg = {
+          ...bizWriteFields(biz, userId),
+          type: 'expense',
+          amount_original: sourceAmt,
+          currency_original: fromCur,
+          amount_idr: fxFrom.amount_idr,
+          booked_rate: fxFrom.booked_rate,
+          rate_source: fxFrom.rate_source,
+          description: desc,
+          source: transferRef,
+          scope: t.scope || 'business',
+          project: t.project || null,
+          category: 'Transfer',
+          transaction_date: txDate,
+          wallet_id: wallet.id,
+          transfer_id: transferId,
+        };
+
+        const creditLeg = {
+          ...bizWriteFields(biz, userId),
+          type: 'income',
+          amount_original: targetAmt,
+          currency_original: toCur,
+          amount_idr: fxTo.amount_idr,
+          booked_rate: fxTo.booked_rate,
+          rate_source: fxTo.rate_source,
+          description: desc,
+          source: transferRef,
+          scope: t.scope || 'business',
+          project: t.project || null,
+          category: 'Transfer',
+          transaction_date: txDate,
+          wallet_id: toWallet.id,
+          transfer_id: transferId,
+        };
+
+        return [debitLeg, creditLeg];
+      }
+
+      // Standard non-transfer transaction (or transfer without to_wallet)
+      const resolvedSource = t.source || (wallet ? wallet.name : null);
+      const cur = String(t.currency || wallet?.currency || 'IDR').toUpperCase().trim();
+
+      let fxRes;
+      if (t.booked_rate || t.rate || (t.amount_idr && cur !== 'IDR')) {
+        const manualRate = t.booked_rate || t.rate || (Number(t.amount_idr) / Number(t.amount));
+        fxRes = await fx.toIdr(t.amount, cur, txDate, {
+          rate: manualRate,
+          source: t.rate_source || 'manual',
+          reason: t.manual_reason || 'client_supplied_rate',
+          actor: userId,
+        });
+      } else {
+        fxRes = await fx.toIdr(t.amount, cur, txDate);
+      }
+
+      return [{
+        ...bizWriteFields(biz, userId),
+        type:                   t.type,
+        amount_original:        t.amount,
+        currency_original:      cur,
+        amount_idr:             fxRes.amount_idr,
+        booked_rate:            fxRes.booked_rate,
+        rate_source:            fxRes.rate_source,
+        description:            t.description,
+        source:                 resolvedSource            || null,
+        scope:                  t.scope                   || 'personal',
+        project:                t.project                 || null,
+        category:               t.category                || null,
+        // Always set transaction_date so period filters work correctly
+        transaction_date:       txDate,
+        // Reference data (Phase 1 — all nullable, backward compatible)
+        cashflow_category_id:   t.cashflow_category_id    || null,
+        counterparty_id:        t.counterparty_id          || null,
+        counterparty_name:      t.counterparty_name        || null,
+        business_direction_id:  t.business_direction_id    || null,
+        activity_type_id:       t.activity_type_id         || null,
+        // Wallet (TASK 29B — nullable, backward compatible)
+        wallet_id:              t.wallet_id                || null,
+        transfer_id:            t.transfer_id              || null,
+      }];
+    }));
+
+    const rows = rowBatches.flat();
+
+    if (!rows.length) return res.json({ saved: 0 });
+    if (typeof supabase.rpc !== 'function')
+      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic batch recording requires migration 070' });
+    const { data, error } = await supabase.rpc('rpc_insert_business_transactions', {
+      p_business_id: biz.business.id, p_user_id: userId, p_rows: rows,
+    });
+    if (error) {
+      if (error.code === 'PGRST202' || /function.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
+        return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic batch recording requires migration 070' });
+      throw error;
+    }
+    if (data?.saved == null) return res.status(500).json({ error: 'atomic_batch_failed' });
+    res.json({ saved: data.saved });
+  } catch (e) {
+    if (balanceFailure(res, e)) return;
+    if (e.message && e.message.startsWith('fx_rate_unavailable:')) {
+      const cur = e.message.split(':')[1] || '';
+      return res.status(400).json({
+        error: 'fx_rate_unavailable',
+        message: `Exchange rate for currency ${cur} is unavailable.`,
+        currency: cur,
+      });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Reference Data API ---------------------------------------------------
+// Phase 1: user_id-scoped reference tables.
+// Future: migrate to business_id-scoped model.
+
+// GET /api/cashflow-categories — user-owned active categories only
+app.get('/api/cashflow-categories', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    // ?archived=1 lists this company's archived categories (to restore them); system ones never archive.
+    const archived = req.query.archived === '1';
+    let q = supabase
+      .from('cashflow_categories')
+      .select('*')
+      .or(bizOrFilter(biz))
+      .eq('is_active', !archived);
+    if (archived) q = q.eq('is_system', false);
+    const { data, error } = await q
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+    if (error) throw error;
+    res.json({ categories: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Profit-group mapping (Design v2 P-10; migration 062) ──────────────────────────
+// GET: this business's categories with their confirmed pnl_group and a SUGGESTION from
+// industry_templates (by the business's KBLI codes). Finance roles; Business only.
+// PATCH: confirm or clear groups for this business's own categories. owner/ceo/admin/cfo;
+// every write audited (pnl_mapping_confirmed). Suggestions are never written by the server
+// on its own. Before 062: GET answers available:false, PATCH 409.
+app.get('/api/pnl-mapping', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing the profit mapping' });
+    const { data: cats, error: cErr } = await supabase.from('cashflow_categories')
+      .select('id, name, group_type, activity_type, is_active, pnl_group')
+      .eq('business_id', biz.business.id).order('sort_order', { ascending: true }).order('name', { ascending: true });
+    if (cErr && TARGETS.isMissingColumn(cErr)) return res.json({ available: false, groups: PNLMAP.GROUPS, categories: [], can_edit: false });
+    if (cErr) throw cErr;
+    const { data: tpl, error: tErr } = await supabase.from('industry_templates')
+      .select('kbli_prefix, category_name, pnl_group, note, sort_order').limit(2000);
+    if (tErr) return res.json({ available: false, groups: PNLMAP.GROUPS, categories: [], can_edit: false });
+    const { data: profRows } = await supabase.from('tax_profiles')
+      .select('primary_kbli, additional_kbli, tax_regime').eq('business_id', biz.business.id).limit(1);
+    const codes = PNLMAP.kbliCodes(profRows?.[0]);
+    const categories = (cats || []).filter((c) => c.is_active !== false)
+      .map((c) => ({ ...c, suggestion: PNLMAP.suggestFor(c.name, tpl, codes) }));
+    res.json({
+      available: true, groups: PNLMAP.GROUPS, kbli: codes, tax_regime: profRows?.[0]?.tax_regime || null,
+      confirmed: categories.some((c) => c.pnl_group), categories,
+      missing_from_template: PNLMAP.missingTemplateCategories(categories, tpl, codes),
+      can_edit: PNLMAP.canEditMapping(biz.role),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/pnl-mapping', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!PNLMAP.canEditMapping(biz.role))
+      return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can confirm the profit mapping' });
+    const { items, error: vErr } = PNLMAP.mappingsFromBody(req.body || {});
+    if (vErr) return res.status(400).json({ error: vErr });
+
+    const ids = items.map((i) => i.category_id);
+    const { data: rows, error: rErr } = await supabase.from('cashflow_categories')
+      .select('id, name, pnl_group').eq('business_id', biz.business.id).in('id', ids);
+    if (rErr && TARGETS.isMissingColumn(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '062' });
+    if (rErr) throw rErr;
+    // Every id must be this business's own category; nothing is written otherwise.
+    if ((rows || []).length !== ids.length)
+      return res.status(404).json({ error: 'category_not_found_in_this_business' });
+
+    const before = Object.fromEntries(rows.map((r) => [r.id, r.pnl_group ?? null]));
+    const changed = items.filter((i) => before[i.category_id] !== i.pnl_group);
+    for (const i of changed) {
+      const { error } = await supabase.from('cashflow_categories')
+        .update({ pnl_group: i.pnl_group, updated_at: new Date().toISOString() })
+        .eq('id', i.category_id).eq('business_id', biz.business.id);
+      if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '062' });
+      if (error) throw error;
+    }
+    if (changed.length) {
+      const names = Object.fromEntries(rows.map((r) => [r.id, r.name]));
+      await recordAudit({
+        businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+        entityType: 'pnl_mapping', entityId: biz.business.id, action: 'pnl_mapping_confirmed',
+        before: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], pnl_group: before[i.category_id] })),
+        after: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], pnl_group: i.pnl_group })),
+      });
+    }
+    res.json({ ok: true, changed: changed.length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Asset register (Design v2 P-11; migration 063) ─────────────────────────────────
+// Business only. GET: finance roles; POST create / dispose: owner/ceo/admin/cfo/accountant,
+// audited. Group and useful life come ONLY from active, verified tax_rules with
+// obligation_type 'depreciation' (effectiveRuleActive); without one an asset is saved with
+// no life and no depreciation is shown. Depreciation is computed, never stored.
+// Before 063: GET answers available:false, writes 409.
+async function verifiedDepreciationGroups() {
+  const { data } = await supabase.from('tax_rules').select('*, official_sources(*)')
+    .eq('obligation_type', 'depreciation').eq('status', 'active');
+  return ASSETS.depreciationGroups(data || [], (r) => effectiveRuleActive(r, r.official_sources || null));
+}
+const ymKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+function lastMonthKeys(n = 12) {
+  const now = new Date(); const out = [];
+  for (let i = n - 1; i >= 0; i--) out.push(ymKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  return out;
+}
+
+app.get('/api/assets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role does not allow viewing assets' });
+    const { data, error } = await supabase.from('assets').select('*')
+      .eq('business_id', biz.business.id).order('acquired_on', { ascending: false });
+    if (error) return res.json({ available: false, assets: [], groups: [], can_edit: false });
+    const groups = await verifiedDepreciationGroups();
+    const months = lastMonthKeys(12);
+    const asOf = ymKey();
+    const assets = (data || []).map((a) => ASSETS.publicAsset(a, asOf, months));
+    const live = assets.filter((a) => !a.disposed_on);
+    res.json({
+      available: true, as_of: asOf, groups, can_edit: ASSETS.canEditAssets(biz.role),
+      assets, totals: { cost: live.reduce((x, a) => x + Number(a.cost), 0), book_value: live.reduce((x, a) => x + a.book_value, 0),
+        without_life: live.filter((a) => !a.useful_life_months).length },
+      depreciation_by_month: Object.fromEntries(months.map((m) => [m, assets.reduce((x, a) => x + (a.depreciation_by_month[m] || 0), 0)])),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/assets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!ASSETS.canEditAssets(biz.role)) return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can add assets' });
+    const v = ASSETS.assetFromBody(req.body || {}, await verifiedDepreciationGroups());
+    if (v.error) return res.status(400).json(v);
+    // Every link must be this business's own row (the 063 trigger enforces it again).
+    const own = async (table, id) => {
+      const { data } = await supabase.from(table).select('id').eq('id', id).eq('business_id', biz.business.id).limit(1);
+      return !!data?.length;
+    };
+    for (const [k, table] of [['purchase_debt_id', 'debts'], ['purchase_transaction_id', 'transactions'], ['purchase_document_id', 'financial_documents'], ['supplier_counterparty_id', 'counterparties']]) {
+      if (v.row[k] != null && !(await own(table, v.row[k]))) return res.status(404).json({ error: `${k.replace(/_id$/, '')}_not_found_in_this_business` });
+    }
+    const { data, error } = await supabase.from('assets')
+      .insert({ ...v.row, business_id: biz.business.id, created_by_user_id: req.user.userId }).select('*').single();
+    if (error && /relation .*assets.* does not exist|Could not find the table/i.test(error.message || '')) return res.status(409).json({ error: 'migration_not_applied', migration: '063' });
+    if (error && /duplicate key|assets_purchase_(debt|tx)_uniq/i.test(error.message || '')) return res.status(409).json({ error: 'purchase_already_registered' });
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'asset', entityId: data.id, action: 'asset_created', after: data });
+    res.json({ asset: ASSETS.publicAsset(data, ymKey(), []) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/assets/:id/dispose', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!ASSETS.canEditAssets(biz.role)) return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can dispose of assets' });
+    const on = req.body?.disposed_on;
+    if (typeof on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(on)) return res.status(400).json({ error: 'invalid_disposed_on' });
+    const { data: rows, error: rErr } = await supabase.from('assets').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    if (rErr) return res.status(409).json({ error: 'migration_not_applied', migration: '063' });
+    const before = rows?.[0];
+    if (!before) return res.status(404).json({ error: 'asset_not_found_in_this_business' });
+    if (on < before.acquired_on) return res.status(400).json({ error: 'disposed_before_acquired' });
+    const { data, error } = await supabase.from('assets').update({ disposed_on: on, updated_at: new Date().toISOString() })
+      .eq('id', before.id).eq('business_id', biz.business.id).select('*').single();
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'asset', entityId: before.id, action: 'asset_disposed', before: { disposed_on: before.disposed_on }, after: { disposed_on: on } });
+    res.json({ asset: ASSETS.publicAsset(data, ymKey(), []) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Business funding register (Design v2 P-03; migration 064) ──────────────────────
+// Path /api/business-funding — NOT /api/funding, which is the Personal↔Business bridge
+// (routes/personalFunding.js, gated off). Nothing here reads or writes Personal: a founder
+// loan is recorded business-side only. Business only. GET: finance roles. Writes:
+// owner/ceo/admin/cfo, audited. Before 064: GET available:false, writes 409.
+async function ownRow(table, id, businessId) {
+  const { data } = await supabase.from(table).select('id').eq('id', id).eq('business_id', businessId).limit(1);
+  return !!data?.length;
+}
+const fundMissing = (e) => /relation .*business_funding.* does not exist|Could not find the table/i.test(e?.message || '');
+
+app.get('/api/business-funding', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role does not allow viewing funding' });
+    const { data: recs, error } = await supabase.from('business_funding_records').select('*')
+      .eq('business_id', biz.business.id).order('received_on', { ascending: false });
+    if (error) return res.json({ available: false, records: [], upcoming: [], totals: null, can_edit: false });
+    const { data: reps } = await supabase.from('business_funding_repayments').select('*').eq('business_id', biz.business.id);
+    const sum = BFUND.summarize(recs || [], reps || [], { today: new Date().toISOString().slice(0, 10), months: lastMonthKeys(12) });
+    res.json({ available: true, can_edit: BFUND.canEditFunding(biz.role), ...sum });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/business-funding', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can record funding' });
+    const v = BFUND.recordFromBody(req.body || {});
+    if (v.error) return res.status(400).json(v);
+    if (v.row.counterparty_id && !(await ownRow('counterparties', v.row.counterparty_id, biz.business.id)))
+      return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+    if (v.row.received_transaction_id != null && !(await ownRow('transactions', v.row.received_transaction_id, biz.business.id)))
+      return res.status(404).json({ error: 'transaction_not_found_in_this_business' });
+    const { data: rec, error } = await supabase.from('business_funding_records')
+      .insert({ ...v.row, business_id: biz.business.id, created_by_user_id: req.user.userId }).select('*').single();
+    if (error && fundMissing(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
+    if (error) return res.status(500).json({ error: error.message });
+    let schedule = [];
+    if (v.schedule.length) {
+      const { data: reps, error: sErr } = await supabase.from('business_funding_repayments')
+        .insert(v.schedule.map((r) => ({ ...r, business_id: biz.business.id, funding_record_id: rec.id, created_by_user_id: req.user.userId }))).select('*');
+      if (sErr) {
+        await supabase.from('business_funding_records').delete().eq('id', rec.id).eq('business_id', biz.business.id);
+        return res.status(400).json({ error: 'schedule_rejected', detail: sErr.message });
+      }
+      schedule = reps || [];
+    }
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business_funding', entityId: rec.id, action: 'funding_recorded', after: { ...rec, schedule_count: schedule.length } });
+    res.json({ record: rec, repayments: schedule });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/business-funding/:id/repayments', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can change repayments' });
+    const v = BFUND.repaymentFromBody(req.body || {});
+    if (v.error) return res.status(400).json(v);
+    const { data: recs, error: rErr } = await supabase.from('business_funding_records').select('id, instrument')
+      .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
+    if (rErr && fundMissing(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
+    if (!recs?.length) return res.status(404).json({ error: 'funding_not_found_in_this_business' });
+    if (recs[0].instrument !== 'loan') return res.status(400).json({ error: 'equity_has_no_repayments' });
+    const { data, error } = await supabase.from('business_funding_repayments')
+      .insert({ ...v.row, business_id: biz.business.id, funding_record_id: recs[0].id, created_by_user_id: req.user.userId }).select('*').single();
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business_funding', entityId: recs[0].id, action: 'funding_repayment_scheduled', after: data });
+    res.json({ repayment: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/business-funding/repayments/:rid/paid', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can change repayments' });
+    const v = BFUND.paidFromBody(req.body || {});
+    if (v.error) return res.status(400).json(v);
+    const { data: rows, error: rErr } = await supabase.from('business_funding_repayments').select('*')
+      .eq('id', req.params.rid).eq('business_id', biz.business.id).limit(1);
+    if (rErr && fundMissing(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
+    const before = rows?.[0];
+    if (!before) return res.status(404).json({ error: 'repayment_not_found_in_this_business' });
+    if (v.paid_transaction_id != null && !(await ownRow('transactions', v.paid_transaction_id, biz.business.id)))
+      return res.status(404).json({ error: 'transaction_not_found_in_this_business' });
+    const { data, error } = await supabase.from('business_funding_repayments').update(v)
+      .eq('id', before.id).eq('business_id', biz.business.id).select('*').single();
+    if (error && /duplicate key|bfrp_paid_tx_uniq/i.test(error.message || '')) return res.status(409).json({ error: 'payment_already_used' });
+    if (error) return res.status(500).json({ error: error.message });
+    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business_funding', entityId: before.funding_record_id, action: 'funding_repayment_paid',
+      before: { paid_on: before.paid_on, paid_transaction_id: before.paid_transaction_id }, after: v });
+    res.json({ repayment: data });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/cashflow-categories — create user custom category
+app.post('/api/cashflow-categories', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, group_type, activity_type, sub_category, description } = req.body;
+    if (!name || !group_type) return res.status(400).json({ error: 'name and group_type required' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    // Manager/Employee may select categories but never create them.
+    if (!canProposeCategory(biz.role))
+      return res.status(403).json({ error: 'Your role cannot create categories' });
+    const { data, error } = await supabase
+      .from('cashflow_categories')
+      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name, group_type, activity_type: activity_type || null, sub_category: sub_category || null, description: description || null, is_system: false })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ category: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/cashflow-categories/:id — update user's own custom category
+app.patch('/api/cashflow-categories/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageCategories(biz.role))
+      return res.status(403).json({ error: 'Your role cannot edit category structure' });
+    const { name, group_type, activity_type, sub_category, description, is_active } = req.body;
+    const updates = { updated_at: new Date().toISOString() };
+    if (name !== undefined) updates.name = name;
+    if (group_type !== undefined) updates.group_type = group_type;
+    if (activity_type !== undefined) updates.activity_type = activity_type;
+    if (sub_category !== undefined) updates.sub_category = sub_category;
+    if (description !== undefined) updates.description = description;
+    if (is_active !== undefined) updates.is_active = is_active;
+    const { data, error } = await supabase
+      .from('cashflow_categories')
+      .update(updates)
+      .eq('id', req.params.id)
+      .or(bizOrFilter(biz))     // business-scoped; system categories have no business_id match
+      .eq('is_system', false)   // never edit system categories
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Category not found or not editable' });
+    res.json({ category: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/cashflow-categories/:id — soft archive user's own category
+app.delete('/api/cashflow-categories/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageCategories(biz.role))
+      return res.status(403).json({ error: 'Your role cannot archive categories' });
+    const { data, error } = await supabase
+      .from('cashflow_categories')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .or(bizOrFilter(biz))
+      .eq('is_system', false)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Category not found' });
+    res.json({ category: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Counterparty Intelligence V1 ─────────────────────────────────────────────
+// The financial memory for vendors, customers, banks and tax authorities.
+//
+// REQUIRES migration 055 (counterparties identity columns +
+// counterparty_bank_accounts). Reads degrade gracefully if it has not been applied
+// yet — a missing bank-account table yields an empty list rather than a 500 — but
+// writes to the new columns need it. Apply the migration before deploying.
+//
+// WHAT THESE ROUTES NEVER DO:
+//   * create a counterparty implicitly. Extraction and suggestion write nothing;
+//     creating is an explicit POST the user triggers.
+//   * merge two counterparties. A likely duplicate is reported and the create is
+//     refused with the candidates, because merging is effectively irreversible.
+//   * trust a client-supplied business_id. Scope comes from the active workspace.
+const CPI = require('./lib/counterpartyIntelligence');
+
+const CP_ROLES = CPI.ROLES;
+
+// `display_name`/`legal_name` fall back to `name`: rows created by the pre-055
+// route (and by the legacy POST shape) only set `name`.
+function cpPublic(row, accounts) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    business_id: row.business_id,
+    name: row.name,
+    legal_name: row.legal_name || row.name,
+    display_name: row.display_name || row.name,
+    role: row.type || null,
+    type: row.type || null,
+    npwp: row.npwp || null,
+    pkp_status: row.pkp_status || 'unknown',
+    address: row.address || null,
+    email: row.email || null,
+    phone: row.phone || null,
+    notes: row.notes || null,
+    aliases: row.aliases || [],
+    group_name: row.group_name || null,
+    default_category: row.default_category || null,
+    default_tax_treatment: row.default_tax_treatment || null,
+    // Design v2 P-04 (migration 060). Absent column → null, so nothing breaks before apply.
+    entity_form: row.entity_form ?? null,
+    payment_terms_days: row.payment_terms_days ?? null,
+    status: row.status || (row.is_active === false ? 'archived' : 'active'),
+    is_active: row.is_active !== false,
+    source_system: row.source_system || null,
+    external_id: row.external_id || null,
+    external_url: row.external_url || null,
+    last_synced_at: row.last_synced_at || null,
+    bank_accounts: accounts || [],
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// Bank accounts live in their own table (055). Absent table -> empty list, so the
+// directory still renders on a database where the migration has not run yet.
+async function cpBankAccounts(biz, counterpartyIds) {
+  if (!counterpartyIds || !counterpartyIds.length) return {};
+  try {
+    const { data, error } = await supabase.from('counterparty_bank_accounts')
+      .select('id, counterparty_id, bank_name, account_number, account_name, currency, is_primary')
+      .eq('business_id', biz.business.id).in('counterparty_id', counterpartyIds);
+    if (error) return {};
+    const byCp = {};
+    for (const a of data || []) (byCp[a.counterparty_id] ||= []).push(a);
+    return byCp;
+  } catch { return {}; }
+}
+
+// Everything the matching engine needs, for THIS business only.
+async function cpDirectoryForMatching(biz) {
+  const { data } = await supabase.from('counterparties').select('*').or(bizOrFilter(biz));
+  const rows = data || [];
+  const accounts = await cpBankAccounts(biz, rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, bank_accounts: accounts[r.id] || [] }));
+}
+
+// GET /api/counterparties — directory. Archived excluded unless asked for.
+// Response shape { counterparties: [...] } is unchanged; existing callers keep working.
+app.get('/api/counterparties', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    let q = supabase.from('counterparties').select('*').or(bizOrFilter(biz));
+    if (req.query.q) q = q.ilike('name', `%${String(req.query.q).trim()}%`);
+    const { data, error } = await q.order('name', { ascending: true });
+    if (error) throw error;
+
+    const includeArchived = /^(1|true|yes)$/i.test(String(req.query.include_archived || ''));
+    const rows = (data || []).filter((r) =>
+      includeArchived || (r.status !== 'archived' && r.is_active !== false));
+    const accounts = await cpBankAccounts(biz, rows.map((r) => r.id));
+    res.json({ counterparties: rows.map((r) => cpPublic(r, accounts[r.id])) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/counterparties/:id — one record with its bank accounts.
+app.get('/api/counterparties/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data } = await supabase.from('counterparties').select('*')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const row = data?.[0];
+    if (!row) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+    const accounts = await cpBankAccounts(biz, [row.id]);
+    res.json({ counterparty: cpPublic(row, accounts[row.id]) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/counterparties — create, after a duplicate check.
+// Accepts the legacy body ({ name }) and the V1 body. Duplicate candidates are
+// returned with 409 rather than merged; `create_new_anyway: true` is the explicit
+// override, and it is audited.
+app.post('/api/counterparties', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const b = req.body || {};
+    const name = (b.legal_name || b.name || b.display_name || '').trim();
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    if (b.role && !CP_ROLES.includes(b.role))
+      return res.status(400).json({ error: 'invalid_role', allowed: CP_ROLES });
+    if (b.pkp_status && !['unknown', 'pkp', 'non_pkp'].includes(b.pkp_status))
+      return res.status(400).json({ error: 'invalid_pkp_status' });
+    // Tax fields (P-04): validated, and only the accountant role and above may set them.
+    const tax = CPI.taxFieldsFromBody(b);
+    if (tax.error) return res.status(400).json({ error: tax.error, allowed: tax.allowed });
+    if (Object.keys(tax.fields).length && !CPI.canSetTaxFields(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can set entity form or payment terms' });
+
+    const bankAccounts = Array.isArray(b.bank_accounts) ? b.bank_accounts : [];
+    const candidate = {
+      legal_name: name, display_name: b.display_name || name,
+      npwp: b.npwp || null, aliases: b.aliases || [],
+      bank_accounts: bankAccounts, email: b.email || null,
+    };
+
+    if (!b.create_new_anyway) {
+      const dup = CPI.findDuplicates(candidate, await cpDirectoryForMatching(biz));
+      if (dup.blocking) {
+        return res.status(409).json({
+          error: 'possible_duplicate_counterparty',
+          message: dup.message,
+          matched_counterparty_id: dup.matched_counterparty_id || null,
+          possible_matches: dup.possible_matches || [],
+          reasons: dup.reasons,
+          hint: 'Link to the existing counterparty, or resend with create_new_anyway: true.',
+        });
+      }
+    }
+
+    const row = {
+      user_id: biz.ownerUserId, business_id: biz.business.id,
+      name, legal_name: name, display_name: b.display_name || name,
+      group_name: b.group_name || null, type: b.role || b.type || null,
+      email: b.email || null, phone: b.phone || null, notes: b.notes || null,
+      npwp: b.npwp || null, pkp_status: b.pkp_status || 'unknown',
+      address: b.address || null,
+      aliases: Array.isArray(b.aliases) && b.aliases.length ? b.aliases : null,
+      default_category: b.default_category || null,
+      default_tax_treatment: b.default_tax_treatment || null,
+      status: 'active',
+      source_system: b.source_system || null, external_id: b.external_id || null,
+      external_url: b.external_url || null,
+      // Only when sent, so a database without migration 060 keeps accepting creates.
+      ...tax.fields,
+    };
+    const { data, error } = await supabase.from('counterparties').insert(row).select().single();
+    if (error && Object.keys(tax.fields).length && TARGETS.isMissingColumn(error))
+      return res.status(409).json({ error: 'migration_not_applied', migration: '060' });
+    if (error) {
+      console.error(`[counterparties] create failed: ${error.message}`);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const created = [];
+    for (const a of bankAccounts) {
+      const number = a && (a.account_number || a.number);
+      if (!number) continue;
+      const { data: acct, error: aErr } = await supabase.from('counterparty_bank_accounts').insert({
+        business_id: biz.business.id, counterparty_id: data.id,
+        bank_name: a.bank_name || null, account_number: String(number),
+        account_name: a.account_name || null, currency: a.currency || 'IDR',
+        is_primary: !!a.is_primary, created_by_user_id: req.user.userId,
+      }).select().single();
+      if (!aErr && acct) created.push(acct);
+    }
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty', entityId: data.id,
+      action: b.create_new_anyway ? 'counterparty_created_duplicate_override' : 'counterparty_created',
+      after: data,
+    });
+    res.json({ counterparty: cpPublic(data, created) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/counterparties/:id — edit.
+//
+// ISOLATION FIX: this route previously scoped by `.eq('user_id', userId)` while GET
+// and POST scoped by business. For a user who owns two businesses that read the
+// wrong set. It is now business-scoped like its siblings, and the row is verified
+// to belong to the active business before anything is written.
+app.patch('/api/counterparties/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data: rows } = await supabase.from('counterparties').select('*')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const existing = rows?.[0];
+    if (!existing) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+
+    const b = req.body || {};
+    if (b.role && !CP_ROLES.includes(b.role))
+      return res.status(400).json({ error: 'invalid_role', allowed: CP_ROLES });
+    if (b.pkp_status && !['unknown', 'pkp', 'non_pkp'].includes(b.pkp_status))
+      return res.status(400).json({ error: 'invalid_pkp_status' });
+    const tax = CPI.taxFieldsFromBody(b);
+    if (tax.error) return res.status(400).json({ error: tax.error, allowed: tax.allowed });
+    if (Object.keys(tax.fields).length && !CPI.canSetTaxFields(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can set entity form or payment terms' });
+
+    const patch = { updated_at: new Date().toISOString(), ...tax.fields };
+    const setIf = (key, val) => { if (val !== undefined) patch[key] = val; };
+    setIf('name', b.legal_name ?? b.name);
+    setIf('legal_name', b.legal_name ?? b.name);
+    setIf('display_name', b.display_name);
+    setIf('group_name', b.group_name);
+    setIf('type', b.role ?? b.type);
+    setIf('email', b.email);
+    setIf('phone', b.phone);
+    setIf('notes', b.notes);
+    setIf('npwp', b.npwp);
+    setIf('pkp_status', b.pkp_status);
+    setIf('address', b.address);
+    setIf('aliases', b.aliases);
+    setIf('default_category', b.default_category);
+    setIf('default_tax_treatment', b.default_tax_treatment);
+    setIf('source_system', b.source_system);
+    setIf('external_id', b.external_id);
+    setIf('external_url', b.external_url);
+    if (b.is_active !== undefined) {
+      patch.is_active = !!b.is_active;
+      patch.status = b.is_active ? 'active' : 'archived';
+    }
+    if (b.status !== undefined) {
+      if (!['active', 'archived'].includes(b.status))
+        return res.status(400).json({ error: 'invalid_status', allowed: ['active', 'archived'] });
+      patch.status = b.status;
+      patch.is_active = b.status === 'active';
+    }
+
+    const { data, error } = await supabase.from('counterparties')
+      .update(patch).eq('id', existing.id).eq('business_id', existing.business_id)
+      .select().single();
+    if (error && Object.keys(tax.fields).length && TARGETS.isMissingColumn(error))
+      return res.status(409).json({ error: 'migration_not_applied', migration: '060' });
+    if (error) throw error;
+
+    // Bank accounts are ADDED here, never silently replaced: dropping an account a
+    // payment already matched on would break that match. Removal is its own explicit
+    // DELETE. A repeat of an existing account is skipped rather than erroring, since
+    // the UI resends the full list on save.
+    if (Array.isArray(b.bank_accounts)) {
+      const { data: current } = await supabase.from('counterparty_bank_accounts')
+        .select('account_number').eq('business_id', biz.business.id).eq('counterparty_id', existing.id);
+      const digits = (v) => String(v || '').replace(/\D/g, '');
+      const have = new Set((current || []).map((a) => digits(a.account_number)));
+      for (const a of b.bank_accounts) {
+        const number = a && (a.account_number || a.number);
+        if (!number || have.has(digits(number))) continue;
+        await supabase.from('counterparty_bank_accounts').insert({
+          business_id: biz.business.id, counterparty_id: existing.id,
+          bank_name: a.bank_name || null, account_number: String(number),
+          account_name: a.account_name || null, currency: a.currency || 'IDR',
+          is_primary: !!a.is_primary, created_by_user_id: req.user.userId,
+        });
+      }
+    }
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty', entityId: existing.id,
+      action: 'counterparty_updated', before: existing, after: data,
+    });
+    const accounts = await cpBankAccounts(biz, [existing.id]);
+    res.json({ counterparty: cpPublic(data, accounts[existing.id]) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/counterparties/:id/bank-accounts/:accountId — remove one account.
+// Explicit because an account is a matching key: removing it can change which
+// counterparty a future payment resolves to.
+app.delete('/api/counterparties/:id/bank-accounts/:accountId', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data: rows } = await supabase.from('counterparties').select('id')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    if (!rows?.length) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+
+    const { data: acct } = await supabase.from('counterparty_bank_accounts').select('*')
+      .eq('id', req.params.accountId).eq('counterparty_id', req.params.id)
+      .eq('business_id', biz.business.id).limit(1);
+    if (!acct?.length) return res.status(404).json({ error: 'bank_account_not_found' });
+
+    const { error } = await supabase.from('counterparty_bank_accounts')
+      .delete().eq('id', req.params.accountId).eq('business_id', biz.business.id);
+    if (error) throw error;
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty_bank_account', entityId: req.params.accountId,
+      action: 'counterparty_bank_account_removed', before: acct[0],
+    });
+    res.json({ ok: true, removed: req.params.accountId });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/counterparties/:id/archive — soft archive. Nothing is deleted, and the
+// record stays linked to whatever history already references it.
+app.post('/api/counterparties/:id/archive', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data: rows } = await supabase.from('counterparties').select('*')
+      .eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+    const existing = rows?.[0];
+    if (!existing) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+
+    const archive = req.body && req.body.unarchive ? false : true;
+    const { data, error } = await supabase.from('counterparties')
+      .update({ status: archive ? 'archived' : 'active', is_active: !archive,
+        updated_at: new Date().toISOString() })
+      .eq('id', existing.id).eq('business_id', existing.business_id).select().single();
+    if (error) throw error;
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'counterparty', entityId: existing.id,
+      action: archive ? 'counterparty_archived' : 'counterparty_unarchived', after: data,
+    });
+    res.json({ counterparty: cpPublic(data, []) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/business-directions — user-owned active directions only
+app.get('/api/business-directions', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data, error } = await supabase
+      .from('business_directions')
+      .select('*')
+      .or(bizOrFilter(biz))
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    res.json({ directions: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/business-directions — create user direction
+app.post('/api/business-directions', auth, async (req, res) => {
+  try {
+    const { name, slug } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data, error } = await supabase
+      .from('business_directions')
+      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name: name.trim(), slug: slug || null, is_system: false, is_active: true, source: 'user' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ direction: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/business-directions/:id — soft archive
+app.delete('/api/business-directions/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('business_directions')
+      .update({ is_active: false })
+      .eq('id', req.params.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Direction not found' });
+    res.json({ direction: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/activity-types — user-owned active activity types only
+app.get('/api/activity-types', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data, error } = await supabase
+      .from('activity_types')
+      .select('*')
+      .or(bizOrFilter(biz))
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    res.json({ activityTypes: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/activity-types — create user activity type
+app.post('/api/activity-types', auth, async (req, res) => {
+  try {
+    const { name, code } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'name required' });
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    const { data, error } = await supabase
+      .from('activity_types')
+      .insert({ user_id: biz.ownerUserId, business_id: biz.business.id, name: name.trim(), code: code || null, is_system: false, is_active: true, source: 'user' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ activityType: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/activity-types/:id — soft archive
+app.delete('/api/activity-types/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { data, error } = await supabase
+      .from('activity_types')
+      .update({ is_active: false })
+      .eq('id', req.params.id)
+      .eq('user_id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Activity type not found' });
+    res.json({ activityType: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── SaaS Foundation Helpers ──────────────────────────────────────────────────
+//
+// Phase 1 bridge: existing financial data remains user_id-scoped.
+// Future migration: transactions/wallets/debts/reminders will move
+// to business_id-scoped model.
+
+/**
+ * Ensure every authenticated user has a default business + owner membership.
+ * Idempotent: safe to call on every request that needs access context.
+ */
+// Read-only half of ensureDefaultBusiness: the user's existing default business, or
+// { business: null, membership: null }. NEVER creates anything — read-only callers
+// (e.g. the MCP adapter) use this so a lookup can never bootstrap a workspace.
+async function findDefaultBusiness(userId) {
+  // Look for an existing active membership. Deterministic: the EARLIEST-created
+  // business-type workspace (never a personal workspace), so the "default" business
+  // is stable across requests rather than whatever Postgres returns first.
+  const { data: memberships } = await supabase
+    .from('business_members')
+    .select('role, status, business_id, businesses(*)')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  const ownedBusiness = (memberships || [])
+    .filter(m => m.businesses && m.businesses.type !== 'personal')
+    .sort((a, b) => new Date(a.businesses.created_at || 0) - new Date(b.businesses.created_at || 0))[0];
+  if (ownedBusiness) {
+    return { business: ownedBusiness.businesses, membership: { role: ownedBusiness.role, status: ownedBusiness.status } };
+  }
+  return { business: null, membership: null };
+}
+
+async function ensureDefaultBusiness(userId, firstName) {
+  const existing = await findDefaultBusiness(userId);
+  if (existing.business) return existing;
+
+  // Email-first Personal Account users (negative app_user_id_seq ids) must NOT get an
+  // auto-created business. They explicitly click "Create business" from /account. Return
+  // a clean "no business" state instead of bootstrapping. Telegram/legacy users have
+  // POSITIVE ids and keep the historical auto-bootstrap behavior below.
+  if (userId < 0) {
+    return { business: null, membership: null };
+  }
+
+  // No business — bootstrap default with 7-day trial
+  const now = new Date();
+  const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const name = `${firstName || 'My'} Business`;
+
+  const { data: business, error: bErr } = await supabase
+    .from('businesses')
+    .insert({
+      owner_user_id:       userId,
+      name,
+      base_currency:       'IDR',
+      plan:                'free',
+      trial_status:        'active',
+      trial_started_at:    now.toISOString(),
+      trial_ends_at:       trialEnd.toISOString(),
+      subscription_status: 'trialing',
+    })
+    .select()
+    .single();
+  if (bErr) throw bErr;
+
+  await supabase.from('business_members').insert({
+    business_id: business.id,
+    user_id:     userId,
+    role:        'owner',
+    status:      'active',
+  });
+
+  return { business, membership: { role: 'owner', status: 'active' } };
+}
+
+/**
+ * Compute effective access state from a business row.
+ * Effective plan rules:
+ *   trial active           → founder-level access (full features)
+ *   subscription active    → business.plan
+ *   expired / no sub       → free
+ */
+// Per-business resolver — see server/lib/businessAccess.js (unit-tested).
+// Back-compat shape used by existing callers.
+function getAccessState(business) {
+  const a = computeBusinessAccess(business);
+  return { isTrialActive: a.trial_status_effective === 'active', daysLeft: a.daysLeft, effectivePlan: a.effective_plan };
+}
+
+// Per-business access WITH membership check (the correct path; no arbitrary pick).
+async function getBusinessAccess(userId, businessId) {
+  const { data: m } = await supabase.from('business_members')
+    .select('role, status, businesses(*)').eq('user_id', userId).eq('business_id', businessId).eq('status', 'active').limit(1);
+  if (!m?.length) return null;
+  const business = m[0].businesses;
+  const access = computeBusinessAccess(business);
+  const { data: limits } = await supabase.from('plan_limits').select('*').eq('plan', access.effective_plan).single();
+  return { business, membership: { role: m[0].role, status: m[0].status }, access, limits: limits || {} };
+}
+
+// Platform-admin path: no membership requirement (admin sees any business).
+async function getBusinessAccessForPlatformAdmin(businessId) {
+  const { data: business } = await supabase.from('businesses').select('*').eq('id', businessId).single();
+  if (!business) return null;
+  const access = computeBusinessAccess(business);
+  const { data: limits } = await supabase.from('plan_limits').select('*').eq('plan', access.effective_plan).single();
+  return { business, access, limits: limits || {} };
+}
+
+/**
+ * Load full access context for a userId.
+ * Returns null if no business found (before ensureDefaultBusiness call).
+ */
+async function getCurrentAccess(userId, businessId = null) {
+  // If a specific business is known, resolve THAT one (no arbitrary pick).
+  if (businessId) {
+    const r = await getBusinessAccess(userId, businessId);
+    if (r) return { business: r.business, membership: r.membership, accessState: getAccessState(r.business), limits: r.limits };
+  }
+  // Legacy default: deterministic — prefer an owned business, then the oldest.
+  const { data: memberships } = await supabase
+    .from('business_members')
+    .select('role, status, businesses(*)')
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  if (!memberships || memberships.length === 0) return null;
+
+  const rolePri = { owner: 0, ceo: 1, admin: 2, cfo: 3, accountant: 4, manager: 5, employee: 6 };
+  memberships.sort((a, b) =>
+    (rolePri[a.role] ?? 9) - (rolePri[b.role] ?? 9) ||
+    new Date(a.businesses?.created_at || 0) - new Date(b.businesses?.created_at || 0));
+  const m = memberships[0];
+  const business = m.businesses;
+  const accessState = getAccessState(business);
+
+  const { data: limits } = await supabase
+    .from('plan_limits')
+    .select('*')
+    .eq('plan', accessState.effectivePlan)
+    .single();
+
+  return {
+    business,
+    membership: { role: m.role, status: m.status },
+    accessState,
+    limits: limits || {},
+  };
+}
+
+/** Returns true if the feature boolean flag is enabled in the access context. */
+function hasFeature(access, featureName) {
+  if (!access) return false;
+  return access.limits[featureName] === true;
+}
+
+/**
+ * Send a standardised 403 upgrade_required response.
+ * requiredPlan is advisory — no billing logic here.
+ */
+function sendUpgradeRequired(res, feature, message, extra = {}) {
+  res.status(403).json({
+    error: message || 'Plan limit reached',
+    feature,
+    upgrade_required: true,
+    ...extra,
+  });
+}
+
+/**
+ * Assert feature is available; sends 403 and returns false if not.
+ * Usage: if (!assertFeature(access, 'payroll_enabled', res)) return;
+ */
+function assertFeature(access, featureName, res) {
+  if (!hasFeature(access, featureName)) {
+    sendUpgradeRequired(res, featureName, 'Feature not available on your current plan', {
+      current_plan: access?.accessState?.effectivePlan || 'free',
+    });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Check if a numeric usage limit is reached.
+ * Returns true (limit reached) when currentUsage >= limit.
+ * A null/undefined limit means unlimited → returns false.
+ */
+function isLimitReached(limitValue, currentUsage) {
+  if (limitValue === null || limitValue === undefined) return false;
+  return currentUsage >= limitValue;
+}
+
+// --- Language helpers -------------------------------------------------------
+
+function normalizeLanguage(lang) {
+  return ['en', 'ru', 'id'].includes(lang) ? lang : 'en'
+}
+
+async function getUserLanguage(userId) {
+  try {
+    const { data } = await supabase
+      .from('users')
+      .select('language')
+      .eq('id', userId)
+      .single()
+    return normalizeLanguage(data?.language)
+  } catch { return 'en' }
+}
+
+const CONTEXT_STRINGS = {
+  en: {
+    financiallyStable: 'Business is financially stable',
+    cashStrong: 'Cash is strong with no urgent payment risks detected. Keep monitoring monthly.',
+    notEnoughExpenseHistory: 'Not enough expense history',
+    runwayUnknown: 'Runway unknown — add expenses',
+    noPayables: 'No payables',
+    noReceivables: 'No receivables',
+    noMonthlyData: 'No monthly data yet',
+    noRisks: 'No significant risks',
+    financesStable: 'Finances look stable',
+    noUrgentActions: 'No urgent actions detected. Keep adding transactions daily and review cash weekly.',
+    needsAttention: 'Needs Attention',
+    someAreasNeedAttention: 'Some areas need attention.',
+    healthy: 'Healthy',
+    critical: 'Critical',
+    notEnoughData: 'Not enough data',
+    addWalletsHint: 'Add wallets, transactions and expenses to calculate safe hiring budget.',
+    readyToHire: 'Ready to hire',
+    hireCaution: 'Proceed with caution',
+    notRecommended: 'Not recommended',
+  },
+  ru: {
+    financiallyStable: 'Финансы бизнеса стабильны',
+    cashStrong: 'Денежная позиция стабильная, срочных рисков нет. Продолжайте контролировать финансы регулярно.',
+    notEnoughExpenseHistory: 'Недостаточно истории расходов',
+    runwayUnknown: 'Запас денег неизвестен — добавьте расходы',
+    noPayables: 'Обязательств нет',
+    noReceivables: 'Дебиторки нет',
+    noMonthlyData: 'За месяц пока нет данных',
+    noRisks: 'Существенных рисков нет',
+    financesStable: 'Финансы выглядят стабильно',
+    noUrgentActions: 'Срочных действий нет. Продолжайте добавлять операции и проверять деньги еженедельно.',
+    needsAttention: 'Требует внимания',
+    someAreasNeedAttention: 'Есть зоны, которые требуют внимания.',
+    healthy: 'Хорошо',
+    critical: 'Критично',
+    notEnoughData: 'Недостаточно данных',
+    addWalletsHint: 'Добавьте кошельки, операции и расходы, чтобы рассчитать безопасный бюджет на найм.',
+    readyToHire: 'Можно нанимать',
+    hireCaution: 'Осторожно',
+    notRecommended: 'Не рекомендуется',
+  },
+  id: {
+    financiallyStable: 'Keuangan bisnis stabil',
+    cashStrong: 'Posisi kas stabil dan tidak ada risiko pembayaran mendesak. Tetap pantau keuangan secara rutin.',
+    notEnoughExpenseHistory: 'Riwayat pengeluaran belum cukup',
+    runwayUnknown: 'Cadangan kas belum diketahui — tambahkan pengeluaran',
+    noPayables: 'Tidak ada kewajiban',
+    noReceivables: 'Tidak ada piutang',
+    noMonthlyData: 'Belum ada data bulanan',
+    noRisks: 'Tidak ada risiko signifikan',
+    financesStable: 'Keuangan terlihat stabil',
+    noUrgentActions: 'Tidak ada tindakan mendesak. Tetap tambah transaksi harian dan tinjau cash flow setiap minggu.',
+    needsAttention: 'Perlu perhatian',
+    someAreasNeedAttention: 'Ada beberapa area yang perlu diperhatikan.',
+    healthy: 'Baik',
+    critical: 'Kritis',
+    notEnoughData: 'Data belum cukup',
+    addWalletsHint: 'Tambahkan dompet, transaksi, dan pengeluaran untuk menghitung anggaran rekrutmen yang aman.',
+    readyToHire: 'Siap merekrut',
+    hireCaution: 'Hati-hati',
+    notRecommended: 'Tidak disarankan',
+    noRisksDetected: 'Tidak ada risiko terdeteksi.',
+    incomeCoversObligations: 'Pemasukan menutup kewajiban.',
+  },
+}
+// AI CFO engine phrases (score, alert, next actions) in the user's language. The English sentence is
+// the key — an unknown language or a missing line falls back to the English text unchanged.
+const CFO_PHRASES = {
+  ru: {
+    'Strong cash position': 'Сильная денежная позиция',
+    'Adequate cash reserves': 'Денег достаточно',
+    'Cash below 1 month expenses': 'Денег меньше, чем на месяц расходов',
+    'Cash critically low': 'Денег критически мало',
+    'Runway excellent (90+ days)': 'Запас отличный (90+ дней)',
+    'Runway healthy (60+ days)': 'Запас хороший (60+ дней)',
+    'Runway adequate (30+ days)': 'Запас достаточный (30+ дней)',
+    'Runway short — needs attention': 'Запас короткий — нужно внимание',
+    'Runway critical (<15 days)': 'Запас критический (меньше 15 дней)',
+    'All receivables on time': 'Клиенты платят вовремя',
+    'Minor overdue receivables': 'Немного просроченной дебиторки',
+    'Significant overdue receivables': 'Заметная просроченная дебиторка',
+    'Most receivables overdue': 'Большая часть дебиторки просрочена',
+    'Overdue payables exceed cash': 'Просроченные счета больше денег на счетах',
+    'Upcoming payments exceed cash': 'Ближайшие платежи больше денег на счетах',
+    'Payables under control': 'Счета под контролем',
+    'Payables manageable': 'Счета в пределах нормы',
+    'Net flow positive': 'Чистый поток положительный',
+    'Monthly expenses exceed income': 'Расходы за месяц больше доходов',
+    'Expenses significantly exceed income': 'Расходы заметно больше доходов',
+    'All key metrics are positive.': 'Все ключевые показатели в норме.',
+    'Monitor closely and take action.': 'Следите внимательно и действуйте.',
+    'Immediate action required.': 'Нужны срочные действия.',
+    'Financial health is critical. Prioritize cash flow.': 'Финансовое состояние критическое. Сначала — деньги.',
+    'Warning': 'Внимание',
+    'Immediate cash action required': 'Требуются действия по деньгам',
+    'Cash balance is negative. Review all transactions and stop non-essential spending.': 'Остаток денег отрицательный. Проверьте все операции и остановите необязательные расходы.',
+    'Cash runway is {n} days. Prioritize collecting receivables and reducing expenses now.': 'Запас денег — {n} дн. Сейчас главное — собрать оплаты и сократить расходы.',
+    'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.': 'Просроченные счета больше доступных денег. Договоритесь о переносе или срочно организуйте оплату.',
+    'Financial health score is below safe threshold. Review all key metrics.': 'Оценка финансов ниже безопасного уровня. Проверьте ключевые показатели.',
+    'Some areas need attention': 'Есть зоны, которые требуют внимания',
+    'Cash runway is {n} days. This requires active cash planning — collect receivables on time.': 'Запас денег — {n} дн. Нужно активно планировать деньги и вовремя собирать оплаты.',
+    'Overdue receivables: {n}. Follow up to protect cash flow.': 'Просроченных оплат от клиентов: {n}. Напомните им, чтобы сберечь деньги.',
+    'Cash position is adequate but some metrics need monitoring.': 'Денег достаточно, но некоторые показатели стоит отслеживать.',
+    'Follow up: {who}': 'Напомнить: {who}',
+    ' — {d}d past due': ' — {d} дн. просрочки',
+    '{amt} {cur} overdue{late}. Send a payment reminder.': '{amt} {cur} просрочено{late}. Отправьте напоминание об оплате.',
+    '{n} more overdue receivables': 'Ещё просроченных оплат: {n}',
+    '{amt} {cur} also overdue. Review and follow up.': 'Ещё {amt} {cur} просрочено. Проверьте и напомните.',
+    'Confirm payment: {who}': 'Подтвердить оплату: {who}',
+    'Receivable due soon': 'Скоро оплата от клиента',
+    '{amt} {cur} expected within 7 days. Confirm collection date.': 'Ожидается {amt} {cur} в течение 7 дней. Уточните дату оплаты.',
+    'Pay or renegotiate: {who}': 'Оплатить или договориться: {who}',
+    '{amt} {cur} overdue{late}. Resolve to protect vendor relationship.': '{amt} {cur} просрочено{late}. Решите вопрос, чтобы сохранить отношения с поставщиком.',
+    'Prepare payment: {who}': 'Подготовить оплату: {who}',
+    '{amt} {cur} due within 7 days. Ensure funds are ready.': '{amt} {cur} к оплате в течение 7 дней. Проверьте, что деньги есть.',
+    'Protect runway: review non-critical spending': 'Сберечь запас: пересмотрите необязательные расходы',
+    'Runway is {n} days. Delay or cancel non-essential expenses to extend cash runway.': 'Запас — {n} дн. Отложите или отмените необязательные расходы, чтобы продлить запас.',
+    'Review top expenses this month': 'Проверьте крупные расходы месяца',
+    'Monthly expenses exceed income by {amt} {cur}. Identify which categories can be reduced.': 'Расходы за месяц больше доходов на {amt} {cur}. Найдите статьи, которые можно сократить.',
+    'Delay hiring — build runway first': 'Отложите найм — сначала нарастите запас',
+    'Runway of {n} days is below safe threshold. Focus on extending runway before adding fixed costs.': 'Запас {n} дн. ниже безопасного уровня. Сначала продлите запас, потом добавляйте постоянные расходы.',
+    'Hiring capacity available': 'Можно нанимать',
+    'Safe monthly salary budget: {amt} {cur}. You can hire conservatively.': 'Безопасный бюджет на зарплату в месяц: {amt} {cur}. Можно нанимать осторожно.',
+  },
+  id: {
+    'Strong cash position': 'Posisi kas kuat',
+    'Adequate cash reserves': 'Cadangan kas memadai',
+    'Cash below 1 month expenses': 'Kas di bawah pengeluaran 1 bulan',
+    'Cash critically low': 'Kas sangat rendah',
+    'Runway excellent (90+ days)': 'Runway sangat baik (90+ hari)',
+    'Runway healthy (60+ days)': 'Runway sehat (60+ hari)',
+    'Runway adequate (30+ days)': 'Runway cukup (30+ hari)',
+    'Runway short — needs attention': 'Runway pendek — perlu perhatian',
+    'Runway critical (<15 days)': 'Runway kritis (kurang dari 15 hari)',
+    'All receivables on time': 'Semua piutang tepat waktu',
+    'Minor overdue receivables': 'Sedikit piutang terlambat',
+    'Significant overdue receivables': 'Piutang terlambat cukup besar',
+    'Most receivables overdue': 'Sebagian besar piutang terlambat',
+    'Overdue payables exceed cash': 'Utang terlambat melebihi kas',
+    'Upcoming payments exceed cash': 'Pembayaran mendatang melebihi kas',
+    'Payables under control': 'Utang terkendali',
+    'Payables manageable': 'Utang masih terkelola',
+    'Net flow positive': 'Arus bersih positif',
+    'Monthly expenses exceed income': 'Pengeluaran bulanan melebihi pemasukan',
+    'Expenses significantly exceed income': 'Pengeluaran jauh melebihi pemasukan',
+    'All key metrics are positive.': 'Semua metrik utama positif.',
+    'Monitor closely and take action.': 'Pantau ketat dan ambil tindakan.',
+    'Immediate action required.': 'Perlu tindakan segera.',
+    'Financial health is critical. Prioritize cash flow.': 'Kesehatan keuangan kritis. Prioritaskan arus kas.',
+    'Warning': 'Peringatan',
+    'Immediate cash action required': 'Perlu tindakan kas segera',
+    'Cash balance is negative. Review all transactions and stop non-essential spending.': 'Saldo kas negatif. Tinjau semua transaksi dan hentikan pengeluaran yang tidak penting.',
+    'Cash runway is {n} days. Prioritize collecting receivables and reducing expenses now.': 'Runway kas {n} hari. Prioritaskan penagihan piutang dan pengurangan biaya sekarang.',
+    'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.': 'Utang terlambat melebihi kas tersedia. Negosiasi ulang atau segera atur pembayaran.',
+    'Financial health score is below safe threshold. Review all key metrics.': 'Skor kesehatan keuangan di bawah batas aman. Tinjau semua metrik utama.',
+    'Some areas need attention': 'Ada area yang perlu diperhatikan',
+    'Cash runway is {n} days. This requires active cash planning — collect receivables on time.': 'Runway kas {n} hari. Perlu perencanaan kas aktif — tagih piutang tepat waktu.',
+    'Overdue receivables: {n}. Follow up to protect cash flow.': 'Piutang terlambat: {n}. Tindak lanjuti untuk menjaga arus kas.',
+    'Cash position is adequate but some metrics need monitoring.': 'Posisi kas memadai, tetapi beberapa metrik perlu dipantau.',
+    'Follow up: {who}': 'Tindak lanjut: {who}',
+    ' — {d}d past due': ' — terlambat {d} hari',
+    '{amt} {cur} overdue{late}. Send a payment reminder.': '{amt} {cur} terlambat{late}. Kirim pengingat pembayaran.',
+    '{n} more overdue receivables': '{n} piutang terlambat lainnya',
+    '{amt} {cur} also overdue. Review and follow up.': '{amt} {cur} juga terlambat. Tinjau dan tindak lanjuti.',
+    'Confirm payment: {who}': 'Konfirmasi pembayaran: {who}',
+    'Receivable due soon': 'Piutang segera jatuh tempo',
+    '{amt} {cur} expected within 7 days. Confirm collection date.': '{amt} {cur} diharapkan dalam 7 hari. Konfirmasi tanggal penagihan.',
+    'Pay or renegotiate: {who}': 'Bayar atau negosiasi ulang: {who}',
+    '{amt} {cur} overdue{late}. Resolve to protect vendor relationship.': '{amt} {cur} terlambat{late}. Selesaikan untuk menjaga hubungan dengan pemasok.',
+    'Prepare payment: {who}': 'Siapkan pembayaran: {who}',
+    '{amt} {cur} due within 7 days. Ensure funds are ready.': '{amt} {cur} jatuh tempo dalam 7 hari. Pastikan dana siap.',
+    'Protect runway: review non-critical spending': 'Jaga runway: tinjau pengeluaran tidak penting',
+    'Runway is {n} days. Delay or cancel non-essential expenses to extend cash runway.': 'Runway {n} hari. Tunda atau batalkan pengeluaran tidak penting untuk memperpanjang runway.',
+    'Review top expenses this month': 'Tinjau pengeluaran terbesar bulan ini',
+    'Monthly expenses exceed income by {amt} {cur}. Identify which categories can be reduced.': 'Pengeluaran bulanan melebihi pemasukan sebesar {amt} {cur}. Temukan kategori yang bisa dikurangi.',
+    'Delay hiring — build runway first': 'Tunda rekrutmen — bangun runway dulu',
+    'Runway of {n} days is below safe threshold. Focus on extending runway before adding fixed costs.': 'Runway {n} hari di bawah batas aman. Perpanjang runway sebelum menambah biaya tetap.',
+    'Hiring capacity available': 'Kapasitas rekrutmen tersedia',
+    'Safe monthly salary budget: {amt} {cur}. You can hire conservatively.': 'Anggaran gaji bulanan aman: {amt} {cur}. Anda bisa merekrut secara hati-hati.',
+  },
+};
+function cxt(language, en, vars = {}) {
+  const lang = normalizeLanguage(language);
+  const tpl = (CFO_PHRASES[lang] || {})[en] || en;
+  return tpl.replace(/\{(\w+)\}/g, (m, k) => (vars[k] === undefined ? m : String(vars[k])));
+}
+
+function cx(language, key) {
+  const lang = normalizeLanguage(language)
+  return (CONTEXT_STRINGS[lang] || CONTEXT_STRINGS.en)[key] || CONTEXT_STRINGS.en[key] || key
+}
+
+function getCfoOutOfScopeResponse(language) {
+  if (language === 'ru') {
+    return 'Извините, я не могу помочь с этим вопросом. Я CFO AI-консультант и отвечаю только на вопросы, связанные с финансами бизнеса: cash flow, дебиторкой, обязательствами, расходами, запасом денег, зарплатами и финансовыми решениями владельца бизнеса.'
+  }
+  if (language === 'id') {
+    return 'Maaf, saya tidak bisa membantu pertanyaan itu. Saya adalah CFO AI — konsultan keuangan untuk pemilik bisnis. Saya hanya menjawab pertanyaan yang terkait dengan keuangan bisnis: cash flow, piutang, kewajiban, pengeluaran, cadangan kas, payroll, dan keputusan keuangan pemilik bisnis.'
+  }
+  return "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions related to business finance: cash flow, receivables, payables, expenses, runway, payroll and financial decisions."
+}
+
+const NOTIFICATION_TEMPLATES = {
+  runway_warning: {
+    en: (p) => `Runway: ${p.days} days. Review upcoming payments and protect your cash buffer.`,
+    ru: (p) => `Запас денег: ${p.days} дней. Проверьте ближайшие платежи и защитите денежный буфер.`,
+    id: (p) => `Cadangan kas: ${p.days} hari. Periksa pembayaran yang akan datang dan lindungi kas bisnis Anda.`,
+  },
+  cash_critical: {
+    en: () => 'Cash is critically low. Immediate action required.',
+    ru: () => 'Деньги на критически низком уровне. Требуются немедленные действия.',
+    id: () => 'Kas berada di level kritis. Diperlukan tindakan segera.',
+  },
+  receivable_overdue: {
+    en: (p) => `Receivable overdue: ${p.counterparty} owes ${p.amount} (${p.days} days overdue).`,
+    ru: (p) => `Просрочена дебиторка: ${p.counterparty} должен ${p.amount} (просрочено на ${p.days} дней).`,
+    id: (p) => `Piutang terlambat: ${p.counterparty} berutang ${p.amount} (terlambat ${p.days} hari).`,
+  },
+  payable_due_soon: {
+    en: (p) => `Payment due soon: ${p.counterparty} — ${p.amount} due in ${p.days} days.`,
+    ru: (p) => `Скоро платёж: ${p.counterparty} — ${p.amount} через ${p.days} дней.`,
+    id: (p) => `Pembayaran segera jatuh tempo: ${p.counterparty} — ${p.amount} dalam ${p.days} hari.`,
+  },
+  payroll_due: {
+    en: (p) => `Payroll due: ${p.amount} in ${p.days} days.`,
+    ru: (p) => `Зарплата: ${p.amount} через ${p.days} дней.`,
+    id: (p) => `Gaji jatuh tempo: ${p.amount} dalam ${p.days} hari.`,
+  },
+  ai_scope_refusal: {
+    en: () => getCfoOutOfScopeResponse('en'),
+    ru: () => getCfoOutOfScopeResponse('ru'),
+    id: () => getCfoOutOfScopeResponse('id'),
+  },
+
+  // ── Telegram notifications for Admin / CFO / Owner ─────────────────────────
+  // Sent via notifyBusinessAdminsViaTelegram(). Params:
+  //   counterparty, amount (formatted with currency), due, createdBy, role, raw
+  telegram_receivable_submitted: {
+    en: (p) => `📥 <b>New receivable request</b>\n\nClient: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nCreated by: ${p.createdBy} · ${p.role}\nSource: Telegram · ⏳ Pending approval${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+    ru: (p) => `📥 <b>Новая заявка: дебиторка</b>\n\nКлиент: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nСоздал: ${p.createdBy} · ${p.role}\nИсточник: Telegram · ⏳ Ожидает подтверждения${p.raw ? `\n\n💬 «${p.raw}»` : ''}`,
+    id: (p) => `📥 <b>Permintaan piutang baru</b>\n\nKlien: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nDibuat oleh: ${p.createdBy} · ${p.role}\nSumber: Telegram · ⏳ Menunggu persetujuan${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+  },
+  telegram_payable_submitted: {
+    en: (p) => `📤 <b>New payable request</b>\n\nSupplier: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nCreated by: ${p.createdBy} · ${p.role}\nSource: Telegram · ⏳ Pending approval${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+    ru: (p) => `📤 <b>Новая заявка: оплата поставщику</b>\n\nПоставщик: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nСоздал: ${p.createdBy} · ${p.role}\nИсточник: Telegram · ⏳ Ожидает подтверждения${p.raw ? `\n\n💬 «${p.raw}»` : ''}`,
+    id: (p) => `📤 <b>Permintaan pembayaran baru</b>\n\nPemasok: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nDibuat oleh: ${p.createdBy} · ${p.role}\nSumber: Telegram · ⏳ Menunggu persetujuan${p.raw ? `\n\n💬 "${p.raw}"` : ''}`,
+  },
+  mcp_payable_submitted: {
+    en: (p) => `🤖 <b>Invoice draft from your AI assistant</b>\n\nSupplier: ${p.counterparty}\nAmount: <b>${p.amount}</b>\nDue: ${p.due}\nInvoice: ${p.invoice}\nSubmitted by: ${p.createdBy}\nSource: CFO AI connector · ⏳ Pending approval\n\nNot counted in cash flow until approved.`,
+    ru: (p) => `🤖 <b>Черновик инвойса от AI-ассистента</b>\n\nПоставщик: ${p.counterparty}\nСумма: <b>${p.amount}</b>\nСрок: ${p.due}\nИнвойс: ${p.invoice}\nОтправил: ${p.createdBy}\nИсточник: коннектор CFO AI · ⏳ Ожидает подтверждения\n\nНе учитывается в cash flow до подтверждения.`,
+    id: (p) => `🤖 <b>Draf invoice dari asisten AI</b>\n\nPemasok: ${p.counterparty}\nJumlah: <b>${p.amount}</b>\nJatuh tempo: ${p.due}\nInvoice: ${p.invoice}\nDikirim oleh: ${p.createdBy}\nSumber: konektor CFO AI · ⏳ Menunggu persetujuan\n\nTidak dihitung dalam arus kas sampai disetujui.`,
+  },
+  telegram_payment_reported: {
+    en: (p) => `💰 <b>Payment reported</b>\n\n${p.counterparty} reportedly paid <b>${p.amount}</b>.\nReported by: ${p.createdBy} · ${p.role}\nNeeds confirmation before it counts as received.`,
+    ru: (p) => `💰 <b>Сообщение об оплате</b>\n\n${p.counterparty} оплатил <b>${p.amount}</b> (по сообщению).\nСообщил: ${p.createdBy} · ${p.role}\nТребуется подтверждение, прежде чем сумма будет засчитана.`,
+    id: (p) => `💰 <b>Pembayaran dilaporkan</b>\n\n${p.counterparty} dilaporkan membayar <b>${p.amount}</b>.\nDilaporkan oleh: ${p.createdBy} · ${p.role}\nPerlu konfirmasi sebelum dihitung sebagai diterima.`,
+  },
+  telegram_expense_request_submitted: {
+    en: (p) => `🧾 <b>Expense request</b>\n\n${p.description}\nAmount: <b>${p.amount}</b>\nCreated by: ${p.createdBy} · ${p.role}\n⏳ Pending approval`,
+    ru: (p) => `🧾 <b>Заявка на расход</b>\n\n${p.description}\nСумма: <b>${p.amount}</b>\nСоздал: ${p.createdBy} · ${p.role}\n⏳ Ожидает подтверждения`,
+    id: (p) => `🧾 <b>Permintaan pengeluaran</b>\n\n${p.description}\nJumlah: <b>${p.amount}</b>\nDibuat oleh: ${p.createdBy} · ${p.role}\n⏳ Menunggu persetujuan`,
+  },
+  telegram_receivable_overdue: {
+    en: (p) => `🔴 <b>Receivable overdue</b>\n\n${p.counterparty} owes <b>${p.amount}</b> — ${p.days} days overdue.`,
+    ru: (p) => `🔴 <b>Просрочена дебиторка</b>\n\n${p.counterparty} должен <b>${p.amount}</b> — просрочено на ${p.days} дн.`,
+    id: (p) => `🔴 <b>Piutang terlambat</b>\n\n${p.counterparty} berutang <b>${p.amount}</b> — terlambat ${p.days} hari.`,
+  },
+  telegram_payable_due_soon: {
+    en: (p) => `🟡 <b>Payment due soon</b>\n\n${p.counterparty} — <b>${p.amount}</b> due in ${p.days} days.`,
+    ru: (p) => `🟡 <b>Скоро платёж</b>\n\n${p.counterparty} — <b>${p.amount}</b> через ${p.days} дн.`,
+    id: (p) => `🟡 <b>Pembayaran segera jatuh tempo</b>\n\n${p.counterparty} — <b>${p.amount}</b> dalam ${p.days} hari.`,
+  },
+  telegram_payable_overdue: {
+    en: (p) => `🔴 <b>Payable overdue</b>\n\n${p.counterparty} — <b>${p.amount}</b>, ${p.days} days overdue.`,
+    ru: (p) => `🔴 <b>Просрочен платёж</b>\n\n${p.counterparty} — <b>${p.amount}</b>, просрочено на ${p.days} дн.`,
+    id: (p) => `🔴 <b>Pembayaran terlambat</b>\n\n${p.counterparty} — <b>${p.amount}</b>, terlambat ${p.days} hari.`,
+  },
+  telegram_payroll_payment_created: {
+    en: (p) => `👥 <b>Payroll payment recorded</b>\n\nEmployee: ${p.employee}\nAmount: <b>${p.amount}</b>\nBy: ${p.createdBy}`,
+    ru: (p) => `👥 <b>Записана выплата зарплаты</b>\n\nСотрудник: ${p.employee}\nСумма: <b>${p.amount}</b>\nКем: ${p.createdBy}`,
+    id: (p) => `👥 <b>Pembayaran gaji dicatat</b>\n\nKaryawan: ${p.employee}\nJumlah: <b>${p.amount}</b>\nOleh: ${p.createdBy}`,
+  },
+  telegram_cash_risk_alert: {
+    en: (p) => `🚨 <b>Cash risk alert</b>\n\nRunway: ${p.runway} days\nCash: ${p.cash}\n${p.detail || ''}`,
+    ru: (p) => `🚨 <b>Риск по деньгам</b>\n\nЗапас: ${p.runway} дн.\nКасса: ${p.cash}\n${p.detail || ''}`,
+    id: (p) => `🚨 <b>Peringatan risiko kas</b>\n\nCadangan: ${p.runway} hari\nKas: ${p.cash}\n${p.detail || ''}`,
+  },
+  telegram_approval_required: {
+    en: (p) => `⏳ <b>Approval required</b>\n\n${p.count} record${p.count > 1 ? 's' : ''} waiting for your review.`,
+    ru: (p) => `⏳ <b>Требуется подтверждение</b>\n\nЗаписей на проверку: ${p.count}.`,
+    id: (p) => `⏳ <b>Persetujuan diperlukan</b>\n\n${p.count} catatan menunggu tinjauan Anda.`,
+  },
+  // TODO: wire to a scheduler (cron / Railway scheduled job) — template is ready,
+  // no scheduling system exists in this repo yet.
+  telegram_daily_financial_pulse: {
+    en: (p) => `📊 <b>CFO AI Daily Pulse</b>\n\nCash: <b>${p.cash}</b>\nRunway: ${p.runway} days\nReceivables overdue: ${p.recvOverdue}\nPayables due soon: ${p.payDueSoon}\nPending approvals: ${p.pendingApprovals}\n\n${p.topAction ? `Top action:\n${p.topAction}` : ''}`,
+    ru: (p) => `📊 <b>CFO AI: дневная сводка</b>\n\nКасса: <b>${p.cash}</b>\nЗапас: ${p.runway} дн.\nПросроченная дебиторка: ${p.recvOverdue}\nБлижайшие платежи: ${p.payDueSoon}\nОжидают подтверждения: ${p.pendingApprovals}\n\n${p.topAction ? `Главное действие:\n${p.topAction}` : ''}`,
+    id: (p) => `📊 <b>CFO AI Pulse Harian</b>\n\nKas: <b>${p.cash}</b>\nCadangan: ${p.runway} hari\nPiutang terlambat: ${p.recvOverdue}\nPembayaran segera: ${p.payDueSoon}\nMenunggu persetujuan: ${p.pendingApprovals}\n\n${p.topAction ? `Tindakan utama:\n${p.topAction}` : ''}`,
+  },
+}
+
+function notificationText(type, language, params = {}) {
+  const lang = normalizeLanguage(language)
+  const template = NOTIFICATION_TEMPLATES[type]
+  if (!template) return ''
+  const fn = template[lang] || template.en
+  return fn(params)
+}
+
+// --- Wallets API ----------------------------------------------------------
+// Phase 1: user-scoped. Balance computed from transactions (wallet_id match
+// OR legacy source-name match for backward compat with pre-wallet transactions).
+
+const WALLET_CASH_IN  = TX.CASH_IN_LEGACY;
+const WALLET_CASH_OUT = TX.CASH_OUT_LEGACY;
+
+// Ledger balance of one wallet — every row (paged), same formula as GET /api/wallets.
+async function walletLedgerBalance(biz, wallet) {
+  const cols = 'id, wallet_id, source, type, amount_original, amount_idr';
+  const bizOr = bizOrFilter(biz);
+  const [byId, byName] = await Promise.all([
+    WL.fetchAllRows(() => supabase.from('transactions').select(cols).or(bizOr).eq('wallet_id', wallet.id).order('id')),
+    WL.fetchAllRows(() => supabase.from('transactions').select(cols).or(bizOr).is('wallet_id', null).eq('source', wallet.name).order('id')),
+  ]);
+  return WL.ledgerBalance([...byId, ...byName], wallet);
+}
+
+// A manual outflow may not take a money account below zero (owner rule, 2026-10-10).
+// Returns true when it refused (the 409 is already sent).
+async function refuseNegativeOutflow(res, biz, wallet, amount) {
+  if (!wallet) return false;
+  const refusal = WL.outflowRefusal({ wallet, balance: await walletLedgerBalance(biz, wallet), amount });
+  if (!refusal) return false;
+  res.status(409).json(refusal);
+  return true;
+}
+
+app.get('/api/wallets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing business wallets' });
+    const bizOr = bizOrFilter(biz);
+
+    // ?archived=1 lists the archived accounts (to restore them); their balances are computed the same way.
+    const { data: wallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('*')
+      .or(bizOr)
+      .eq('is_active', req.query.archived !== '1')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (wErr) throw wErr;
+
+    if (!wallets || wallets.length === 0) return res.json({ wallets: [] });
+
+    // Fetch transactions to compute per-wallet balances
+    // Preserves query contract for tests: .select('wallet_id, source, type, amount_idr')
+    const txs = await WL.fetchAllRows(() => supabase
+      .from('transactions')
+      .select('id, wallet_id, source, type, amount_original, amount_idr, currency_original')
+      .or(bizOr)
+      .order('id'));
+
+    let hasIncompleteBalance = false;
+    const unvaluedCurrencies = [];
+    const withBalance = wallets.map(w => {
+      const related = (txs || []).filter(t =>
+        t.wallet_id === w.id || (!t.wallet_id && t.source === w.name)
+      );
+      const balance = related.reduce((sum, t) => {
+        const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+        if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
+        if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
+        if (t.type === 'correction')           return sum + amt; // signed delta
+        return sum;
+      }, 0);
+      const cur = (w.currency || 'IDR').toUpperCase();
+      const q = fx.getQuote(cur);
+      let rate = null;
+      let balance_idr = null;
+      let rateSource = null;
+      let rateEffectiveDate = null;
+      let isFixed = false;
+      let rateType = null;
+
+      if (cur === 'IDR') {
+        rate = 1;
+        balance_idr = balance;
+        rateSource = 'base_currency';
+        rateEffectiveDate = new Date().toISOString().slice(0, 10);
+        isFixed = true;
+        rateType = 'base_currency';
+      } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+        rate = Number(q.rate);
+        balance_idr = Math.round(balance * rate);
+        rateSource = q.source;
+        rateEffectiveDate = q.rate_effective_date;
+        isFixed = !!q.is_fixed_accounting;
+        rateType = q.rate_type || 'market_api';
+      } else {
+        if (balance !== 0) {
+          hasIncompleteBalance = true;
+          if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+        }
+      }
+
+      return {
+        ...w,
+        balance,
+        balance_idr,
+        rate_today: rate,
+        rate_source: rateSource,
+        rate_effective_date: rateEffectiveDate,
+        is_fixed_accounting: isFixed,
+        rate_type: rateType,
+        is_unvalued: balance_idr === null && cur !== 'IDR',
+      };
+    });
+
+    const total_balance_idr = withBalance.reduce((s, w) => s + (w.balance_idr ?? (w.currency === 'IDR' ? w.balance : 0)), 0);
+    const as_of_date = new Date().toISOString().slice(0, 10);
+
+    res.json({
+      wallets: withBalance,
+      total_balance_idr,
+      as_of_date,
+      rates: fx.getRatesMap(as_of_date),
+      rates_metadata: fx.getProviderMetadata(),
+      has_incomplete_balance: hasIncompleteBalance,
+      unvalued_currencies: unvaluedCurrencies,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/wallets', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { name, currency, type, entity_name, color, opening_balance, sort_order, scope } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  if (scope && !['business', 'personal'].includes(scope)) {
+    return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
+  }
+  // Business Workspace creates business-scoped wallets only. Reject personal scope
+  // while Personal Workspace is gated — never silently create a personal wallet here.
+  if (scope === 'personal' && !PERSONAL_WORKSPACE_ENABLED) {
+    return res.status(400).json({ error: 'personal_wallets_disabled', message: 'Personal wallets are not available yet.' });
+  }
+  const walletScope = (scope === 'personal' && PERSONAL_WORKSPACE_ENABLED) ? 'personal' : 'business';
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing wallets' });
+
+    // ── Feature gate: wallet limit ───────────────────────────────────────────
+    const access = await getCurrentAccess(userId);
+    if (access) {
+      const maxWallets = access.limits.max_wallets;
+      if (maxWallets !== null && maxWallets !== undefined) {
+        const { count: currentCount } = await supabase
+          .from('wallets')
+          .select('id', { count: 'exact', head: true })
+          .or(bizOrFilter(biz))
+          .eq('is_active', true);
+        if ((currentCount || 0) >= maxWallets) {
+          return res.status(403).json({
+            error: 'Plan limit reached',
+            feature: 'wallets',
+            limit: maxWallets,
+            current: currentCount,
+            upgrade_required: true,
+          });
+        }
+      }
+    }
+    // ── End gate ─────────────────────────────────────────────────────────────
+
+    // Pre-validate FX rate for opening balance BEFORE creating wallet
+    const ob = Number(opening_balance) || 0;
+    let obFxRes = null;
+    const cur = (currency || 'IDR').toUpperCase();
+    if (ob !== 0) {
+      try {
+        if (req.body.rate || req.body.booked_rate) {
+          obFxRes = await fx.toIdr(Math.abs(ob), cur, null, {
+            rate: req.body.rate || req.body.booked_rate,
+            source: req.body.rate_source || 'manual',
+            reason: req.body.manual_reason || 'opening_balance_manual_rate',
+            actor: userId,
+          });
+        } else {
+          obFxRes = await fx.toIdr(Math.abs(ob), cur);
+        }
+      } catch (err) {
+        return res.status(400).json({
+          error: 'fx_rate_unavailable',
+          message: `Cannot initialize wallet: exchange rate for currency ${cur} is unavailable.`,
+          currency: cur,
+        });
+      }
+    }
+
+    const { data: wallet, error: wErr } = await supabase
+      .from('wallets')
+      .insert({
+        ...bizWriteFields(biz, userId),
+        name,
+        currency:    currency    || 'IDR',
+        type:        type        || null,
+        entity_name: entity_name || null,
+        color:       color       || null,
+        sort_order:  sort_order  || 0,
+        scope:       walletScope,
+      })
+      .select()
+      .single();
+    if (wErr) throw wErr;
+
+    // Insert opening balance transaction if provided and non-zero
+    if (ob !== 0 && obFxRes) {
+      await supabase.from('transactions').insert({
+        ...bizWriteFields(biz, userId),
+        type:             ob > 0 ? 'income' : 'expense',
+        amount_original:  Math.abs(ob),
+        currency_original: cur,
+        amount_idr:       obFxRes.amount_idr,
+        booked_rate:      obFxRes.booked_rate,
+        rate_source:      obFxRes.rate_source,
+        // Marked so the classifier identifies this as seeded balance, never revenue.
+        // The description carries the same signal, so wallets created before this
+        // marker existed still classify correctly.
+        category:         'Opening balance',
+        description:      `Opening balance · ${name}`,
+        source:           'wallet_opening_balance',
+        is_opening_balance: true,
+        wallet_id:        wallet.id,
+        scope:            walletScope,
+      });
+    }
+
+    res.json({ wallet });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Wallet transactions ──────────────────────────────────────────────────────
+app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { period = 'all', limit = 200 } = req.query;
+
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing wallet details' });
+    const bizOr = bizOrFilter(biz);
+
+    const { data: wRows } = await supabase
+      .from('wallets').select('id, name, currency, type')
+      .eq('id', id).or(bizOr).limit(1);
+    const wallet = wRows?.[0];
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
+
+    let query = supabase.from('transactions')
+      .select('*')
+      .or(bizOr)
+      .order('transaction_date', { ascending: false, nullsLast: true })
+      .order('created_at', { ascending: false })
+      .limit(Number(limit));
+
+    const { data: txs, error: tErr } = await query;
+    if (tErr) throw tErr;
+
+    // Compute period boundary (if any)
+    let fromDate = null;
+    if (period !== 'all') {
+      const now = new Date();
+      if (period === 'week')        { fromDate = new Date(now); fromDate.setDate(now.getDate() - 7); }
+      else if (period === 'month')    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      else if (period === '3m')     { fromDate = new Date(now); fromDate.setMonth(now.getMonth() - 3); }
+    }
+    const fromStr = fromDate ? fromDate.toISOString().slice(0, 10) : null;
+
+    const filtered = (txs || []).filter(t => {
+      // Wallet match: prefer wallet_id, fall back to legacy source name
+      const walletMatch = t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name);
+      if (!walletMatch) return false;
+
+      // Period filter: use transaction_date; fall back to created_at date for null transaction_date
+      if (fromStr) {
+        const txDate = t.transaction_date || (t.created_at ? t.created_at.slice(0, 10) : null);
+        if (!txDate || txDate < fromStr) return false;
+      }
+
+      return true;
+    });
+
+    res.json({ wallet, transactions: filtered });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/wallets/:id', auth, async (req, res) => {
+  const userId = req.user.userId;
+  const { id } = req.params;
+  const { name, currency, type, entity_name, color, sort_order, scope, is_active } = req.body;
+  if (scope !== undefined && !['business', 'personal'].includes(scope)) {
+    return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
+  }
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing wallets' });
+
+    // The currency of an account with transactions is fixed: every amount on it is in that currency.
+    if (currency !== undefined) {
+      const { data: cur } = await supabase.from('wallets').select('currency').eq('id', id).or(bizOrFilter(biz)).limit(1);
+      if (cur?.[0] && String(cur[0].currency || 'IDR').toUpperCase() !== String(currency || 'IDR').toUpperCase()) {
+        const { count } = await supabase.from('transactions').select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)).eq('wallet_id', id);
+        if (count > 0) return res.status(409).json({ error: 'currency_locked', message: 'This account already has transactions; its currency cannot change.' });
+      }
+    }
+
+    // If renaming, sync source text on legacy transactions for balance continuity
+    if (name) {
+      const { data: exRows } = await supabase
+        .from('wallets').select('name').eq('id', id).or(bizOrFilter(biz)).limit(1);
+      const existing = exRows?.[0];
+      if (existing && existing.name !== name) {
+        await supabase.from('transactions')
+          .update({ source: name })
+          .or(bizOrFilter(biz))
+          .eq('source', existing.name);
+      }
+    }
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (name         !== undefined) updates.name        = name;
+    if (currency     !== undefined) updates.currency    = currency;
+    if (type         !== undefined) updates.type        = type;
+    if (entity_name  !== undefined) updates.entity_name = entity_name;
+    if (color        !== undefined) updates.color       = color;
+    if (sort_order   !== undefined) updates.sort_order  = sort_order;
+    if (scope        !== undefined) updates.scope       = scope;
+    if (is_active === true)         updates.is_active   = true;   // restore from the archive (archiving is DELETE)
+
+    const { data, error } = await supabase
+      .from('wallets')
+      .update(updates)
+      .eq('id', id)
+      .or(bizOrFilter(biz))
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ wallet: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/wallets/:id', auth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing wallets' });
+    const { error } = await supabase
+      .from('wallets')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .or(bizOrFilter(biz));
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/wallets/backfill
+// Creates wallets from distinct transactions.source values for THIS user only.
+// Never touches other users. Skips sources that already exist as wallet names.
+app.post('/api/wallets/backfill', auth, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const { data: txs, error: tErr } = await supabase
+      .from('transactions')
+      .select('source')
+      .eq('user_id', userId)
+      .not('source', 'is', null);
+    if (tErr) throw tErr;
+
+    const sources = [...new Set((txs || []).map(t => t.source).filter(Boolean))];
+    if (sources.length === 0) return res.json({ created: 0, wallets: [] });
+
+    const { data: existing } = await supabase
+      .from('wallets').select('name').eq('user_id', userId);
+    const existingNames = new Set((existing || []).map(w => w.name));
+
+    const toCreate = sources.filter(s => !existingNames.has(s));
+    if (toCreate.length === 0) return res.json({ created: 0, wallets: [] });
+
+    const rows = toCreate.map((name, i) => ({
+      user_id:  userId,
+      name,
+      // Heuristic: name contains '$' or 'usd' (case-insensitive) → USD wallet
+      currency: /\$|usd/i.test(name) ? 'USD' : 'IDR',
+      type:     null,
+      sort_order: i,
+    }));
+
+    const { data: created, error: cErr } = await supabase
+      .from('wallets').insert(rows).select();
+    if (cErr) throw cErr;
+
+    res.json({ created: (created || []).length, wallets: created || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Accounts API ---------------------------------------------------------
+
+app.post('/api/accounts/adjust', auth, async (req, res) => {
+  const { name, diff, type } = req.body
+  if (!name || diff === undefined) return res.status(400).json({ error: 'Missing fields' })
+  const { error } = await supabase.from('transactions').insert({
+    user_id: req.user.userId,
+    type: diff > 0 ? 'income' : 'expense',
+    amount_original: Math.abs(diff),
+    currency_original: 'IDR',
+    amount_idr: Math.abs(diff),
+    description: `Balance adjustment · ${name}`,
+    source: name,
+    scope: type || 'personal',
+  })
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+app.post('/api/accounts/delete', auth, async (req, res) => {
+  const { name } = req.body
+  if (!name) return res.status(400).json({ error: 'Missing name' })
+  const { error } = await supabase.from('transactions')
+    .update({ source: null })
+    .eq('user_id', req.user.userId)
+    .eq('source', name)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+app.post('/api/accounts/rename', auth, async (req, res) => {
+  const { oldName, newName, type } = req.body
+  if (!oldName || !newName) return res.status(400).json({ error: 'Missing fields' })
+  // Update all transactions where source = oldName
+  const updates = { source: newName }
+  if (type !== undefined) updates.scope = type
+  const { error } = await supabase.from('transactions')
+    .update(updates)
+    .eq('user_id', req.user.userId)
+    .eq('source', oldName)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+
+app.post('/api/accounts', auth, async (req, res) => {
+  const { name, type, balance } = req.body
+  const { error } = await supabase.from('transactions').insert({
+    user_id: req.user.userId,
+    type: 'income',
+    amount_original: balance || 0,
+    currency_original: 'IDR',
+    amount_idr: balance || 0,
+    description: `Opening balance · ${name}`,
+    source: name,
+    scope: type || 'personal',
+  })
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+// --- Platform Admin guard -------------------------------------------------
+
+function isAdminUser(userId) {
+  const ids = (process.env.ADMIN_TELEGRAM_IDS || '')
+    .split(',')
+    .map(x => x.trim())
+    .filter(Boolean);
+  return ids.includes(String(userId));
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!isAdminUser(req.user.userId)) return res.status(403).json({ error: 'Admin access required' });
+  next();
+}
+
+// POST /api/wallets/:id/adjust-balance
+// Any authenticated user — ownership-checked. Creates a signed correction
+// transaction to bring the wallet balance to target_balance.
+// NEVER modifies wallet.balance directly.
+app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
+  try {
+    const userId   = req.user.userId;
+    const walletId = req.params.id;
+    const { target_balance, reason, transaction_date } = req.body;
+
+    if (target_balance === undefined || target_balance === null) {
+      return res.status(400).json({ error: 'target_balance is required' });
+    }
+    const targetNum = Number(target_balance);
+    if (isNaN(targetNum)) {
+      return res.status(400).json({ error: 'target_balance must be a number' });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: 'reason is required' });
+    }
+
+    // Role check: only owner/admin/cfo of the active business can adjust balance
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManageWallets(biz.role)) {
+      return res.status(403).json({ error: 'Only business owner, admin or CFO can adjust wallet balances' });
+    }
+    const bizOr = bizOrFilter(biz);
+
+    // Load wallet — business-scoped
+    const { data: wRows } = await supabase
+      .from('wallets')
+      .select('id, user_id, name, currency, scope')
+      .eq('id', walletId)
+      .or(bizOr)
+      .limit(1);
+    const wallet = wRows?.[0];
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
+
+    // Compute current balance in wallet native currency
+    const { data: txs, error: tErr } = await supabase
+      .from('transactions')
+      .select('wallet_id, source, type, amount_original, amount_idr')
+      .or(bizOr);
+    if (tErr) throw tErr;
+
+    const related = (txs || []).filter(t =>
+      t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
+    );
+    const currentBalance = related.reduce((sum, t) => {
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
+      if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
+      if (t.type === 'correction')           return sum + amt;
+      return sum;
+    }, 0);
+
+    const delta = targetNum - currentBalance;
+
+    if (delta === 0) {
+      return res.json({
+        ok: true,
+        message: 'Balance is already at target — no correction needed.',
+        current_balance: currentBalance,
+        delta: 0,
+      });
+    }
+
+    const txDate = transaction_date
+      ? new Date(transaction_date).toISOString()
+      : new Date().toISOString();
+
+    const cur = (wallet.currency || 'IDR').toUpperCase();
+    const fxRes = await fx.toIdr(delta, cur, txDate.slice(0, 10));
+
+    const { data: corrTx, error: cErr } = await supabase
+      .from('transactions')
+      .insert({
+        ...bizWriteFields(biz, userId),
+        type:              'correction',
+        amount_original:   delta,
+        currency_original: cur,
+        amount_idr:        fxRes.amount_idr,
+        booked_rate:       fxRes.booked_rate,
+        rate_source:       fxRes.rate_source,
+        description:       `Balance correction: ${String(reason).trim()}`,
+        source:            wallet.name,
+        wallet_id:         wallet.id,
+        scope:             wallet.scope || 'business',
+        category:          'Balance Correction',
+        created_at:        txDate,
+      })
+      .select('id')
+      .single();
+    if (cErr) throw cErr;
+
+    res.json({
+      ok:               true,
+      previous_balance: currentBalance,
+      delta,
+      new_balance:      targetNum,
+      transaction_id:   corrTx.id,
+    });
+  } catch (e) {
+    if (e.message && e.message.startsWith('fx_rate_unavailable:')) {
+      const cur = e.message.split(':')[1] || '';
+      return res.status(400).json({
+        error: 'fx_rate_unavailable',
+        message: `Exchange rate for currency ${cur} is unavailable.`,
+        currency: cur,
+      });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/wallets/transfer — atomic double-entry transfer between business wallets (TASK 30)
+app.post('/api/wallets/transfer', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canCreateConfirmedFinancialRecord(biz.role)) {
+      return res.status(403).json({ error: 'Your role does not allow creating wallet transfers' });
+    }
+
+    const {
+      from_wallet_id,
+      to_wallet_id,
+      amount,
+      target_amount,
+      rate,
+      rate_source,
+      date,
+      description,
+    } = req.body;
+
+    if (!nativeInputIsExact(amount) || (target_amount != null && !nativeInputIsExact(target_amount)))
+      return res.status(400).json({ error: 'invalid_amount_precision' });
+    const sourceAmount = Number(amount);
+    if (isNaN(sourceAmount) || sourceAmount <= 0) {
+      return res.status(400).json({ error: 'invalid_amount', message: 'Transfer amount must be greater than zero' });
+    }
+
+    if (!from_wallet_id || !to_wallet_id || from_wallet_id === to_wallet_id) {
+      return res.status(400).json({ error: 'invalid_transfer_wallets', message: 'Source and destination wallets must be different' });
+    }
+
+    const bizOr = bizOrFilter(biz);
+    const { data: wallets, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, name, currency, scope, is_active, type')
+      .or(bizOr)
+      .in('id', [from_wallet_id, to_wallet_id]);
+
+    if (wErr) throw wErr;
+
+    const fromWallet = (wallets || []).find(w => w.id === from_wallet_id && w.is_active);
+    const toWallet = (wallets || []).find(w => w.id === to_wallet_id && w.is_active);
+
+    if (!fromWallet || !toWallet) {
+      return res.status(404).json({ error: 'wallet_not_found', message: 'One or both wallets not found or inactive' });
+    }
+
+    const fromCur = (fromWallet.currency || 'IDR').toUpperCase();
+    const toCur   = (toWallet.currency || 'IDR').toUpperCase();
+    const txDate  = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const transferId = req.body.transfer_id || crypto.randomUUID();
+    const transferRef = `xfer:${transferId}`;
+    const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
+
+    // Replay / idempotency check for existing transfer_id
+    if (req.body.transfer_id) {
+      const { data: existingTxs } = await supabase
+        .from('transactions')
+        .select('*')
+        .or(bizOr)
+        .eq('transfer_id', req.body.transfer_id);
+
+      if (existingTxs && existingTxs.length > 0) {
+        const debit = existingTxs.find(t => t.type === 'expense');
+        const credit = existingTxs.find(t => t.type === 'income');
+        if (!debit || !credit || debit.wallet_id !== fromWallet.id || credit.wallet_id !== toWallet.id
+          || TX.cmpDec(debit.amount_original, sourceAmount) !== 0
+          || (target_amount != null && TX.cmpDec(credit.amount_original, target_amount) !== 0)
+          || String(debit.currency_original).toUpperCase() !== fromCur
+          || String(credit.currency_original).toUpperCase() !== toCur
+          || debit.transaction_date !== txDate) {
+          return res.status(409).json({ error: 'idempotency_key_mismatch', message: 'Transfer id already used with different parameters' });
+        }
+        return res.status(200).json({
+          ok: true,
+          is_replay: true,
+          transfer_id: req.body.transfer_id,
+          transactions: existingTxs,
+          from_wallet_id: fromWallet.id,
+          to_wallet_id: toWallet.id,
+          source_amount: sourceAmount,
+          source_currency: fromCur,
+          target_amount: Number(credit.amount_original),
+          target_currency: toCur,
+        });
+      }
+    }
+
+    // A replay of an already-recorded transfer was answered above; every new one is checked
+    // (the app always sends a transfer_id, so the check may not depend on its absence).
+    if (await refuseNegativeOutflow(res, biz, fromWallet, sourceAmount)) return;
+
+    let fxResFrom;
+    let fxResTo;
+    let finalTargetAmount;
+
+    // 1. Calculate source FX in IDR
+    fxResFrom = await fx.toIdr(sourceAmount, fromCur, txDate);
+
+    // 2. Multi-currency calculation
+    if (fromCur === toCur) {
+      finalTargetAmount = sourceAmount;
+      fxResTo = fxResFrom;
+    } else {
+      if (target_amount && Number(target_amount) > 0) {
+        finalTargetAmount = Number(target_amount);
+      } else if (rate && Number(rate) > 0) {
+        finalTargetAmount = Math.round(sourceAmount * Number(rate) * 100) / 100;
+      } else {
+        // Compute from quote
+        if (fromCur === 'IDR') {
+          const qTo = await fx.toIdr(1, toCur, txDate);
+          finalTargetAmount = Math.round((sourceAmount / (qTo.booked_rate || 1)) * 100) / 100;
+        } else if (toCur === 'IDR') {
+          finalTargetAmount = fxResFrom.amount_idr;
+        } else {
+          const qTo = await fx.toIdr(1, toCur, txDate);
+          finalTargetAmount = Math.round((fxResFrom.amount_idr / (qTo.booked_rate || 1)) * 100) / 100;
+        }
+      }
+
+      if (toCur === 'IDR') {
+        fxResTo = { amount_idr: finalTargetAmount, booked_rate: 1, rate_source: 'base_currency' };
+      } else {
+        fxResTo = await fx.toIdr(finalTargetAmount, toCur, txDate, {
+          rate: rate || (sourceAmount > 0 ? fxResFrom.amount_idr / finalTargetAmount : null),
+          source: rate_source || 'transfer_cross_currency',
+          actor: userId,
+        });
+      }
+    }
+
+    // Strict atomic RPC execution: row-locking and single DB transaction
+    if (typeof supabase.rpc !== 'function') {
+      return res.status(500).json({
+        error: 'rpc_not_available',
+        message: 'Atomic RPC functions are not supported or available on client',
+      });
+    }
+
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer_guarded', {
+        p_business_id: biz.business.id,
+        p_user_id: userId,
+        p_from_wallet_id: fromWallet.id,
+        p_to_wallet_id: toWallet.id,
+        p_source_amount: sourceAmount,
+        p_source_currency: fromCur,
+        p_source_amount_idr: fxResFrom.amount_idr,
+        p_source_booked_rate: fxResFrom.booked_rate,
+        p_target_amount: finalTargetAmount,
+        p_target_currency: toCur,
+        p_target_amount_idr: fxResTo.amount_idr,
+        p_target_booked_rate: fxResTo.booked_rate,
+        p_rate_source: rate_source || fxResFrom.rate_source || 'system',
+        p_description: desc,
+        p_transaction_date: txDate,
+        p_transfer_id: transferId,
+        p_scope: 'business',
+      });
+
+      if (!rpcErr && rpcRes && rpcRes.ok) {
+        const status = rpcRes.is_replay ? 200 : 201;
+        return res.status(status).json(rpcRes);
+      }
+      if (rpcErr) {
+        if (balanceFailure(res, rpcErr)) return;
+        const msg = rpcErr.message || '';
+        if (rpcErr.code === 'PGRST202' || (msg.includes('function') && /does not exist|schema cache|could not find/i.test(msg))) {
+          return res.status(503).json({
+            error: 'balance_rpc_unavailable',
+            message: 'Atomic transfer recording requires migration 070',
+          });
+        }
+        return res.status(400).json({ error: rpcErr.message });
+      }
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: 'No response from transfer RPC' });
+    } catch (rpcErr) {
+      console.error('[wallets/transfer] Fatal RPC execution error:', rpcErr.message);
+      return res.status(500).json({ error: 'atomic_transfer_failed', message: rpcErr.message });
+    }
+  } catch (e) {
+    if (balanceFailure(res, e)) return;
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Admin endpoints -------------------------------------------------------
+
+app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
+  try {
+    // Fetch raw data — counts only, no financial amounts
+    const [
+      { data: users,        error: uErr },
+      { data: transactions, error: tErr },
+      { data: debts,        error: dErr },
+      { data: reminders,    error: rErr },
+      { data: identities },
+    ] = await Promise.all([
+      supabase.from('users').select('*').order('id', { ascending: true }),
+      supabase.from('transactions').select('user_id, created_at'),
+      supabase.from('debts').select('user_id, created_at'),
+      supabase.from('reminders').select('user_id, created_at'),
+      supabase.from('user_email_identities').select('user_id, email'),
+    ]);
+
+    if (uErr) throw uErr;
+
+    // email identities per user (lets admins search by email as well as name/id)
+    const emailMap = {};
+    (identities || []).forEach(i => {
+      const uid = String(i.user_id);
+      (emailMap[uid] = emailMap[uid] || []).push(i.email);
+    });
+
+    // Build per-user aggregates in JS
+    const txMap  = {};
+    const dbMap  = {};
+    const rmMap  = {};
+
+    (transactions || []).forEach(t => {
+      const uid = String(t.user_id);
+      if (!txMap[uid]) txMap[uid] = { count: 0, last: null };
+      txMap[uid].count++;
+      if (!txMap[uid].last || t.created_at > txMap[uid].last) txMap[uid].last = t.created_at;
+    });
+
+    (debts || []).forEach(d => {
+      const uid = String(d.user_id);
+      if (!dbMap[uid]) dbMap[uid] = { count: 0, last: null };
+      dbMap[uid].count++;
+      if (!dbMap[uid].last || d.created_at > dbMap[uid].last) dbMap[uid].last = d.created_at;
+    });
+
+    (reminders || []).forEach(r => {
+      const uid = String(r.user_id);
+      if (!rmMap[uid]) rmMap[uid] = { count: 0, last: null };
+      rmMap[uid].count++;
+      if (!rmMap[uid].last || r.created_at > rmMap[uid].last) rmMap[uid].last = r.created_at;
+    });
+
+    const now30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const enriched = (users || []).map(u => {
+      const uid  = String(u.id);
+      const txD  = txMap[uid]  || { count: 0, last: null };
+      const dbD  = dbMap[uid]  || { count: 0, last: null };
+      const rmD  = rmMap[uid]  || { count: 0, last: null };
+
+      // Last activity = most recent across all tables
+      const lastActivity = [txD.last, dbD.last, rmD.last]
+        .filter(Boolean)
+        .sort()
+        .pop() || null;
+
+      return {
+        id:                   u.id,
+        username:             u.username   || null,
+        first_name:           u.first_name || null,
+        last_name:            u.last_name  || null,
+        photo_url:            u.photo_url  || null,
+        language:             u.language   || null,
+        timezone:             u.timezone   || null,
+        created_at:           u.created_at || null,
+        is_telegram_connected: Number(u.id) > 0, // positive ids = Telegram-origin
+        emails:               emailMap[uid] || [],
+        transaction_count:    txD.count,
+        debt_count:           dbD.count,
+        reminder_count:       rmD.count,
+        last_transaction_date: txD.last,
+        last_debt_date:        dbD.last,
+        last_reminder_date:    rmD.last,
+        last_activity_date:    lastActivity,
+      };
+    });
+
+    // Summary stats
+    const activeLast30Days = enriched.filter(u =>
+      u.last_activity_date && u.last_activity_date >= now30
+    ).length;
+
+    const summary = {
+      totalUsers:             enriched.length,
+      usersWithTransactions:  enriched.filter(u => u.transaction_count > 0).length,
+      usersWithDebts:         enriched.filter(u => u.debt_count > 0).length,
+      usersWithReminders:     enriched.filter(u => u.reminder_count > 0).length,
+      activeLast30Days,
+    };
+
+    res.json({ summary, users: enriched });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/admin/users/:id  — single user detail for admin
+app.get('/api/admin/users/:id', auth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+
+    const [
+      { data: user,         error: uErr  },
+      { data: transactions, error: tErr  },
+      { data: debts,        error: dErr  },
+      { data: reminders,    error: rErr  },
+    ] = await Promise.all([
+      supabase.from('users').select('*').eq('id', targetId).single(),
+      supabase.from('transactions').select('created_at, description, type').eq('user_id', targetId).order('created_at', { ascending: false }),
+      supabase.from('debts').select('created_at, counterparty, type, due_date').eq('user_id', targetId).order('created_at', { ascending: false }),
+      supabase.from('reminders').select('created_at, title, due_date').eq('user_id', targetId).order('created_at', { ascending: false }),
+    ]);
+
+    if (uErr || !user) return res.status(404).json({ error: 'User not found' });
+
+    const txs  = transactions || [];
+    const dbs  = debts        || [];
+    const rms  = reminders    || [];
+
+    // --- Summary ---
+    const allDates = [
+      ...txs.map(x => x.created_at),
+      ...dbs.map(x => x.created_at),
+      ...rms.map(x => x.created_at),
+    ].filter(Boolean).sort();
+
+    const first_activity_at  = allDates[0]  || null;
+    const last_activity_at   = allDates[allDates.length - 1] || null;
+
+    // Count distinct calendar days with any activity
+    const activeDaySet = new Set(allDates.map(d => d.slice(0, 10)));
+    const active_days_count = activeDaySet.size;
+
+    // --- Monthly activity ---
+    const monthMap = {};
+    const bucket = (date, field) => {
+      if (!date) return;
+      const m = date.slice(0, 7); // "2026-06"
+      if (!monthMap[m]) monthMap[m] = { month: m, transactions: 0, debts: 0, reminders: 0 };
+      monthMap[m][field]++;
+    };
+    txs.forEach(t => bucket(t.created_at, 'transactions'));
+    dbs.forEach(d => bucket(d.created_at, 'debts'));
+    rms.forEach(r => bucket(r.created_at, 'reminders'));
+
+    const monthly_activity = Object.values(monthMap)
+      .sort((a, b) => a.month > b.month ? 1 : -1);
+
+    // --- Recent activity (last 10, NO amounts) ---
+    const events = [
+      ...txs.map(t => ({ type: 'transaction', title: t.description || `${t.type} transaction`, date: t.created_at, meta: t.type })),
+      ...dbs.map(d => ({ type: 'debt',        title: d.counterparty || 'Debt',                  date: d.created_at, meta: d.type })),
+      ...rms.map(r => ({ type: 'reminder',    title: r.title || 'Reminder',                     date: r.created_at, meta: r.due_date ? `due ${r.due_date.slice(0,10)}` : null })),
+    ];
+    const recent_activity = events
+      .sort((a, b) => (b.date || '') > (a.date || '') ? 1 : -1)
+      .slice(0, 10);
+
+    // Identity + membership enrichment (email login identities, business memberships).
+    // is_telegram_connected is derived from the id sign: positive ids are Telegram-origin,
+    // negative ids (next_app_user_id) are email-first accounts with no Telegram identity.
+    const identity = await adminUserSummary(targetId);
+
+    res.json({
+      user: {
+        id:                   user.id,
+        username:             user.username   || null,
+        first_name:           user.first_name || null,
+        last_name:            user.last_name  || null,
+        photo_url:            user.photo_url  || null,
+        language:             user.language   || null,
+        timezone:             user.timezone   || null,
+        created_at:           user.created_at || null,
+        is_telegram_connected: Number(user.id) > 0,
+        account_status:       'active', // no disable column yet — see identity MVP docs
+      },
+      email_identities: identity.emails,
+      businesses:        identity.businesses,
+      summary: {
+        transaction_count: txs.length,
+        debt_count:        dbs.length,
+        reminder_count:    rms.length,
+        first_activity_at,
+        last_activity_at,
+        active_days_count,
+      },
+      monthly_activity,
+      recent_activity,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Basic identity + membership summary for one user (admin-facing). Used by the detail
+// endpoint and by the link-email CONFLICT response so an admin can see who owns an email.
+// No secrets/tokens; business names + roles only.
+async function adminUserSummary(userId) {
+  const [pRes, eRes, mRes] = await Promise.all([
+    supabase.from('user_profiles').select('display_name, avatar_url').eq('user_id', userId).limit(1),
+    supabase.from('user_email_identities').select('email, email_verified_at').eq('user_id', userId),
+    supabase.from('business_members').select('business_id, role, status, businesses(name, type, business_code)').eq('user_id', userId),
+  ]);
+  const { data: prof } = pRes, { data: emails } = eRes, { data: mems } = mRes;
+  // Surface query failures so callers can FAIL CLOSED. Without this an errored lookup is
+  // indistinguishable from "no email" / "no memberships", which would make a user look
+  // safe to clean up when we simply could not read their data.
+  const errors = {
+    profile: pRes.error ? true : false,
+    emails: eRes.error ? true : false,
+    memberships: mRes.error ? true : false,
+  };
+  if (pRes.error || eRes.error || mRes.error) {
+    console.error(`[admin] adminUserSummary(${userId}) partial: ` +
+      `${[pRes.error && 'profile', eRes.error && 'emails', mRes.error && 'memberships'].filter(Boolean).join(',')}`);
+  }
+  return {
+    _errors: errors,
+    _partial: errors.profile || errors.emails || errors.memberships,
+    user_id: String(userId),
+    display_name: prof?.[0]?.display_name || null,
+    avatar_url: prof?.[0]?.avatar_url || null,
+    is_telegram: Number(userId) > 0,
+    emails: (emails || []).map(e => ({ email: e.email, verified: !!e.email_verified_at })),
+    businesses: (mems || []).map(m => ({ id: m.business_id, name: m.businesses?.name || null, type: m.businesses?.type || null, business_code: m.businesses?.business_code || null, role: m.role, status: m.status })),
+  };
+}
+
+// POST /api/admin/users/:id/link-email — SAFE admin identity linking. Adds an email login
+// identity to an EXISTING user (e.g. a Telegram-origin account like PT Helm Care's owner)
+// so the same person can also sign in by email and keep all business access. Admin-only,
+// never public, never merges two distinct users, never logs secrets. Every attempt (link /
+// already-linked / conflict) is written to audit_events.
+app.post('/api/admin/users/:id/link-email', auth, requireAdmin, async (req, res) => {
+  try {
+    // Coerce the path id to a numeric user id. Number() (not parseInt) so partial-numeric
+    // strings like "12abc" become NaN and are rejected. Both positive (Telegram-origin) and
+    // negative (email-origin, next_app_user_id) ids are valid; NaN/floats/unsafe → 400.
+    const targetId = Number(req.params.id);
+    if (!Number.isSafeInteger(targetId)) return res.status(400).json({ error: 'invalid_user_id' });
+    const email = normalizeEmail(req.body?.email);
+    if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
+
+    // Target user must exist.
+    const { data: tRows } = await supabase.from('users').select('id').eq('id', targetId).limit(1);
+    if (!tRows?.length) return res.status(404).json({ error: 'user_not_found' });
+
+    // Is this email already an identity somewhere?
+    const { data: idRows } = await supabase.from('user_email_identities')
+      .select('user_id').eq('email', email).limit(1);
+    if (idRows?.length) {
+      const owner = Number(idRows[0].user_id);
+      if (owner === targetId) {
+        await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'user_identity', entityId: targetId, action: 'email_already_linked', after: { email } });
+        return res.json({ status: 'already_linked', user_id: targetId, email });
+      }
+      // Email belongs to a DIFFERENT user — do NOT auto-merge. Return a conflict with both
+      // sides so an admin can decide; destructive merge is future work.
+      const existing = await adminUserSummary(owner);
+      await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'user_identity', entityId: targetId, action: 'email_link_conflict', after: { email, existing_user_id: owner } });
+      return res.status(409).json({ status: 'conflict', email, target_user_id: targetId, existing_user_id: owner, existing_user: existing });
+    }
+
+    // No existing identity → link it. An explicit admin action is treated as admin-verified.
+    const { error: insErr } = await supabase.from('user_email_identities')
+      .insert({ user_id: targetId, email, email_verified_at: new Date().toISOString() });
+    if (insErr) return res.status(500).json({ error: 'link_failed' });
+    // Ensure a profile shell exists so /account resolves (non-fatal).
+    const { data: prof } = await supabase.from('user_profiles').select('user_id').eq('user_id', targetId).limit(1);
+    if (!prof?.length) { try { await supabase.from('user_profiles').insert({ user_id: targetId, display_name: email.split('@')[0] }); } catch { /* non-fatal */ } }
+    await recordAudit({ actorUserId: req.user.userId, actorRole: 'platform_admin', entityType: 'user_identity', entityId: targetId, action: 'email_linked', after: { email, admin_verified: true } });
+    res.status(201).json({ status: 'linked', user_id: targetId, email, verified: true });
+  } catch (e) {
+    res.status(500).json({ error: 'link_failed' });
+  }
+});
+
+// GET /api/admin/users/:id/cleanup-preflight — READ-ONLY cleanup assessment for one user.
+// Powers the admin "Cleanup & Reset" panel: what this account owns, how much data hangs off
+// it, and which cleanup actions are safe. Mutates NOTHING. Counts only — never financial
+// amounts, never secrets; the email is masked. Any metric that cannot be computed safely is
+// returned as null with a sanitized warning (raw DB errors stay in the server log).
+app.get('/api/admin/users/:id/cleanup-preflight', auth, requireAdmin, async (req, res) => {
+  const warnings = [];
+  const softFail = (label, e) => {
+    console.error(`[admin-cleanup] ${label} failed: ${e?.message || e}`);
+    warnings.push(`${label}: unavailable (database error)`);
+    return null;
+  };
+  // Bounded COUNT (head:true → no rows transferred).
+  const countRows = async (label, table, col, apply = null) => {
+    try {
+      let q = supabase.from(table).select(col, { count: 'exact', head: true });
+      if (apply) q = apply(q);
+      const { count, error } = await q;
+      if (error) return softFail(label, new Error(error.message));
+      return count ?? 0;
+    } catch (e) { return softFail(label, e); }
+  };
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isSafeInteger(targetId)) return res.status(400).json({ error: 'invalid_user_id' });
+
+    const { data: uRows } = await supabase.from('users').select('*').eq('id', targetId).limit(1);
+    const user = uRows?.[0];
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
+
+    // Identity + memberships (reuses the shared admin summary helper).
+    // FAIL CLOSED: a failed identity/membership lookup must never read as "no email" or
+    // "no memberships" — that would make an unreadable account look safe to clean up.
+    const summary = await adminUserSummary(targetId);
+    if (summary._errors?.emails) warnings.push('identity.email: unavailable (database error)');
+    if (summary._errors?.memberships) warnings.push('ownership.memberships: unavailable (database error)');
+    if (summary._errors?.profile) warnings.push('identity.profile: unavailable (database error)');
+    const identityUnknown = !!summary._partial;
+    const emails = summary.emails || [];
+    const hasEmail = identityUnknown ? null : emails.length > 0;
+    const hasTelegram = Number(targetId) > 0;   // positive ids are Telegram-origin
+    // Mask the address — admins need to recognise it, not read it in full.
+    const maskEmail = (e) => {
+      if (!e) return null;
+      const [l, d] = String(e).split('@');
+      if (!d) return null;
+      return `${l.slice(0, 2)}${'*'.repeat(Math.max(1, l.length - 2))}@${d}`;
+    };
+
+    // Workspaces this user OWNS (bounded) — distinct from memberships.
+    const OWN_CAP = 200;
+    let owned = [], ownedTruncated = false;
+    try {
+      const { data, error } = await supabase.from('businesses')
+        .select('id, name, type, status').eq('owner_user_id', targetId).limit(OWN_CAP);
+      if (error) throw new Error(error.message);
+      owned = data || [];
+      ownedTruncated = owned.length >= OWN_CAP;
+      if (ownedTruncated) warnings.push(`ownership: truncated at ${OWN_CAP} workspaces — treat counts as approximate`);
+    } catch (e) { softFail('ownership', e); owned = null; }
+
+    const ownedIds = (owned || []).map(b => b.id);
+    // A truncated list is INCOMPLETE: reporting exact-looking counts from it would mislead.
+    if (ownedTruncated) owned = null;
+    const membershipsCount = summary._errors?.memberships ? null : (summary.businesses || []).length;
+    const ownership = owned === null ? {
+      owned_workspaces_count: null, personal_workspaces_count: null,
+      company_workspaces_count: null, archived_workspaces_count: null,
+      memberships_count: membershipsCount,
+    } : {
+      owned_workspaces_count: owned.length,
+      personal_workspaces_count: owned.filter(b => b.type === 'personal').length,
+      company_workspaces_count: owned.filter(b => b.type !== 'personal').length,
+      archived_workspaces_count: owned.filter(b => b.status === 'archived').length,
+      memberships_count: membershipsCount,
+    };
+
+    // Data footprint. Wallets are workspace-scoped, so they are counted across the
+    // workspaces this user owns; transactions/documents/audit are counted on the user.
+    const [transactions_count, documents_count, audit_events_count] = await Promise.all([
+      countRows('data_counts.transactions', 'transactions', 'id', q => q.eq('user_id', targetId)),
+      countRows('data_counts.documents', 'financial_documents', 'id', q => q.eq('created_by_user_id', targetId)),
+      countRows('data_counts.audit_events', 'audit_events', 'id', q => q.eq('actor_user_id', targetId)),
+    ]);
+    let wallets_count = 0;
+    if (owned === null) { wallets_count = null; warnings.push('data_counts.wallets: unavailable (owner workspaces unknown)'); }
+    else if (ownedIds.length) wallets_count = await countRows('data_counts.wallets', 'wallets', 'id', q => q.in('business_id', ownedIds));
+
+    const data_counts = { transactions_count, documents_count, wallets_count, audit_events_count };
+    const hasFinancialData = [transactions_count, wallets_count].some(n => Number(n) > 0);
+    const hasDocuments = Number(documents_count) > 0;
+
+    // Risk flags — raised ONLY from values we actually computed (never from unknowns).
+    const risk_flags = [];
+    if (hasTelegram && hasEmail === false) risk_flags.push('telegram_only_owner');
+    // Owner whose account originates from email (negative id) and owns a company workspace.
+    // NOT a proven duplicate — nothing here establishes that a second account exists.
+    if (!hasTelegram && hasEmail === true && (ownership.company_workspaces_count || 0) > 0) risk_flags.push('email_origin_owner');
+    if ((ownership.company_workspaces_count || 0) > 0) risk_flags.push('owns_company_workspace');
+    if (hasFinancialData) risk_flags.push('has_financial_data');
+    if (hasDocuments) risk_flags.push('has_documents');
+    if ((ownership.personal_workspaces_count || 0) > 0) risk_flags.push('is_personal_workspace_owner');
+
+    const recommended_actions = ['do_not_delete_user'];
+    if ((ownership.company_workspaces_count || 0) > 0 || (ownership.personal_workspaces_count || 0) > 0)
+      recommended_actions.push('archive_test_workspace');
+    if (hasTelegram && hasEmail === false) recommended_actions.push('review_email_identity_transfer');
+
+    // FAIL CLOSED. "Safe" requires that we could read EVERYTHING and found nothing of value.
+    // Any error, any truncated list, any unknown critical count ⇒ NOT safe. Safety is never
+    // inferred from missing data.
+    const criticalUnknown =
+      Object.values(data_counts).some(v => v === null) ||
+      owned === null ||                       // includes the truncation case (owned nulled above)
+      ownedTruncated ||
+      identityUnknown ||
+      ownership.memberships_count === null;
+    const safe_to_archive_or_reset = !criticalUnknown && !hasFinancialData && !hasDocuments;
+    if (criticalUnknown) warnings.push('safety: some critical data could not be read — treated as NOT safe to archive or reset');
+
+    res.json({
+      ok: true,
+      user: {
+        id: String(user.id),
+        name: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || null,
+        username: user.username || null,
+        email_masked: identityUnknown ? null : maskEmail(emails[0]?.email),
+        has_email_identity: hasEmail,          // null when the lookup failed
+        has_telegram_identity: hasTelegram,
+        identity_type: hasEmail === null ? 'unknown'
+          : hasEmail && hasTelegram ? 'email+telegram' : hasEmail ? 'email' : 'telegram',
+      },
+      identity_complete: !identityUnknown,
+      ownership,
+      ownership_truncated: ownedTruncated,
+      owned_workspaces: (owned || []).map(b => ({ id: b.id, name: b.name, type: b.type || 'business', status: b.status || 'active' })),
+      data_counts,
+      risk_flags,
+      recommended_actions,
+      safe_to_archive_or_reset,
+      // Phase 1: reset is preflight-only. These are the tables a future reset would touch.
+      reset_scope_preview: ['transactions', 'documents', 'wallets', 'reminders', 'debts', 'business metadata', 'personal finance data'],
+      reset_enabled: false,
+      hard_delete_enabled: false,
+      user_suspend_enabled: false,
+      warnings,
+    });
+  } catch (e) {
+    console.error(`[admin-cleanup] user preflight failed: ${e.message}`);
+    res.status(500).json({ error: 'cleanup_preflight_unavailable' });
+  }
+});
+
+// GET /api/admin/status  — any authenticated user can call; returns is_admin boolean
+// Used by frontend to conditionally show admin-only UI elements.
+app.get('/api/admin/status', auth, (req, res) => {
+  res.json({ is_admin: isAdminUser(req.user.userId) });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PLATFORM ADMIN — BUSINESS REGISTRY (read-only, PR1). Platform admin only.
+// ═════════════════════════════════════════════════════════════════════════════
+const monthStartISO = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1).toISOString(); };
+
+// ── PLATFORM ADMIN DASHBOARD (read-only foundation) ──────────────────────────
+// GET /api/admin/dashboard — owner/admin overview of the whole customer base.
+// STRICTLY READ-ONLY: counts and derived risk signals only, never financial amounts,
+// never secrets/tokens/keys. Any metric that cannot be computed safely returns null and
+// adds a human-readable entry to `warnings` — we never invent a number.
+app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
+  const warnings = [];
+  const daysAgoISO = (d) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
+
+  // ── Overall collection deadline ──────────────────────────────────────────
+  // A DB outage makes every query burn supabase-js retry backoff, so without a deadline the
+  // admin UI hangs for ~20s+. Every query races this shared deadline and is aborted when it
+  // fires; whatever has not resolved becomes null with a single safe warning.
+  const DEADLINE_MS = 6000;
+  const ctl = new AbortController();
+  let timedOut = false;
+  let deadlineTimer = null;
+  const deadline = new Promise(resolve => {
+    deadlineTimer = setTimeout(() => {
+      timedOut = true;
+      try { ctl.abort(); } catch { /* ignore */ }
+      resolve('__deadline__');
+    }, DEADLINE_MS);
+    deadlineTimer.unref?.();   // never hold the event loop open on its own
+  });
+  // Every Supabase query MUST go through this so it carries the shared abort signal —
+  // otherwise it keeps running in the background after a degraded response.
+  const signed = (q) => (typeof q.abortSignal === 'function' ? q.abortSignal(ctl.signal) : q);
+  // Warnings are SANITIZED: metric name only, never raw DB/network/schema internals.
+  // Technical detail goes to the server log.
+  const failed = (label, e) => {
+    console.error(`[admin-dashboard] ${label} failed: ${e?.message || e}`);
+    warnings.push(`${label}: unavailable (database error)`);
+  };
+  const raceDeadline = async (label, run) => {
+    // Never START new work once the deadline has passed — the response is already degraded.
+    if (timedOut) return null;
+    const r = await Promise.race([run().catch(e => ({ __err: e })), deadline]);
+    if (r === '__deadline__') return null;                 // timeout → single global warning
+    if (r && r.__err) { failed(label, r.__err); return null; }
+    return r;
+  };
+
+  // Bounded COUNT query (head:true → no rows transferred). Missing table/column ⇒ null.
+  const countRows = (label, table, col = 'id', apply = null) => raceDeadline(label, async () => {
+    let q = supabase.from(table).select(col, { count: 'exact', head: true });
+    if (apply) q = apply(q);
+    q = signed(q);
+    const { count, error } = await q;
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+  });
+  const sub = (a, b) => (a == null || b == null ? null : a - b);
+
+  try {
+    // All counts run in PARALLEL. Sequential awaits would multiply per-query retry backoff
+    // during a DB outage (~7s each), leaving an admin request hanging for minutes.
+    // Identity origin is encoded in the id sign: positive = Telegram, negative = email-first.
+    const [
+      total_users, with_email, telegram_origin, email_origin, email_on_telegram,
+      new_users_7d, new_users_30d,
+      biz_total, biz_archived, biz_personal, biz_company, biz_no_owner, new_biz_7d, new_biz_30d,
+    ] = await Promise.all([
+      countRows('users.total', 'users'),
+      countRows('users.with_email', 'user_email_identities', 'user_id'),
+      countRows('users.telegram_origin', 'users', 'id', q => q.gt('id', 0)),
+      countRows('users.email_origin', 'users', 'id', q => q.lt('id', 0)),
+      countRows('users.email_linked_to_telegram', 'user_email_identities', 'user_id', q => q.gt('user_id', 0)),
+      countRows('users.new_7d', 'users', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('users.new_30d', 'users', 'id', q => q.gte('created_at', daysAgoISO(30))),
+      countRows('businesses.total', 'businesses'),
+      countRows('businesses.archived', 'businesses', 'id', q => q.eq('status', 'archived')),
+      countRows('businesses.personal', 'businesses', 'id', q => q.eq('type', 'personal')),
+      countRows('businesses.company', 'businesses', 'id', q => q.neq('type', 'personal')),
+      countRows('businesses.without_owner', 'businesses', 'id', q => q.is('owner_user_id', null)),
+      countRows('businesses.new_7d', 'businesses', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('businesses.new_30d', 'businesses', 'id', q => q.gte('created_at', daysAgoISO(30))),
+    ]);
+
+    // ── Identity risk signals ────────────────────────────────────────────────
+    // Owner ids + email-identity ids are small sets at this scale; both are capped so the
+    // dashboard can never trigger an unbounded scan.
+    const CAP = 5000;
+    let telegram_only_owners = null, email_only_owners = null, users_without_identity = null;
+    const risk = await raceDeadline('identity_risks', async () => {
+      const [oRes, iRes] = await Promise.all([
+        signed(supabase.from('businesses').select('owner_user_id').not('owner_user_id', 'is', null).limit(CAP)),
+        signed(supabase.from('user_email_identities').select('user_id').limit(CAP)),
+      ]);
+      if (oRes.error || iRes.error) throw new Error(oRes.error?.message || iRes.error?.message);
+      return { owners: oRes.data || [], idents: iRes.data || [] };
+    });
+    if (risk) {
+      // Hitting the safety cap means the sets are INCOMPLETE. A partial count would look
+      // exact and mislead, so dependent metrics stay null rather than being reported.
+      if (risk.owners.length >= CAP || risk.idents.length >= CAP) {
+        warnings.push('identity_risks: unavailable because source rows reached the safety cap');
+      } else {
+        const emailSet = new Set(risk.idents.map(r => String(r.user_id)));
+        const ownerIds = [...new Set(risk.owners.map(r => String(r.owner_user_id)))];
+        // Telegram-origin owner (id > 0) with no email identity → cannot use email login.
+        telegram_only_owners = ownerIds.filter(id => Number(id) > 0 && !emailSet.has(id)).length;
+        // Email-first owner: negative id AND an actual email identity — a negative id alone
+        // does not prove the account has an email login.
+        email_only_owners = ownerIds.filter(id => Number(id) < 0 && emailSet.has(id)).length;
+      }
+    }
+
+    // Email-first users with NO email identity row would be unreachable by any login.
+    const negative_users_with_email = email_on_telegram == null ? null
+      : (with_email == null ? null : with_email - email_on_telegram);
+    users_without_identity = sub(email_origin, negative_users_with_email);
+    if (users_without_identity != null && users_without_identity < 0) {
+      users_without_identity = null;
+      warnings.push('identity_risks.users_without_login_identity: inconsistent counts — not reported');
+    }
+
+    // ── Activity (last 7 days) — also parallel ───────────────────────────────
+    const [act_audit, act_tx, act_docs] = await Promise.all([
+      countRows('activity.audit_events_7d', 'audit_events', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('activity.transactions_7d', 'transactions', 'id', q => q.gte('created_at', daysAgoISO(7))),
+      countRows('activity.documents_7d', 'financial_documents', 'id', q => q.gte('created_at', daysAgoISO(7))),
+    ]);
+
+    // Deliberately not computed: needs a per-business scan of transactions/documents,
+    // which is the kind of unbounded query this endpoint must avoid.
+    warnings.push('businesses.inactive_no_recent_activity: not computed (requires per-business aggregation)');
+    warnings.push('identity_risks.duplicate_email_conflicts: unavailable; conflicts are currently detected at link time');
+    if (timedOut) warnings.push('Dashboard metrics timed out. Some metrics are unavailable.');
+    // Collection finished (or gave up) — stop the deadline timer so nothing lingers.
+    if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null; }
+
+    // db_reachable: at least one count succeeded (a total outage nulls everything).
+    // A timeout means we could not confirm reachability → report degraded, never "true".
+    const db_reachable = timedOut ? false : [total_users, biz_total, act_audit].some(v => v != null);
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      users: {
+        total: total_users,
+        with_email_identity: with_email,
+        telegram_origin, email_origin,
+        with_email_and_telegram: email_on_telegram,
+        without_email: sub(total_users, with_email),
+        without_telegram: email_origin,
+        new_last_7_days: new_users_7d,
+        new_last_30_days: new_users_30d,
+      },
+      businesses: {
+        total: biz_total,
+        active: sub(biz_total, biz_archived),
+        archived: biz_archived,
+        personal_workspaces: biz_personal,
+        company_workspaces: biz_company,
+        without_owner: biz_no_owner,
+        new_last_7_days: new_biz_7d,
+        new_last_30_days: new_biz_30d,
+        inactive_no_recent_activity: null,   // needs per-business aggregation — see warnings
+      },
+      identity_risks: {
+        telegram_only_owners,
+        email_only_owners,
+        email_identities_on_email_first_users: negative_users_with_email,
+        users_without_login_identity: users_without_identity,
+        // NOT measured — reporting 0 would look like a real measurement. Conflicts are
+        // detected at link time by POST /api/admin/users/:id/link-email.
+        duplicate_email_conflicts: null,
+      },
+      activity_last_7_days: {
+        audit_events: act_audit,
+        transactions: act_tx,
+        documents: act_docs,
+        new_users: new_users_7d,
+        new_businesses: new_biz_7d,
+      },
+      system: {
+        db_reachable,
+        degraded: timedOut,          // true ⇒ collection hit the deadline; metrics are partial
+        timestamp: new Date().toISOString(),
+        commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
+        // Booleans only — never the values of secrets/keys.
+        feature_flags: {
+          email_auth: EMAIL_AUTH_ENABLED,
+          personal_account_v1: process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true',
+          telegram_active_business: TELEGRAM_ACTIVE_BUSINESS_ENABLED,
+          telegram_paid_gate: TELEGRAM_PAID_GATE_ENABLED,
+          personal_funding_bridge: process.env.PERSONAL_FUNDING_BRIDGE_ENABLED === 'true',
+        },
+      },
+      billing: {
+        billing_enabled: false,
+        paid_businesses: null,
+        mrr: null,
+        note: 'Billing/entitlements not implemented yet',
+      },
+      warnings,
+    });
+  } catch (e) {
+    if (deadlineTimer) { clearTimeout(deadlineTimer); deadlineTimer = null; }
+    console.error(`[admin-dashboard] failed: ${e.message}`);
+    res.status(500).json({ error: 'dashboard_unavailable' });
+  }
+});
+
+// GET /api/admin/businesses — the real business registry.
+app.get('/api/admin/businesses', auth, requireAdmin, async (req, res) => {
+  try {
+    const { data: businesses } = await supabase.from('businesses').select('*').order('business_code', { ascending: true, nullsFirst: false }).order('created_at');
+    const all = businesses || [];
+    const ids = all.map(b => b.id);
+    // members + owner names
+    const { data: members } = ids.length ? await supabase.from('business_members').select('business_id, user_id, role, status').in('business_id', ids) : { data: [] };
+    const ownerIds = [...new Set(all.map(b => b.owner_user_id).filter(Boolean))];
+    const { data: owners } = ownerIds.length ? await supabase.from('users').select('id, first_name, username').in('id', ownerIds) : { data: [] };
+    const ownerById = Object.fromEntries((owners || []).map(u => [String(u.id), u]));
+    const mByBiz = {}; for (const m of (members || [])) (mByBiz[m.business_id] ||= []).push(m);
+    // usage counters (per business)
+    const { data: wallets } = ids.length ? await supabase.from('wallets').select('business_id').in('business_id', ids).eq('is_active', true) : { data: [] };
+    const wCount = {}; for (const w of (wallets || [])) wCount[w.business_id] = (wCount[w.business_id] || 0) + 1;
+    const { data: txs } = ids.length ? await supabase.from('transactions').select('business_id').in('business_id', ids).gte('created_at', monthStartISO()) : { data: [] };
+    const txCount = {}; for (const t of (txs || [])) txCount[t.business_id] = (txCount[t.business_id] || 0) + 1;
+
+    let rows = all.map(b => {
+      const a = computeBusinessAccess(b);
+      const mem = mByBiz[b.id] || [];
+      const owner = ownerById[String(b.owner_user_id)];
+      return {
+        business_id: b.id, business_code: b.business_code, name: b.name, type: b.type || 'business',
+        status: b.status || 'active',
+        owner: owner ? { user_id: b.owner_user_id, name: owner.first_name || owner.username || null } : { user_id: b.owner_user_id, name: null },
+        member_count: mem.length, active_member_count: mem.filter(m => m.status === 'active').length,
+        stored_plan: a.stored_plan, effective_plan: a.effective_plan, effective_access_source: a.effective_access_source,
+        trial_status_effective: a.trial_status_effective, trial_ends_at: b.trial_ends_at,
+        subscription_status: b.subscription_status, admin_override_plan: b.admin_override_plan,
+        wallet_count: wCount[b.id] || 0, transactions_this_month: txCount[b.id] || 0,
+        created_at: b.created_at, last_activity: b.updated_at,
+      };
+    });
+    // filters
+    const q = (req.query.search || '').toLowerCase();
+    if (q) rows = rows.filter(r => (r.name || '').toLowerCase().includes(q) || (r.business_code || '').toLowerCase().includes(q));
+    if (req.query.plan) rows = rows.filter(r => r.effective_plan === req.query.plan);
+    if (req.query.type) rows = rows.filter(r => r.type === req.query.type);
+    if (req.query.trial) rows = rows.filter(r => r.trial_status_effective === req.query.trial);
+    const limit = Math.min(Number(req.query.limit) || 100, 200), offset = Number(req.query.offset) || 0;
+    res.json({ total: rows.length, limit, offset, businesses: rows.slice(offset, offset + limit) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId — detail
+app.get('/api/admin/businesses/:businessId', auth, requireAdmin, async (req, res) => {
+  try {
+    const r = await getBusinessAccessForPlatformAdmin(req.params.businessId);
+    if (!r) return res.status(404).json({ error: 'Business not found' });
+    const b = r.business;
+    const { count: memberCount } = await supabase.from('business_members').select('id', { count: 'exact', head: true }).eq('business_id', b.id);
+    const { data: owner } = b.owner_user_id ? await supabase.from('users').select('id, first_name, username').eq('id', b.owner_user_id).single() : { data: null };
+    res.json({
+      identity: { business_id: b.id, business_code: b.business_code, name: b.name, type: b.type || 'business', status: b.status, country: b.country, language: b.base_currency ? undefined : null, currency: b.base_currency, timezone: b.timezone, created_at: b.created_at },
+      owner: owner ? { user_id: b.owner_user_id, name: owner.first_name || owner.username } : { user_id: b.owner_user_id, name: null },
+      members_summary: { total: memberCount || 0 },
+      access: r.access, last_activity: b.updated_at,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId/members
+app.get('/api/admin/businesses/:businessId/members', auth, requireAdmin, async (req, res) => {
+  try {
+    const { data: biz } = await supabase.from('businesses').select('id').eq('id', req.params.businessId).single();
+    if (!biz) return res.status(404).json({ error: 'Business not found' });
+    const { data: members } = await supabase.from('business_members').select('user_id, role, status, joined_at, onboarding_status, telegram_connected_at').eq('business_id', req.params.businessId);
+    const uids = [...new Set((members || []).map(m => m.user_id))];
+    const { data: users } = uids.length ? await supabase.from('users').select('id, first_name, username').in('id', uids) : { data: [] };
+    const uById = Object.fromEntries((users || []).map(u => [String(u.id), u]));
+    res.json({ members: (members || []).map(m => ({
+      user_id: m.user_id, name: uById[String(m.user_id)]?.first_name || uById[String(m.user_id)]?.username || null,
+      username: uById[String(m.user_id)]?.username || null, role: m.role, status: m.status,
+      joined_at: m.joined_at, onboarding_status: m.onboarding_status, telegram_connected: !!m.telegram_connected_at,
+    })) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId/usage
+app.get('/api/admin/businesses/:businessId/usage', auth, requireAdmin, async (req, res) => {
+  try {
+    const id = req.params.businessId;
+    const { data: biz } = await supabase.from('businesses').select('id').eq('id', id).single();
+    if (!biz) return res.status(404).json({ error: 'Business not found' });
+    const since = monthStartISO();
+    const head = (t, extra) => supabase.from(t).select('id', { count: 'exact', head: true }).eq('business_id', id);
+    const [{ count: wallets }, { count: tx }, { count: debts }, { count: members }, { count: batches }, { count: docs }] = await Promise.all([
+      supabase.from('wallets').select('id', { count: 'exact', head: true }).eq('business_id', id).eq('is_active', true),
+      supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('business_id', id).gte('created_at', since),
+      supabase.from('debts').select('id', { count: 'exact', head: true }).eq('business_id', id).gte('created_at', since),
+      supabase.from('business_members').select('id', { count: 'exact', head: true }).eq('business_id', id),
+      supabase.from('bank_import_batches').select('id', { count: 'exact', head: true }).eq('business_id', id),
+      supabase.from('financial_documents').select('id', { count: 'exact', head: true }).eq('business_id', id).then(r => r, () => ({ count: null })),
+    ]);
+    res.json({ usage: {
+      wallets: wallets ?? 0, transactions_this_month: tx ?? 0, invoices_this_month: debts ?? 0,
+      ai_chat_usage: null, voice_usage: null,   // no usage_event store yet (PR-future)
+      members: members ?? 0, bank_imports: batches ?? 0, documents: docs ?? null,
+    } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/businesses/:businessId/cleanup-preflight — ALL-TIME dependency counts
+// for a safe archive/delete decision. Read-only; mutates nothing. Proves whether a
+// business/workspace is empty (safe to hard-delete later) or carries real data (archive only).
+app.get('/api/admin/businesses/:businessId/cleanup-preflight', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res);
+    if (!b) return;
+    const id = b.id;
+    const warnings = [];
+    // FAIL CLOSED: an ordinary Supabase `{ error }` must NEVER collapse into 0 / [] — that
+    // would tell the admin a workspace is empty when we simply could not read it.
+    const cnt = async (label, t, col = 'id') => {
+      try {
+        const r = await supabase.from(t).select(col, { count: 'exact', head: true }).eq('business_id', id);
+        if (r.error) throw new Error(r.error.message);
+        return r.count ?? 0;
+      } catch (e) {
+        console.error(`[admin-cleanup] business preflight ${label} failed: ${e.message}`);
+        warnings.push(`${label}: unavailable (database error)`);
+        return null;
+      }
+    };
+    const [members, wallets, transactions, documents, audit] = await Promise.all([
+      cnt('members', 'business_members'), cnt('wallets', 'wallets'), cnt('transactions', 'transactions'),
+      cnt('documents', 'financial_documents'), cnt('audit_events', 'audit_events'),
+    ]);
+    // debts ≠ invoices: these are debt rows (payables + receivables). There is no invoices
+    // table, so `invoices` is reported as unavailable rather than proxied from debts.
+    let debts_count = null, payables = null, receivables = null;
+    try {
+      const r = await supabase.from('debts').select('type').eq('business_id', id);
+      if (r.error) throw new Error(r.error.message);
+      const rows = r.data || [];
+      debts_count = rows.length;
+      payables = rows.filter(d => d.type === 'payable').length;
+      receivables = rows.filter(d => d.type === 'receivable').length;
+    } catch (e) {
+      console.error(`[admin-cleanup] business preflight debts failed: ${e.message}`);
+      warnings.push('debts: unavailable (database error)');
+    }
+
+    const counts = { members, wallets, transactions, debts_count, payables, receivables, documents, audit_events: audit, invoices: null };
+    warnings.push('invoices: not available (no invoices table — debt rows are reported as debts_count)');
+
+    // Any unknown critical count ⇒ preflight incomplete ⇒ never "empty", never archivable.
+    const criticalUnknown = [wallets, transactions, documents, debts_count].some(v => v === null);
+    const hasFinancialData = [wallets, transactions, debts_count, documents].some(n => Number(n) > 0);
+    const preflight_complete = !criticalUnknown;
+    if (criticalUnknown) warnings.push('preflight incomplete: some counts could not be read — archive is blocked until metrics are available');
+
+    res.json({
+      business: { business_id: id, name: b.name, type: b.type || 'business', owner_user_id: b.owner_user_id, status: b.status || 'active' },
+      counts,
+      preflight_complete,
+      is_empty: criticalUnknown ? null : !hasFinancialData,
+      recommendation: criticalUnknown ? 'blocked_incomplete_preflight'
+        : hasFinancialData ? 'archive_only' : 'archive_or_delete_with_owner_approval',
+      warnings,
+    });
+  } catch (e) {
+    // Sanitized: no relation/column/schema/network internals reach the client.
+    console.error(`[admin-cleanup] business preflight failed: ${e.message}`);
+    res.status(500).json({ error: 'business_cleanup_preflight_unavailable', message: 'Business cleanup preflight unavailable. Try again later.' });
+  }
+});
+
+// POST /api/admin/businesses/:businessId/archive — SOFT archive (status='archived').
+// Requires confirm:true AND confirm_name matching the exact business name, so a real
+// workspace (e.g. Helm Care) can never be archived accidentally. Reversible; deletes NO
+// data. Archived workspaces vanish from the switcher (listAccessibleWorkspaces) but stay
+// visible in admin. Audited to audit_events. NEVER hard-deletes.
+// A cleanup action must never happen without a trace: this writes the audit row and REPORTS
+// failure instead of swallowing it (unlike best-effort recordAudit). Returns true on success.
+async function recordCleanupAudit({ actorUserId, action, targetType, targetId, targetName, reason, before, after }) {
+  try {
+    const { error } = await supabase.from('audit_events').insert({
+      business_id: targetType === 'business' ? targetId : null,
+      actor_user_id: actorUserId, actor_role: 'platform_admin', channel: 'web',
+      entity_type: targetType, entity_id: targetId != null ? String(targetId) : null,
+      action,
+      before_json: { ...(before || {}), target_name: targetName || null },
+      after_json: { ...(after || {}), target_name: targetName || null, reason: reason || null },
+    });
+    if (error) { console.error(`[admin-cleanup] audit write failed for ${action}: ${error.message}`); return false; }
+    return true;
+  } catch (e) { console.error(`[admin-cleanup] audit write failed for ${action}: ${e.message}`); return false; }
+}
+// The audit write failed, so undo the status change — and REPORT TRUTHFULLY whether the
+// undo actually worked. Claiming "rolled back" without checking would hide a real
+// inconsistency from the operator. (Future improvement: make status change + audit a single
+// atomic DB/RPC operation so no compensating update is needed at all.)
+async function rollbackAfterAuditFailure(res, businessId, previousStatus, label) {
+  let rolledBack = false;
+  try {
+    // An update can return no error yet affect ZERO rows. Only a returned row whose status
+    // equals the expected previous status proves the undo actually happened.
+    const { data, error } = await supabase.from('businesses')
+      .update({ status: previousStatus, updated_at: new Date().toISOString() })
+      .eq('id', businessId).select('id,status').single();
+    if (error) {
+      console.error(`[admin-cleanup] rollback of ${label} on ${businessId} FAILED: ${error.message}`);
+    } else if (!data) {
+      console.error(`[admin-cleanup] rollback of ${label} on ${businessId} UNCONFIRMED: no row returned`);
+    } else if (data.status !== previousStatus) {
+      console.error(`[admin-cleanup] rollback of ${label} on ${businessId} UNCONFIRMED: status is '${data.status}', expected '${previousStatus}'`);
+    } else {
+      rolledBack = true;
+    }
+  } catch (e) {
+    console.error(`[admin-cleanup] rollback of ${label} on ${businessId} FAILED: ${e.message}`);
+  }
+  if (rolledBack) {
+    return res.status(500).json({
+      error: 'audit_failed_rolled_back',
+      message: `${label} was rolled back because the audit event could not be written. No change was kept.`,
+    });
+  }
+  console.error(`[admin-cleanup] UNCERTAIN STATE: ${label} on ${businessId} — audit failed AND rollback failed`);
+  return res.status(500).json({
+    error: 'audit_failed_rollback_failed',
+    state: 'uncertain',
+    message: 'Audit failed and rollback could not be confirmed. Manual review required.',
+  });
+}
+// Cleanup actions require a human-readable reason (stored in the audit trail).
+const cleanupReason = (v) => {
+  const r = String(v ?? '').trim();
+  return r.length >= 3 && r.length <= 500 ? r : null;
+};
+
+app.post('/api/admin/businesses/:businessId/archive', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res);
+    if (!b) return;
+    const { confirm, confirm_name } = req.body || {};
+    const reason = cleanupReason(req.body?.reason);
+    if (!reason) return res.status(400).json({ error: 'reason_required', message: 'Provide a reason (3–500 characters) — it is stored in the audit trail.' });
+    if (confirm !== true) return res.status(400).json({ error: 'confirmation_required', message: 'Set confirm:true to archive.' });
+    if ((confirm_name || '').trim() !== (b.name || '').trim())
+      return res.status(400).json({ error: 'name_mismatch', message: 'confirm_name must exactly match the business name.' });
+    if (b.status === 'archived') return res.json({ status: 'archived', business_id: b.id, name: b.name, already: true });
+
+    const { data: after, error } = await supabase.from('businesses')
+      .update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', b.id).select().single();
+    if (error) return res.status(500).json({ error: 'archive_failed' });
+
+    // No audit ⇒ no cleanup action. Archive is reversible, so roll the status back rather
+    // than leave a state change with no trace.
+    const audited = await recordCleanupAudit({
+      actorUserId: req.user.userId, action: 'business_archived', targetType: 'business',
+      targetId: b.id, targetName: b.name, reason,
+      before: { status: b.status || 'active' }, after: { status: 'archived' },
+    });
+    if (!audited) return await rollbackAfterAuditFailure(res, b.id, b.status || 'active', 'Archive');
+    res.json({ status: 'archived', business_id: after.id, name: after.name, reason });
+  } catch (e) { res.status(500).json({ error: 'archive_failed' }); }
+});
+
+// POST /api/admin/businesses/:businessId/unarchive — reverse an archive (status='active').
+app.post('/api/admin/businesses/:businessId/unarchive', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res);
+    if (!b) return;
+    const reason = cleanupReason(req.body?.reason);
+    if (!reason) return res.status(400).json({ error: 'reason_required', message: 'Provide a reason (3–500 characters) — it is stored in the audit trail.' });
+    if (b.status !== 'archived') return res.json({ status: b.status || 'active', business_id: b.id, name: b.name, already: true });
+    const { data: after, error } = await supabase.from('businesses')
+      .update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', b.id).select().single();
+    if (error) return res.status(500).json({ error: 'unarchive_failed' });
+    const audited = await recordCleanupAudit({
+      actorUserId: req.user.userId, action: 'business_unarchived', targetType: 'business',
+      targetId: b.id, targetName: b.name, reason,
+      before: { status: 'archived' }, after: { status: 'active' },
+    });
+    if (!audited) return await rollbackAfterAuditFailure(res, b.id, 'archived', 'Restore');
+    res.json({ status: 'active', business_id: after.id, name: after.name, reason });
+  } catch (e) { res.status(500).json({ error: 'unarchive_failed' }); }
+});
+
+// GET /api/admin/businesses/:businessId/access — full resolver response
+app.get('/api/admin/businesses/:businessId/access', auth, requireAdmin, async (req, res) => {
+  try {
+    const r = await getBusinessAccessForPlatformAdmin(req.params.businessId);
+    if (!r) return res.status(404).json({ error: 'Business not found' });
+    res.json({ ...r.access, limits: r.limits, features: r.limits });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── PLATFORM ADMIN — access WRITE endpoints (PR2) ────────────────────────────
+const OVERRIDE_PLANS = ['starter', 'business', 'founder', 'enterprise'];
+
+// Load business or 404; also reject a malformed UUID with 400.
+async function loadBusinessOr4xx(req, res) {
+  const id = req.params.businessId;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) { res.status(400).json({ error: 'Invalid business id' }); return null; }
+  const { data: b } = await supabase.from('businesses').select('*').eq('id', id).single();
+  if (!b) { res.status(404).json({ error: 'Business not found' }); return null; }
+  return b;
+}
+
+// Apply an UPDATE to a business, write an access_audit row, return new access.
+async function applyAccessChange(before, patch, action, reason, actorUserId) {
+  const prev = computeBusinessAccess(before);
+  const { data: after } = await supabase.from('businesses').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', before.id).select().single();
+  const next = computeBusinessAccess(after);
+  await supabase.from('access_audit').insert({
+    business_id: before.id, business_code: before.business_code, action,
+    previous_plan: before.plan, previous_effective_plan: prev.effective_plan,
+    new_plan: after.plan, new_effective_plan: next.effective_plan,
+    access_source: next.effective_access_source, reason: reason || null,
+    changed_by_user_id: actorUserId, override_ends_at: after.override_ends_at || null,
+    metadata: { admin_override_plan: after.admin_override_plan || null },
+  });
+  return next;
+}
+
+// POST /trial — activate a 7-day full trial or extend by 7/14/30 days.
+app.post('/api/admin/businesses/:businessId/trial', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    const op = req.body?.action;
+    const now = new Date();
+    let patch, action;
+    if (op === 'activate') {
+      const end = new Date(now.getTime() + 7 * 86400000);
+      patch = { trial_started_at: now.toISOString(), trial_ends_at: end.toISOString(), trial_status: 'active', subscription_status: 'trialing' };
+      action = 'trial_activated';
+    } else if (op === 'extend') {
+      const days = Number(req.body?.days);
+      if (![7, 14, 30].includes(days)) return res.status(400).json({ error: 'days must be 7, 14 or 30' });
+      const base = b.trial_ends_at && new Date(b.trial_ends_at) > now ? new Date(b.trial_ends_at) : now;
+      patch = { trial_ends_at: new Date(base.getTime() + days * 86400000).toISOString(), trial_status: 'active' };
+      action = 'trial_extended';
+    } else return res.status(400).json({ error: 'action must be activate or extend' });
+    const access = await applyAccessChange(b, patch, action, req.body?.reason, req.user.userId);
+    res.json({ ok: true, access });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /access — grant/change an admin override plan.
+app.patch('/api/admin/businesses/:businessId/access', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    const plan = req.body?.plan;
+    if (!OVERRIDE_PLANS.includes(plan)) return res.status(400).json({ error: `plan must be one of ${OVERRIDE_PLANS.join(', ')}` });
+    let overrideEnds = null;
+    if (req.body?.expires_at) { const d = new Date(req.body.expires_at); if (isNaN(d) || d <= new Date()) return res.status(400).json({ error: 'expires_at must be a future date' }); overrideEnds = d.toISOString(); }
+    if (!req.body?.reason || !String(req.body.reason).trim()) return res.status(400).json({ error: 'reason is required' });
+    const patch = {
+      admin_override_plan: plan, override_started_at: new Date().toISOString(), override_ends_at: overrideEnds,
+      override_reason: String(req.body.reason).trim(), override_created_by_user_id: req.user.userId, override_created_at: new Date().toISOString(),
+    };
+    const action = b.admin_override_plan ? 'override_changed' : 'override_created';
+    const access = await applyAccessChange(b, patch, action, req.body.reason, req.user.userId);
+    res.json({ ok: true, access });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /override — remove the override (fallback to subscription→trial→free).
+app.delete('/api/admin/businesses/:businessId/override', auth, requireAdmin, async (req, res) => {
+  try {
+    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    if (!b.admin_override_plan) return res.status(400).json({ error: 'No active override' });
+    const patch = { admin_override_plan: null, override_started_at: null, override_ends_at: null, override_reason: null, override_created_by_user_id: null, override_created_at: null };
+    const access = await applyAccessChange(b, patch, 'override_removed', req.body?.reason, req.user.userId);
+    res.json({ ok: true, access });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /access-audit — read-only access change history (optional ?business_id).
+app.get('/api/admin/access-audit', auth, requireAdmin, async (req, res) => {
+  try {
+    let q = supabase.from('access_audit').select('*').order('changed_at', { ascending: false }).limit(Math.min(Number(req.query.limit) || 100, 200));
+    if (req.query.business_id) q = q.eq('business_id', req.query.business_id);
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ events: data || [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/wallets/:id/adjust-balance
+// Super-admin only. Creates a signed correction transaction to bring the wallet
+// balance to target_balance.  NEVER modifies wallet.balance directly.
+// correction type: affects wallet balance + total cash, excluded from income/expense KPIs.
+app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req, res) => {
+  try {
+    const adminUserId = req.user.userId;
+    const walletId    = req.params.id;
+    const { target_balance, reason, transaction_date } = req.body;
+
+    if (target_balance === undefined || target_balance === null) {
+      return res.status(400).json({ error: 'target_balance is required' });
+    }
+    const targetNum = Number(target_balance);
+    if (isNaN(targetNum)) {
+      return res.status(400).json({ error: 'target_balance must be a number' });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: 'reason is required' });
+    }
+
+    // Load wallet (no user_id filter — admin can adjust any wallet)
+    const { data: wallet, error: wErr } = await supabase
+      .from('wallets')
+      .select('id, user_id, name, currency, scope')
+      .eq('id', walletId)
+      .single();
+    if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
+
+    // Compute current balance in wallet native currency
+    const { data: txs, error: tErr } = await supabase
+      .from('transactions')
+      .select('wallet_id, source, type, amount_original, amount_idr')
+      .eq('user_id', wallet.user_id);
+    if (tErr) throw tErr;
+
+    const related = (txs || []).filter(t =>
+      t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
+    );
+    const currentBalance = related.reduce((sum, t) => {
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
+      if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
+      if (t.type === 'correction')           return sum + amt;
+      return sum;
+    }, 0);
+
+    const delta = targetNum - currentBalance;
+
+    if (delta === 0) {
+      return res.json({
+        ok: true,
+        message: 'Balance is already at target — no correction needed.',
+        current_balance: currentBalance,
+        delta: 0,
+      });
+    }
+
+    // Create correction transaction (signed delta stored in amount fields)
+    const txDate = transaction_date
+      ? new Date(transaction_date).toISOString()
+      : new Date().toISOString();
+
+    const cur = (wallet.currency || 'IDR').toUpperCase();
+    const fxRes = await fx.toIdr(delta, cur, txDate.slice(0, 10));
+
+    const corrRow = {
+      user_id:           wallet.user_id,
+      type:              'correction',
+      amount_original:   delta,                              // signed: + increase, − decrease
+      currency_original: cur,
+      amount_idr:        fxRes.amount_idr,                   // signed
+      booked_rate:       fxRes.booked_rate,
+      rate_source:       fxRes.rate_source,
+      description:       `Balance correction: ${String(reason).trim()} [admin:${adminUserId}]`,
+      source:            wallet.name,
+      wallet_id:         wallet.id,
+      scope:             wallet.scope || 'business',
+      category:          'Balance Correction',
+      created_at:        txDate,
+    };
+
+    const { data: corrTx, error: cErr } = await supabase
+      .from('transactions')
+      .insert(corrRow)
+      .select('id')
+      .single();
+    if (cErr) throw cErr;
+
+    res.json({
+      ok:               true,
+      previous_balance: currentBalance,
+      delta,
+      new_balance:      targetNum,
+      transaction_id:   corrTx.id,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Profile ---------------------------------------------------------------
+
+app.get('/api/profile', auth, async (req, res) => {
+  const { data, error } = await supabase.from('users').select('*').eq('id', req.user.userId).single()
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
+app.post('/api/profile', auth, async (req, res) => {
+  const { first_name, last_name, photo_url, language, timezone } = req.body
+  const { data, error } = await supabase.from('users').update({ first_name, last_name, photo_url, language, timezone }).eq('id', req.user.userId).select().single()
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
+app.post('/api/debts/:id/pay', auth, async (req, res) => {
+  const { amount, account, date, wallet_id } = req.body;
+  if (!nativeInputIsExact(amount)) return res.status(400).json({ error: 'invalid_amount_precision' });
+  if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
+
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canCreateConfirmedFinancialRecord(biz.role))
+    return res.status(403).json({ error: 'Your role does not allow recording payments' });
+
+  const { data: debtRows } = await supabase.from('debts')
+    .select('*').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
+  const debt = debtRows?.[0];
+  if (!debt) return res.status(404).json({ error: 'Debt not found' });
+
+  const debtCurrency = typeof debt.currency === 'string' ? debt.currency.trim().toUpperCase() : '';
+  if (!debtCurrency) {
+    return res.status(400).json({
+      error: 'debt_currency_missing',
+      message: 'Debt has no valid currency specified',
+    });
+  }
+
+  // Wallet must belong to the same business (resolved by wallet_id or legacy matching by account name)
+  let payWallet = null;
+  if (wallet_id) {
+    const { data: wRows } = await supabase.from('wallets')
+      .select('id, name, scope, currency, type').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+    if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
+    payWallet = wRows[0];
+  } else if (account && typeof account === 'string' && account.trim()) {
+    const { data: nameRows } = await supabase.from('wallets')
+      .select('id, name, scope, currency, type').eq('name', account.trim()).or(bizOrFilter(biz)).limit(1);
+    if (nameRows?.length) {
+      payWallet = nameRows[0];
+    }
+  }
+
+  if (payWallet) {
+    const walletCurrency = typeof payWallet.currency === 'string' ? payWallet.currency.trim().toUpperCase() : '';
+    if (!walletCurrency) {
+      return res.status(400).json({
+        error: 'wallet_currency_missing',
+        message: 'Wallet has no valid currency specified',
+      });
+    }
+
+    if (walletCurrency !== debtCurrency) {
+      return res.status(400).json({
+        error: 'cross_currency_not_supported',
+        message: `Cross-currency debt payment is not supported yet: debt is in ${debtCurrency}, but wallet '${payWallet.name}' is in ${walletCurrency}`,
+        debt_currency: debtCurrency,
+        wallet_currency: walletCurrency,
+      });
+    }
+  }
+
+  const paymentAmount  = Number(amount);
+  const effectiveTotal = Number(debt.original_amount || debt.amount || 0);
+  const alreadyPaid    = Number(debt.paid_amount || 0);
+  // Same formula as computeDebtStatus: withholding allocations are already settled, so a
+  // payment can never cover them a second time (DECISIONS.md, final decisions item 5).
+  const withheld       = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
+  const remaining      = DW.remainingOf({ ...debt, withholding_allocated: withheld });
+
+  const newPaidAmount = alreadyPaid + paymentAmount;
+  const isFullyPaid   = newPaidAmount + withheld >= effectiveTotal - 0.01;
+  const newStatus     = isFullyPaid ? 'paid' : 'partial';
+
+  // 1. Create transaction
+  const txType = debt.type === 'payable' ? 'expense' : 'income';
+  const cur = (payWallet?.currency || debtCurrency).toUpperCase();
+  const txDate = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+  let fxRes;
+  try {
+    if (req.body.rate || req.body.booked_rate) {
+      fxRes = await fx.toIdr(paymentAmount, cur, txDate, {
+        rate: req.body.rate || req.body.booked_rate,
+        source: req.body.rate_source || 'manual',
+        reason: req.body.manual_reason || 'debt_payment_manual_rate',
+        actor: req.user.userId,
+      });
+    } else {
+      fxRes = await fx.toIdr(paymentAmount, cur, txDate);
+    }
+  } catch (fxErr) {
+    return res.status(400).json({
+      error: 'fx_rate_unavailable',
+      message: `Cannot record payment: exchange rate for currency ${cur} is unavailable.`,
+      currency: cur,
+    });
+  }
+
+  // Idempotency key handling
+  const idempotencyKey = (req.headers['idempotency-key'] || req.body?.idempotency_key || '').toString().trim();
+  const requestHash = crypto.createHash('sha256').update(JSON.stringify({
+    debt_id: String(debt.id),
+    amount: paymentAmount,
+    wallet_id: payWallet ? String(payWallet.id) : (wallet_id ? String(wallet_id) : null),
+    currency: cur,
+    date: txDate,
+  })).digest('hex');
+
+  if (idempotencyKey) {
+    try {
+      const { data: idempRow } = await supabase.from('debt_payment_idempotency')
+        .select('*')
+        .eq('business_id', biz.business.id)
+        .eq('key', idempotencyKey)
+        .maybeSingle();
+
+      if (idempRow) {
+        if (idempRow.request_hash === requestHash) {
+          return res.status(idempRow.response_status || 200).json({
+            ...idempRow.response_body,
+            is_replay: true,
+          });
+        } else {
+          return res.status(409).json({
+            error: 'idempotency_key_mismatch',
+            message: 'Idempotency key already used with different payment parameters',
+          });
+        }
+      }
+    } catch (idempErr) {
+      console.warn('[debts:pay] Idempotency lookup skipped:', idempErr.message);
+    }
+  }
+
+  if (paymentAmount > remaining + 0.01) {
+    return res.status(400).json({ error: `Payment amount exceeds remaining balance (${remaining})` });
+  }
+
+  if (!payWallet) {
+    return res.status(400).json({
+      error: 'wallet_required',
+      message: 'A valid active business wallet is required to record a payment',
+    });
+  }
+  // After the replay check: a replay of a recorded payment is answered above, never refused.
+  if (debt.type === 'payable' && await refuseNegativeOutflow(res, biz, payWallet, paymentAmount)) return;
+
+  // Strict atomic RPC execution with FOR UPDATE locking and single DB transaction
+  if (typeof supabase.rpc !== 'function') {
+    return res.status(500).json({
+      error: 'rpc_not_available',
+      message: 'Atomic RPC functions are not supported or available on client',
+    });
+  }
+
+  try {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment_guarded', {
+      p_business_id: biz.business.id,
+      p_user_id: req.user.userId,
+      p_debt_id: debt.id,
+      p_wallet_id: payWallet.id,
+      p_amount: paymentAmount,
+      p_currency: cur,
+      p_amount_idr: fxRes.amount_idr,
+      p_booked_rate: fxRes.booked_rate,
+      p_rate_source: fxRes.rate_source,
+      p_payment_date: txDate,
+      p_idempotency_key: idempotencyKey || null,
+      p_request_hash: requestHash,
+      p_account_name: payWallet.name,
+      p_created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
+    });
+
+    if (rpcErr) {
+      if (balanceFailure(res, rpcErr)) return;
+      const msg = rpcErr.message || '';
+      if (msg.includes('idempotency_key_mismatch')) {
+        return res.status(409).json({ error: 'idempotency_key_mismatch', message: msg });
+      }
+      if (msg.includes('payment_exceeds_remaining')) {
+        return res.status(400).json({ error: 'payment_exceeds_remaining', message: msg });
+      }
+      if (msg.includes('debt_already_closed')) {
+        return res.status(400).json({ error: 'debt_already_closed', message: msg });
+      }
+      if (msg.includes('cross_currency_not_supported') || msg.includes('debt_currency_mismatch')) {
+        return res.status(400).json({ error: 'cross_currency_not_supported', message: msg });
+      }
+      if (msg.includes('debt_not_found')) {
+        return res.status(404).json({ error: 'debt_not_found', message: msg });
+      }
+      if (rpcErr.code === 'PGRST202' || (msg.includes('function') && /does not exist|schema cache|could not find/i.test(msg))) {
+        return res.status(503).json({
+          error: 'balance_rpc_unavailable',
+          message: 'Atomic debt payment requires migration 070',
+        });
+      }
+      return res.status(500).json({ error: msg });
+    }
+
+    if (rpcRes) {
+      if (rpcRes.is_replay) {
+        return res.status(rpcRes.status || 200).json({
+          ...rpcRes.data,
+          is_replay: true,
+        });
+      }
+      return res.json({
+        ok: true,
+        isFullyPaid: rpcRes.data.is_fully_paid,
+        remaining: Math.max(0, Number(rpcRes.data.remaining)),
+        debt: computeDebtStatus({ ...rpcRes.data.debt, withholding_allocated: withheld }),
+      });
+    }
+
+    return res.status(500).json({ error: 'atomic_payment_failed', message: 'No response from payment RPC' });
+  } catch (rpcErr) {
+    console.error('[debts:pay] Fatal RPC execution error:', rpcErr.message);
+    return res.status(500).json({ error: 'atomic_payment_failed', message: rpcErr.message });
+  }
+});
+
+// ── Business Settings Endpoint ───────────────────────────────────────────────
+// PATCH /api/business/current — owner/admin can update safe fields
+const BUSINESS_ALLOWED_CURRENCIES = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'THB', 'CNY'];
+
+// ── Business targets and alerts (Design v2 P-01 + P-08; migrations 058, 059) ──
+// runway target, minimum cash, weekly brief schedule. Business workspaces only, never
+// Personal. Read: finance roles. Write: owner/ceo/admin/cfo, audited.
+// No financial effect. The weekly brief is NOT sent by anything yet (no scheduler); when
+// it is, recipients come from notificationPolicy ('ai_cfo_summary'), not from here.
+// Before the migrations are applied: GET returns nulls with available:false (the UI keeps
+// its defaults), PATCH returns 409 and writes nothing.
+async function loadBusinessTargets(businessId) {
+  const { data, error } = await supabase.from('businesses')
+    .select(TARGETS.COLUMNS.join(', ')).eq('id', businessId).limit(1);
+  if (error && TARGETS.isMissingColumn(error)) return { row: null, available: false };
+  if (error) throw error;
+  return { row: data?.[0] || null, available: true };
+}
+
+app.get('/api/business/targets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow viewing business targets' });
+    const { row, available } = await loadBusinessTargets(biz.business.id);
+    res.json({ targets: TARGETS.publicTargets(row), available, can_edit: TARGETS.canEditTargets(biz.role) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch('/api/business/targets', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal')
+      return res.status(403).json({ error: 'business_workspace_required' });
+    if (!TARGETS.canEditTargets(biz.role))
+      return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can change targets' });
+
+    const { patch, error: vErr, field } = TARGETS.targetsPatchFromBody(req.body || {});
+    if (vErr) return res.status(400).json({ error: vErr, field });
+    if (!Object.keys(patch).length) return res.status(400).json({ error: 'no_target_fields', allowed: TARGETS.COLUMNS });
+
+    const { row: before, available } = await loadBusinessTargets(biz.business.id);
+    if (!available) return res.status(409).json({ error: 'migration_not_applied', migration: '058/059' });
+
+    const { data, error } = await supabase.from('businesses')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', biz.business.id).select(TARGETS.COLUMNS.join(', ')).single();
+    if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '058/059' });
+    if (error) return res.status(500).json({ error: error.message });
+
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'business', entityId: biz.business.id, action: 'business_targets_updated',
+      before: TARGETS.publicTargets(before), after: TARGETS.publicTargets(data),
+    });
+    res.json({ targets: TARGETS.publicTargets(data), available: true, can_edit: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/business/current', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data, error } = await supabase.from('businesses').select('*').eq('id', biz.business.id).single();
+    if (error) throw error;
+    res.json({ business: { id: data.id, name: data.name, country: data.country ?? null,
+      timezone: data.timezone ?? null, base_currency: data.base_currency ?? null },
+      can_edit: ['owner', 'admin'].includes(biz.role) });
+  } catch (e) { res.status(500).json({ error: 'Could not load business settings.' }); }
+});
+
+app.patch('/api/business/current', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, base_currency, timezone, country } = req.body;
+
+    if (base_currency && !BUSINESS_ALLOWED_CURRENCIES.includes(base_currency)) {
+      return res.status(400).json({ error: `Invalid currency: ${base_currency}. Allowed: ${BUSINESS_ALLOWED_CURRENCIES.join(', ')}` });
+    }
+    if (!name && !base_currency && timezone === undefined && country === undefined) {
+      return res.status(400).json({ error: 'At least one field required: name, base_currency, timezone, country' });
+    }
+
+    // Workspace-aware + Business-only. This endpoint must NEVER mutate a Personal
+    // Workspace. Explicit-but-inaccessible/stale ids are rejected (no silent fallback).
+    const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+    let businessId;
+    if (requested) {
+      const { data } = await supabase.from('business_members')
+        .select('role, businesses(id, type)')
+        .eq('user_id', userId).eq('business_id', requested).eq('status', 'active').limit(1);
+      const m = data?.[0];
+      if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+      if (m.businesses.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+      if (!['owner', 'admin'].includes(m.role)) return res.status(403).json({ error: 'Only owner or admin can update business settings' });
+      businessId = m.businesses.id;
+    } else {
+      // No explicit id — pick the user's default BUSINESS (never a personal workspace).
+      const { data: memberships } = await supabase.from('business_members')
+        .select('business_id, role, businesses(type)')
+        .eq('user_id', userId).eq('status', 'active').in('role', ['owner', 'admin']);
+      const biz = (memberships || []).find(m => m.businesses?.type === 'business');
+      if (biz) businessId = biz.business_id;
+      else {
+        const { data: userRow } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
+        const firstName = userRow?.first_name || userRow?.username || 'My';
+        const { business: newBiz } = await ensureDefaultBusiness(userId, firstName);
+        // Email-first user with no business yet — nothing to update. They must create a
+        // business first (no silent auto-create here).
+        if (!newBiz) return res.status(409).json({ error: 'no_business', message: 'Create a business first.' });
+        businessId = newBiz.id;
+      }
+    }
+    const updates = { updated_at: new Date().toISOString() };
+    if (name?.trim())           updates.name          = name.trim();
+    if (base_currency)          updates.base_currency = base_currency;
+    if (timezone !== undefined) updates.timezone      = timezone || null;
+    if (country  !== undefined) updates.country       = country  || null;
+
+    // Graceful degradation: if an optional column (e.g. country/timezone) is not in
+    // the live schema, drop it and retry rather than surfacing a raw PostgREST schema
+    // error. Required fields (name/base_currency) are never dropped.
+    let business, bErr, dropped = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      ({ data: business, error: bErr } = await supabase
+        .from('businesses').update(updates).eq('id', businessId).select().single());
+      if (!bErr) break;
+      // PostgREST: "Could not find the 'x' column"; Postgres itself: 'column "x" of relation … does not exist'.
+      const m = /find the '([a-z_]+)' column|column "([a-z_]+)" of relation/i.exec(bErr.message || '');
+      const col = m?.[1] || m?.[2];
+      if (col && col in updates && !['name', 'base_currency'].includes(col)) { delete updates[col]; dropped.push(col); continue; }
+      break;
+    }
+    if (bErr) return res.status(400).json({ error: 'Could not save business settings. Please check the fields and try again.' });
+
+    res.json({ business, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
+  } catch (e) {
+    res.status(500).json({ error: 'Could not save business settings.' });
+  }
+});
+
+// ── Access Status Endpoint ───────────────────────────────────────────────────
+// GET /api/access/status
+// Returns current plan, trial info, limits, and usage for the authenticated user.
+// Also bootstraps default business+trial on first call (idempotent).
+app.get('/api/access/status', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Fetch user profile for business name bootstrap
+    const { data: user } = await supabase
+      .from('users')
+      .select('first_name, username')
+      .eq('id', userId)
+      .single();
+    const firstName = user?.first_name || user?.username || 'My';
+
+    // Honor the active workspace: if a valid x-business-id is supplied, report plan/
+    // trial for THAT business; reject an explicit-but-inaccessible id (no silent
+    // fallback). With no id, bootstrap/return the user's default business.
+    let business, membership;
+    const requestedBiz = req.headers['x-business-id'] || req.query?.business_id || null;
+    if (requestedBiz) {
+      const { data } = await supabase.from('business_members')
+        .select('role, status, businesses(*)')
+        .eq('user_id', userId).eq('business_id', requestedBiz).eq('status', 'active').limit(1);
+      const m = data?.[0];
+      if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+      business = m.businesses;
+      membership = { role: m.role, status: m.status };
+    } else {
+      ({ business, membership } = await ensureDefaultBusiness(userId, firstName));
+    }
+
+    // Email-first Personal Account users with no business yet: clean "no business" state.
+    // No auto-created workspace, no plan/trial — the client shows onboarding ("Create
+    // your first business workspace") rather than crashing on a null business.
+    if (!business) {
+      return res.json({
+        business: null,
+        membership: null,
+        plan: null,
+        limits: {},
+        usage: {
+          wallets_count:           0,
+          transactions_this_month: 0,
+          invoices_this_month:     0,
+          ai_questions_this_month: 0,
+          voice_inputs_this_month: 0,
+        },
+      });
+    }
+
+    // Compute access state
+    const accessState = getAccessState(business);
+
+    // Fetch plan limits for effective plan
+    const { data: limits } = await supabase
+      .from('plan_limits')
+      .select('*')
+      .eq('plan', accessState.effectivePlan)
+      .single();
+
+    // Usage counts
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    const [walletsRes, txRes] = await Promise.all([
+      supabase.from('wallets').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).eq('is_active', true),
+      supabase.from('transactions').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).gte('created_at', monthStart),
+    ]);
+
+    res.json({
+      business: {
+        id:            business.id,
+        name:          business.name,
+        base_currency: business.base_currency,
+        timezone:      business.timezone  || null,
+        country:       business.country   || null,
+      },
+      membership,
+      plan: {
+        name:               business.plan,
+        subscription_status: business.subscription_status,
+        trial_status:        business.trial_status,
+        trial_started_at:    business.trial_started_at,
+        trial_ends_at:       business.trial_ends_at,
+        days_left_in_trial:  accessState.daysLeft,
+        is_trial_active:     accessState.isTrialActive,
+        effective_plan:      accessState.effectivePlan,
+      },
+      limits: limits || {},
+      usage: {
+        wallets_count:             walletsRes.count  || 0,
+        transactions_this_month:   txRes.count       || 0,
+        invoices_this_month:       0,   // invoice table not yet implemented
+        ai_questions_this_month:   0,   // not tracked yet
+        voice_inputs_this_month:   0,   // not tracked yet
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── AI CFO V2 ─────────────────────────────────────────────────────────────────
+
+/**
+ * Build rich financial context for AI CFO.
+ * Reuses existing data from Pulse + access helpers.
+ */
+async function buildAiCfoContext(userId, language = 'en', biz = null) {
+  const now       = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // Business-scoped when biz provided (the normal path); legacy user_id
+  // fallback kept for internal callers that have no business context.
+  const scopeQ = (q) => biz ? q.or(bizOrFilter(biz)) : q.eq('user_id', userId);
+
+  const [
+    { data: allTxs    },
+    { data: monthTxs  },
+    { data: rawDebts  },
+    { data: wallets   },
+    accessData,
+  ] = await Promise.all([
+    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,wallet_id,source,scope')).order('created_at', { ascending: false }),
+    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope')).gte('created_at', monthStart),
+    scopeQ(supabase.from('debts').select('*')).or('is_training.is.null,is_training.eq.false'),
+    scopeQ(supabase.from('wallets').select('id,name,currency,type,scope')).eq('is_active', true),
+    getCurrentAccess(biz ? biz.ownerUserId : userId),
+  ]);
+
+  const debts = biz ? await enrichDebtsFor(biz.business.id, rawDebts) : enrichDebts(rawDebts);
+
+  // ── Wallet scope split ────────────────────────────────────────────────────
+  const allWallets      = wallets || [];
+  const businessWallets = allWallets.filter(w => (w.scope || 'business') === 'business');
+  const personalWallets = allWallets.filter(w => w.scope === 'personal');
+  const businessWalletIds = new Set(businessWallets.map(w => w.id));
+
+  // ── Cash (business wallets only for CFO Score / runway) ──────────────────
+  const CASH_IN  = TX.CASH_IN_LEGACY;
+  const CASH_OUT = TX.CASH_OUT_LEGACY;
+
+  // Helper to sum tx that belong to a given set of wallet IDs (or legacy source match or scope field)
+  function txBelongsToWallets(t, walletSet, walletIdSet, scopeValue) {
+    if (t.wallet_id) return walletIdSet.has(t.wallet_id);
+    if (walletSet.some(w => w.name === t.source)) return true;
+    // Fallback: use the scope column (same logic as Pulse endpoint)
+    if (scopeValue) return (t.scope || 'business') === scopeValue;
+    return false;
+  }
+
+  // ── Wallet balances (multi-currency aware) ─────────────────────────────────
+  let hasIncompleteBalance = false;
+  const unvaluedCurrencies = [];
+  const walletList = allWallets.map(w => {
+    const related = (allTxs || []).filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name));
+    const bal = related.reduce((s,t) => {
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (CASH_IN.includes(t.type))  return s + amt;
+      if (CASH_OUT.includes(t.type)) return s - amt;
+      if (t.type === 'correction')   return s + amt;
+      return s;
+    }, 0);
+    const cur = (w.currency || 'IDR').toUpperCase();
+    const q = fx.getQuote(cur);
+    let balIdr = null;
+    let rateToday = null;
+    let rateSource = null;
+    let rateEffectiveDate = null;
+    let isFixed = false;
+    let rateType = null;
+
+    if (cur === 'IDR') {
+      balIdr = bal;
+      rateToday = 1;
+      rateSource = 'base_currency';
+      rateEffectiveDate = new Date().toISOString().slice(0, 10);
+      isFixed = true;
+      rateType = 'base_currency';
+    } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+      rateToday = Number(q.rate);
+      balIdr = Math.round(bal * rateToday);
+      rateSource = q.source;
+      rateEffectiveDate = q.rate_effective_date;
+      isFixed = !!q.is_fixed_accounting;
+      rateType = q.rate_type || 'market_api';
+    } else {
+      if (bal !== 0) {
+        hasIncompleteBalance = true;
+        if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+      }
+    }
+    return {
+      id: w.id,
+      name: w.name,
+      currency: cur,
+      type: w.type,
+      scope: w.scope || 'business',
+      balance: bal,
+      balance_idr: balIdr,
+      rate_today: rateToday,
+      rate_source: rateSource,
+      rate_effective_date: rateEffectiveDate,
+      is_fixed_accounting: isFixed,
+      rate_type: rateType,
+      is_unvalued: balIdr === null && cur !== 'IDR',
+    };
+  });
+
+  // Total cash in IDR at today's rate across all business accounts
+  const totalBalance = walletList
+    .filter(w => (w.scope || 'business') === 'business')
+    .reduce((s, w) => s + (w.balance_idr ?? (w.currency === 'IDR' ? w.balance : 0)), 0);
+
+  // Personal cash (informational only — not used in CFO score)
+  const persTxs = (allTxs || []).filter(t => txBelongsToWallets(t, personalWallets, new Set(personalWallets.map(w => w.id)), 'personal'));
+  const personalBalance = persTxs.filter(t => CASH_IN.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0)
+    - persTxs.filter(t => CASH_OUT.includes(t.type)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0)
+    + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+
+  // ── This month (business wallets only, transfers excluded) ─────────────────
+  const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
+  const isXfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
+  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+
+  // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
+  const bizTxs      = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
+  const burnMetrics = computeBurnAndRunway(bizTxs, totalBalance);
+  const burnRate    = burnMetrics.burn_rate_daily;
+
+  // ── Debts breakdowns ──────────────────────────────────────────────────────
+  // Only approved records count as real obligations / expected cash.
+  // pending_approval (Telegram submissions awaiting admin review) are tracked
+  // separately as potential cash pressure; rejected are excluded entirely.
+  const openDebts  = debts.filter(d =>
+    !['paid','cancelled'].includes(d.status) &&
+    (d.approval_status === 'approved' || !d.approval_status)
+  );
+  const pendingSubmissions = debts.filter(d =>
+    d.approval_status === 'pending_approval' && !['paid','cancelled'].includes(d.status)
+  );
+  const recvList   = openDebts.filter(d => d.type === 'receivable');
+  const payList    = openDebts.filter(d => d.type === 'payable');
+
+  const recvTotal    = recvList.reduce((s,d) => s + Number(d.remaining_amount||0), 0);
+  const recvOverdue  = recvList.filter(d => d.status === 'overdue');
+  const recvDueSoon  = recvList.filter(d => { const days = Math.ceil((new Date(d.due_date)-now)/86400000); return days>=0 && days<=7; });
+
+  const payTotal     = payList.reduce((s,d) => s + Number(d.remaining_amount||0), 0);
+  const payOverdue   = payList.filter(d => d.status === 'overdue');
+  const payDueSoon   = payList.filter(d => { const days = Math.ceil((new Date(d.due_date)-now)/86400000); return days>=0 && days<=7; });
+
+  // ── Risks ─────────────────────────────────────────────────────────────────
+  const risks  = [];
+  const runway = burnMetrics.runway_days;
+  if (totalBalance < 0) risks.push({ type:'negative_balance', severity:'critical', title:'Negative cash balance', description:'Total cash is below zero', amount: totalBalance });
+  if (runway !== null && runway < 7)  risks.push({ type:'runway_critical', severity:'critical', title:`Only ${runway} days runway`, description:'Cash will run out very soon', amount: totalBalance });
+  else if (runway !== null && runway < 14) risks.push({ type:'runway_low', severity:'high', title:`Short runway: ${runway} days`, description:'Monitor cash carefully', amount: totalBalance });
+  if (recvOverdue.length > 0) risks.push({ type:'overdue_receivables', severity:'high', title:`${recvOverdue.length} overdue receivable${recvOverdue.length>1?'s':''}`, description:'Clients have not paid past due date', amount: recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0) });
+  if (payOverdue.length > 0)  risks.push({ type:'overdue_payables', severity:'high', title:`${payOverdue.length} overdue payable${payOverdue.length>1?'s':''}`, description:'Payments overdue — may affect relationships', amount: payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0) });
+  if (payDueSoon.length > 0)  risks.push({ type:'payables_due_soon', severity:'medium', title:`${payDueSoon.length} payment${payDueSoon.length>1?'s':''} due within 7 days`, description:'Upcoming cash outflows', amount: payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0) });
+  if (payTotal > recvTotal && payTotal > 0) risks.push({ type:'payables_exceed_receivables', severity:'medium', title:'Payables exceed receivables', description:'Net cash pressure ahead', amount: payTotal - recvTotal });
+  if (risks.length === 0) risks.push({ type:'healthy', severity:'low', title: cx(language, 'noRisks'), description: cx(language, 'financesStable'), amount: 0 });
+
+  // ── Build partial context for engines (before final return) ──────────────
+  const walletsSummary = {
+    business_cash:          totalBalance,
+    personal_cash:          personalBalance,
+    total_cash:             totalBalance + personalBalance,
+    business_wallets_count: businessWallets.length,
+    personal_wallets_count: personalWallets.length,
+  };
+
+  const partialCtx = {
+    business:        { name: (accessData?.business || {}).name || 'My Business', base_currency: (accessData?.business || {}).base_currency || 'IDR', plan: (accessData?.business || {}).plan || 'free', effective_plan: (accessData?.accessState || {}).effectivePlan || 'free', trial_status: (accessData?.business || {}).trial_status || 'inactive', days_left_in_trial: (accessData?.accessState || {}).daysLeft || 0 },
+    cash:            {
+      total_balance: totalBalance,
+      has_incomplete_balance: hasIncompleteBalance,
+      unvalued_currencies: unvaluedCurrencies,
+      wallets_count: businessWallets.length,
+      wallets: walletList.filter(w => (w.scope||'business') === 'business').slice(0,5),
+      rates: fx.getRatesMap(),
+      rates_metadata: fx.getProviderMetadata(),
+    },
+    fx_metadata:     fx.getProviderMetadata(),
+    rates:           fx.getRatesMap(),
+    wallets_summary: walletsSummary,
+    current_month: { income: monthIncome, expenses: monthExpenses, net_flow: monthIncome - monthExpenses, transactions_count: (monthTxs||[]).length, burn_rate: burnRate, burn_window_days: burnMetrics.burn_window_days },
+    receivables:   { total_remaining: recvTotal, overdue_total: recvOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: recvOverdue.length, partial_total: recvList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: recvDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: recvList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
+    payables:      { total_remaining: payTotal, overdue_total: payOverdue.reduce((s,d)=>s+Number(d.remaining_amount||0),0), overdue_count: payOverdue.length, partial_total: payList.filter(d=>d.status==='partial').reduce((s,d)=>s+Number(d.remaining_amount||0),0), due_soon_total: payDueSoon.reduce((s,d)=>s+Number(d.remaining_amount||0),0), top: payList.slice(0,5).map(d=>({counterparty:d.counterparty,remaining_amount:d.remaining_amount,due_date:d.due_date,status:d.status,days_overdue:d.days_overdue})) },
+    // Unconfirmed Telegram submissions — NOT included in totals above.
+    // AI should mention these as potential cash pressure awaiting approval.
+    pending_submissions: {
+      count:             pendingSubmissions.length,
+      receivables_total: pendingSubmissions.filter(d=>d.type==='receivable').reduce((s,d)=>s+Number(d.remaining_amount||d.amount||0),0),
+      payables_total:    pendingSubmissions.filter(d=>d.type==='payable').reduce((s,d)=>s+Number(d.remaining_amount||d.amount||0),0),
+      items: pendingSubmissions.slice(0,5).map(d=>({type:d.type,counterparty:d.counterparty,amount:d.remaining_amount||d.amount,due_date:d.due_date,created_by:d.created_by_name,role:d.created_by_role,source:d.source_channel})),
+    },
+    risks,
+    runway_days: runway,
+  };
+
+  // ── Decision layer engines ────────────────────────────────────────────────
+  const cfoScore        = calculateCfoScore(partialCtx, language);
+  const aiAlert         = calculateAiAlertStatus(partialCtx, cfoScore, language);
+  const hiringReadiness = calculateHiringReadiness(partialCtx, language);
+  const nextActions     = buildNextActionsV2(partialCtx, hiringReadiness, language);
+
+  // ── Compliance obligations (AI Accountant — upcoming/overdue tax filings) ──
+  // V1: dates only (estimated amounts come with the tax calc engine later), so
+  // these are surfaced as compliance pressure, not numeric cash forecast.
+  let compliance = { upcoming: [], overdue_count: 0 };
+  try {
+    if (biz) {
+      const today = new Date();
+      const [{ data: evRows }, { data: profRows }] = await Promise.all([
+        supabase.from('compliance_events')
+          .select('title, due_date, obligation_type, status, period, amount_status, estimated_amount, confirmed_amount, currency, professional_review_status, owner_approval_status, payment_status, source_verification_required')
+          .eq('business_id', biz.business.id).order('due_date', { ascending: true }),
+        supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1),
+      ]);
+      const all = (evRows || []).map(e => ({ ...e, days: Math.ceil((new Date(e.due_date) - today) / 86400000) }));
+      // Real pressure = unpaid obligations backed by a verified source.
+      const open = all.filter(e => !['paid', 'filed'].includes(e.payment_status) && !e.source_verification_required);
+      const overdue = open.filter(e => e.days < 0);
+      const sum = (arr, f) => arr.reduce((s, e) => s + Number(e[f] || 0), 0);
+      const missing = profileCompleteness(profRows?.[0] || null).missing;
+      compliance = {
+        // Counts (deterministic; amounts NOT subtracted from cash — pressure only)
+        upcoming_7d:  open.filter(e => e.days >= 0 && e.days <= 7).length,
+        upcoming_30d: open.filter(e => e.days >= 0 && e.days <= 30).length,
+        upcoming_90d: open.filter(e => e.days >= 0 && e.days <= 90).length,
+        overdue_count: overdue.length,
+        overdue_amount: sum(overdue, 'confirmed_amount') || sum(overdue, 'estimated_amount'),
+        // estimated = potential; confirmed = professionally reviewed / owner confirmed
+        estimated_amount: sum(open.filter(e => e.amount_status === 'estimated'), 'estimated_amount'),
+        confirmed_amount: sum(open.filter(e => ['professionally_reviewed', 'owner_confirmed'].includes(e.amount_status)), 'confirmed_amount'),
+        professional_review_pending: open.filter(e => e.professional_review_status && !['approved', 'not_started'].includes(e.professional_review_status)).length,
+        owner_approval_pending: open.filter(e => e.owner_approval_status === 'required').length,
+        missing_profile_fields: missing,
+        upcoming: open.filter(e => e.days >= -30 && e.days <= 90).slice(0, 8),
+        next_90: open.filter(e => e.days >= 0 && e.days <= 90),
+      };
+      if (compliance.overdue_count > 0)
+        partialCtx.risks.push({ type: 'overdue_filing', severity: 'high', title: `${compliance.overdue_count} overdue tax filing${compliance.overdue_count > 1 ? 's' : ''}`, description: 'Compliance deadlines passed — confirm with your accountant', amount: 0 });
+    }
+  } catch (_) { /* compliance is optional context */ }
+
+  // ── Access info ───────────────────────────────────────────────────────────
+  const limits = accessData?.limits || {};
+
+  return {
+    ...partialCtx,
+    compliance,
+    next_actions:     nextActions,
+    cfo_score:        cfoScore,
+    ai_alert:         aiAlert,
+    hiring_readiness: hiringReadiness,
+    usage: {
+      ai_questions_this_month:    0,   // not tracked in DB yet — V2 limitation
+      max_ai_questions_per_month: limits.max_ai_questions_per_month ?? null,
+      remaining_ai_questions:     limits.max_ai_questions_per_month ?? null,
+    },
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AI CFO DECISION ENGINE — deterministic. The LLM never recomputes these.
+// Approval ≠ Payment: approval only confirms an obligation (no cash move);
+// payment/receipt is the only thing that changes cash.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// V1 default risk policy (centralized — not universal accounting rules).
+// Business-configurable policy is a later task.
+const DEFAULT_DECISION_POLICY = {
+  critical_runway_days: 15,
+  caution_runway_days:  30,
+  target_runway_days:   60,
+  protected_cash_days:  30,
+  large_payment_pct:    15,   // % of current business cash
+};
+
+function daysUntilDate(dateStr, now = new Date()) {
+  if (!dateStr) return null;
+  return Math.ceil((new Date(dateStr) - now) / 86400000);
+}
+
+// Build a deterministic business financial snapshot. Reuses the same CASH model
+// and computeBurnAndRunway() used by Pulse and AI CFO — no separate formula.
+async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = null) {
+  const now = asOfDate ? new Date(asOfDate) : new Date();
+  const bizOr = bizOrFilter(biz);
+
+  const [{ data: wallets }, { data: txs }, { data: rawDebts }, { data: employees }, { data: taxObs }] = await Promise.all([
+    supabase.from('wallets').select('id,name,currency,type,scope').or(bizOr).eq('is_active', true),
+    WL.fetchAllRows(() => supabase.from('transactions').select('id,type,amount_original,amount_idr,created_at,wallet_id,source,scope').or(bizOr).order('id')).then((data) => ({ data })),
+    supabase.from('debts').select('*').or(bizOr).or('is_training.is.null,is_training.eq.false'),
+    supabase.from('payroll_employees').select('default_salary,pay_day,status').or(bizOr).neq('status', 'archived'),
+    // Tax obligations: only verified-source, reviewed/owner-confirmed, unpaid ones
+    // count as real cash pressure. Estimates / unverified are excluded.
+    supabase.from('compliance_events')
+      .select('title, due_date, confirmed_amount, estimated_amount, amount_status, payment_status, professional_review_status, owner_approval_status, source_verification_required')
+      .eq('business_id', biz.business.id),
+  ]);
+
+  const CASH_IN = TX.CASH_IN_LEGACY, CASH_OUT = TX.CASH_OUT_LEGACY;
+  const allWallets = wallets || [];
+  const businessWallets = allWallets.filter(w => (w.scope || 'business') === 'business');
+  const bizWalletIds = new Set(businessWallets.map(w => w.id));
+
+  const isBizTx = (t) => t.wallet_id ? bizWalletIds.has(t.wallet_id)
+    : (businessWallets.some(w => w.name === t.source) || (!t.source && (t.scope || 'business') === 'business'));
+  const bizTxs = (txs || []).filter(isBizTx);
+
+  const walletBalance = (w) => (txs || [])
+    .filter(t => t.wallet_id === w.id || (!t.wallet_id && t.source === w.name))
+    .reduce((s, t) => {
+      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
+      if (CASH_IN.includes(t.type))  return s + amt;
+      if (CASH_OUT.includes(t.type)) return s - amt;
+      if (t.type === 'correction')   return s + amt;
+      return s;
+    }, 0);
+
+  let hasIncompleteBalance = false;
+  const unvaluedCurrencies = [];
+  const byWallet = businessWallets.map(w => {
+    const bal = walletBalance(w);
+    const cur = (w.currency || 'IDR').toUpperCase();
+    const q = fx.getQuote(cur);
+    let rate = null;
+    let balIdr = null;
+    if (cur === 'IDR') {
+      rate = 1;
+      balIdr = bal;
+    } else if (q && q.rate != null && Number.isFinite(Number(q.rate))) {
+      rate = Number(q.rate);
+      balIdr = Math.round(bal * rate);
+    } else {
+      if (bal !== 0) {
+        hasIncompleteBalance = true;
+        if (!unvaluedCurrencies.includes(cur)) unvaluedCurrencies.push(cur);
+      }
+    }
+    return { id: w.id, name: w.name, currency: cur, type: w.type, balance: bal, balance_idr: balIdr, rate_today: rate, is_unvalued: balIdr === null && cur !== 'IDR' };
+  });
+  const totalCash = byWallet.reduce((s, w) => s + (w.balance_idr ?? (w.currency === 'IDR' ? w.balance : 0)), 0);
+
+  const burn = computeBurnAndRunway(bizTxs, totalCash);
+  const dailyBurn = burn.burn_rate_daily;
+
+  // Debts — only approved/open count as confirmed; pending tracked separately.
+  const debts = await enrichDebtsFor(biz.business.id, rawDebts);
+  const confirmed = debts.filter(d => !['paid', 'cancelled'].includes(d.status) && (d.approval_status === 'approved' || !d.approval_status));
+  const pending   = debts.filter(d => d.approval_status === 'pending_approval' && !['paid', 'cancelled'].includes(d.status));
+
+  function debtBuckets(list) {
+    const rem = (d) => Number(d.remaining_amount || d.amount || 0);
+    const overdue = list.filter(d => d.status === 'overdue');
+    const within = (n) => list.filter(d => { const dd = daysUntilDate(d.due_date, now); return dd !== null && dd >= 0 && dd <= n; });
+    return {
+      active_remaining: list.reduce((s, d) => s + rem(d), 0),
+      overdue_amount:   overdue.reduce((s, d) => s + rem(d), 0),
+      overdue_count:    overdue.length,
+      due_7_days:       within(7).reduce((s, d) => s + rem(d), 0),
+      due_14_days:      within(14).reduce((s, d) => s + rem(d), 0),
+      due_30_days:      within(30).reduce((s, d) => s + rem(d), 0),
+      top_items:        list.slice(0, 5).map(d => ({ id: d.id, counterparty: d.counterparty, remaining: rem(d), due_date: d.due_date, status: d.status })),
+    };
+  }
+  const payList = confirmed.filter(d => d.type === 'payable');
+  const recvList = confirmed.filter(d => d.type === 'receivable');
+
+  // Tax obligations as confirmed future cash pressure (reviewed / owner-approved
+  // only; never draft / unverified / estimate-only / AI-only).
+  const taxConfirmed = (taxObs || []).filter(o =>
+    !['paid', 'filed'].includes(o.payment_status) && !o.source_verification_required &&
+    (['professionally_reviewed', 'owner_confirmed'].includes(o.amount_status) || o.owner_approval_status === 'approved' || (o.professional_review_status === 'approved')));
+  const taxAmt = (o) => Number(o.confirmed_amount || o.estimated_amount || 0);
+  const taxWithin = (n) => taxConfirmed.filter(o => { const dd = daysUntilDate(o.due_date, now); return dd !== null && dd >= 0 && dd <= n; });
+  const taxObligations = {
+    due_7_days:  taxWithin(7).reduce((s, o) => s + taxAmt(o), 0),
+    due_30_days: taxWithin(30).reduce((s, o) => s + taxAmt(o), 0),
+    due_90_days: taxWithin(90).reduce((s, o) => s + taxAmt(o), 0),
+    next_item:   taxWithin(90).sort((a, b) => new Date(a.due_date) - new Date(b.due_date))[0] || null,
+  };
+
+  // Payroll — best-effort estimate from employees' pay_day (no scheduled table).
+  const dom = now.getDate();
+  const daysToPayDay = (pd) => { if (!pd) return null; const d = pd - dom; return d >= 0 ? d : d + 30; };
+  const payroll7 = (employees || []).filter(e => { const d = daysToPayDay(e.pay_day); return d !== null && d <= 7; }).reduce((s, e) => s + Number(e.default_salary || 0), 0);
+  const payroll30 = (employees || []).reduce((s, e) => s + Number(e.default_salary || 0), 0);
+
+  return {
+    business_id: biz.business.id,
+    currency: biz.business.base_currency || 'IDR',
+    cash: { total: totalCash, by_wallet: byWallet, available_business_cash: totalCash, has_incomplete_balance: hasIncompleteBalance, unvalued_currencies: unvaluedCurrencies },
+    burn: { daily_burn: dailyBurn, monthly_expenses: dailyBurn * 30, rolling_window_days: burn.burn_window_days, runway_days: burn.runway_days },
+    payables: { ...debtBuckets(payList), pending_amount: pending.filter(d => d.type === 'payable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },
+    receivables: { ...debtBuckets(recvList), pending_amount: pending.filter(d => d.type === 'receivable').reduce((s, d) => s + Number(d.remaining_amount || d.amount || 0), 0) },
+    payroll: { due_7_days: payroll7, due_30_days: payroll30 },
+    tax_obligations: taxObligations,
+    policy: DEFAULT_DECISION_POLICY,
+    _confirmedPayables: payList,
+  };
+}
+
+function runwayAfter(cash, dailyBurn) {
+  if (!dailyBurn || dailyBurn <= 0) return null;
+  return Math.round(cash / dailyBurn);
+}
+
+// ── Approval assessment: confirms an obligation, no cash movement ────────────
+function assessDebtApproval(snap, debt) {
+  const amount = Number(debt.remaining_amount || debt.original_amount || debt.amount || 0);
+  const cash = snap.cash.total;
+  const isRecv = debt.type === 'receivable';
+  const confirmedBefore = snap.payables.due_30_days;
+  const confirmedAfter = isRecv ? confirmedBefore : confirmedBefore + amount;
+  const coverage = confirmedAfter > 0 ? cash / confirmedAfter : null;
+
+  const factors = [];
+  let recommendation = 'safe', risk = 'low';
+
+  if (!amount || amount <= 0) { recommendation = 'insufficient_data'; risk = 'medium'; factors.push({ key: 'no_amount', severity: 'high', label: 'Amount missing', value: amount }); }
+  if (['paid', 'cancelled'].includes(debt.status) || debt.approval_status === 'rejected') {
+    recommendation = 'not_recommended'; risk = 'high';
+    factors.push({ key: 'invalid_state', severity: 'high', label: 'Already resolved', value: debt.status });
+  }
+
+  if (isRecv) {
+    factors.push({ key: 'expected_cash', severity: 'info', label: 'Expected, not guaranteed cash', value: amount });
+  } else {
+    factors.push({ key: 'obligation_added', severity: 'info', label: 'Confirmed obligation added', value: amount });
+    if (coverage !== null && coverage < 1.2 && recommendation === 'safe') { recommendation = 'caution'; risk = 'medium'; factors.push({ key: 'tight_coverage', severity: 'medium', label: 'Cash barely covers 30d obligations', value: coverage }); }
+    if (snap.burn.runway_days !== null && snap.burn.runway_days < snap.policy.caution_runway_days && recommendation === 'safe') { recommendation = 'caution'; risk = 'medium'; }
+  }
+
+  return {
+    decision_type: isRecv ? 'approve_receivable' : 'approve_payable',
+    recommendation, risk_level: risk,
+    current: { cash, runway_days: snap.burn.runway_days, confirmed_obligations_30d: confirmedBefore },
+    after:   { cash, runway_days: snap.burn.runway_days, confirmed_obligations_30d: confirmedAfter },
+    impact:  { cash_change: 0, runway_change_days: 0, obligation_change: isRecv ? 0 : amount, coverage_after: coverage },
+    upcoming: { payroll_7d: snap.payroll.due_7_days, payables_7d: snap.payables.due_7_days, payables_30d: snap.payables.due_30_days, overdue_payables: snap.payables.overdue_amount, overdue_receivables: snap.receivables.overdue_amount },
+    factors,
+    note: isRecv ? 'Approval marks expected cash. It does not change current cash.' : 'Approval confirms the obligation. It does not pay it or change cash.',
+  };
+}
+
+// ── Payment simulation: real cash impact (simulated, never persisted) ────────
+function assessDebtPayment(snap, debt, paymentAmount, walletId) {
+  const isRecv = debt.type === 'receivable';
+  const amount = Number(paymentAmount || debt.remaining_amount || debt.amount || 0);
+  const cashBefore = snap.cash.total;
+  const cashAfter = isRecv ? cashBefore + amount : cashBefore - amount;
+  const runwayBefore = snap.burn.runway_days;
+  const runwayAfterVal = runwayAfter(cashAfter, snap.burn.daily_burn);
+
+  const wallet = walletId ? snap.cash.by_wallet.find(w => String(w.id) === String(walletId)) : null;
+  const walletBefore = wallet ? wallet.balance : null;
+  const walletAfter = wallet ? (isRecv ? walletBefore + amount : walletBefore - amount) : null;
+
+  // Obligations excluding THIS debt (avoid double counting on payment).
+  const thisRem = Number(debt.remaining_amount || debt.amount || 0);
+  const payables7 = Math.max(0, snap.payables.due_7_days - (isRecv ? 0 : thisRem));
+  const payables30 = Math.max(0, snap.payables.due_30_days - (isRecv ? 0 : thisRem));
+  const protectedCash = snap.burn.daily_burn * snap.policy.protected_cash_days;
+  const pctOfCash = cashBefore > 0 ? (amount / cashBefore) * 100 : 0;
+
+  const factors = [];
+  let recommendation = 'safe', risk = 'low';
+  const flag = (rec, rk) => { const order = { safe: 0, caution: 1, not_recommended: 2 }; if (order[rec] > order[recommendation]) { recommendation = rec; } const rorder = { low: 0, medium: 1, high: 2, critical: 3 }; if (rorder[rk] > rorder[risk]) risk = rk; };
+
+  if (!snap.burn.daily_burn) { recommendation = 'insufficient_data'; risk = 'medium'; factors.push({ key: 'no_burn', severity: 'medium', label: 'No expense history — runway unknown' }); }
+
+  if (!isRecv) {
+    if (amount > cashBefore) { flag('not_recommended', 'critical'); factors.push({ key: 'exceeds_cash', severity: 'critical', label: 'Payment exceeds total business cash', value: amount }); }
+    if (wallet && walletAfter < 0) { flag('not_recommended', 'critical'); factors.push({ key: 'wallet_negative', severity: 'critical', label: `${wallet.name} would go negative`, value: walletAfter }); }
+    if (runwayAfterVal !== null && runwayAfterVal < snap.policy.critical_runway_days) { flag('not_recommended', 'high'); factors.push({ key: 'runway_critical', severity: 'high', label: `Runway after payment below ${snap.policy.critical_runway_days}d`, value: runwayAfterVal }); }
+    else if (runwayAfterVal !== null && runwayAfterVal < snap.policy.caution_runway_days) { flag('caution', 'medium'); factors.push({ key: 'runway_low', severity: 'medium', label: `Runway after payment below ${snap.policy.caution_runway_days}d`, value: runwayAfterVal }); }
+    if (pctOfCash > snap.policy.large_payment_pct) { flag('caution', 'medium'); factors.push({ key: 'large_payment', severity: 'medium', label: `Payment is ${Math.round(pctOfCash)}% of cash`, value: pctOfCash }); }
+    if (snap.payroll.due_7_days > 0 && cashAfter < snap.payroll.due_7_days + payables7) { flag('caution', 'high'); factors.push({ key: 'payroll_pressure', severity: 'high', label: 'Payroll + near-term payables may not be covered after payment', value: snap.payroll.due_7_days }); }
+    if (cashAfter < protectedCash && recommendation === 'safe') { flag('caution', 'medium'); factors.push({ key: 'below_reserve', severity: 'medium', label: `Cash after payment below ${snap.policy.protected_cash_days}d reserve`, value: protectedCash }); }
+    // Reviewed / owner-approved tax obligations due soon are real cash pressure.
+    const taxDue30 = snap.tax_obligations?.due_30_days || 0;
+    if (taxDue30 > 0 && cashAfter < taxDue30 + payables7) {
+      flag('caution', 'high');
+      const ti = snap.tax_obligations.next_item;
+      const amt = Math.round(taxDue30).toLocaleString('en-US');
+      factors.push({ key: 'tax_obligation_pressure', severity: 'high', label: ti ? `Reviewed tax obligation ${amt} due ~${ti.due_date} may not be covered after payment` : `Reviewed tax obligations ${amt} due within 30d may not be covered`, value: taxDue30 });
+    }
+  }
+
+  return {
+    decision_type: isRecv ? 'receive_receivable' : 'pay_payable',
+    recommendation, risk_level: risk,
+    current: { cash: cashBefore, wallet_balance: walletBefore, runway_days: runwayBefore },
+    after:   { cash: cashAfter, wallet_balance: walletAfter, runway_days: runwayAfterVal },
+    impact:  { cash_change: isRecv ? amount : -amount, runway_change_days: runwayAfterVal !== null && runwayBefore !== null ? runwayAfterVal - runwayBefore : null, wallet_change: walletAfter !== null ? walletAfter - walletBefore : null, payment_pct_of_cash: Math.round(pctOfCash) },
+    upcoming: { payroll_7d: snap.payroll.due_7_days, payables_7d: payables7, payables_30d: payables30, overdue_payables: snap.payables.overdue_amount, overdue_receivables: snap.receivables.overdue_amount },
+    factors,
+    wallet_known: !!wallet,
+    note: isRecv ? 'Marking received creates an income transaction and increases the selected wallet.' : 'Paying creates an expense transaction and decreases the selected wallet.',
+  };
+}
+
+// Ranked list of approved unpaid payables for "which should I pay first?".
+function buildPaymentPriority(snap) {
+  const now = new Date();
+  return (snap._confirmedPayables || []).map(d => {
+    const rem = Number(d.remaining_amount || d.amount || 0);
+    const dd = daysUntilDate(d.due_date, now);
+    let score = 0;
+    if (d.status === 'overdue') score += 100;
+    if (dd !== null && dd >= 0 && dd <= 7) score += 50;
+    else if (dd !== null && dd >= 0 && dd <= 30) score += 20;
+    if (snap.cash.total > 0 && rem / snap.cash.total > 0.15) score += 10;
+    return {
+      debt_id: d.id, counterparty: d.counterparty, amount: rem, due_date: d.due_date,
+      priority_score: score,
+      reason: d.status === 'overdue' ? 'Overdue' : (dd !== null && dd <= 7 ? 'Due within 7 days' : 'Upcoming'),
+      recommended_action: 'pay',
+    };
+  }).sort((a, b) => b.priority_score - a.priority_score);
+}
+
+// ── CFO Score Engine ─────────────────────────────────────────────────────────
+function calculateCfoScore(ctx, language = 'en') {
+  const cash   = ctx.cash     || {};
+  const month  = ctx.current_month || {};
+  const recv   = ctx.receivables   || {};
+  const pay    = ctx.payables      || {};
+  const runway = ctx.runway_days;
+
+  const bal      = Number(cash.total_balance  || 0);
+  const mExpense = Number(month.expenses      || 0);
+  const mIncome  = Number(month.income        || 0);
+  const netFlow  = Number(month.net_flow      || 0);
+  const recvTotal    = Number(recv.total_remaining || 0);
+  const recvOverdue  = Number(recv.overdue_total   || 0);
+  const payTotal     = Number(pay.total_remaining  || 0);
+  const payOverdue   = Number(pay.overdue_total    || 0);
+  const payDueSoon   = Number(pay.due_soon_total   || 0);
+
+  // ── Cash Health (25%) ───────────────────────────────────────────────────
+  let cashScore, cashLabel, cashImpact;
+  if (mExpense === 0) {
+    cashScore = 70; cashLabel = cx(language, 'notEnoughExpenseHistory'); cashImpact = 'neutral';
+  } else {
+    const ratio = bal / mExpense;
+    if (ratio >= 3)       { cashScore = 90; cashLabel = cxt(language, 'Strong cash position'); cashImpact = 'positive'; }
+    else if (ratio >= 1)  { cashScore = 78; cashLabel = cxt(language, 'Adequate cash reserves'); cashImpact = 'positive'; }
+    else if (ratio >= 0.5){ cashScore = 58; cashLabel = cxt(language, 'Cash below 1 month expenses'); cashImpact = 'warning'; }
+    else                  { cashScore = 30; cashLabel = cxt(language, 'Cash critically low'); cashImpact = 'negative'; }
+  }
+
+  // ── Runway (25%) ────────────────────────────────────────────────────────
+  let runwayScore, runwayLabel, runwayImpact;
+  if (runway === null || runway === 999) {
+    runwayScore = 60; runwayLabel = cx(language, 'runwayUnknown'); runwayImpact = 'neutral';
+  } else if (runway >= 90)  { runwayScore = 100; runwayLabel = cxt(language, 'Runway excellent (90+ days)'); runwayImpact = 'positive'; }
+  else if (runway >= 60)    { runwayScore = 85;  runwayLabel = cxt(language, 'Runway healthy (60+ days)');   runwayImpact = 'positive'; }
+  else if (runway >= 30)    { runwayScore = 70;  runwayLabel = cxt(language, 'Runway adequate (30+ days)');  runwayImpact = 'neutral'; }
+  else if (runway >= 15)    { runwayScore = 45;  runwayLabel = cxt(language, 'Runway short — needs attention'); runwayImpact = 'warning'; }
+  else                      { runwayScore = 20;  runwayLabel = cxt(language, 'Runway critical (<15 days)');  runwayImpact = 'negative'; }
+
+  // ── Receivables (15%) ───────────────────────────────────────────────────
+  let recvScore, recvLabel, recvImpact;
+  if (recvTotal === 0) {
+    recvScore = 80; recvLabel = cx(language, 'noReceivables'); recvImpact = 'neutral';
+  } else {
+    const overdueRatio = recvOverdue / recvTotal;
+    if (recvOverdue === 0)       { recvScore = 85; recvLabel = cxt(language, 'All receivables on time');    recvImpact = 'positive'; }
+    else if (overdueRatio < 0.25){ recvScore = 70; recvLabel = cxt(language, 'Minor overdue receivables');  recvImpact = 'neutral'; }
+    else if (overdueRatio < 0.5) { recvScore = 50; recvLabel = cxt(language, 'Significant overdue receivables'); recvImpact = 'warning'; }
+    else                         { recvScore = 30; recvLabel = cxt(language, 'Most receivables overdue');   recvImpact = 'negative'; }
+  }
+
+  // ── Payables (20%) ──────────────────────────────────────────────────────
+  let payScore, payLabel, payImpact;
+  if (payTotal === 0) {
+    payScore = 90; payLabel = cx(language, 'noPayables'); payImpact = 'positive';
+  } else if (bal > 0 && payOverdue > bal) {
+    payScore = 20; payLabel = cxt(language, 'Overdue payables exceed cash'); payImpact = 'negative';
+  } else if (bal > 0 && payDueSoon > bal) {
+    payScore = 35; payLabel = cxt(language, 'Upcoming payments exceed cash'); payImpact = 'negative';
+  } else if (bal > 0 && payDueSoon <= bal * 0.3) {
+    payScore = 80; payLabel = cxt(language, 'Payables under control'); payImpact = 'positive';
+  } else {
+    payScore = 60; payLabel = cxt(language, 'Payables manageable'); payImpact = 'neutral';
+  }
+
+  // ── Expense Control (15%) ───────────────────────────────────────────────
+  let expScore, expLabel, expImpact;
+  if (mIncome === 0 && mExpense === 0) {
+    expScore = 60; expLabel = cx(language, 'noMonthlyData'); expImpact = 'neutral';
+  } else if (netFlow >= 0) {
+    const margin = mIncome > 0 ? netFlow / mIncome : 0;
+    expScore = margin > 0.2 ? 92 : margin > 0.05 ? 80 : 72;
+    expLabel = cxt(language, 'Net flow positive'); expImpact = 'positive';
+  } else if (cashScore >= 70) {
+    expScore = 62; expLabel = cxt(language, 'Monthly expenses exceed income'); expImpact = 'warning';
+  } else {
+    expScore = mExpense > mIncome * 1.5 ? 32 : 48;
+    expLabel = cxt(language, 'Expenses significantly exceed income'); expImpact = 'negative';
+  }
+
+  // ── Weighted total ──────────────────────────────────────────────────────
+  const score = Math.round(
+    cashScore   * 0.25 +
+    runwayScore * 0.25 +
+    recvScore   * 0.15 +
+    payScore    * 0.20 +
+    expScore    * 0.15
+  );
+
+  const status = score >= 75 ? 'healthy' : score >= 50 ? 'warning' : 'critical';
+  const statusLabel = score >= 75 ? cx(language, 'healthy') : score >= 50 ? cx(language, 'needsAttention') : cx(language, 'critical');
+
+  // Summary sentence
+  const positives = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => [cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i] === 'positive');
+  const warnings  = [cashLabel, runwayLabel, recvLabel, payLabel, expLabel].filter((_, i) => ['warning','negative'].includes([cashImpact,runwayImpact,recvImpact,payImpact,expImpact][i]));
+  let summary;
+  if (status === 'healthy') summary = positives.length > 0 ? `${positives[0]}. ${warnings.length > 0 ? warnings[0] + '.' : cxt(language, 'All key metrics are positive.')}` : cx(language, 'financiallyStable');
+  else if (status === 'warning') summary = warnings.length > 0 ? `${warnings[0]}. ${cxt(language, 'Monitor closely and take action.')}` : cx(language, 'someAreasNeedAttention');
+  else summary = warnings.length > 0 ? `${warnings[0]}. ${cxt(language, 'Immediate action required.')}` : cxt(language, 'Financial health is critical. Prioritize cash flow.');
+
+  return {
+    score,
+    status,
+    label: statusLabel,
+    summary,
+    factors: {
+      cash_health:      { score: cashScore,   label: cashLabel,   impact: cashImpact },
+      runway:           { score: runwayScore, label: runwayLabel, impact: runwayImpact },
+      receivables:      { score: recvScore,   label: recvLabel,   impact: recvImpact },
+      payables:         { score: payScore,    label: payLabel,    impact: payImpact },
+      expense_control:  { score: expScore,    label: expLabel,    impact: expImpact },
+    },
+  };
+}
+
+// ── AI Alert Status ───────────────────────────────────────────────────────────
+function calculateAiAlertStatus(ctx, cfoScore, language = 'en') {
+  const cash   = ctx.cash     || {};
+  const pay    = ctx.payables || {};
+  const runway = ctx.runway_days;
+  const score  = cfoScore?.score ?? 70;
+
+  const bal         = Number(cash.total_balance  || 0);
+  const payOverdue  = Number(pay.overdue_total   || 0);
+  const payDueSoon  = Number(pay.due_soon_total  || 0);
+
+  const isCritical =
+    (runway !== null && runway < 15) ||
+    (bal > 0 && payOverdue > bal) ||
+    bal < 0 ||
+    score < 40;
+
+  const isWarning = !isCritical && (
+    (runway !== null && runway < 30) ||
+    (ctx.receivables?.overdue_count || 0) > 0 ||
+    (bal > 0 && payDueSoon > bal * 0.3) ||
+    score < 70
+  );
+
+  if (isCritical) return {
+    status: 'critical', label: cx(language, 'critical'), color: 'red',
+    headline: cxt(language, 'Immediate cash action required'),
+    description: bal < 0
+      ? cxt(language, 'Cash balance is negative. Review all transactions and stop non-essential spending.')
+      : runway !== null && runway < 7
+        ? cxt(language, 'Cash runway is {n} days. Prioritize collecting receivables and reducing expenses now.', { n: runway })
+        : payOverdue > bal
+          ? cxt(language, 'Overdue payables exceed available cash. Renegotiate or arrange payment immediately.')
+          : cxt(language, 'Financial health score is below safe threshold. Review all key metrics.'),
+  };
+
+  if (isWarning) return {
+    status: 'warning', label: cxt(language, 'Warning'), color: 'amber',
+    headline: cxt(language, 'Some areas need attention'),
+    description: runway !== null && runway < 30
+      ? cxt(language, 'Cash runway is {n} days. This requires active cash planning — collect receivables on time.', { n: runway })
+      : (ctx.receivables?.overdue_count || 0) > 0
+        ? (normalizeLanguage(language) === 'en' ? `${ctx.receivables.overdue_count} receivable${ctx.receivables.overdue_count > 1 ? 's are' : ' is'} overdue. Follow up to protect cash flow.` : cxt(language, 'Overdue receivables: {n}. Follow up to protect cash flow.', { n: ctx.receivables.overdue_count }))
+        : cxt(language, 'Cash position is adequate but some metrics need monitoring.'),
+  };
+
+  return {
+    status: 'healthy', label: cx(language, 'healthy'), color: 'green',
+    headline: cx(language, 'financiallyStable'),
+    description: cx(language, 'cashStrong'),
+  };
+}
+
+// ── Hiring Readiness Engine ───────────────────────────────────────────────────
+function calculateHiringReadiness(ctx, language = 'en') {
+  const cash   = ctx.cash          || {};
+  const month  = ctx.current_month || {};
+  const pay    = ctx.payables      || {};
+  const runway = ctx.runway_days;
+
+  const bal        = Number(cash.total_balance     || 0);
+  const mExpense   = Number(month.expenses         || 0);
+  const netFlow    = Number(month.net_flow         || 0);
+  const burnRate   = Number(month.burn_rate        || 0);
+  const dueSoon    = Number(pay.due_soon_total     || 0);
+  const currency   = ctx.business?.base_currency   || 'IDR';
+
+  if (mExpense === 0 && bal === 0) return {
+    status: 'insufficient_data', label: cx(language, 'notEnoughData'),
+    recommendation: cx(language, 'addWalletsHint'),
+    safe_monthly_salary: 0, max_safe_monthly_salary: 0, currency,
+    reasoning: ['No expense or balance data available.'],
+    assumptions: [],
+  };
+
+  const BUFFER_DAYS   = 30;
+  const bufferCash    = burnRate * BUFFER_DAYS;
+  const safeCashPool  = Math.max(0, bal - bufferCash - dueSoon);
+  const safeSalary    = Math.max(0, Math.round(safeCashPool / 3));
+
+  const reasoning = [];
+  if (runway !== null) reasoning.push(`Current runway is ${runway} days.`);
+  reasoning.push(netFlow >= 0 ? 'Monthly net flow is positive.' : 'Monthly expenses currently exceed income.');
+  if (dueSoon > 0) reasoning.push(`${dueSoon.toLocaleString()} ${currency} in payables due within 7 days.`);
+  reasoning.push(`Safe salary = (cash − 30d buffer − due-soon payables) ÷ 3 months.`);
+
+  let status, label, recommendation;
+  if (runway === null && mExpense === 0) {
+    status = 'insufficient_data'; label = cx(language, 'notEnoughData');
+    recommendation = cx(language, 'addWalletsHint');
+  } else if (runway !== null && runway >= 60 && netFlow >= 0) {
+    status = 'ready'; label = cx(language, 'readyToHire');
+    recommendation = safeSalary > 0
+      ? `You can hire within the safe salary limit. Keep at least ${BUFFER_DAYS} days runway after onboarding.`
+      : 'Runway and flow are healthy, but most cash is tied up in upcoming payments.';
+  } else if (runway === null || (runway >= 30 && runway < 60)) {
+    status = 'caution'; label = cx(language, 'hireCaution');
+    recommendation = language === 'ru' ? 'Запас денег умеренный. Найм возможен, но держите зарплату консервативной и проверяйте деньги еженедельно.' : 'Runway is moderate. A hire is possible but keep the salary conservative and monitor cash weekly.';
+  } else {
+    status = 'not_ready'; label = cx(language, 'notRecommended');
+    recommendation = `Runway is ${runway !== null ? runway + ' days' : 'unknown'}. Delay hiring until runway exceeds 45 days and cash flow stabilises.`;
+    return { status, label, recommendation, safe_monthly_salary: 0, max_safe_monthly_salary: 0, currency, reasoning, assumptions: ['Requires 45+ days runway before hiring.'] };
+  }
+
+  return {
+    status, label, recommendation,
+    safe_monthly_salary: safeSalary,
+    max_safe_monthly_salary: safeSalary,
+    currency, reasoning,
+    assumptions: [
+      `Keeps at least ${BUFFER_DAYS} days cash buffer after withdrawal.`,
+      'Based on current monthly burn rate.',
+      'Covers upcoming payables due within 7 days.',
+    ],
+  };
+}
+
+// ── Next Best Actions V2 ──────────────────────────────────────────────────────
+function buildNextActionsV2(ctx, hiringReadiness, language = 'en') {
+  const recv   = ctx.receivables   || {};
+  const pay    = ctx.payables      || {};
+  const month  = ctx.current_month || {};
+  const runway = ctx.runway_days;
+  const currency = ctx.business?.base_currency || 'IDR';
+
+  const actions = [];
+  const fmt = n => Number(n || 0).toLocaleString('id-ID');
+
+  // ── Overdue receivables ──────────────────────────────────────────────────
+  const recvOverdueList = (recv.top || []).filter(d => d.status === 'overdue');
+  if (recvOverdueList.length > 0) {
+    const top = recvOverdueList[0];
+    actions.push({
+      title: cxt(language, 'Follow up: {who}', { who: top.counterparty }),
+      description: cxt(language, '{amt} {cur} overdue{late}. Send a payment reminder.', { amt: fmt(top.remaining_amount), cur: currency, late: (top.days_overdue > 0 ? cxt(language, ' — {d}d past due', { d: top.days_overdue }) : '') }),
+      action_type: 'receivable_followup', priority: 'high',
+      amount: top.remaining_amount, route: '/receivables',
+    });
+    if (recvOverdueList.length > 1) {
+      const total = recvOverdueList.reduce((s, d) => s + Number(d.remaining_amount || 0), 0);
+      actions.push({
+        title: normalizeLanguage(language) === 'en' ? `${recvOverdueList.length - 1} more overdue receivable${recvOverdueList.length > 2 ? 's' : ''}` : cxt(language, '{n} more overdue receivables', { n: recvOverdueList.length - 1 }),
+        description: cxt(language, '{amt} {cur} also overdue. Review and follow up.', { amt: fmt(total - Number(top.remaining_amount || 0)), cur: currency }),
+        action_type: 'receivable_followup', priority: 'high',
+        amount: total - Number(top.remaining_amount || 0), route: '/receivables',
+      });
+    }
+  } else if ((recv.due_soon_total || 0) > 0) {
+    const topDueSoon = (recv.top || []).find(d => d.status !== 'paid' && d.status !== 'cancelled');
+    actions.push({
+      title: topDueSoon ? cxt(language, 'Confirm payment: {who}', { who: topDueSoon.counterparty }) : cxt(language, 'Receivable due soon'),
+      description: cxt(language, '{amt} {cur} expected within 7 days. Confirm collection date.', { amt: fmt(recv.due_soon_total), cur: currency }),
+      action_type: 'receivable_due_soon', priority: 'medium',
+      amount: recv.due_soon_total, route: '/receivables',
+    });
+  }
+
+  // ── Overdue payables ─────────────────────────────────────────────────────
+  const payOverdueList = (pay.top || []).filter(d => d.status === 'overdue');
+  if (payOverdueList.length > 0) {
+    const top = payOverdueList[0];
+    actions.push({
+      title: cxt(language, 'Pay or renegotiate: {who}', { who: top.counterparty }),
+      description: cxt(language, '{amt} {cur} overdue{late}. Resolve to protect vendor relationship.', { amt: fmt(top.remaining_amount), cur: currency, late: (top.days_overdue > 0 ? cxt(language, ' — {d}d past due', { d: top.days_overdue }) : '') }),
+      action_type: 'payable_overdue', priority: 'high',
+      amount: top.remaining_amount, route: '/payables',
+    });
+  }
+
+  // ── Payables due soon ────────────────────────────────────────────────────
+  const payDueSoonList = (pay.top || []).filter(d => {
+    const days = d.due_date ? Math.ceil((new Date(d.due_date) - new Date()) / 86400000) : null;
+    return days !== null && days >= 0 && days <= 7 && d.status !== 'paid';
+  });
+  if (payDueSoonList.length > 0 && payOverdueList.length === 0) {
+    const top = payDueSoonList[0];
+    actions.push({
+      title: cxt(language, 'Prepare payment: {who}', { who: top.counterparty }),
+      description: cxt(language, '{amt} {cur} due within 7 days. Ensure funds are ready.', { amt: fmt(top.remaining_amount), cur: currency }),
+      action_type: 'payable_due_soon', priority: 'medium',
+      amount: top.remaining_amount, route: '/payables',
+    });
+  }
+
+  // ── Cash / runway actions ────────────────────────────────────────────────
+  if (runway !== null && runway < 30) {
+    actions.push({
+      title: cxt(language, 'Protect runway: review non-critical spending'),
+      description: cxt(language, 'Runway is {n} days. Delay or cancel non-essential expenses to extend cash runway.', { n: runway }),
+      action_type: 'cash_protection', priority: runway < 15 ? 'high' : 'medium',
+      amount: 0, route: '/transactions',
+    });
+  }
+  if (Number(month.net_flow || 0) < 0 && (runway === null || runway >= 30)) {
+    actions.push({
+      title: cxt(language, 'Review top expenses this month'),
+      description: cxt(language, 'Monthly expenses exceed income by {amt} {cur}. Identify which categories can be reduced.', { amt: fmt(Math.abs(month.net_flow)), cur: currency }),
+      action_type: 'expense_review', priority: 'medium',
+      amount: Math.abs(month.net_flow || 0), route: '/transactions',
+    });
+  }
+
+  // ── Hiring readiness action ──────────────────────────────────────────────
+  if (hiringReadiness) {
+    if (hiringReadiness.status === 'not_ready' && (runway || 0) > 0) {
+      actions.push({
+        title: cxt(language, 'Delay hiring — build runway first'),
+        description: cxt(language, 'Runway of {n} days is below safe threshold. Focus on extending runway before adding fixed costs.', { n: runway }),
+        action_type: 'hiring_delay', priority: 'medium',
+        amount: 0, route: '/cfo',
+      });
+    } else if (hiringReadiness.status === 'ready' && hiringReadiness.safe_monthly_salary > 0) {
+      actions.push({
+        title: cxt(language, 'Hiring capacity available'),
+        description: cxt(language, 'Safe monthly salary budget: {amt} {cur}. You can hire conservatively.', { amt: fmt(hiringReadiness.safe_monthly_salary), cur: currency }),
+        action_type: 'hiring_ready', priority: 'low',
+        amount: hiringReadiness.safe_monthly_salary, route: '/cfo',
+      });
+    }
+  }
+
+  // ── Fallback ─────────────────────────────────────────────────────────────
+  if (actions.length === 0) {
+    actions.push({
+      title: cx(language, 'financesStable'),
+      description: cx(language, 'noUrgentActions'),
+      action_type: 'pulse', priority: 'low',
+      amount: 0, route: '/transactions',
+    });
+  }
+
+  return actions.slice(0, 5);
+}
+
+/**
+ * Local rule-based CFO answer — used when Anthropic is unavailable.
+ * Answers common financial questions from context data.
+ */
+function generateLocalCfoAnswer(question, ctx) {
+  const q      = (question || '').toLowerCase();
+  const fmt    = n => Number(n || 0).toLocaleString('id-ID');
+  const biz    = ctx.business || {};
+  const cash   = ctx.cash     || {};
+  const month  = ctx.current_month || {};
+  const recv   = ctx.receivables   || {};
+  const pay    = ctx.payables      || {};
+  const runway = ctx.runway_days;
+
+  const currency = biz.base_currency || 'IDR';
+  const hasData  = cash.total_balance !== undefined;
+
+  if (!hasData) {
+    return `I don't have enough data yet for ${biz.name || 'your business'}. Please add transactions, wallets, receivables and payables first to get meaningful insights.`;
+  }
+
+  // Cash / balance questions
+  if (/cash|balance|money|сколько|остат|баланс|дене/.test(q)) {
+    let ans = `**${biz.name}** has **${fmt(cash.total_balance)} ${currency}** in total cash`;
+    if (cash.wallets_count > 0) ans += ` across ${cash.wallets_count} wallet${cash.wallets_count > 1 ? 's' : ''}`;
+    if (cash.has_incomplete_balance && (cash.unvalued_currencies || []).length > 0) {
+      ans += ` (excluding unvalued ${cash.unvalued_currencies.join(', ')} wallets)`;
+    }
+    ans += '.';
+    if (recv.total_remaining > 0) ans += `\n\nYou also have **${fmt(recv.total_remaining)} ${currency}** in outstanding receivables.`;
+    if (pay.total_remaining > 0)  ans += `\n\nUpcoming payables: **${fmt(pay.total_remaining)} ${currency}**.`;
+    if (runway !== null) ans += `\n\nAt current burn rate, cash runway is approximately **${runway} days**.`;
+    return ans;
+  }
+
+  // Runway / cash risk
+  if (/runway|run out|когда закончится|риск/.test(q)) {
+    if (runway === null || runway === 999) return `Runway cannot be calculated — no regular expenses tracked yet. Add expense transactions to get a burn rate estimate.`;
+    const status = runway < 7 ? '🔴 Critical' : runway < 14 ? '⚠️ Short' : '✅ Healthy';
+    const advice = runway < 7
+      ? 'This needs immediate attention — focus on collecting receivables and cutting non-essential expenses.'
+      : runway < 14
+        ? 'This needs active cash planning. Focus on collecting receivables on time and reviewing upcoming expenses.'
+        : 'Runway looks healthy. Keep monitoring monthly expenses and incoming payments.';
+    return `${status} — approximately **${runway} days** of cash runway remaining.\n\nCurrent balance: ${fmt(cash.total_balance)} ${currency}\nDaily burn rate: ~${fmt(month.burn_rate)} ${currency}/day\n\n${advice}`;
+  }
+
+  // Owner withdrawal / personal draw
+  if (isOwnerWithdrawalQuestion(q)) {
+    const bal      = Number(cash.total_balance || 0);
+    const burnRate = Number(month.burn_rate || 0);
+    const currency = biz.base_currency || 'IDR';
+
+    // Try to parse an amount from the question (e.g. "15M", "10,000,000", "5 juta")
+    let amount = 0;
+    const mM  = q.match(/(\d[\d,.]*)[\s]*m(?:illion)?(?:\s*idr)?/);
+    const mK  = q.match(/(\d[\d,.]*)[\s]*k(?:\s*idr)?/);
+    const mN  = q.match(/(\d[\d,.]+)\s*(idr|juta|jt|rb|ribu)?/);
+    if (mM)       amount = parseFloat(mM[1].replace(/,/g,'')) * 1_000_000;
+    else if (mK)  amount = parseFloat(mK[1].replace(/,/g,'')) * 1_000;
+    else if (mN)  amount = parseFloat(mN[1].replace(/,/g,''));
+
+    if (amount <= 0) {
+      return `I won't advise on how to spend money personally.\n\nBut as your CFO, I can assess whether an owner withdrawal is safe for the business. **How much are you planning to take out?** (e.g. "Can I take 15M IDR?")`;
+    }
+
+    const cashAfter   = bal - amount;
+    const runwayAfter = burnRate > 0 ? Math.floor(cashAfter / burnRate) : null;
+    const pctOfCash   = bal > 0 ? Math.round((amount / bal) * 100) : 100;
+    const hasOverdue  = (pay.overdue_count || 0) > 0;
+
+    let rating, advice;
+    if (cashAfter < 0) {
+      rating = '🔴 Not recommended';
+      advice = `This withdrawal exceeds current cash balance. It would leave the business with a negative cash position.`;
+    } else if (runwayAfter !== null && runwayAfter < 15 || pctOfCash > 70 || hasOverdue) {
+      rating = '⚠️ Caution';
+      advice = `${hasOverdue ? `You have ${pay.overdue_count} overdue payable${pay.overdue_count > 1 ? 's' : ''} (${fmt(pay.overdue_total || 0)} ${currency}) that should be resolved first. ` : ''}${runwayAfter !== null && runwayAfter < 15 ? `Runway after withdrawal would be only ${runwayAfter} days. ` : ''}Consider a smaller amount or wait until receivables are collected.`;
+    } else {
+      rating = '✅ Appears safe';
+      advice = `Payroll and upcoming payables (${fmt(pay.total_remaining)} ${currency}) appear coverable from remaining cash.`;
+    }
+
+    return `I won't advise on personal spending decisions.\n\nAs CFO, here is the **business cash-flow assessment** for a ${fmt(amount)} ${currency} owner withdrawal:\n\n**${rating}**\n\nCash before: ${fmt(bal)} ${currency}\nCash after: ${fmt(Math.max(0, cashAfter))} ${currency}\n${runwayAfter !== null ? `Runway after: ~${Math.max(0, runwayAfter)} days (vs ${runway ?? '?'} days now)\n` : ''}\n${advice}\n\n**Classification:** Record this as owner withdrawal, salary, or dividend — not as a business expense. Confirm tax treatment with your accountant.`;
+  }
+
+  // Receivables
+  if (/receiv|owes|owe me|кто должен|дебитор|поступлен/.test(q)) {
+    if (recv.total_remaining === 0) return `No open receivables at the moment. Everything has been collected or no receivables have been added yet.`;
+    let ans = `You have **${fmt(recv.total_remaining)} ${currency}** in outstanding receivables.`;
+    if (recv.overdue_count > 0) ans += `\n\n⚠️ **${recv.overdue_count} overdue** — ${fmt(recv.overdue_total)} ${currency} past due date.`;
+    if (recv.due_soon_total > 0) ans += `\n\n⏰ **${fmt(recv.due_soon_total)} ${currency}** due within 7 days.`;
+    if ((recv.top || []).length > 0) {
+      ans += '\n\nTop receivables:\n';
+      recv.top.forEach(r => { ans += `• ${r.counterparty}: ${fmt(r.remaining_amount)} ${currency} (${r.status})\n`; });
+    }
+    return ans;
+  }
+
+  // Payables / urgent payments
+  if (/payable|pay|owe|платить|кому должны|срочн|urgent/.test(q)) {
+    if (pay.total_remaining === 0) return `No open payables at the moment.`;
+    let ans = `You have **${fmt(pay.total_remaining)} ${currency}** in outstanding payables.`;
+    if (pay.overdue_count > 0) ans += `\n\n🔴 **${pay.overdue_count} overdue** — ${fmt(pay.overdue_total)} ${currency}. Pay immediately.`;
+    if (pay.due_soon_total > 0) ans += `\n\n⏰ **${fmt(pay.due_soon_total)} ${currency}** due within 7 days.`;
+    if ((pay.top || []).length > 0) {
+      ans += '\n\nTop payables:\n';
+      pay.top.forEach(p => { ans += `• ${p.counterparty}: ${fmt(p.remaining_amount)} ${currency} (${p.status})\n`; });
+    }
+    return ans;
+  }
+
+  // Hire / headcount — use hiring_readiness engine result if available
+  if (/hire|нанять|employee|salary(?! to)|staff|headcount|hiring/.test(q)) {
+    const hr = ctx.hiring_readiness;
+    if (hr) {
+      if (hr.status === 'insufficient_data') return `Not enough financial data to calculate a safe hiring budget.\n\n${hr.recommendation}`;
+      if (hr.status === 'not_ready') return `**${hr.label}** — ${hr.recommendation}\n\n${hr.reasoning.join('\n')}`;
+      const salaryStr = hr.safe_monthly_salary > 0 ? `\n\n**Safe monthly salary budget:** ${fmt(hr.safe_monthly_salary)} ${currency}/month` : '';
+      return `**${hr.label}**\n\n${hr.recommendation}${salaryStr}\n\n${hr.reasoning.join('\n')}\n\n_Note: This is a conservative estimate. Confirm with your accountant._`;
+    }
+    // Fallback if hiring_readiness not in ctx
+    const bal = cash.total_balance || 0;
+    if (bal <= 0) return `Current cash balance is ${fmt(bal)} ${currency}. Hiring is not recommended until cash position improves.`;
+    if (runway !== null && runway < 30) return `Cash runway is only ${runway} days. Delay hiring until runway is above 45 days and cash flow is stable.`;
+    const safeBudget = Math.round(bal * 0.12);
+    return `Cash position is ${fmt(bal)} ${currency}${runway !== null ? ` with ${runway} days runway` : ''}. A conservative monthly salary budget would be around **${fmt(safeBudget)} ${currency}** (12% of cash).\n\nCheck upcoming payables (${fmt(pay.total_remaining)} ${currency}) before committing to fixed costs.`;
+  }
+
+  // What to do today
+  if (/today|сегодня|do now|next action|что делать|priority/.test(q)) {
+    const actions = ctx.next_actions || [];
+    if (actions.length === 0) {
+      if (language === 'ru') return 'Финансы стабильны. Продолжайте добавлять операции ежедневно для точных данных.'
+      if (language === 'id') return 'Keuangan terlihat stabil. Tetap tambah transaksi harian untuk menjaga data yang akurat.'
+      return 'Finances look stable. Keep adding transactions daily to maintain accurate insights.'
+    }
+    let ans = `**Today's priorities for ${biz.name}:**\n\n`;
+    actions.slice(0, 3).forEach((a, i) => { ans += `${i+1}. ${a.title}\n   ${a.description}\n\n`; });
+    return ans.trim();
+  }
+
+  // Expenses / costs
+  if (/expense|cost|spend|расход|затрат/.test(q)) {
+    if (month.expenses === 0) return `No expenses recorded this month yet.`;
+    return `This month: **${fmt(month.expenses)} ${currency}** in expenses, **${fmt(month.income)} ${currency}** income.\nNet flow: **${month.net_flow >= 0 ? '+' : ''}${fmt(month.net_flow)} ${currency}**.\nBurn rate: ~${fmt(month.burn_rate)} ${currency}/day.`;
+  }
+
+  // Default — financial summary
+  const topRisk = (ctx.risks || []).find(r => r.severity === 'critical') || (ctx.risks || [])[0];
+  const runwayNote = runway !== null
+    ? runway < 7  ? `\n\n⚠️ Runway is ${runway} days — this needs immediate attention.`
+    : runway < 14 ? `\n\n⚠️ Runway is ${runway} days — this requires active cash planning.`
+    : runway < 30 ? `\n\nRunway is ${runway} days. Keep monitoring cash flow carefully.`
+    : ''
+    : '';
+  return `**Financial summary for ${biz.name}:**\n\nCash: ${fmt(cash.total_balance)} ${currency}${runway !== null ? ` · ${runway}d runway` : ''}\nThis month: +${fmt(month.income)} income / −${fmt(month.expenses)} expenses\nReceivables: ${fmt(recv.total_remaining)} ${currency} outstanding\nPayables: ${fmt(pay.total_remaining)} ${currency} pending\n\n${topRisk ? `Key insight: ${topRisk.title}` : 'No major risks detected.'}${runwayNote}`;
+}
+
+// ── Domain guardrail for AI CFO ───────────────────────────────────────────────
+
+/**
+ * isOwnerWithdrawalQuestion — detects questions about taking money from business
+ * for personal/family use (owner draw, salary, dividend, personal spend).
+ * These are ALLOWED as CFO cash-impact questions, not lifestyle advice.
+ */
+function isOwnerWithdrawalQuestion(question) {
+  const q = question.toLowerCase().trim();
+  const OWNER_PATTERNS = [
+    /owner.{0,10}draw/,
+    /withdraw/,
+    /take.{0,15}(money|cash|funds|out)/,
+    /pay (my)?self/,
+    /for (my)?self/,
+    /personal.{0,15}(spend|withdraw|use|take)/,
+    /family.{0,20}(spend|use|take|weekend|money|cash)/,
+    /dividend/,
+    /director.{0,10}(draw|withdrawal|salary)/,
+    /founder.{0,10}(draw|withdrawal|salary)/,
+    /use.{0,15}(business|company).{0,15}(cash|money|funds)/,
+    /company.{0,15}(money|cash|funds).{0,15}(personal|myself|family)/,
+    /transfer.{0,15}(to myself|personal)/,
+    /i want to spend/,
+    /can i spend/,
+    /i (need|want).{0,10}(take|use|withdraw)/,
+    /вывести|вывод денег|зарплата себе|дивиденд|личные расходы/,
+  ];
+  return OWNER_PATTERNS.some(re => re.test(q));
+}
+
+/**
+ * isBusinessFinanceQuestion — returns true if question is within CFO scope.
+ * Flow: owner_withdrawal → always allow
+ *       blocklist → false (lifestyle / unrelated)
+ *       allowlist → true  (explicit finance keywords)
+ *       short / ambiguous → fail open (true)
+ */
+function isBusinessFinanceQuestion(question) {
+  const q = question.toLowerCase().trim();
+
+  // 0. Owner withdrawal is always allowed — it's a business cash-impact question
+  if (isOwnerWithdrawalQuestion(q)) return true;
+
+  // 1. Blocklist — obvious lifestyle / out-of-scope topics
+  //    NOTE: "family" alone is NOT blocked — "family" + spend/withdraw is owner_withdrawal (caught above)
+  //    Only block pure lifestyle uses of family: "where to go with family", "family trip"
+  const BLOCKED = [
+    /cook|recipe|пельмен|борщ|блин|суп|готов(?!ить бизнес)/,
+    /poem|стих(?!и о деньгах)|write me a (song|poem|story|rap)/,
+    /\bmovie\b|\bfilm\b|фильм|сериал|netflix|кино/,
+    /\bfootball\b|\bsoccer\b|game score|sport.*result|who won the/,
+    /romantic|dating|boyfriend|girlfriend|marriage/,
+    /politic|election|президент|vote|партия(?! в бизнесе)|война|war(?! on cost)/,
+    /weather|погод(?!а в бизнесе)|forecast(?! cash)|температур/,
+    /\bmedical\b|\bdoctor\b|\bmedicine\b|болезн|симптом|лекарств|diagnos/,
+    /\bjoke\b|funny|анекдот|\bhumor\b/,
+    /horoscope|гороскоп|astrology/,
+    /where (should|to) (i|we) go.{0,20}(weekend|vacation|holiday|trip|family)/,
+    /recommend.{0,20}(restaurant|place|hotel|travel|movie|show)/,
+    /where is my (sister|brother|mom|dad|friend|wife|husband)/,
+  ];
+  if (BLOCKED.some(re => re.test(q))) return false;
+
+  // 2. Finance/business allowlist — explicit finance keywords always pass
+  const ALLOWED = [
+    /cash|деньги|наличн/,
+    /balance|баланс/,
+    /runway|рунвей/,
+    /receiv|дебитор/,
+    /payable|кредитор/,
+    /invoice|счёт|счет/,
+    /expense|расход|затрат/,
+    /income|revenue|доход|выручк/,
+    /profit|прибыл/,
+    /hire|нанять|employee|salary|зарплат|payroll|staff|headcount/,
+    /\bdebt\b|долг/,
+    /\brisk\b|риск/,
+    /budget|бюджет/,
+    /business|company|бизнес|компани/,
+    /payment|платеж|заплатить/,
+    /collect|взыскать/,
+    /financial|финанс/,
+    /\btax\b|налог/,
+    /burn rate|\bburn\b/,
+    /wallet|кошелек/,
+    /transaction|транзакц/,
+    /overdue|просроч/,
+    /what should (i|we) do/,
+    /can i (hire|afford)/,
+    /how much (cash|do i have)/,
+    /what.*biggest.*risk/,
+    /today.*priorit|priorit.*today/,
+    /liquidity|ликвидн/,
+    /cash flow|кэш.?флоу/,
+  ];
+  if (ALLOWED.some(re => re.test(q))) return true;
+
+  // 3. Very short questions (<= 5 words) — ambiguous, fail open
+  const wordCount = q.split(/\s+/).filter(Boolean).length;
+  if (wordCount <= 5) return true;
+
+  // 4. Default: fail open — better to answer than over-block a legitimate question
+  return true;
+}
+
+const CFO_OUT_OF_SCOPE_RESPONSE = "Sorry, I can't help with that. I'm CFO AI — a financial consultant for business owners. I only answer questions about business finance: cash flow, receivables, payables, expenses, runway, hiring readiness, payroll and owner financial decisions.";
+const CFO_OUT_OF_SCOPE_RESPONSE_RU = "Извините, я не могу помочь с этим вопросом. Я CFO AI-консультант и отвечаю только на вопросы, связанные с финансами бизнеса.";
+
+// GET /api/ai-cfo/context — full financial context for AI CFO page
+app.get('/api/ai-cfo/context', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canUseAiCfo(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow using AI CFO' });
+    const language = normalizeLanguage(req.query.language || await getUserLanguage(req.user.userId));
+    const ctx = await buildAiCfoContext(req.user.userId, language, biz);
+    res.json(ctx);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/ai-cfo/ask — ask the AI CFO a question
+app.post('/api/ai-cfo/ask', auth, async (req, res) => {
+  try {
+    const userId   = req.user.userId;
+    const { question } = req.body;
+    const rawLang = req.body.language || await getUserLanguage(userId);
+    const language = normalizeLanguage(rawLang);
+    const isRu = language === 'ru';
+    if (!question || !question.trim()) return res.status(400).json({ error: 'question required' });
+
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canUseAiCfo(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow using AI CFO' });
+
+    // ── Domain guardrail: reject out-of-scope questions ───────────────────────
+    if (!isBusinessFinanceQuestion(question)) {
+      return res.json({ answer: getCfoOutOfScopeResponse(language), out_of_scope: true });
+    }
+
+    // ── Usage limit check (soft — not yet tracked in DB) ─────────────────────
+    let access;
+    try {
+      access = await getCurrentAccess(userId);
+      if (access) {
+        const maxQ = access.limits?.max_ai_questions_per_month;
+        // V1 limitation: ai_questions_this_month is not tracked in DB.
+        // Limit enforcement will be added when usage table is created (TASK 36+).
+        // For now: enforce if access returns a count > 0 from future tracking.
+        // Skipped intentionally to not block users in V1.
+        void maxQ;
+      }
+    } catch (_) { /* fail open */ }
+
+    // ── Build context ─────────────────────────────────────────────────────────
+    const ctx = await buildAiCfoContext(userId, language, biz);
+    const currency = ctx.business?.base_currency || 'IDR';
+
+    // ── Try Anthropic first, fall back to local analyzer ─────────────────────
+    let answer;
+    const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+
+    if (hasApiKey) {
+      try {
+        const ownerWithdrawal = isOwnerWithdrawalQuestion(question);
+        const cfo   = ctx.cfo_score        || {};
+        const alert = ctx.ai_alert         || {};
+        const hire  = ctx.hiring_readiness || {};
+        const savedLangName = language === 'ru' ? 'Russian' : language === 'id' ? 'Indonesian' : 'English';
+        const langInstruction = `LANGUAGE: Reply in the SAME language as the user's latest message (Russian, Indonesian, or English). If the language is unclear, default to ${savedLangName}. Write the entire reply — headings, recommendations and refusals — in that one language. Never announce or describe which language you use. Keep product terms like CFO AI, AI CFO, cash flow, runway in their original form.`;
+
+        // Granular per-currency FX breakdown
+        const nonBaseCurrencies = new Set([
+          'USD',
+          ...(ctx.cash.wallets || []).map(w => w.currency).filter(c => c && c.toUpperCase() !== currency.toUpperCase()),
+        ]);
+        const fxLines = [];
+        for (const cur of nonBaseCurrencies) {
+          const q = ctx.rates?.[cur];
+          if (q && q.rate != null) {
+            const srcLabel = q.source === 'bi_jisdor' ? 'Bank Indonesia JISDOR'
+              : q.source === 'exchangerate_api' ? 'ExchangeRate-API'
+              : q.source === 'coingecko' ? 'CoinGecko'
+              : q.source === 'fixed_accounting_table' ? 'Fixed Accounting Table'
+              : q.source;
+            const fallbackTxt = q.is_fallback ? ` [FALLBACK: ${q.fallback_reason || 'primary unavailable'}]` : '';
+            fxLines.push(`${cur}: 1 ${cur} = ${Number(q.rate).toLocaleString()} ${currency} (source: ${srcLabel}, date: ${q.rate_effective_date || q.as_of || 'current'}, status: ${q.status}${fallbackTxt})`);
+          }
+        }
+        const fxBlock = fxLines.length ? `\n- FX Rates & Sources (by currency):\n  * ${fxLines.join('\n  * ')}\n  * Overall Provider: ${ctx.fx_metadata?.primary_source || ctx.fx_metadata?.source || 'standard'} (status: ${ctx.fx_metadata?.status || 'active'})\n  * RULE: Each currency has its own specific source above. Never attribute non-USD currencies (like EUR or USDT) or fallback USD quotes to Bank Indonesia JISDOR.\n` : '';
+
+        const systemPrompt = `You are CFO AI, a financial decision assistant for ${ctx.business.name} — a ${ctx.business.effective_plan} plan business using ${currency} as base currency.
+Answer like a calm, direct CFO speaking to a CEO. Be specific, conservative, action-oriented, and not dramatic.
+${langInstruction}
+
+YOUR ROLE: You ONLY answer questions about business finance: cash flow, runway, receivables, payables,
+expenses, income, payroll, hiring readiness, invoices, financial risks, budgeting, owner financial decisions.
+Refuse unrelated topics (cooking, entertainment, politics, sports, relationships, medical, poems, jokes).
+
+OWNER WITHDRAWAL POLICY: If user asks about taking money from business for personal/family use,
+do NOT give lifestyle advice. Assess cash-flow impact: cash before/after, runway before/after,
+payables coverage, rating (safe/caution/not recommended). Recommend classification (owner withdrawal,
+salary, or dividend). Say "confirm tax treatment with your accountant." Do NOT comment on how to spend.
+
+DECISION RULES (deterministic engine is the source of truth):
+- A backend Decision Engine computes all approval/payment recommendations and before/after cash & runway. NEVER redo this arithmetic and NEVER contradict it.
+- ALWAYS separate two decisions: APPROVE confirms an obligation and changes NO cash; PAY/RECEIVE is the only thing that moves cash and a wallet. A request can be safe to approve but not safe to pay today.
+- A receivable is EXPECTED cash, never current/guaranteed cash. Pending submissions are not confirmed.
+
+DECISION LAYER (today ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}):
+- CFO Score: ${cfo.score ?? '?'}/100 — ${cfo.label ?? 'unknown'} (${cfo.summary ?? ''})
+- AI Alert: ${alert.label ?? 'unknown'} — ${alert.headline ?? ''}
+- Hiring: ${hire.label ?? 'unknown'} — safe salary ${hire.safe_monthly_salary ? hire.safe_monthly_salary.toLocaleString() + ' ' + currency + '/mo' : 'unknown'}
+  ${(hire.reasoning || []).join(' ')}
+
+FINANCIAL CONTEXT:
+- Total cash: ${ctx.cash.total_balance.toLocaleString()} ${currency}
+- Cash runway: ${ctx.runway_days !== null ? ctx.runway_days + ' days' : 'unknown'}
+- This month: +${ctx.current_month.income.toLocaleString()} income / -${ctx.current_month.expenses.toLocaleString()} expenses (net: ${ctx.current_month.net_flow.toLocaleString()})
+- Daily burn rate: ~${ctx.current_month.burn_rate.toLocaleString()} ${currency}/day
+- Receivables: ${ctx.receivables.total_remaining.toLocaleString()} ${currency} outstanding (${ctx.receivables.overdue_count} overdue)
+- Payables: ${ctx.payables.total_remaining.toLocaleString()} ${currency} pending (${ctx.payables.overdue_count} overdue)
+${ctx.receivables.top.length > 0 ? `- Top receivables: ${ctx.receivables.top.map(r => `${r.counterparty} ${r.remaining_amount.toLocaleString()} (${r.status})`).join(', ')}` : ''}
+${ctx.payables.top.length > 0 ? `- Top payables: ${ctx.payables.top.map(p => `${p.counterparty} ${p.remaining_amount.toLocaleString()} (${p.status})`).join(', ')}` : ''}
+- Wallets: ${ctx.cash.wallets.map(w => `${w.name} ${w.balance.toLocaleString()} ${w.currency}${w.is_unvalued ? ' (UNVALUED: NO FX RATE)' : ''}`).join(', ') || 'none'}
+${ctx.cash.has_incomplete_balance && ctx.cash.unvalued_currencies?.length ? `- FX INCOMPLETE: Currencies [${ctx.cash.unvalued_currencies.join(', ')}] have no available exchange rate and are excluded from the ${currency} cash total.\n` : ''}${fxBlock}${(ctx.pending_submissions?.count > 0) ? `- Pending team submissions (NOT confirmed — do NOT count in obligations, mention as potential cash pressure): ${ctx.pending_submissions.count} item(s), receivables ${ctx.pending_submissions.receivables_total.toLocaleString()}, payables ${ctx.pending_submissions.payables_total.toLocaleString()} ${currency} — ${ctx.pending_submissions.items.map(i => `${i.counterparty || '—'} ${Number(i.amount||0).toLocaleString()} (${i.type}, by ${i.created_by || 'team'})`).join(', ')}` : ''}
+${(ctx.compliance?.upcoming?.length) ? `- Upcoming tax/compliance deadlines (dates from the Tax Rules Registry; estimated amounts not yet computed in V1 — treat as compliance pressure, advise confirming with the accountant): ${ctx.compliance.upcoming.map(e => `${e.title} due ${e.due_date} (${e.status})`).join('; ')}${ctx.compliance.overdue_count ? ` · ${ctx.compliance.overdue_count} OVERDUE` : ''}` : ''}
+- Risk signals: ${ctx.risks.map(r => r.title).join('; ') || 'none'}
+- Top actions: ${(ctx.next_actions || []).slice(0,3).map(a => a.title).join(' | ') || 'none'}
+${ownerWithdrawal ? '\nNOTE: This is an owner withdrawal question. Apply OWNER WITHDRAWAL POLICY.' : ''}
+
+ANSWER RULES:
+- Concise, direct, 3-8 sentences max — like a real CFO
+- Use ONLY the actual numbers above — never invent data
+- If data is missing, say what is missing
+- Use ${currency} in all amounts
+- NEVER use: "this isn't a drill", "crisis", "emergency" for moderate situations
+- For moderate risk: "This needs attention" / "This requires active cash planning" / "This is manageable if income is collected on time"
+- Reserve strong warnings for truly critical: runway < 7 days or negative cash
+- When asked about hiring → use the Hiring Readiness data above
+- When asked what to do today → use the Top Actions above
+- When asked about biggest risk → use Risk signals + AI Alert above`;
+
+        const response = await anthropic.messages.create({
+          model:      'claude-haiku-4-5',
+          max_tokens: 400,
+          system:     systemPrompt,
+          messages:   [{ role: 'user', content: question.trim() }],
+        });
+        answer = response.content[0].text.trim();
+      } catch (aiErr) {
+        console.warn('[ai-cfo/ask] Anthropic failed, using local fallback:', aiErr.message);
+        answer = generateLocalCfoAnswer(question, ctx);
+      }
+    } else {
+      answer = generateLocalCfoAnswer(question, ctx);
+    }
+
+    res.json({
+      answer,
+      context_summary: {
+        total_balance:   ctx.cash.total_balance,
+        runway_days:     ctx.runway_days,
+        risks_count:     ctx.risks.filter(r => r.severity !== 'low').length,
+      },
+      used_ai_provider: hasApiKey,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── DELETE /api/user/reset-data ───────────────────────────────────────────────
+// Deletes all financial data for the current user.
+// Keeps: users row, business, business_members, access/plan.
+// Deletes: transactions, debts, wallets, reminders.
+// Requires confirmation token in body: { confirm: "RESET" }
+// Atomic, business-scoped, owner/admin-only financial reset. All-or-nothing via the
+// rpc_reset_business_financial(uuid) Postgres function (single transaction) — never
+// partial. Confirm token: { "confirm": "RESET" }.
+async function resetFinancialHandler(req, res) {
+  try {
+    const { confirm } = req.body || {};
+    if (confirm !== 'RESET') return res.status(400).json({ ok: false, error: 'confirm_required', message: 'Send { "confirm": "RESET" } to confirm.' });
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ ok: false, error: 'forbidden', message: 'Only owner, CEO, admin or CFO can reset financial data.' });
+    const { data, error } = await supabase.rpc('rpc_reset_business_financial', {
+      p_business: biz.business.id,
+      p_actor_user_id: req.user.userId,
+    });
+    // The RPC itself enforces auth + atomicity and always returns { ok, deleted, error }.
+    if (error || !data || data.ok !== true)
+      return res.status(200).json({ ok: false, error: (data && data.error) || 'reset_failed', deleted: {}, message: 'Financial reset failed. No data was deleted.' });
+    return res.json({ ok: true, deleted: data.deleted || {} });
+  } catch (e) {
+    return res.status(200).json({ ok: false, error: 'reset_failed', message: 'Financial reset failed. No data was deleted.' });
+  }
+}
+app.delete('/api/user/reset-data', auth, resetFinancialHandler);       // legacy path (frontend)
+app.post('/api/business/reset-financial', auth, resetFinancialHandler); // canonical path
+
+// GET /api/business/active — auth-gated isolation diagnostic. Echoes the requested
+// x-business-id and the business the backend actually RESOLVED for this caller, so a
+// "shows another business's data" report can be pinned to client vs server in one call.
+app.get('/api/business/active', auth, async (req, res) => {
+  try {
+    const requested = req.headers['x-business-id'] || req.query?.business_id || null;
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const primaryId = await getPrimaryBusinessId(supabase, req.user.userId);
+    res.json({
+      requested_business_id: requested,
+      resolved: {
+        id:            biz.business.id,
+        business_code: biz.business.business_code || null,
+        name:          biz.business.name,
+        type:          biz.business.type || 'business',
+      },
+      role: biz.role,
+      is_primary_business: !!primaryId && primaryId === biz.business.id,
+      // True only when the client sent an id AND the server resolved that exact id.
+      matched: !!requested && String(requested) === String(biz.business.id),
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message || 'failed' });
+  }
+});
+
+// Business-scoped financial row counts (shared by financial-counts + delete-guard).
+async function businessFinancialCounts(id) {
+  const cnt = async (tbl, col = 'business_id') => {
+    try { const { count } = await supabase.from(tbl).select('*', { count: 'exact', head: true }).eq(col, id); return count || 0; }
+    catch { return 0; }
+  };
+  return {
+    transactions: await cnt('transactions'),
+    debts: await cnt('debts'),
+    wallets: await cnt('wallets'),
+    reminders: await cnt('reminders'),
+    payroll_payments: await cnt('payroll_payments'),
+    bank_import_batches: await cnt('bank_import_batches'),
+  };
+}
+
+// GET /api/business/financial-counts — counts before/after reset (business-scoped).
+app.get('/api/business/financial-counts', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    res.json({ ok: true, counts: await businessFinancialCounts(biz.business.id) });
+  } catch (e) { res.status(200).json({ ok: false, counts: {} }); }
+});
+
+// DELETE /api/businesses/:id — owner-only, business-only, never the last business.
+// Empty business → hard delete (memberships cascade; workspace prefs FK is SET NULL).
+// Business with financial data → blocked (reset first). Returns the next business to
+// switch to so the client never lands on a deleted workspace.
+app.delete('/api/businesses/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const businessId = req.params.id;
+    const { confirm } = req.body || {};
+
+    const { data } = await supabase.from('business_members')
+      .select('role, status, businesses(*)')
+      .eq('user_id', userId).eq('business_id', businessId).eq('status', 'active').limit(1);
+    const m = data?.[0];
+    if (!m || !m.businesses) return res.status(403).json({ error: 'workspace_not_accessible' });
+    const business = m.businesses;
+    if (business.type === 'personal') return res.status(403).json({ error: 'business_workspace_required', message: 'Personal workspaces cannot be deleted here.' });
+    if (m.role !== 'owner') return res.status(403).json({ error: 'forbidden', message: 'Only the business owner can delete it.' });
+
+    // Typed confirmation: the business name OR the literal "DELETE BUSINESS".
+    if (confirm !== 'DELETE BUSINESS' && confirm !== business.name)
+      return res.status(400).json({ error: 'confirm_required', message: 'Type the business name or "DELETE BUSINESS" to confirm.' });
+
+    // Never delete the user's only business workspace.
+    const { data: owned } = await supabase.from('business_members')
+      .select('business_id, businesses(type)')
+      .eq('user_id', userId).eq('status', 'active');
+    const businessWorkspaces = (owned || []).filter(x => x.businesses && x.businesses.type !== 'personal');
+    if (businessWorkspaces.length <= 1)
+      return res.status(409).json({ error: 'last_business', message: 'You cannot delete your only business.' });
+
+    // Block when the business still holds financial data — reset it first.
+    const counts = await businessFinancialCounts(businessId);
+    const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+    if (total > 0)
+      return res.status(409).json({ error: 'business_not_empty', counts, message: 'This business has financial data and cannot be deleted yet.' });
+
+    // ATOMIC hard delete: a SINGLE delete of the business row. business_members has
+    // ON DELETE CASCADE, so memberships are removed in the same statement/transaction
+    // — no risk of a partial delete (orphaned members with no business). If any RESTRICT
+    // FK still references this business (it shouldn't: counts are proven zero above),
+    // the delete fails wholesale and we return a clean error — nothing is partially
+    // removed. We do NOT touch migration-037 tables (e.g. user_workspace_preferences);
+    // their FK to businesses is ON DELETE SET NULL when present, and absent in prod
+    // (037 not applied) — either way no manual cleanup is needed here.
+    const { error: delErr } = await supabase.from('businesses').delete().eq('id', businessId);
+    if (delErr) return res.status(409).json({ error: 'delete_blocked', message: 'This business has related records and cannot be deleted yet.' });
+
+    const next = businessWorkspaces.find(x => x.business_id !== businessId);
+    res.json({ ok: true, deleted_business_id: businessId, next_business_id: next?.business_id || null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/businesses — create an additional business (caller becomes owner).
+// Does not touch existing businesses. Graceful for optional columns (country/timezone/
+// business_type) that may be absent in the live schema — no raw schema error.
+app.post('/api/businesses', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, base_currency, country, timezone, business_type } = req.body || {};
+    if (!name?.trim()) return res.status(400).json({ error: 'Business name is required.' });
+    if (base_currency && !BUSINESS_ALLOWED_CURRENCIES.includes(base_currency))
+      return res.status(400).json({ error: `Invalid currency. Allowed: ${BUSINESS_ALLOWED_CURRENCIES.join(', ')}` });
+
+    const row = { owner_user_id: userId, name: name.trim(), base_currency: base_currency || 'IDR', plan: 'free', type: 'business' };
+    if (country !== undefined) row.country = country || null;
+    if (timezone !== undefined) row.timezone = timezone || null;
+    if (business_type !== undefined) row.business_type = business_type || null;
+
+    let business, bErr, dropped = [];
+    for (let i = 0; i < 5; i++) {
+      ({ data: business, error: bErr } = await supabase.from('businesses').insert(row).select().single());
+      if (!bErr) break;
+      // PostgREST: "Could not find the 'x' column"; Postgres itself: 'column "x" of relation … does not exist'.
+      const m = /find the '([a-z_]+)' column|column "([a-z_]+)" of relation/i.exec(bErr.message || '');
+      const col = m?.[1] || m?.[2];
+      if (col && col in row && !['name', 'base_currency', 'owner_user_id', 'type', 'plan'].includes(col)) { delete row[col]; dropped.push(col); continue; }
+      break;
+    }
+    if (bErr) return res.status(400).json({ error: 'Could not create the business. Please try again.' });
+
+    const { error: mErr } = await supabase.from('business_members').insert({ business_id: business.id, user_id: userId, role: 'owner', status: 'active' });
+    if (mErr) return res.status(500).json({ error: 'Business created but membership failed. Please contact support.' });
+
+    // Standard cash-flow categories (a company used to start with none). Best effort, idempotent.
+    const seeded = await defaultCategories.seedBusinessCategories(supabase, business.id, userId);
+
+    res.status(201).json({ business, categories_seeded: seeded.inserted, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
+  } catch (e) {
+    res.status(500).json({ error: 'Could not create the business.' });
+  }
+});
+
+// ── PAYROLL V1 ───────────────────────────────────────────────────────────────
+
+// GET /api/payroll/employees
+app.get('/api/payroll/employees', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
+    const { data, error } = await supabase
+      .from('payroll_employees')
+      .select('*')
+      .or(bizOrFilter(biz))
+      .neq('status', 'archived')
+      .order('name', { ascending: true });
+    if (error) throw error;
+    res.json({ employees: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/payroll/employees
+app.post('/api/payroll/employees', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { name, role, default_salary, currency, pay_day, default_wallet_id, notes } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
+
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+
+    // Validate wallet belongs to the business if supplied
+    if (default_wallet_id) {
+      const { data: w } = await supabase.from('wallets').select('id').eq('id', default_wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!w?.length) return res.status(400).json({ error: 'Invalid wallet.' });
+    }
+
+    const { data, error } = await supabase.from('payroll_employees').insert({
+      ...bizWriteFields(biz, userId),
+      name: name.trim(),
+      role: role?.trim() || null,
+      default_salary: default_salary ? Number(default_salary) : null,
+      currency: currency || 'IDR',
+      pay_day: pay_day ? Number(pay_day) : null,
+      default_wallet_id: default_wallet_id || null,
+      notes: notes?.trim() || null,
+    }).select().single();
+    if (error) throw error;
+    res.json({ employee: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PATCH /api/payroll/employees/:id
+app.patch('/api/payroll/employees/:id', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { name, role, default_salary, currency, pay_day, default_wallet_id, status, notes } = req.body;
+
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+
+    const { data: exRows } = await supabase.from('payroll_employees').select('id').eq('id', id).or(bizOrFilter(biz)).limit(1);
+    if (!exRows?.length) return res.status(404).json({ error: 'Employee not found.' });
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (name !== undefined)              updates.name              = name.trim();
+    if (role !== undefined)              updates.role              = role?.trim() || null;
+    if (default_salary !== undefined)    updates.default_salary    = default_salary ? Number(default_salary) : null;
+    if (currency !== undefined)          updates.currency          = currency;
+    if (pay_day !== undefined)           updates.pay_day           = pay_day ? Number(pay_day) : null;
+    if (default_wallet_id !== undefined) updates.default_wallet_id = default_wallet_id || null;
+    if (status !== undefined)            updates.status            = status;
+    if (notes !== undefined)             updates.notes             = notes?.trim() || null;
+
+    const { data, error } = await supabase.from('payroll_employees').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    res.json({ employee: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/payroll/employees/:id  — soft delete
+app.delete('/api/payroll/employees/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+    const { data: exRows } = await supabase.from('payroll_employees').select('id').eq('id', id).or(bizOrFilter(biz)).limit(1);
+    if (!exRows?.length) return res.status(404).json({ error: 'Employee not found.' });
+
+    const { error } = await supabase.from('payroll_employees').update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/payroll/payments
+app.get('/api/payroll/payments', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
+    const { data, error } = await supabase
+      .from('payroll_payments')
+      .select('*, payroll_employees(name, role)')
+      .or(bizOrFilter(biz))
+      .order('payment_date', { ascending: false });
+    if (error) throw error;
+    res.json({ payments: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/payroll/overview
+app.get('/api/payroll/overview', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
+    const bizOr = bizOrFilter(biz);
+
+    const [empRes, payRes] = await Promise.all([
+      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day, default_wallet_id').or(bizOr).neq('status', 'archived').order('name'),
+      supabase.from('payroll_payments').select('*, payroll_payment_items(*)').or(bizOr).order('payment_date', { ascending: false }),
+    ]);
+
+    const employees = empRes.data || [];
+    const payments  = payRes.data || [];
+
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // Use net_amount if available, fallback to amount for old records
+    const netOf = p => Number(p.net_amount ?? p.amount ?? 0);
+    const paidThisMonth = payments
+      .filter(p => (p.period_month || '').startsWith(thisMonth) && p.status === 'paid')
+      .reduce((s, p) => s + netOf(p), 0);
+    const totalPaidAll = payments
+      .filter(p => p.status === 'paid')
+      .reduce((s, p) => s + netOf(p), 0);
+
+    res.json({
+      employees,
+      payments: payments.slice(0, 20),
+      summary: {
+        employee_count: employees.length,
+        paid_this_month: paidThisMonth,
+        total_paid_all: totalPaidAll,
+        payments_this_month: payments.filter(p => (p.period_month || '').startsWith(thisMonth)).length,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/payroll/payments
+// TODO (Telegram): When Telegram bot parses "зарплата Kevin 12M + бонус 2M - штраф 300k с BCA",
+//   it should call this same endpoint with the items array. No separate Telegram payroll logic.
+//
+// Creates payroll_payment + payroll_payment_items + linked transaction (net amount only).
+app.post('/api/payroll/payments', auth, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const {
+      employee_id,
+      employee_name,
+      currency = 'IDR',
+      period_month,
+      payment_date,
+      wallet_id,
+      notes,
+      items = [],   // NEW: array of { item_type, label, amount, direction }
+      // Legacy single-amount fallback (V1 compatibility)
+      amount: legacyAmount,
+      payment_type: legacyType = 'salary',
+    } = req.body;
+
+    if (!employee_name || !employee_name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
+
+    // ── Build items ──────────────────────────────────────────────────────────
+    // If items array provided (V1.1), use it. Otherwise fall back to legacy single amount.
+    let resolvedItems = [];
+    if (items && items.length > 0) {
+      // Validate each item
+      for (const item of items) {
+        if (!item.label || !item.label.trim())            return res.status(400).json({ error: 'Each item must have a label.' });
+        if (!Number(item.amount) || Number(item.amount) <= 0) return res.status(400).json({ error: `Amount for "${item.label}" must be positive.` });
+        if (!['addition', 'deduction'].includes(item.direction)) return res.status(400).json({ error: `Invalid direction for "${item.label}".` });
+      }
+      resolvedItems = items;
+    } else if (legacyAmount && Number(legacyAmount) > 0) {
+      // Legacy V1 fallback: single salary amount
+      resolvedItems = [{ item_type: legacyType, label: 'Salary', amount: Number(legacyAmount), direction: 'addition' }];
+    } else {
+      return res.status(400).json({ error: 'No payroll items provided.' });
+    }
+
+    // ── Calculate gross / deductions / net ───────────────────────────────────
+    const grossAmount     = resolvedItems.filter(i => i.direction === 'addition').reduce((s, i) => s + Number(i.amount), 0);
+    const deductionAmount = resolvedItems.filter(i => i.direction === 'deduction').reduce((s, i) => s + Number(i.amount), 0);
+    const netAmount       = grossAmount - deductionAmount;
+
+    if (netAmount <= 0) return res.status(400).json({ error: `Net amount must be positive. Gross: ${grossAmount}, Deductions: ${deductionAmount}.` });
+
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
+
+    // ── Validate wallet (must belong to same business) ───────────────────────
+    let wallet = null;
+    if (wallet_id) {
+      const { data: wRows } = await supabase.from('wallets').select('id, name, scope, currency, type').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet.' });
+      wallet = wRows[0];
+    }
+    if (await refuseNegativeOutflow(res, biz, wallet, netAmount)) return;
+
+    const payDate     = payment_date || new Date().toISOString().slice(0, 10);
+    const periodLabel = period_month ? ` — ${period_month}` : '';
+    const description = `Payroll payment for ${employee_name.trim()}${periodLabel}`;
+
+    const payCur = (wallet?.currency || currency || 'IDR').toUpperCase();
+    const fxRes = await fx.toIdr(netAmount, payCur, payDate);
+
+    // ── 1. Create transaction (net paid only — single cash impact) ───────────
+    const transactionRow = {
+      ...bizWriteFields(biz, userId),
+      type:              'payroll',
+      amount_original:   netAmount,
+      amount_idr:        fxRes.amount_idr,
+      booked_rate:       fxRes.booked_rate,
+      rate_source:       fxRes.rate_source,
+      currency_original: payCur,
+      description,
+      source:            wallet ? wallet.name : null,
+      wallet_id:         wallet_id || null,
+      scope:             wallet ? (wallet.scope || 'business') : 'business',
+      category:          'payroll',
+      transaction_date:  payDate,
+    };
+
+    // ── 2. Create payroll_payment ─────────────────────────────────────────────
+    const paymentRow = {
+      ...bizWriteFields(biz, userId),
+      employee_id:      employee_id || null,
+      employee_name:    employee_name.trim(),
+      amount:           netAmount,
+      gross_amount:     grossAmount,
+      deduction_amount: deductionAmount,
+      net_amount:       netAmount,
+      currency,
+      payment_type:     resolvedItems[0]?.item_type || legacyType,
+      period_month:     period_month || null,
+      payment_date:     payDate,
+      wallet_id:        wallet_id || null,
+      status:           'paid',
+      notes:            notes?.trim() || null,
+    };
+
+    // ── 3. Create payroll_payment_items ───────────────────────────────────────
+    const itemRows = resolvedItems.map(item => ({
+        user_id:            biz.ownerUserId,
+        business_id:        biz.business.id,
+        item_type:          item.item_type || 'other',
+        label:              item.label.trim(),
+        amount:             Number(item.amount),
+        direction:          item.direction,
+        notes:              item.notes?.trim() || null,
+      }));
+    if (typeof supabase.rpc !== 'function')
+      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic payroll recording requires migration 070' });
+    const { data, error } = await supabase.rpc('rpc_record_business_payroll', {
+      p_business_id: biz.business.id, p_user_id: userId,
+      p_transaction: transactionRow, p_payment: paymentRow, p_items: itemRows,
+    });
+    if (error) {
+      if (balanceFailure(res, error)) return;
+      if (error.code === 'PGRST202' || /function.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
+        return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic payroll recording requires migration 070' });
+      throw error;
+    }
+    if (!data?.transaction || !data?.payment) return res.status(500).json({ error: 'atomic_payroll_failed' });
+    res.json(data);
+  } catch (e) {
+    if (balanceFailure(res, e)) return;
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/payroll/by-transaction/:transactionId
+// TODO (Telegram): Telegram-created payroll payments should link to
+//   payroll_payments.transaction_id the same way as web-created payments.
+//   Telegram bot should call POST /api/payroll/payments — no separate logic needed.
+app.get('/api/payroll/by-transaction/:transactionId', auth, async (req, res) => {
+  try {
+    const transactionId = Number(req.params.transactionId);
+    if (!transactionId) return res.status(400).json({ error: 'Invalid transaction ID.' });
+
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canManagePayroll(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow accessing payroll' });
+
+    // Security: verify transaction belongs to the business
+    const { data: txRows } = await supabase
+      .from('transactions').select('id, user_id, type').eq('id', transactionId).or(bizOrFilter(biz)).limit(1);
+    if (!txRows?.length) return res.status(404).json({ error: 'Transaction not found.' });
+
+    // Fetch payroll_payment linked to this transaction
+    const { data: pmtRows } = await supabase
+      .from('payroll_payments')
+      .select('*')
+      .eq('transaction_id', transactionId)
+      .or(bizOrFilter(biz))
+      .limit(1);
+    const payment = pmtRows?.[0];
+
+    if (!payment) return res.json({ payroll_payment: null, items: [] });
+
+    // Fetch items
+    const { data: items } = await supabase
+      .from('payroll_payment_items')
+      .select('*')
+      .eq('payroll_payment_id', payment.id)
+      .order('direction', { ascending: false }); // additions first
+
+    res.json({ payroll_payment: payment, items: items || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── END PAYROLL V1 ────────────────────────────────────────────────────────────
+
+// ════════════════════════════════════════════════════════════════════════════
+// TAX DOCUMENTS RUNTIME V1 — secure document center & financial-record linking
+// Uses the migration-031 tables only. No cash impact: linking/archiving a
+// document never creates a transaction, moves a wallet, or touches a debt.
+// ════════════════════════════════════════════════════════════════════════════
+const DOC_BUCKET = process.env.DOCUMENTS_BUCKET || 'financial-documents';
+const SIGNED_URL_TTL = 600; // 10 minutes
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+// ── Storage & audit readiness (cached ~60s; never auto-creates the bucket) ────
+// Documents is disabled gracefully when storage is not ready; the rest of CFO
+// AI is unaffected. In production a missing audit table is a degraded config.
+let _docHealth = { at: 0, value: null };
+async function getDocumentsHealth() {
+  if (_docHealth.value && Date.now() - _docHealth.at < 60000) return _docHealth.value;
+  const env_present = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
+  let bucket_exists = false, bucket_private = false, bucket_error = null;
+  try {
+    const { data, error } = await supabase.storage.getBucket(DOC_BUCKET);
+    if (error) bucket_error = error.message;
+    else if (data) { bucket_exists = true; bucket_private = data.public === false; }
+  } catch (e) { bucket_error = e.message; }
+  let audit_table = false;
+  try {
+    const { error } = await supabase.from('document_audit').select('id', { head: true, count: 'exact' }).limit(1);
+    audit_table = !error;
+  } catch { audit_table = false; }
+  // Critical mutations require the 036 RPCs. Probe one with bogus args: a
+  // "function does not exist" error means missing; any other error means present.
+  let rpc_functions = false;
+  try {
+    const { error } = await supabase.rpc('rpc_document_archive',
+      { p_document_id: '00000000-0000-0000-0000-000000000000', p_business_id: '00000000-0000-0000-0000-000000000000', p_actor: 0, p_channel: 'probe' });
+    rpc_functions = !(error && /does not exist|could not find|schema cache/i.test(error.message));
+  } catch { rpc_functions = false; }
+
+  const storage_ready = env_present && bucket_exists && bucket_private;
+  // Production hard-requires the audit table (035) and the RPCs (036).
+  const audit_degraded = IS_PROD && (!audit_table || !rpc_functions);
+  const value = {
+    env_present, bucket: DOC_BUCKET, bucket_exists, bucket_private, bucket_error,
+    audit_table, rpc_functions, storage_ready,
+    degraded: !storage_ready || audit_degraded,
+    documents_enabled: storage_ready,
+    reasons: [
+      ...(env_present ? [] : ['env_missing']),
+      ...(bucket_exists ? [] : ['bucket_missing']),
+      ...(bucket_exists && !bucket_private ? ['bucket_public'] : []),
+      ...(IS_PROD && !audit_table ? ['audit_table_missing'] : []),
+      ...(IS_PROD && !rpc_functions ? ['rpc_functions_missing'] : []),
+    ],
+  };
+  _docHealth = { at: Date.now(), value };
+  return value;
+}
+// Gate for storage-dependent ops (upload, signed URL). Returns true if it sent a response.
+async function blockIfStorageNotReady(res) {
+  const h = await getDocumentsHealth();
+  if (!h.storage_ready) {
+    res.status(503).json({ error: 'documents_unavailable', reasons: h.reasons });
+    return true;
+  }
+  return false;
+}
+
+// Roles: upload = anyone who can create a request (NOT auditor); manage
+// (link/unlink/archive/edit) = confirmed-record roles; view-all = finance roles
+// + auditor. Manager/employee see only their own uploads.
+function canUploadDocument(role)   { return canCreateFinancialRequest(role) && role !== 'auditor'; }
+function canManageDocuments(role)  { return canCreateConfirmedFinancialRecord(role); }
+function canViewAllDocuments(role) { return canViewBusinessFinance(role); }
+
+// Business-specific entitlement (NOT the arbitrary .limit(1) path — see spec §16).
+async function hasDocumentsAccess(biz) {
+  try {
+    const r = await getBusinessAccess(biz.ownerUserId, biz.business.id);
+    const plan = r?.access?.effective_plan;
+    if (plan === 'founder' || plan === 'enterprise') return true;
+    if (r?.access?.trial_status_effective === 'active') return true;
+  } catch { /* fall through to addon */ }
+  try {
+    const { data } = await supabase.from('business_addons')
+      .select('addon').eq('business_id', biz.business.id)
+      .like('addon', 'ai_accountant%').eq('status', 'active').limit(1);
+    return !!data?.length;
+  } catch { return false; }
+}
+
+// Best-effort audit. If migration 035 (document_audit) is not applied yet, the
+// insert fails silently and the document operation still succeeds.
+async function logDocumentAudit(biz, { document_id, actor_user_id, action, target_type = null, target_id = null, channel = 'web', metadata = null }) {
+  try {
+    await supabase.from('document_audit').insert({
+      business_id: biz.business.id, document_id: document_id || null,
+      actor_user_id: actor_user_id ?? null, channel, action,
+      target_type, target_id: target_id != null ? String(target_id) : null, metadata,
+    });
+  } catch { _docHealth.at = 0; /* table may be absent — surface via health, never block the op */ }
+}
+
+// Debt ids the actor created — for restricted (manager/employee) visibility of
+// documents linked to their own submitted records.
+async function ownedDebtIds(biz, userId) {
+  const { data } = await supabase.from('debts').select('id')
+    .eq('business_id', biz.business.id).eq('created_by_user_id', userId);
+  return (data || []).map(d => d.id);
+}
+// Per-document access for restricted roles (own upload OR linked to own debt).
+async function userCanAccessDoc(biz, userId, role, docWithLinks) {
+  if (docA.canViewAllDocuments(role)) return true;
+  if (docWithLinks.created_by_user_id === userId) return true;
+  const owned = await ownedDebtIds(biz, userId);
+  return docA.canAccessDocument({ role, userId, doc: docWithLinks, ownedDebtIds: owned });
+}
+
+// Resolve a financial_documents row scoped to the active business (+ file meta).
+async function loadDocumentScoped(biz, documentId) {
+  const { data } = await supabase.from('financial_documents')
+    .select('*').eq('id', documentId).eq('business_id', biz.business.id).limit(1);
+  return data?.[0] || null;
+}
+
+// Attach resolved links (debt / transaction / compliance) to a set of documents.
+async function attachLinks(biz, docs) {
+  const ids = docs.map(d => d.id);
+  if (!ids.length) return docs;
+  const byDoc = new Map(ids.map(id => [id, []]));
+  for (const [type, def] of Object.entries(docV.LINK_TARGETS)) {
+    const { data } = await supabase.from(def.table)
+      .select(`id, document_id, ${def.column}`).eq('business_id', biz.business.id).in('document_id', ids);
+    for (const row of (data || [])) {
+      (byDoc.get(row.document_id) || []).push({ link_id: row.id, target_type: type, target_id: row[def.column] });
+    }
+  }
+  return docs.map(d => ({ ...d, links: byDoc.get(d.id) || [] }));
+}
+
+// GET /api/documents/health — storage + audit readiness (admin/status surface).
+// Reports degraded configuration; never auto-creates the bucket. In production
+// a missing audit table (035) is reported as degraded.
+app.get('/api/documents/health', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    const h = await getDocumentsHealth();
+    // Ordinary users get only availability. Bucket/env/audit internals are
+    // visible to Platform Admin only.
+    if (!isAdminUser(req.user.userId)) return res.json({ available: h.documents_enabled, degraded: h.degraded });
+    res.json({ ...h, environment: IS_PROD ? 'production' : (process.env.NODE_ENV || 'development') });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI ACCOUNTANT — DOCUMENT INTAKE (Phase 1)
+//
+// One upload window, then CFO AI organises. Uploading itself REUSES the existing
+// /api/documents/upload-init + upload-complete flow (same storage, dedup, role checks and
+// audit) — nothing new was added there. These endpoints only add classification, a
+// preliminary required-document checklist, and manual correction.
+//
+// Safety:
+//   * Every endpoint is business-scoped through requireBusiness + the documents role/plan
+//     gates, so a document can never be read or written across workspaces, and Personal
+//     workspaces are rejected by the business resolver.
+//   * Classification is deterministic (file name + MIME only). No OCR, no AI provider, no
+//     new env var, NO migration: intake metadata lives in the existing free-form
+//     financial_documents.extracted_json.ai_intake.
+//   * GETs never write. Auto-classification is DERIVED on read; only a manual confirmation
+//     is persisted.
+//   * Nothing here asserts that a document is officially valid.
+// ═══════════════════════════════════════════════════════════════════════════
+const docIntake = require('./lib/documentIntake');
+const docContent = require('./lib/documentContent');
+const docIdentify = require('./lib/documentIdentify');
+const profileDocs = require('./lib/profileFromDocuments');
+const taxDeadlines = require('./lib/taxDeadlines');
+const { normalizePkpStatus } = require('./lib/pkpStatus');
+const defaultCategories = require('./lib/defaultCategories');
+const statementParsers = require('./lib/statementParsers');
+const { extractPdfText } = require('./lib/pdfText');
+const docExtract = require('./lib/documentExtraction');
+const docOcr = require('./lib/documentOcr');
+const docDates = require('./lib/documentDates');
+const docParties = require('./lib/documentParties');
+const uploadIntentLib = require('./lib/uploadIntent');
+const { publicIntakeV2, publicUploadIntent } = require('./lib/documentPublicView');
+
+const INTAKE_DOC_CAP = 500;
+
+// Phase 2 — classify from the document's own content when it carries readable text.
+// PDF embedded text only: no OCR provider, no AI provider, no new env var. A scanned page
+// yields no text and simply degrades to the Phase 1 file-name verdict.
+// Returns the object stored at extracted_json.ai_intake.
+// Kill switch — DEFAULT OFF. Content extraction stays dark until a disposable Supabase +
+// browser smoke passes in production. Absent env var = OFF, so no Railway change is needed
+// to ship this safely; only an explicit "true"/"1" turns it on.
+const CONTENT_CLASSIFICATION_ENABLED =
+  /^(true|1|yes|on)$/i.test(String(process.env.DOCUMENT_CONTENT_CLASSIFICATION_ENABLED || ''));
+
+function classifyUploadedBytes(buf, { file_name, mime_type, company_name }) {
+  const isPdf = /pdf/i.test(mime_type || '') || /\.pdf$/i.test(file_name || '');
+  const startedAt = Date.now();
+  const ex = (CONTENT_CLASSIFICATION_ENABLED && isPdf && Buffer.isBuffer(buf))
+    ? extractPdfText(buf)
+    : { text: '', text_available: false, method: 'filename_only',
+        reason: CONTENT_CLASSIFICATION_ENABLED ? 'not_a_pdf' : 'content_classification_disabled' };
+  const result = docContent.classifyDocument({
+    file_name, mime_type, company_name,
+    text: ex.text, text_available: ex.text_available, method: ex.method, extraction_reason: ex.reason,
+  });
+  return {
+    doc_type: result.doc_type,
+    confidence: result.confidence,
+    classification_status: result.classification_status,
+    matched_on: result.matched_on,
+    signals: result.signals,
+    extraction: result.extraction,
+    explanation: docContent.explain(result),
+    classified_at: new Date().toISOString(),
+    // Bounded operational metadata — no internals, no document content.
+    extraction_ms: Date.now() - startedAt,
+    content_classification_enabled: CONTENT_CLASSIFICATION_ENABLED,
+    classifier_version: CONTENT_CLASSIFICATION_ENABLED ? 2 : 1,
+  };
+}
+
+// Shared loader: active-business documents + file metadata + intake classification.
+//
+// Applies the SAME role-level visibility rule as GET /api/documents — business scoping alone
+// is not enough. A manager/employee must not see file names, ids, classification or checklist
+// matches for documents they cannot access (own uploads, or docs linked to their own debts).
+// Returns { documents, truncated } so callers can avoid confident conclusions on a partial set.
+async function loadIntakeDocuments(biz, userId) {
+  const { data: docs, error } = await supabase.from('financial_documents')
+    .select('*').eq('business_id', biz.business.id).is('archived_at', null)
+    .order('created_at', { ascending: false }).limit(INTAKE_DOC_CAP + 1);   // +1 detects the cap
+  if (error) throw new Error(error.message);
+  let rows = docs || [];
+  const truncated = rows.length > INTAKE_DOC_CAP;
+  if (truncated) rows = rows.slice(0, INTAKE_DOC_CAP);
+
+  // Links are required by the restricted-role rule (doc linked to a debt the user created).
+  rows = await attachLinks(biz, rows);
+  if (!canViewAllDocuments(biz.role)) {
+    const owned = await ownedDebtIds(biz, userId);
+    rows = rows.filter(d => docA.canAccessDocument({ role: biz.role, userId, doc: d, ownedDebtIds: owned }));
+  }
+
+  const fileIds = [...new Set(rows.map(d => d.file_id).filter(Boolean))];
+  let filesById = {};
+  if (fileIds.length) {
+    const { data: files } = await supabase.from('document_files')
+      .select('id, file_name, mime_type, file_size, created_at')
+      .eq('business_id', biz.business.id).in('id', fileIds);
+    filesById = Object.fromEntries((files || []).map(f => [f.id, f]));
+  }
+  const documents = rows.map(d => {
+    const file = filesById[d.file_id] || {};
+    const raw_intake = docIntake.readIntake(d, file);
+    const intake = { ...raw_intake, signals: publicSignals(raw_intake.signals) };
+    return {
+      id: d.id,
+      file_name: file.file_name || null,
+      mime_type: file.mime_type || null,
+      file_size: file.file_size ?? null,
+      uploaded_at: d.created_at,
+      stored_document_type: d.document_type,          // the CHECK-valid column value
+      review_status: d.review_status,
+      intake,                                          // { doc_type, label, area, confidence, classification_status }
+      routed_to: intake.area,
+      raw: d,                                          // internal only; stripped before responses
+    };
+  });
+  return { documents, truncated };
+}
+const publicIntakeDoc = ({ raw, ...rest }) => rest;   // never leak the raw row
+
+// Marker LABELS only — our own vocabulary, never an excerpt of the document. Phase 2 stores
+// no document text at all, and this whitelist keeps any future field from leaking by default.
+// ── public serialisers for the GENERIC document endpoints ───────────────────
+// `financial_documents.extracted_json` is free-form and now also holds Phase 2 classification
+// metadata, so returning the column wholesale would leak extraction internals through
+// /api/documents. Both of these are WHITELISTS: a field that is not named here is not
+// returned, so future additions to extracted_json are private by default.
+const IDENTIFY_FIELDS = ['v', 'lang', 'at', 'read', 'suggested_filing', 'taxes', 'suggested_type', 'suggested_label', 'suggested_area', 'suggested_source', 'suggested_confidence', 'unavailable_reason'];
+const EXPLAIN_FIELDS = ['title', 'summary', 'issued_by', 'issued_on', 'number', 'purpose', 'place', 'next_step', 'bank_name', 'account_number', 'period', 'counterparty_name', 'total_amount', 'currency', 'due_on', 'tax_steps', 'warnings'];
+const publicIdentify = (all) => {
+  if (!all || typeof all !== 'object') return null;
+  const out = {};
+  for (const lang of ['ru', 'en', 'id']) {
+    const r = all[lang];
+    if (!r || typeof r !== 'object') continue;
+    const row = Object.fromEntries(IDENTIFY_FIELDS.map((k) => [k, r[k] ?? null]));
+    row.explanation = r.explanation ? Object.fromEntries(EXPLAIN_FIELDS.map((k) => [k, r.explanation[k] ?? null])) : null;
+    out[lang] = row;
+  }
+  return Object.keys(out).length ? out : null;
+};
+const FILING_FIELDS = ['kind', 'wallet_id', 'wallet_name', 'period', 'counterparty_id', 'counterparty_name', 'reason', 'note', 'at'];
+const publicFiling = (f) => (f && typeof f === 'object' && f.kind ? Object.fromEntries(FILING_FIELDS.map((k) => [k, f[k] ?? null])) : null);
+const publicExtractedJson = (ej) => {
+  if (!ej || typeof ej !== 'object') return null;
+  const ai = ej.ai_intake;
+  return {
+    notes: typeof ej.notes === 'string' ? ej.notes : null,
+    ai_intake: ai ? {
+      doc_type: ai.doc_type ?? null,
+      confidence: ai.confidence ?? null,
+      classification_status: ai.classification_status ?? null,
+      matched_on: ai.matched_on ?? null,
+      explanation: ai.explanation ?? null,
+      confirmed_at: ai.confirmed_at ?? null,
+      signals: publicSignals(ai.signals),
+      extraction: ai.extraction
+        ? { text_available: !!ai.extraction.text_available, method: ai.extraction.method ?? null }
+        : null,
+    } : null,
+    // The Document Intake Orchestrator's review summary. Whitelisted field-by-field in
+    // server/lib/documentPublicView.js — review metadata only, never document text.
+    // Without this the Document Center could not show what intake concluded, so a
+    // recognised invoice still read as "Unclassified".
+    ai_intake_v2: publicIntakeV2(ej.ai_intake_v2),
+    // Which screen the upload came from. The UI shows it beside the AI's reading so a
+    // disagreement is visible instead of silently resolved.
+    upload_intent: publicUploadIntent(ej.upload_intent),
+    // "What is this document?" readings (POST /api/documents/:id/identify), per language.
+    ai_identify: publicIdentify(ej.ai_identify),
+    // Where a document is kept when it explains no single bill or payment (POST …/filing).
+    filing: publicFiling(ej.filing),
+  };
+};
+const publicDocRow = (d) => (d ? { ...d, extracted_json: publicExtractedJson(d.extracted_json) } : d);
+// Explicit WHITELIST of the file fields the UI actually renders. A blacklist (drop
+// storage_path, keep the rest) would keep leaking as columns are added, and would still expose
+// the SHA-256 fingerprint, the internal file id, business_id and the uploader's user id.
+// Everything not named here — including every future column — stays server-side.
+// Downloads go through the audited signed-URL endpoint, never through a path in a payload.
+const PUBLIC_FILE_FIELDS = ['file_name', 'mime_type', 'file_size', 'created_at', 'upload_channel'];
+const publicFileRow = (f) => {
+  if (!f || typeof f !== 'object') return null;
+  const out = {};
+  for (const k of PUBLIC_FILE_FIELDS) if (f[k] !== undefined) out[k] = f[k];
+  return out;
+};
+
+const publicSignals = (s) => (s ? {
+  filename_matches: s.filename_matches || [],
+  text_matches: s.text_matches || [],
+  strong_matches: s.strong_matches || [],
+  company_name_match: s.company_name_match || null,
+  conflict: s.conflict || null,
+  mime_type: s.mime_type || null,
+} : null);
+
+// GET /api/ai-accountant/document-intake — intake inbox for the ACTIVE business.
+app.get('/api/ai-accountant/document-intake', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    // Visibility-filtered inside the loader — restricted roles never receive metadata for
+    // documents they cannot access.
+    const { documents, truncated } = await loadIntakeDocuments(biz, req.user.userId);
+    const docs = documents.map(publicIntakeDoc);
+    res.json({
+      business: { id: biz.business.id, name: biz.business.name },
+      types: docIntake.INTAKE_TYPES.map(({ type, label, area }) => ({ type, label, area })),
+      documents: docs,
+      needs_review_count: docs.filter(d => d.intake.classification_status === 'needs_review').length,
+      truncated,
+      warnings: truncated ? [`Showing the ${INTAKE_DOC_CAP} most recent documents — older documents are not included.`] : [],
+      // Lets the UI tell the truth about what the classifier actually did.
+      content_classification_enabled: CONTENT_CLASSIFICATION_ENABLED,
+      note: CONTENT_CLASSIFICATION_ENABLED
+        ? 'Preliminary classification from the document text and file name — confirm each document.'
+        : 'Preliminary classification from file name and type only — confirm each document.',
+    });
+  } catch (e) {
+    console.error(`[doc-intake] list failed: ${e.message}`);
+    res.status(500).json({ error: 'document_intake_unavailable' });
+  }
+});
+
+// POST /api/ai-accountant/documents/classify — STATELESS preview for the upload window.
+// Writes nothing; lets the UI show a detected type before/while uploading.
+app.post('/api/ai-accountant/documents/classify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    const files = Array.isArray(req.body?.files) ? req.body.files.slice(0, 50) : null;
+    if (!files) return res.status(400).json({ error: 'files_required' });
+    res.json({
+      results: files.map(f => {
+        const c = docIntake.classify({ file_name: f?.file_name, mime_type: f?.mime_type });
+        return { file_name: f?.file_name ?? null, ...c, label: docIntake.labelFor(c.doc_type), area: docIntake.areaFor(c.doc_type) };
+      }),
+    });
+  } catch (e) {
+    console.error(`[doc-intake] classify failed: ${e.message}`);
+    res.status(500).json({ error: 'classify_unavailable' });
+  }
+});
+
+// PATCH /api/ai-accountant/documents/:id/classification — manual correction.
+// Sets classification_status='manually_confirmed' and keeps the stored document_type on a
+// CHECK-valid value. Persisted through the SAME audited RPC the Document Center uses.
+app.patch('/api/ai-accountant/documents/:id/classification', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const docType = req.body?.doc_type;
+    if (!docIntake.isIntakeType(docType)) return res.status(400).json({ error: 'invalid_doc_type' });
+
+    // Business-scoped load — a document from another workspace simply is not found.
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found' });
+    // An archived document has been removed from the intake and the checklist, so confirming
+    // it would write a classification nothing can see. A stale list or a second tab is the
+    // realistic way to reach this — treat it as gone.
+    if (doc.archived_at) return res.status(404).json({ error: 'document_not_found' });
+
+    const patch = {
+      document_type: docIntake.mapsTo(docType),
+      extracted_json: docIntake.intakePatch(doc.extracted_json, { doc_type: docType, actorUserId: req.user.userId }),
+    };
+    const { error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      console.error(`[doc-intake] classification update failed: ${error.message}`);
+      return res.status(500).json({ error: 'classification_update_failed' });
+    }
+    res.json({
+      ok: true, id: doc.id, doc_type: docType, label: docIntake.labelFor(docType),
+      area: docIntake.areaFor(docType), classification_status: 'manually_confirmed',
+    });
+  } catch (e) {
+    console.error(`[doc-intake] classification failed: ${e.message}`);
+    res.status(500).json({ error: 'classification_update_failed' });
+  }
+});
+
+// POST /api/ai-accountant/documents/:id/reclassify — re-read an EXISTING document's content.
+// For documents uploaded before Phase 2, or after a failed extraction. Same guards as the
+// manual correction: auth + requireBusiness (personal rejected) + manage role + business-scoped
+// load, so a document from another workspace is simply not found. Never returns document text.
+app.post('/api/ai-accountant/documents/:id/reclassify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    // Flag OFF: re-reading a document would do nothing but a pointless storage download.
+    // Say so plainly instead of pretending to have re-read it.
+    if (!CONTENT_CLASSIFICATION_ENABLED)
+      return res.status(503).json({ error: 'content_classification_disabled',
+        message: 'Reading document content is not enabled yet. Choose the document type manually.' });
+    if (await blockIfStorageNotReady(res)) return;
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found' });
+    if (doc.archived_at) return res.status(404).json({ error: 'document_not_found' });
+    // A manually confirmed type is the user's decision — never overwrite it automatically.
+    if (doc.extracted_json?.ai_intake?.classification_status === 'manually_confirmed')
+      return res.status(409).json({ error: 'manually_confirmed', message: 'This document type was confirmed manually. Change it from the document list instead.' });
+
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('id, storage_path, file_name, mime_type')
+      .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+
+    const intake = classifyUploadedBytes(buf, {
+      file_name: file.file_name, mime_type: file.mime_type, company_name: biz.business?.name,
+    });
+    const patch = {
+      document_type: docIntake.mapsTo(intake.doc_type),
+      extracted_json: { ...(doc.extracted_json || {}), ai_intake: intake },
+    };
+    const { error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      console.error(`[doc-intake] reclassify update failed: ${error.message}`);
+      return res.status(500).json({ error: 'reclassify_failed' });
+    }
+    // Response mirrors the intake list shape — marker labels only, never document text.
+    res.json({
+      ok: true, id: doc.id, doc_type: intake.doc_type, label: docIntake.labelFor(intake.doc_type),
+      area: docIntake.areaFor(intake.doc_type), confidence: intake.confidence,
+      classification_status: intake.classification_status, explanation: intake.explanation,
+      signals: publicSignals(intake.signals),
+      extraction: { text_available: !!intake.extraction?.text_available, method: intake.extraction?.method || null },
+    });
+  } catch (e) {
+    console.error(`[doc-intake] reclassify failed: ${e.message}`);
+    res.status(500).json({ error: 'reclassify_failed' });
+  }
+});
+
+// GET /api/ai-accountant/required-documents — PRELIMINARY checklist for the active business.
+// The company's required-documents checklist (which documents apply to this profile and
+// which are missing). Read-only; shared by the route below and the MCP adapter. The caller
+// is responsible for the role and Document Center gates.
+async function buildRequiredDocuments(biz, userId) {
+  // Profile drives which documents apply. A missing profile is reported, never guessed.
+  const { data: profRows, error: pErr } = await supabase.from('tax_profiles')
+    .select('*').eq('business_id', biz.business.id).limit(1);
+  const warnings = [];
+  if (pErr) { console.error(`[doc-intake] profile read failed: ${pErr.message}`); warnings.push('tax profile: unavailable (database error)'); }
+  const profile = profRows?.[0] || {};
+  if (!pErr && !profRows?.length) warnings.push('No tax profile saved yet — the checklist assumes defaults until you complete it.');
+
+  // Same visibility filtering as the intake list: a restricted role must not learn about
+  // documents through the checklist either. `truncated` stops a partial set producing a
+  // confident "missing".
+  const { documents, truncated } = await loadIntakeDocuments(biz, userId);
+  const checklist = docIntake.buildChecklist(profile, documents, { truncated });
+  return {
+    business: { id: biz.business.id, name: biz.business.name },
+    profile_used: {
+      legal_entity_type: profile.legal_entity_type ?? null,
+      pkp_status: profile.pkp_status ?? null,
+      employee_status: profile.employee_status ?? null,
+      country: profile.country ?? null,
+    },
+    ...checklist,
+    truncated,
+    warnings: [...warnings, ...checklist.warnings],
+  };
+}
+
+app.get('/api/ai-accountant/required-documents', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    res.json(await buildRequiredDocuments(biz, req.user.userId));
+  } catch (e) {
+    console.error(`[doc-intake] required-documents failed: ${e.message}`);
+    res.status(500).json({ error: 'required_documents_unavailable' });
+  }
+});
+
+// GET /api/documents — business-scoped list with filters.
+app.get('/api/documents', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled on this plan', upgrade_required: true });
+
+    const r = await listDocumentsForUser(biz, req.user.userId, req.query);
+    if (r.error) return res.status(500).json({ error: r.error });
+    res.json({ documents: r.documents });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// The document list with the SAME role-level visibility as the Document Center. Shared by
+// GET /api/documents and the MCP list_documents tool. The caller runs the role / plan gates.
+//
+// Filters (all optional): type, date_from, date_to, counterparty, uploaded_by, search,
+// linked_status (linked|unlinked), debt_id | transaction_id | compliance_id, status
+// ('archived' → archived only, otherwise active only), limit (≤200). Extra filters used by
+// the MCP adapter: document_id, uploaded_after (ISO), review ('needs_review').
+async function listDocumentsForUser(biz, userId, filters = {}) {
+  const { type, date_from, date_to, counterparty, uploaded_by, search,
+          linked_status, debt_id, transaction_id, compliance_id, status,
+          document_id, uploaded_after, review } = filters;
+
+  // Link-target filters: resolve document ids from the link table first.
+  let restrictIds = null;
+  const target = debt_id ? ['debt', debt_id] : transaction_id ? ['transaction', transaction_id] : compliance_id ? ['compliance', compliance_id] : null;
+  if (target) {
+    const def = docV.LINK_TARGETS[target[0]];
+    const { data } = await supabase.from(def.table).select('document_id')
+      .eq('business_id', biz.business.id).eq(def.column, target[1]);
+    restrictIds = (data || []).map(r => r.document_id);
+    if (!restrictIds.length) return { documents: [] };
+  }
+
+  let q = supabase.from('financial_documents').select('*').eq('business_id', biz.business.id);
+  if (status === 'archived') q = q.not('archived_at', 'is', null);
+  else q = q.is('archived_at', null);
+  // Manager/employee are restricted — filtered in JS after links resolve
+  // (own uploads OR linked to a debt they created). No SQL created_by filter
+  // here so linked-to-own-debt docs are not excluded prematurely.
+  if (type) q = q.eq('document_type', type);
+  if (counterparty) q = q.eq('issuer_counterparty_id', counterparty);
+  if (uploaded_by) q = q.eq('created_by_user_id', uploaded_by);
+  if (date_from) q = q.gte('document_date', date_from);
+  if (date_to) q = q.lte('document_date', date_to);
+  if (search) q = q.ilike('document_number', `%${search}%`);
+  if (document_id) q = q.eq('id', document_id);
+  if (uploaded_after) q = q.gte('created_at', uploaded_after);
+  if (restrictIds) q = q.in('id', restrictIds);
+  q = q.order('created_at', { ascending: false }).limit(Math.min(Number(filters.limit) || 100, 200));
+
+  let { data: docs, error } = await q;
+  if (error) return { error: error.message };
+  docs = docs || [];
+
+  // File metadata
+  const fileIds = [...new Set(docs.map(d => d.file_id).filter(Boolean))];
+  const fileMap = new Map();
+  if (fileIds.length) {
+    const { data: files } = await supabase.from('document_files')
+      .select('id, file_name, mime_type, file_size, upload_channel').in('id', fileIds);
+    for (const f of (files || [])) fileMap.set(f.id, f);
+  }
+  let out = docs.map(d => ({ ...publicDocRow(d), file: publicFileRow(fileMap.get(d.file_id)) || null }));
+  out = await attachLinks(biz, out);
+  // Restricted roles: keep only own uploads + docs linked to their own debts.
+  if (!canViewAllDocuments(biz.role)) {
+    const owned = await ownedDebtIds(biz, userId);
+    out = out.filter(d => docA.canAccessDocument({ role: biz.role, userId, doc: d, ownedDebtIds: owned }));
+  }
+  if (linked_status === 'linked') out = out.filter(d => d.links.length > 0);
+  if (linked_status === 'unlinked') out = out.filter(d => d.links.length === 0);
+  // "Needs review": not attached to anything yet, and the intake did not reach a state where a
+  // concrete action is ready — or the type itself is still unconfirmed.
+  if (review === 'needs_review') {
+    out = out.filter((d) => {
+      if (d.links.length) return false;
+      const ej = d.extracted_json || {};
+      const st = ej.ai_intake_v2 && ej.ai_intake_v2.status;
+      return !st || st !== 'ready_to_confirm'
+        || (ej.ai_intake && ej.ai_intake.classification_status === 'needs_review');
+    });
+  }
+  return { documents: out };
+}
+
+// A short-lived view/download URL for one document, after the caller's access check.
+// Shared by POST /api/documents/:id/signed-url and the MCP adapter. Audited.
+async function signedDocumentUrl(biz, actorUserId, doc, { mode = 'view', channel = 'web' } = {}) {
+  const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name').eq('id', doc.file_id).limit(1);
+  if (!fileRows?.length) return { error: 'file_not_found', status: 404 };
+  const opts = mode === 'download' ? { download: fileRows[0].file_name } : {};
+  const { data, error } = await supabase.storage.from(DOC_BUCKET).createSignedUrl(fileRows[0].storage_path, SIGNED_URL_TTL, opts);
+  if (error) return { error: 'storage_unavailable', status: 500, detail: error.message };
+  await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: actorUserId, action: 'signed_url_issued', channel, metadata: { mode } });
+  return { url: data.signedUrl, expires_in: SIGNED_URL_TTL };
+}
+
+// GET /api/documents/:id — detail.
+app.get('/api/documents/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const [withLinks] = await attachLinks(biz, [doc]);
+    if (!await userCanAccessDoc(biz, req.user.userId, biz.role, withLinks))
+      return res.status(403).json({ error: 'You do not have access to this document' });
+    // Select only what the whitelist can return — defence in depth, so a widened
+    // serialiser could still not reach storage_path, the checksum or the uploader id.
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('file_name, mime_type, file_size, created_at, upload_channel')
+      .eq('id', doc.file_id).limit(1);
+    res.json({ document: publicDocRow(withLinks), file: publicFileRow(fileRows?.[0]) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/upload-init — validate + issue a short-lived signed upload URL.
+app.post('/api/documents/upload-init', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    if (await blockIfStorageNotReady(res)) return;
+    const { file_name, mime_type, file_size, document_type, sha256 } = req.body || {};
+    const v = docV.validateUpload({ file_name, mime_type, file_size, document_type });
+    if (!v.ok) return res.status(400).json({ error: v.error });
+
+    // Stage 1 dedup: if the client's preliminary hash already matches a verified
+    // file in THIS business, skip the upload entirely. Never reveals other
+    // businesses (query is business-scoped). The hash is re-verified server-side
+    // in upload-complete, so a forged hash here only forgoes a shortcut.
+    if (docV.isValidSha256(sha256)) {
+      const { data: dup } = await supabase.from('document_files')
+        .select('id').eq('business_id', biz.business.id).eq('sha256_hash', sha256).limit(1);
+      if (dup?.length) {
+        const { data: ex } = await supabase.from('financial_documents')
+          .select('id').eq('business_id', biz.business.id).eq('file_id', dup[0].id).limit(1);
+        return res.status(409).json({ error: 'duplicate', duplicate: true, existing_document_id: ex?.[0]?.id || null });
+      }
+    }
+
+    const documentId = crypto.randomUUID();
+    const storagePath = docV.buildStoragePath(biz.business.id, documentId, file_name);
+    const { data, error } = await supabase.storage.from(DOC_BUCKET).createSignedUploadUrl(storagePath);
+    if (error) return res.status(500).json({ error: 'storage_unavailable', detail: error.message });
+    // Absolute URL the client PUTs the raw file to (no supabase-js on the client).
+    const uploadUrl = `${process.env.SUPABASE_URL}/storage/v1/object/upload/sign/${DOC_BUCKET}/${storagePath}?token=${data.token}`;
+    res.json({ document_id: documentId, storage_path: storagePath, token: data.token, upload_url: uploadUrl, bucket: DOC_BUCKET });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/upload-complete — record metadata after the client upload.
+app.post('/api/documents/upload-complete', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    if (await blockIfStorageNotReady(res)) return;
+    const b = req.body || {};
+    const v = docV.validateUpload(b);
+    if (!v.ok) return res.status(400).json({ error: v.error });
+    if (!b.document_id) return res.status(400).json({ error: 'document_id required' });
+    // The storage path must be the one we issued (business + doc scoped).
+    const expectedPath = docV.buildStoragePath(biz.business.id, b.document_id, b.file_name);
+    if (b.storage_path !== expectedPath) return res.status(400).json({ error: 'storage_path_mismatch' });
+
+    // ── Server-side verification: download the ACTUAL stored bytes and compute
+    //    the real SHA-256. The client hash is never trusted for storage. ───────
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(expectedPath);
+    if (dlErr || !blob) return res.status(400).json({ error: 'upload_not_found' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+    const r = await finalizeDocumentUpload(biz, req.user.userId, {
+      buf, documentId: b.document_id, storagePath: expectedPath, channel: 'web', body: b,
+    });
+    if (r.error) {
+      const { status, error, ...rest } = r;
+      return res.status(status || 500).json({ error, ...rest });
+    }
+    res.json({ document: publicDocRow(r.doc), link_result: r.link_result, intake: r.intake });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// The second half of every upload, whoever brought the bytes: the web app (client PUT to a
+// signed URL, then upload-complete downloads them) or the MCP connector (bytes in the call,
+// see storeDocumentBytes). One function so a document gets the same verification, dedup,
+// atomic create + audit, optional link and intake run whichever channel it came through.
+// The caller has already run the role / plan / storage gates and validated name + type.
+// Returns { doc, link_result, intake } or { error, status, ...details }.
+async function finalizeDocumentUpload(biz, actorUserId, { buf, documentId, storagePath, channel = 'web', body: b = {} }) {
+  const removeOrphan = () => supabase.storage.from(DOC_BUCKET).remove([storagePath]).catch(() => {});
+  if (buf.length === 0) { await removeOrphan(); return { error: 'empty_upload', status: 400 }; }
+  if (buf.length > docV.MAX_FILE_BYTES) { await removeOrphan(); return { error: 'file_too_large', status: 413 }; }
+  const verifiedHash = crypto.createHash('sha256').update(buf).digest('hex');
+  // If the client claimed a hash that doesn't match the real bytes → tamper.
+  if (docV.isValidSha256(b.sha256) && b.sha256.toLowerCase() !== verifiedHash) {
+    await removeOrphan();
+    return { error: 'hash_mismatch', status: 409 };
+  }
+
+  // ── Stage 2 dedup + atomic create. rpc_document_finalize_upload inserts
+  //    document_files + financial_documents + the 'uploaded' audit row in ONE
+  //    transaction (migration 036). The UNIQUE(business_id, sha256_hash) index
+  //    serialises concurrent duplicates; on conflict the RPC aborts. ─────────
+  const fileId = crypto.randomUUID();
+  const notes = (b.description || '').toString().slice(0, 2000) || null;
+  const pFile = {
+    id: fileId, business_id: biz.business.id, storage_path: storagePath,
+    file_name: docV.safeFilename(b.file_name), mime_type: b.mime_type, file_size: buf.length,
+    sha256_hash: verifiedHash, upload_channel: channel,
+  };
+  const pDoc = {
+    id: documentId, business_id: biz.business.id,
+    document_type: b.document_type || 'other',
+    document_number: b.title ? String(b.title).slice(0, 200) : (b.document_number || null),
+    document_date: b.document_date || null,
+    period_start: b.period_start || null, period_end: b.period_end || null,
+    issuer_counterparty_id: b.counterparty_id || null,
+    currency: b.currency || 'IDR',
+    gross_amount: (b.amount != null && isFinite(Number(b.amount))) ? Number(b.amount) : null,
+    extracted_json: notes ? { notes } : null,
+  };
+  // Which screen the upload came from. Review metadata only: it never becomes the
+  // document_type column, and an unrecognised value is discarded rather than stored.
+  const intentRow = uploadIntentLib.buildUploadIntent(b.upload_source, { declaredType: b.document_type });
+  if (intentRow) pDoc.extracted_json = { ...(pDoc.extracted_json || {}), upload_intent: intentRow };
+  // ── Phase 2: content-based classification, best effort ──────────────────
+  // The verified bytes are already in memory, so no second storage read is needed.
+  // Never blocks or fails the upload: on any problem this falls back to the Phase 1
+  // file-name verdict, which is what shipped before.
+  try {
+    const intake = classifyUploadedBytes(buf, {
+      file_name: pFile.file_name, mime_type: pFile.mime_type, company_name: biz.business?.name,
+    });
+    pDoc.extracted_json = { ...(pDoc.extracted_json || {}), ai_intake: intake };
+  } catch (e) {
+    console.warn(`[doc-intake] content classification skipped: ${e.message}`);
+  }
+  const { data: doc, error: rpcErr } = await supabase.rpc('rpc_document_finalize_upload',
+    { p_file: pFile, p_doc: pDoc, p_actor: actorUserId, p_channel: channel });
+  if (rpcErr) {
+    await removeOrphan();
+    if (/duplicate|unique/i.test(rpcErr.message)) {
+      return { error: 'duplicate', status: 409, duplicate: true,
+        existing_document_id: await documentIdByHash(biz, verifiedHash) };
+    }
+    return { error: 'document_finalize_failed', status: 500, detail: rpcErr.message };
+  }
+
+  // Optional link — best-effort; never lose the upload if linking fails.
+  let link_result = null;
+  if (b.link && b.link.target_type && b.link.target_id != null) {
+    const r = await linkDocument(biz, doc, b.link.target_type, b.link.target_id, actorUserId, channel);
+    link_result = r.ok ? { ok: true, link_id: r.link_id } : { ok: false, error: r.error };
+  }
+
+  // Run the intake pipeline so a freshly uploaded document arrives with its meaning
+  // already worked out, rather than sitting inert until someone opens it. It writes
+  // only review metadata — no counterparty, payable or transaction is created here.
+  //
+  // FAIL-OPEN by construction: the file is already stored and the row already exists,
+  // so a parsing problem must never turn a successful upload into an error. A failure
+  // leaves the document without an intake summary, and /intake can be called again.
+  let intake = null;
+  try {
+    const r = await runDocumentIntake(biz, doc, { persist: true, actorUserId });
+    if (!r.error) intake = r.intake;
+  } catch (e) {
+    console.error(`[doc-intake-v2] post-upload run failed for ${doc.id}: ${e.message}`);
+  }
+  return { doc, link_result, intake };
+}
+
+// The document already holding these exact bytes in THIS business, or null.
+async function documentIdByHash(biz, sha256Hex) {
+  const { data: dupf } = await supabase.from('document_files')
+    .select('id').eq('business_id', biz.business.id).eq('sha256_hash', sha256Hex).limit(1);
+  if (!dupf?.length) return null;
+  const { data: ex } = await supabase.from('financial_documents')
+    .select('id').eq('business_id', biz.business.id).eq('file_id', dupf[0].id).limit(1);
+  return ex?.[0]?.id || null;
+}
+
+// MCP upload: the bytes arrive in the tool call, so the SERVER writes them to storage (the
+// web app has the browser PUT them to a signed URL instead) and then finalises exactly like
+// upload-complete. Same validation (name, MIME, size), same business-scoped hash dedup
+// before anything is written, same storage path scheme. Gates are the caller's.
+async function storeDocumentBytes(biz, actorUserId, { buf, fileName, mimeType, documentType = null, link = null, channel = 'mcp' }) {
+  const h = await getDocumentsHealth();
+  if (!h.storage_ready) return { error: 'documents_unavailable', status: 503 };
+  const v = docV.validateUpload({ file_name: fileName, mime_type: mimeType, file_size: buf.length, document_type: documentType || undefined });
+  if (!v.ok) return { error: v.error, status: 400 };
+  const sha = crypto.createHash('sha256').update(buf).digest('hex');
+  const existing = await documentIdByHash(biz, sha);
+  if (existing) return { error: 'duplicate', status: 409, duplicate: true, existing_document_id: existing };
+
+  const documentId = crypto.randomUUID();
+  const storagePath = docV.buildStoragePath(biz.business.id, documentId, fileName);
+  const { error: upErr } = await supabase.storage.from(DOC_BUCKET)
+    .upload(storagePath, buf, { contentType: mimeType, upsert: false });
+  if (upErr) return { error: 'storage_unavailable', status: 503 };
+  return finalizeDocumentUpload(biz, actorUserId, {
+    buf, documentId, storagePath, channel,
+    body: { file_name: fileName, mime_type: mimeType, document_type: documentType || undefined, sha256: sha,
+      upload_source: 'ai_assistant', link },
+  });
+}
+
+// ── Upload link for AI assistants (MCP upload_document, link mode) ─────────────
+// Some AI clients cannot pass file bytes through a tool call. They hand the user a link to a
+// CFO page instead: app.cfo-ai.site/upload#t=<token>. Owner decision (2026-10-02): no table,
+// a signed short-lived token — 15 minutes, bound to ONE user and ONE company — and the page
+// ALSO requires the user to be signed in to CFO as that same user, so a forwarded link is
+// useless to anyone else. The token is in the URL FRAGMENT, which browsers never send to a
+// server, so it does not reach access logs or a Referer header.
+//
+// The token logic (derived key, audience, 15-minute TTL) lives in server/lib/uploadLink.js.
+// The upload itself goes through the ordinary upload-init / upload-complete routes with their
+// own auth, role and plan gates: the token only names the company and the intent; it grants
+// nothing the user could not do in the app.
+const uploadLinkLib = require('./lib/uploadLink');
+const uploadLinkEnabled = () => process.env.MCP_SERVER_ENABLED === 'true' && process.env.MCP_WRITE_TOOLS_ENABLED === 'true';
+
+function issueUploadLink(biz, userId, { documentType = null, link = null } = {}) {
+  const t = uploadLinkLib.issueUploadLinkToken(JWT_SECRET, { userId, businessId: biz.business.id, documentType, link });
+  const base = (process.env.MCP_PUBLIC_BASE_URL || process.env.APP_BASE_URL || process.env.WEB_APP_URL || '').replace(/\/+$/, '');
+  return { url: `${base}/upload#t=${t.token}`, expires_at: t.expires_at, issued_at: t.issued_at };
+}
+
+// The upload page never renders inside someone else's frame (a framed drop zone could be
+// used to trick a signed-in user into dropping a file), and is never cached.
+app.get('/upload', (req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
+// POST /api/upload-link/session — the /upload page asks what a link is for. Signed-in user
+// only, and only the user the link was issued to. Returns the company and the intent; the
+// page then uploads with the normal document routes, scoped to that company.
+app.post('/api/upload-link/session', auth, async (req, res) => {
+  try {
+    if (!uploadLinkEnabled()) return res.status(404).json({ error: 'not_found' });
+    const p = uploadLinkLib.verifyUploadLinkToken(JWT_SECRET, req.body && req.body.token);
+    if (!p) return res.status(410).json({ error: 'link_expired_or_invalid' });
+    if (String(p.userId) !== String(req.user.userId)) return res.status(403).json({ error: 'link_for_another_account' });
+    req.headers['x-business-id'] = p.businessId;
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (biz.business.id !== p.businessId) return res.status(403).json({ error: 'workspace_not_accessible' });
+    if (!canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot upload documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    res.json({
+      company: { id: biz.business.id, name: biz.business.name || null },
+      expires_at: p.expires_at,
+      document_type: p.documentType,
+      link: p.link,
+    });
+  } catch (e) {
+    console.error(`[upload-link] session failed: ${e.message}`);
+    res.status(500).json({ error: 'upload_link_unavailable' });
+  }
+});
+
+// POST /api/documents/:id/signed-url — short-lived view/download URL after access check.
+app.post('/api/documents/:id/signed-url', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    if (await blockIfStorageNotReady(res)) return;
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const [docWithLinks] = await attachLinks(biz, [doc]);
+    if (!await userCanAccessDoc(biz, req.user.userId, biz.role, docWithLinks))
+      return res.status(403).json({ error: 'You do not have access to this document' });
+    const r = await signedDocumentUrl(biz, req.user.userId, doc, { mode: req.body?.mode === 'download' ? 'download' : (req.body?.mode || 'view') });
+    if (r.error === 'file_not_found') return res.status(404).json({ error: 'File not found' });
+    if (r.error) return res.status(r.status || 500).json({ error: r.error, detail: r.detail });
+    res.json({ url: r.url, expires_in: r.expires_in });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/documents/:id — safe metadata only.
+app.patch('/api/documents/:id', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const b = req.body || {};
+    if (b.document_type != null && !docV.DOCUMENT_TYPES.includes(b.document_type))
+      return res.status(400).json({ error: 'invalid_document_type' });
+    // Build the safe patch (whitelist only); the RPC writes it + audit atomically.
+    const patch = {};
+    if (b.document_type != null) patch.document_type = b.document_type;
+    if (b.title != null) patch.document_number = String(b.title).slice(0, 200);
+    if (b.document_date !== undefined && b.document_date) patch.document_date = b.document_date;
+    if (b.period_start !== undefined && b.period_start) patch.period_start = b.period_start;
+    if (b.period_end !== undefined && b.period_end) patch.period_end = b.period_end;
+    if (b.currency != null) patch.currency = b.currency;
+    if (b.amount !== undefined && b.amount != null && isFinite(Number(b.amount))) patch.gross_amount = Number(b.amount);
+    if (b.counterparty_id) patch.issuer_counterparty_id = b.counterparty_id;
+    if (b.description !== undefined) patch.extracted_json = { ...(doc.extracted_json || {}), notes: b.description ? String(b.description).slice(0, 2000) : null };
+    const { data, error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ document: publicDocRow(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// PATCH /api/documents/:id/financial-fields — the commercial figures a settlement needs.
+//
+// WHY THIS IS SEPARATE FROM PATCH /api/documents/:id
+// That route writes through rpc_document_update_metadata, whose column list is fixed in
+// SQL (migration 036) and does not include commercial_base_amount / commercial_tax_amount.
+// Adding them there would mean altering the function — a migration. This route writes the
+// two missing columns directly and reproduces the RPC's two guarantees itself: an archived
+// document is refused, and a document_audit row is written.
+//
+// These are MANUAL OR EXTRACTED values. Nothing here reads a PDF. The columns exist so a
+// person (or, later, a real extraction pipeline) can record what the invoice says.
+app.patch('/api/documents/:id/financial-fields', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role))
+      return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    const b = req.body || {};
+    // Money fields only. business_id, file_id, storage path, owner and uploader are not
+    // addressable here by construction — they are simply never read off the body.
+    const money = (v, name) => {
+      if (v === undefined) return undefined;
+      if (v === null || v === '') return null;
+      const n = Number(v);
+      if (!Number.isFinite(n)) return { err: `${name} must be a number` };
+      if (n < 0) return { err: `${name} must not be negative` };
+      return n;
+    };
+    const base = money(b.commercial_base_amount, 'commercial_base_amount');
+    const tax = money(b.commercial_tax_amount, 'commercial_tax_amount');
+    // The schema column is gross_amount; commercial_total_amount is accepted as an alias
+    // because that is what callers tend to name it.
+    const grossIn = b.gross_amount !== undefined ? b.gross_amount : b.commercial_total_amount;
+    const gross = money(grossIn, 'gross_amount');
+    for (const v of [base, tax, gross]) if (v && v.err) return res.status(400).json({ error: v.err });
+
+    const patch = {};
+    if (base !== undefined) patch.commercial_base_amount = base;
+    if (tax !== undefined) patch.commercial_tax_amount = tax;
+    if (gross !== undefined) patch.gross_amount = gross;
+
+    // Effective values after the patch, so validation sees the row as it will be.
+    const effBase = patch.commercial_base_amount !== undefined ? patch.commercial_base_amount : doc.commercial_base_amount;
+    const effTax = patch.commercial_tax_amount !== undefined ? patch.commercial_tax_amount : doc.commercial_tax_amount;
+    let effGross = patch.gross_amount !== undefined ? patch.gross_amount : doc.gross_amount;
+
+    // Derive the total only when it was not supplied, and say so in the response rather
+    // than quietly inventing a number.
+    let derived = false;
+    if (effGross == null && effBase != null && effTax != null) {
+      effGross = Number(effBase) + Number(effTax);
+      patch.gross_amount = effGross;
+      derived = true;
+    }
+    if (effGross != null && effBase != null && Number(effGross) + 0.01 < Number(effBase))
+      return res.status(400).json({ error: 'total_less_than_base', gross_amount: effGross, commercial_base_amount: effBase });
+    if (effGross != null && effTax != null && Number(effTax) > Number(effGross) + 0.01)
+      return res.status(400).json({ error: 'tax_exceeds_total', commercial_tax_amount: effTax, gross_amount: effGross });
+
+    const hasAmount = [effBase, effTax, effGross].some((v) => v != null);
+    const effCurrency = b.currency != null ? String(b.currency).trim().toUpperCase() : doc.currency;
+    if (hasAmount && !effCurrency)
+      return res.status(400).json({ error: 'currency_required_when_amounts_present' });
+    if (b.currency != null) patch.currency = effCurrency;
+
+    if (b.document_number !== undefined || b.invoice_number !== undefined || b.document_reference !== undefined) {
+      const ref = b.document_number ?? b.invoice_number ?? b.document_reference;
+      patch.document_number = ref ? String(ref).slice(0, 200) : null;
+    }
+    for (const f of ['document_date', 'period_start', 'period_end']) {
+      if (b[f] !== undefined) patch[f] = b[f] || null;
+    }
+    if (b.counterparty_id !== undefined && b.counterparty_id) {
+      // Must be a counterparty of THIS business; the 031 isolation trigger enforces it
+      // too, but a 400 is a better answer than a database exception.
+      const { data: cp } = await supabase.from('counterparties')
+        .select('id').eq('id', b.counterparty_id).eq('business_id', biz.business.id).limit(1);
+      if (!cp || !cp.length) return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
+      patch.issuer_counterparty_id = b.counterparty_id;
+    }
+
+    if (Object.keys(patch).length === 0)
+      return res.status(400).json({ error: 'no_editable_fields_supplied' });
+    patch.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase.from('financial_documents')
+      .update(patch).eq('id', doc.id).eq('business_id', biz.business.id).select().single();
+    if (error) {
+      console.error(`[doc-financial-fields] update failed: ${error.message}`);
+      return res.status(500).json({ error: 'document_update_failed', detail: error.message });
+    }
+
+    // Same audit trail the RPC writes, so document history stays consistent.
+    try {
+      await supabase.from('document_audit').insert({
+        business_id: biz.business.id, document_id: doc.id,
+        actor_user_id: req.user.userId, channel: 'web', action: 'metadata_changed',
+      });
+    } catch { /* audit is best-effort, exactly as elsewhere */ }
+    await recordAudit({
+      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
+      entityType: 'financial_document', entityId: doc.id,
+      action: 'document_financial_fields_updated', after: patch,
+    });
+
+    res.json({ ok: true, derived_gross_amount: derived, document: publicDocRow(data) });
+  } catch (e) {
+    console.error(`[doc-financial-fields] failed: ${e.message}`);
+    res.status(500).json({ error: 'document_financial_fields_failed' });
+  }
+});
+
+
+// ── Document intake pipeline (shared) ────────────────────────────────────────
+// Used by POST /api/documents/:id/intake and, best-effort, straight after upload.
+// Reads the file, extracts, resolves the counterparty against this business, and
+// returns the orchestrator result. Writes only review metadata, and only when it
+// actually changed.
+const intakeOrchestrator = require('./lib/documentIntakeOrchestrator');
+
+/**
+ * Read one document the SAME way for every caller.
+ *
+ * This exists because it once did not. The intake pipeline gained an OCR fallback while
+ * /counterparty-suggestion kept its own embedded-text-only copy of the same steps, so a
+ * scanned document that intake could read perfectly well came back from the counterparty
+ * endpoint as "No counterparty name could be read" — two readers, two answers, one
+ * document. Any future reader change now lands in both places by construction.
+ *
+ * Returns { file, buf, extraction, readSource, ocr } or { error, status }.
+ */
+async function readDocumentForIntake(biz, doc) {
+  const { data: fileRows } = await supabase.from('document_files')
+    .select('id, storage_path, file_name, mime_type')
+    .eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+  const file = fileRows?.[0];
+  if (!file) return { error: 'file_not_found', status: 404 };
+
+  const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+  if (dlErr || !blob) return { error: 'document_unavailable', status: 503 };
+  const buf = Buffer.from(await blob.arrayBuffer());
+
+  const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+  const ex = isPdf ? extractPdfText(buf)
+    : { text: '', text_available: false, method: 'not_a_pdf', reason: 'not_a_pdf' };
+  let extraction = docExtract.extractFromText(ex.text, {
+    text_available: ex.text_available, document_type: doc.document_type,
+    file_name: file.file_name, extraction_reason: ex.reason,
+  });
+
+  // ── OCR / Vision fallback ────────────────────────────────────────────────
+  // Embedded text first, always: it is free, deterministic and exact. Vision runs ONLY
+  // when there was no text to read, so a readable PDF never costs a vision call and its
+  // result can never be overridden by a model's reading of the same page.
+  //
+  // Gated by DOCUMENT_OCR_VISION_ENABLED. Fail-open throughout: readDocumentWithVision
+  // never throws, and a result that is not `ok` leaves `extraction` exactly as the
+  // no-text path produced it — the same "unsupported" answer as before OCR existed.
+  let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
+  let ocr = null;
+  if (!ex.text_available && docOcr.ocrEnabled()) {
+    ocr = await docOcr.readDocumentWithVision(buf, {
+      mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
+    });
+    if (ocr.ok && (ocr.text || ocr.document_type !== 'unknown')) {
+      // Re-run the SAME parser over the transcript, then let the reader's own structured
+      // fields fill what the parser could not find. One extraction shape downstream, so
+      // the orchestrator, the UI and the tests do not care which reader produced it.
+      const fromText = docExtract.extractFromText(ocr.text, {
+        text_available: !!ocr.text, document_type: doc.document_type, file_name: file.file_name,
+      });
+      extraction = docOcr.mergeIntoExtraction(fromText, ocr);
+      readSource = 'ocr_vision';
+    }
+  }
+  // Dates and parties are read from the SAME text the fields came from, so every
+  // caller of this helper gets the same structured answer. The FULL text, not the
+  // 600-character excerpt stored on the row — a due date or a second party block
+  // routinely sits past that cut.
+  const readText = (readSource === 'ocr_vision' ? (ocr && ocr.text) : ex.text) || '';
+  const dates = docDates.extractDates(readText, { document_type: extraction.document_type });
+  const parties = docParties.extractParties(readText);
+
+  return { file, buf, extraction, readSource, ocr, dates, parties };
+}
+
+// The same reading shape as readDocumentForIntake, for text the caller already holds —
+// e.g. an MCP client (Claude / ChatGPT) that read the invoice itself. No file, no storage,
+// no OCR call. readSource 'client_model_text' tells the orchestrator the text came from a
+// model, so tax figures get the same caution as an OCR/Vision reading (see assessTax).
+function readTextForIntake(text) {
+  const body = String(text || '');
+  const extraction = docExtract.extractFromText(body, { text_available: body.trim().length > 0 });
+  const dates = docDates.extractDates(body, { document_type: extraction.document_type });
+  const parties = docParties.extractParties(body);
+  return { file: null, buf: null, extraction, readSource: 'client_model_text', ocr: null, dates, parties };
+}
+
+// The post-read half of runDocumentIntake: counterparties, existing links and tax rules
+// for THIS business, then the orchestrator. Pure read — writes nothing. Shared by the web
+// intake and the MCP adapter so one document gets one answer whoever asks.
+async function analyzeDocumentReading(biz, doc, read) {
+  const { extraction, readSource, ocr } = read;
+
+  // Counterparty directory + anything this document is already attached to. Both are
+  // business-scoped reads; a failure degrades to "unknown" rather than a 500.
+  let counterparties = [];
+  try { counterparties = await cpDirectoryForMatching(biz); } catch { counterparties = []; }
+
+  const existingLinks = { debt_ids: [], transaction_ids: [] };
+  // A document that is not stored yet (caller-supplied text) has no links to look up.
+  if (doc.id) {
+    try {
+      const [{ data: dl }, { data: tl }] = await Promise.all([
+        supabase.from('document_debt_links').select('debt_id')
+          .eq('document_id', doc.id).eq('business_id', biz.business.id),
+        supabase.from('document_transaction_links').select('transaction_id')
+          .eq('document_id', doc.id).eq('business_id', biz.business.id),
+      ]);
+      existingLinks.debt_ids = (dl || []).map((x) => x.debt_id);
+      existingLinks.transaction_ids = (tl || []).map((x) => x.transaction_id);
+    } catch { /* links unknown; the pipeline still runs */ }
+  }
+
+  // Tax rules the caller may safely act on. effectiveRuleActive is the existing gate:
+  // active status, verified rule, cited source, and the source itself still good.
+  // Anything failing it is passed through as under_review so the result can quote it
+  // without treating it as settled law.
+  let taxRules = [];
+  try {
+    const { data: rules } = await supabase.from('tax_rules')
+      .select('rule_code, status, rate, last_verified_at, official_source_id, official_sources(status, last_verified_at)')
+      .limit(50);
+    taxRules = (rules || []).map((r) => ({
+      rule_code: r.rule_code, status: r.status, rate: r.rate,
+      citation: r.rule_code, effective_active: effectiveRuleActive(r, r.official_sources),
+    }));
+  } catch { taxRules = []; }
+
+  return intakeOrchestrator.processDocument({
+    document: doc, extraction, businessName: biz.business?.name,
+    counterparties, existingLinks, taxRules,
+    // What the user said they were uploading, kept from upload-complete. It is a hint
+    // and a cross-check — never a classification.
+    uploadIntent: (doc.extracted_json || {}).upload_intent || null,
+    readSource, ocr,
+    dates: read.dates || null,
+  });
+}
+
+async function runDocumentIntake(biz, doc, opts = {}) {
+  const read = await readDocumentForIntake(biz, doc);
+  if (read.error) return { error: read.error, status: read.status };
+  const intake = await analyzeDocumentReading(biz, doc, read);
+
+  let stored = false;
+  if (opts.persist) {
+    const summary = intakeOrchestrator.toStoredIntake(intake);
+    const previous = (doc.extracted_json || {}).ai_intake_v2 || null;
+    // Re-running must not churn the row or the audit trail.
+    if (!intakeOrchestrator.sameIntake(previous, summary)) {
+      try {
+        await supabase.from('financial_documents')
+          .update({
+            extracted_json: { ...(doc.extracted_json || {}), ai_intake_v2: summary },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', doc.id).eq('business_id', biz.business.id);
+        stored = true;
+      } catch (e) {
+        console.error(`[doc-intake-v2] persist failed: ${e.message}`);
+      }
+    }
+  }
+  return { intake, stored };
+}
+
+// Duplicate check across ONE business, using references already recorded on its
+// documents. `excludeDocId` keeps a stored document from matching itself; it is null for
+// text that is not stored yet. Read-only; shared by /extract and the MCP adapter.
+async function findDocumentDuplicate(biz, excludeDocId, fields = {}) {
+  const candidateRef = fields.payment_reference_number || fields.document_number;
+  if (!candidateRef) return { duplicate: false };
+  let q = supabase.from('financial_documents')
+    .select('id, document_number, gross_amount, extracted_json')
+    .eq('business_id', biz.business.id);
+  if (excludeDocId) q = q.neq('id', excludeDocId);
+  const { data: others } = await q.limit(200);
+  const existing = (others || []).map((d) => ({
+    id: d.id,
+    document_number: d.document_number,
+    payment_reference_number: d.extracted_json && d.extracted_json.payment_reference_number,
+    amount: d.gross_amount == null ? null : Number(d.gross_amount),
+  }));
+  return docExtract.findDuplicateDocument(
+    { ...fields, amount: fields.amount ?? fields.gross_amount }, existing);
+}
+
+// POST /api/documents/:id/extract — suggest structured fields from the document's text.
+//
+// ZERO-WRITE. This route reads the stored file, pulls whatever text the PDF already
+// carries, parses it, and returns a SUGGESTION. It never updates the document. Saving
+// is a separate, explicit call to PATCH /api/documents/:id/financial-fields, so a user
+// always sees the values before they land on a financial record.
+//
+// NOT OCR. server/lib/pdfText.js reads embedded text only. A scanned page carries none,
+// and the response then says needs_manual_review rather than guessing.
+//
+// This deliberately does NOT consult DOCUMENT_CONTENT_CLASSIFICATION_ENABLED. That flag
+// gates the AUTOMATIC classify-and-write that runs during upload; the risk it manages is
+// an unattended write. Extraction here is user-initiated and writes nothing, and the
+// same hardened, bounded reader does the work.
+app.post('/api/documents/:id/extract', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    // Same shared reader as intake and counterparty-suggestion: embedded text first,
+    // OCR fallback when enabled. Three endpoints, one reading of the document.
+    // (The file lookup and the business-scoped download live inside the helper.)
+    const read = await readDocumentForIntake(biz, doc);
+    if (read.error) return res.status(read.status || 500).json({ error: read.error });
+    const result = read.extraction;
+
+    // Duplicate check across this business, using references already recorded.
+    const duplicate = await findDocumentDuplicate(biz, doc.id, result.fields);
+
+    res.json({
+      ok: true, business_id: biz.business.id, document_id: doc.id,
+      // Nothing was written. The client must call financial-fields to save.
+      saved: false,
+      extraction: result,
+      duplicate,
+      source: read.readSource,
+      // Each date, told apart and status-tagged. Never a fallback to the upload date.
+      dates: read.dates,
+      parties: read.parties?.parties || [],
+      text_source: { available: read.readSource !== 'filename_only', method: read.readSource, reason: result.reason },
+    });
+  } catch (e) {
+    console.error(`[doc-extract] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'document_extract_failed' });
+  }
+});
+
+// POST /api/documents/:id/counterparty-suggestion — who is the other party here?
+//
+// ZERO-WRITE. Reads the document's embedded text, works out which side is the
+// counterparty, matches against this business's directory, and returns either a
+// recognised record, possible matches, or a suggested new profile. Creating
+// remains an explicit POST /api/counterparties the user triggers.
+app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    // The SAME reader the intake pipeline uses — embedded text first, OCR fallback when
+    // enabled. Before this shared helper existed, a scanned document intake could read
+    // fine answered "No counterparty name could be read" here, because this endpoint had
+    // its own embedded-text-only copy of the steps.
+    const read = await readDocumentForIntake(biz, doc);
+    if (read.error) return res.status(read.status || 500).json({ error: read.error });
+    const { extraction, readSource } = read;
+
+    // Parties first, as whole objects. This is what stops a name from one company
+    // being paired with another company's tax number — and what stops the business
+    // being offered as its own counterparty.
+    const partyRead = docParties.resolveCounterparty(
+      (read.readSource === 'ocr_vision' ? (read.ocr && read.ocr.text) : null) || extraction.raw_text_excerpt || '',
+      { legal_name: biz.business?.legal_name || biz.business?.name, display_name: biz.business?.name,
+        name: biz.business?.name, npwp: biz.business?.npwp, aliases: biz.business?.aliases || [] });
+
+    if (partyRead.status === 'self_match') {
+      return res.json({
+        ok: true, business_id: biz.business.id, document_id: doc.id, saved: false,
+        source: read.readSource,
+        status: 'self_match',
+        can_create: false,                 // the hard rule: nothing to create
+        suggested_counterparty: null,
+        parties: partyRead.parties,
+        reason: partyRead.reason,
+        warnings: [partyRead.reason, ...(partyRead.warnings || [])],
+      });
+    }
+
+    const suggestion = CPI.suggestFromDocument(extraction, { business_name: biz.business?.name });
+    // The structured read wins where it has an answer: its name and NPWP came from one
+    // party block, whereas the field-level suggestion pairs whatever it found.
+    if (partyRead.counterparty) {
+      suggestion.suggested_counterparty = {
+        ...(suggestion.suggested_counterparty || {}),
+        legal_name: partyRead.counterparty.legal_name,
+        display_name: partyRead.counterparty.legal_name,
+        npwp: partyRead.counterparty.npwp,
+      };
+    }
+    const match = CPI.matchCounterparty(suggestion.suggested_counterparty, await cpDirectoryForMatching(biz));
+
+    res.json({
+      ok: true, business_id: biz.business.id, document_id: doc.id,
+      saved: false,                       // nothing was created
+      source: readSource,
+      text_source: { available: readSource !== 'filename_only', reason: extraction.reason },
+      extraction_status: extraction.status,
+      status: match.status,               // matched | possible_match | not_found
+      confidence: match.confidence,
+      matched_counterparty_id: match.matched_counterparty_id,
+      possible_matches: match.possible_matches,
+      match_reasons: match.match_reasons,
+      suggested_counterparty: suggestion.suggested_counterparty,
+      // Whether a one-click create may be offered at all. A guess the reader could not
+      // tie to this business is reviewed, not created.
+      can_create: partyRead.status === 'ok',
+      party_status: partyRead.status,
+      parties: partyRead.parties,
+      direction: suggestion.direction,
+      role_reason: suggestion.role_reason,
+      warnings: [...suggestion.warnings, ...match.warnings],
+      requires_confirmation: true,
+    });
+  } catch (e) {
+    console.error(`[counterparty-suggestion] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'counterparty_suggestion_failed' });
+  }
+});
+
+// POST /api/documents/:id/intake — run the full intake pipeline for one document.
+//
+// Classify, extract, resolve the counterparty, work out what record it implies, read
+// the tax signals, and say what to do next. Business-scoped throughout.
+//
+// WRITES ONLY REVIEW METADATA. The stored summary lands in
+// extracted_json.ai_intake_v2 and contains no financial record — no debt, no
+// transaction, no counterparty is created here. Those need an explicit user action
+// through their own endpoints.
+//
+// Idempotent: re-running produces the same summary, and an unchanged summary is not
+// written again. `?persist=false` makes it a pure read.
+app.post('/api/documents/:id/intake', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+
+    const result = await runDocumentIntake(biz, doc, {
+      persist: !/^(0|false|no)$/i.test(String(req.query.persist ?? 'true')),
+      actorUserId: req.user.userId,
+    });
+    if (result.error) return res.status(result.status || 500).json({ error: result.error });
+
+    res.json({ ok: true, business_id: biz.business.id, ...result.intake, stored: result.stored });
+  } catch (e) {
+    console.error(`[doc-intake-v2] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'document_intake_failed' });
+  }
+});
+
+// POST /api/documents/:id/identify — "what is this document?" in the user's language.
+//
+// The TYPE is the deterministic content classifier's (documentContent.js) when it is confident;
+// the model may only propose one otherwise, and says so. The model EXPLAINS (title, summary,
+// issuer, date, number, purpose, where it belongs, next step). Nothing is applied: the client
+// offers the suggested type and the user confirms it through the existing classification route.
+// The reading is stored at extracted_json.ai_identify (one per language) so a document is read
+// once, not on every open; `force` re-reads. A document with no text layer is sent to the model
+// as the file itself (owner decision 2026-10-09: the AI must identify documents on its own).
+app.post('/api/documents/:id/identify', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role))
+      return res.status(403).json({ error: 'Your role cannot view business finance' });
+    if (!await hasDocumentsAccess(biz))
+      return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'document_not_found_in_this_business' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+    const [withLinks] = await attachLinks(biz, [doc]);
+    if (!await userCanAccessDoc(biz, req.user.userId, biz.role, withLinks))
+      return res.status(403).json({ error: 'You do not have access to this document' });
+
+    const lang = ['ru', 'en', 'id'].includes(req.body?.lang) ? req.body.lang : 'en';
+    const stored = (doc.extracted_json || {}).ai_identify || {};
+    if (!req.body?.force && stored[lang]) return res.json({ ok: true, cached: true, identify: await attachTaxObligations(biz, stored[lang]) });
+
+    const { data: fileRows } = await supabase.from('document_files')
+      .select('storage_path, file_name, mime_type').eq('id', doc.file_id).eq('business_id', biz.business.id).limit(1);
+    const file = fileRows?.[0];
+    if (!file) return res.status(404).json({ error: 'file_not_found' });
+    const { data: blob, error: dlErr } = await supabase.storage.from(DOC_BUCKET).download(file.storage_path);
+    if (dlErr || !blob) return res.status(503).json({ error: 'document_unavailable' });
+    const buf = Buffer.from(await blob.arrayBuffer());
+
+    const isPdf = /pdf/i.test(file.mime_type || '') || /\.pdf$/i.test(file.file_name || '');
+    const isSheet = /\.(xlsx|xlsm|xls|csv|tsv)$/i.test(file.file_name || '') || /spreadsheet|excel|text\/csv/i.test(file.mime_type || '');
+    let text = '';
+    let method = 'none';
+    if (isPdf) {
+      const ex = extractPdfText(buf);
+      if (ex.text_available) { text = ex.text; method = 'embedded_text'; }
+    } else if (/\.(csv|tsv|txt)$/i.test(file.file_name || '') || /^text\//i.test(file.mime_type || '')) {
+      text = buf.toString('utf8').slice(0, 20000); method = 'text_file';
+    } else if (isSheet && typeof req.body?.sheet_text === 'string') {
+      // The server has no spreadsheet parser; the browser already rendered the sheet's own
+      // cells for the preview and sends them here. Accepted only for a spreadsheet file.
+      text = req.body.sheet_text.slice(0, 20000); method = 'sheet_cells';
+    }
+    const verdict = docContent.classifyDocument({
+      file_name: file.file_name, mime_type: file.mime_type, company_name: biz.business?.name,
+      text, text_available: !!text, method: method === 'none' ? 'filename_only' : method,
+    });
+    const types = docIntake.INTAKE_TYPES.map((x) => x.type);
+    const ai = await docIdentify.explainDocument({
+      client: anthropic, text, verdict, types, lang, file_name: file.file_name,
+      company_name: biz.business?.name, buffer: text ? null : buf, mime_type: file.mime_type,
+    });
+    const explanation = ai.ok ? ai.explanation : null;
+    const kind = docIdentify.suggestedKind(verdict, explanation);
+    // Where to keep it when it explains no single bill or payment (statement → bank account +
+    // month, payroll / tax → month, contract → counterparty). Business-scoped reads only.
+    let filing = null;
+    if (kind && explanation) {
+      let wallets = [], counterparties = [];
+      try {
+        if (kind.type === 'bank_statement') {
+          const { data } = await supabase.from('wallets').select('id, name, entity_name, currency')
+            .eq('business_id', biz.business.id).eq('is_active', true).eq('scope', 'business');
+          wallets = data || [];
+        }
+        if (kind.type === 'contract') counterparties = await cpDirectoryForMatching(biz);
+      } catch { /* no suggestion rather than a failure */ }
+      filing = docIdentify.suggestedFiling(kind.type, explanation, { wallets, counterparties, currency: doc.currency });
+    }
+    const readMethod = text ? method : (ai.ok ? 'file_to_model' : 'none');
+    const identify = {
+      v: 3, lang, at: new Date().toISOString(), model: ai.ok ? docIdentify.MODEL : null, suggested_filing: filing,
+      // Taxes the document creates: amounts only when printed in its own text (documentIdentify.taxFindings).
+      taxes: docIdentify.taxFindings(explanation, { text, read: readMethod }),
+      read: readMethod,
+      suggested_type: kind?.type || null, suggested_label: kind ? docIntake.labelFor(kind.type) : null,
+      suggested_area: kind ? docIntake.areaFor(kind.type) : null,
+      suggested_source: kind?.source || null, suggested_confidence: kind?.confidence || null,
+      classifier: { doc_type: verdict.doc_type, confidence: verdict.confidence, matched_on: verdict.matched_on },
+      explanation, unavailable_reason: ai.ok ? null : ai.reason,
+    };
+    // Store only a successful reading — a failure (no key, timeout) must be retried next time.
+    if (ai.ok) {
+      try {
+        await supabase.from('financial_documents')
+          .update({ extracted_json: { ...(doc.extracted_json || {}), ai_identify: { ...stored, [lang]: identify } }, updated_at: new Date().toISOString() })
+          .eq('id', doc.id).eq('business_id', biz.business.id);
+      } catch (e) { console.error(`[doc-identify] persist failed: ${e.message}`); }
+    }
+    res.json({ ok: true, cached: false, identify: await attachTaxObligations(biz, identify) });
+  } catch (e) {
+    console.error(`[doc-identify] failed: ${e.message}`);
+    res.status(500).json({ ok: false, error: 'document_identify_failed' });
+  }
+});
+
+// POST /api/documents/:id/filing — where a document belongs when it explains no single bill or
+// payment (owner 2026-10-09; the pattern Xero / QuickBooks / Ramp use):
+//   bank_account_period  a bank statement → a bank account + month (also sets period_start/end)
+//   counterparty         a contract or letter → a counterparty (issuer_counterparty_id)
+//   keep                 kept on file with a reason (payroll, tax, contract, other)
+//   clear: true          removes the filing
+// No migration: written through rpc_document_update_metadata (audited) into existing columns and
+// extracted_json.filing. Nothing here touches money, links or the ledger.
+const FILING_KINDS = ['bank_account_period', 'counterparty', 'keep'];
+const FILING_REASONS = ['payroll', 'tax', 'contract', 'other'];
+app.post('/api/documents/:id/filing', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot edit documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+    const b = req.body || {};
+    const ej = { ...(doc.extracted_json || {}) };
+    const patch = {};
+    if (b.clear) {
+      delete ej.filing;
+    } else {
+      if (!FILING_KINDS.includes(b.kind)) return res.status(400).json({ error: 'invalid_filing_kind', allowed: FILING_KINDS });
+      const filing = { kind: b.kind, by: req.user.userId, at: new Date().toISOString() };
+      if (b.kind === 'bank_account_period') {
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(b.period || ''))) return res.status(400).json({ error: 'invalid_period' });
+        const { data: w } = await supabase.from('wallets').select('id, name, currency')
+          .eq('id', String(b.wallet_id || '')).eq('business_id', biz.business.id).eq('scope', 'business').limit(1);
+        if (!w?.length) return res.status(404).json({ error: 'wallet_not_found' });
+        const [y, m] = b.period.split('-').map(Number);
+        filing.wallet_id = w[0].id; filing.wallet_name = w[0].name; filing.period = b.period;
+        patch.period_start = `${b.period}-01`;
+        patch.period_end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      } else if (b.kind === 'counterparty') {
+        const { data: cp } = await supabase.from('counterparties').select('id, name')
+          .eq('id', String(b.counterparty_id || '')).or(bizOrFilter(biz)).limit(1);
+        if (!cp?.length) return res.status(404).json({ error: 'counterparty_not_found' });
+        filing.counterparty_id = cp[0].id; filing.counterparty_name = cp[0].name;
+        patch.issuer_counterparty_id = cp[0].id;
+      } else {
+        if (!FILING_REASONS.includes(b.reason)) return res.status(400).json({ error: 'invalid_reason', allowed: FILING_REASONS });
+        filing.reason = b.reason;
+        if (b.period && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(b.period))) filing.period = b.period;
+      }
+      if (typeof b.note === 'string' && b.note.trim()) filing.note = b.note.trim().slice(0, 300);
+      ej.filing = filing;
+    }
+    patch.extracted_json = ej;
+    const { data, error } = await supabase.rpc('rpc_document_update_metadata',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_patch: patch, p_channel: 'web' });
+    if (error) {
+      if (/archived/i.test(error.message)) return res.status(409).json({ error: 'document_archived' });
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ ok: true, document: publicDocRow(data) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// The tax calendar obligation each tax on a document belongs to, read live (status, amount and
+// payment change after the reading was stored), plus the general deadlines for its period.
+async function attachTaxObligations(biz, identify) {
+  const taxes = Array.isArray(identify?.taxes) ? identify.taxes : [];
+  if (!taxes.length) return identify;
+  const out = [];
+  for (const t of taxes) {
+    let obligation = null;
+    if (t.rule_code && t.period) {
+      try {
+        const { data } = await supabase.from('compliance_events')
+          .select('id, title, period, due_date, status, amount_status, estimated_amount, confirmed_amount, payment_status, filing_status')
+          .eq('business_id', biz.business.id).eq('rule_code', t.rule_code).eq('period', t.period).limit(1);
+        obligation = data?.[0] || null;
+      } catch { obligation = null; }
+    }
+    out.push({ ...t, obligation, deadlines: t.rule_code && t.period ? taxDeadlines.deadlinesFor(t.rule_code, t.period) : null });
+  }
+  return { ...identify, taxes: out };
+}
+
+const CONFIRMED_AMOUNT = ['professionally_reviewed', 'owner_confirmed'];
+
+// POST /api/documents/:id/tax-obligation — put a tax found on a document into the tax calendar.
+//
+// The amount is the one stored in the document's own reading (printed on the document, checked by
+// documentIdentify.taxFindings) — never one sent by the client. PPh 21 from a payroll register
+// becomes the obligation's ESTIMATED amount (an accountant or the owner still confirms it); a PPN
+// line only links the document as evidence, because one invoice is not the month's VAT payable.
+// A confirmed or paid obligation keeps its amount. When the calendar has no row for the period
+// (the rule engine is paused while rules await review) one is created with the general deadline
+// and source_verification_required = true. Nothing here moves money.
+app.post('/api/documents/:id/tax-obligation', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role) || !canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role cannot change tax obligations' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    if (doc.archived_at) return res.status(409).json({ error: 'document_archived' });
+    const { tax, period } = req.body || {};
+    const readings = Object.values((doc.extracted_json || {}).ai_identify || {});
+    const finding = readings.flatMap((r) => r?.taxes || []).find((t) => t.tax === tax && t.period === period);
+    if (!finding) return res.status(404).json({ error: 'tax_not_found_on_document' });
+    if (!finding.rule_code) return res.status(400).json({ error: 'no_calendar_rule_for_tax' });
+
+    const { data: ruleRows } = await supabase.from('tax_rules').select('id, rule_code, title, obligation_type, version')
+      .eq('jurisdiction', 'ID').eq('rule_code', finding.rule_code).limit(1);
+    const rule = ruleRows?.[0];
+    if (!rule) return res.status(400).json({ error: 'no_calendar_rule_for_tax' });
+
+    let { data: evRows } = await supabase.from('compliance_events').select('*')
+      .eq('business_id', biz.business.id).eq('rule_code', rule.rule_code).eq('period', period).limit(1);
+    let ev = evRows?.[0] || null;
+    if (!ev) {
+      const d = taxDeadlines.deadlinesFor(rule.rule_code, period);
+      if (!d) return res.status(400).json({ error: 'invalid_period' });
+      const { data: created, error: cErr } = await supabase.from('compliance_events').insert({
+        business_id: biz.business.id, rule_id: rule.id, rule_code: rule.rule_code, rule_version: rule.version || null,
+        obligation_type: rule.obligation_type, title: rule.title, period, period_start: d.period_start, period_end: d.period_end,
+        due_date: d.file_by, currency: 'IDR', status: eventStatus(d.file_by, new Date()), amount_status: 'unknown',
+        source_verification_required: true, generated_at: new Date().toISOString(), generated_by: req.user.userId,
+      }).select('*').single();
+      if (cErr) return res.status(500).json({ error: cErr.message });
+      ev = created;
+    }
+    const paid = ['paid', 'filed'].includes(ev.payment_status) || ['paid', 'filed'].includes(ev.status);
+    let amountWritten = false;
+    if (finding.amount_to_obligation && finding.amount != null && !paid && !CONFIRMED_AMOUNT.includes(ev.amount_status)) {
+      const { data: upd, error: uErr } = await supabase.from('compliance_events')
+        .update({ estimated_amount: finding.amount, amount_status: 'estimated', calculation_status: 'from_document', updated_at: new Date().toISOString() })
+        .eq('id', ev.id).eq('business_id', biz.business.id).select('*').single();
+      if (uErr) return res.status(500).json({ error: uErr.message });
+      ev = upd; amountWritten = true;
+    }
+    const link = await linkDocument(biz, doc, 'compliance', ev.id, req.user.userId);
+    if (!link.ok && link.error !== 'already_linked') return res.status(link.status || 500).json({ error: link.error });
+    res.json({ ok: true, amount_written: amountWritten, obligation: {
+      id: ev.id, title: ev.title, period: ev.period, due_date: ev.due_date, amount_status: ev.amount_status,
+      estimated_amount: ev.estimated_amount, payment_status: ev.payment_status } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/accountant/tax-calendar — READ-ONLY tax calendar for the v2 Taxes tab.
+//
+// While the tax rules wait for professional review (migration 023 demoted all of them, so the rule
+// engine generates nothing) the dates come from the general deadlines in lib/taxDeadlines.js and
+// are marked verified:false. A rule that is active with a verified source keeps the engine's own
+// stored date. Stored obligations (amount, payment, filing, linked documents) are merged in, and
+// unpaid stored obligations outside the window are kept so an overdue one never disappears.
+//
+// Dormant periods: when a month (or a year, for the annual return) has no transactions at all, the
+// row says nil_return — the report is still due, with zero amounts.
+app.get('/api/accountant/tax-calendar', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
+    const { data: profRows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const profile = profRows?.[0] || null;
+    const jur = profile?.jurisdiction || 'ID';
+    const { data: rules } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur);
+    const now = new Date();
+    const advisory = taxDeadlines.advisoryCalendar(rules || [], profile, now);
+    const { data: stored } = await supabase.from('compliance_events').select('*').eq('business_id', biz.business.id);
+    const byKey = new Map((stored || []).map((e) => [`${e.rule_code}|${e.period}`, e]));
+    const rows = new Map(advisory.map((a) => [`${a.rule_code}|${a.period}`, a]));
+    for (const e of stored || []) {
+      const k = `${e.rule_code}|${e.period}`;
+      const open = !['paid', 'filed'].includes(e.payment_status) && !['paid', 'filed'].includes(e.status);
+      // A stored row for a tax that no longer applies (e.g. PPN for a non-PKP company) is not shown.
+      if (!rows.has(k) && open && (!taxDeadlines.GENERAL[e.rule_code] || taxDeadlines.appliesTo(e.rule_code, profile))) {
+        const d = taxDeadlines.deadlinesFor(e.rule_code, e.period, profile) || {};
+        rows.set(k, { rule_code: e.rule_code, title: e.title, obligation_type: e.obligation_type, period: e.period,
+          period_start: e.period_start, period_end: e.period_end, pay_by: d.pay_by || null, file_by: d.file_by || e.due_date,
+          due_date: d.file_by || e.due_date, source: d.source || null, verified: false });
+      }
+    }
+    // Which periods had any money movement (opening balances do not count as activity).
+    const { data: txs } = await supabase.from('transactions').select('transaction_date, created_at, source, category')
+      .or(bizOrFilter(biz)).limit(20000);
+    const active = new Set();
+    for (const t of txs || []) {
+      if (t.source === 'wallet_opening_balance' || t.category === 'Opening balance') continue;
+      const d = String(t.transaction_date || t.created_at || '').slice(0, 10);
+      if (d) { active.add(d.slice(0, 7)); active.add(d.slice(0, 4)); }
+    }
+    const { data: links } = await supabase.from('document_compliance_links').select('compliance_event_id').eq('business_id', biz.business.id);
+    const docCount = new Map();
+    for (const l of links || []) docCount.set(l.compliance_event_id, (docCount.get(l.compliance_event_id) || 0) + 1);
+
+    const today = now.toISOString().slice(0, 10);
+    const events = [...rows.values()].map((r) => {
+      const rule = (rules || []).find((x) => x.rule_code === r.rule_code);
+      const verifiedRule = !!rule && rule.status === 'active' && effectiveRuleActive(rule, rule.official_sources);
+      const s = byKey.get(`${r.rule_code}|${r.period}`) || null;
+      const due = verifiedRule && s?.due_date ? String(s.due_date).slice(0, 10) : r.due_date;
+      const done = s && (['paid', 'filed'].includes(s.payment_status) || ['paid', 'filed'].includes(s.status));
+      const hadActivity = active.has(r.period);
+      return {
+        ...r, id: s?.id || null, due_date: due, verified: verifiedRule,
+        days: Math.ceil((new Date(due) - new Date(today)) / 86400000),
+        stage: done ? 'done' : due < today ? 'overdue' : 'todo',
+        amount_status: s?.amount_status || 'unknown', estimated_amount: s?.estimated_amount ?? null,
+        confirmed_amount: s?.confirmed_amount ?? null, payment_status: s?.payment_status || 'unpaid',
+        filing_status: s?.filing_status || 'not_filed', documents: s?.id ? (docCount.get(s.id) || 0) : 0,
+        // No money moved in the period: the return is still due, with zero amounts.
+        // Only for a period that has ended; a current or future month simply has no activity yet.
+        nil_return: String(r.period_end || '') < today && !hadActivity && !(Number(s?.estimated_amount) > 0) && !(Number(s?.confirmed_amount) > 0),
+        nil_rule: taxDeadlines.nilRule(r.rule_code, r.period),
+      };
+    }).sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
+    const missing = profileCompleteness(profile).missing;
+    // What the calendar could not decide without the profile (shown as setup steps, never guessed).
+    const undecided = [];
+    if (!profile?.employee_status && profile?.has_employees == null) undecided.push('employees');
+    if (normalizePkpStatus(profile?.pkp_status) === 'unknown' && normalizePkpStatus(profile?.vat_status) === 'unknown') undecided.push('pkp');
+    if (!profile?.legal_entity_type) undecided.push('legal_entity');
+    res.json({ jurisdiction: jur, events, missing_profile_fields: missing, undecided, has_profile: !!profile, today,
+      rules_verified: (rules || []).filter((r) => r.status === 'active' && effectiveRuleActive(r, r.official_sources)).length,
+      rules_total: (rules || []).length });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/:id/archive — soft archive (no hard-delete of evidence).
+app.post('/api/documents/:id/archive', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot archive documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const { data, error } = await supabase.rpc('rpc_document_archive',
+      { p_document_id: doc.id, p_business_id: biz.business.id, p_actor: req.user.userId, p_channel: 'web' });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, document: { id: data.id, archived_at: data.archived_at } });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Shared link helper — rpc_document_link validates same-business (document AND
+// target) and writes the link + audit atomically (migration 036).
+async function linkDocument(biz, doc, targetType, targetId, actorUserId, channel = 'web') {
+  if (!docV.LINK_TARGETS[targetType]) return { ok: false, error: 'invalid_target_type', status: 400 };
+  const { data, error } = await supabase.rpc('rpc_document_link', {
+    p_document_id: doc.id, p_business_id: biz.business.id,
+    p_target_type: targetType, p_target_id: String(targetId), p_actor: actorUserId, p_channel: channel,
+  });
+  if (error) {
+    if (/cross-business/i.test(error.message)) return { ok: false, error: 'cross_business_link_forbidden', status: 403 };
+    if (/duplicate|unique/i.test(error.message)) return { ok: false, error: 'already_linked', status: 409 };
+    if (/invalid input syntax|not found/i.test(error.message)) return { ok: false, error: 'target_not_found', status: 404 };
+    return { ok: false, error: error.message, status: 500 };
+  }
+  return { ok: true, link_id: data };
+}
+
+// POST /api/documents/:id/links — link to debt / transaction / compliance.
+app.post('/api/documents/:id/links', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot link documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const { target_type, target_id } = req.body || {};
+    if (!target_type || target_id == null) return res.status(400).json({ error: 'target_type and target_id required' });
+    const r = await linkDocument(biz, doc, target_type, target_id, req.user.userId);
+    if (!r.ok) return res.status(r.status || 400).json({ error: r.error });
+    res.json({ ok: true, link_id: r.link_id });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/documents/:id/links/:linkId — remove a link; records untouched.
+app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canManageDocuments(biz.role)) return res.status(403).json({ error: 'Your role cannot unlink documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    // rpc_document_unlink deletes the link + writes audit atomically.
+    const { error } = await supabase.rpc('rpc_document_unlink', {
+      p_link_id: req.params.linkId, p_document_id: doc.id, p_business_id: biz.business.id,
+      p_actor: req.user.userId, p_channel: 'web',
+    });
+    if (error) {
+      if (/not found/i.test(error.message)) return res.status(404).json({ error: 'Link not found' });
+      return res.status(500).json({ error: error.message });
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Personal Workspaces, Relationships, FX quotes, Wallet transfers & Funding Bridge.
+// Mounted under /api; shares auth, the service-role client and access helpers.
+app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MCP adapter — read-only tools, gated by MCP_SERVER_ENABLED (default OFF → 404); OAuth
+// "Sign in with CFO Finance" for AI clients gated by MCP_OAUTH_ENABLED. Mounted BEFORE the
+// /api 404 handler (it owns /api/mcp-oauth) and before the SPA catch-all (it owns /mcp,
+// /oauth/consent headers, /authorize, /token, /register, /revoke, /.well-known/oauth-*).
+// See _specs/mcp-server-audit-and-plan.md and _specs/mcp-oauth.md.
+//
+// The adapter receives the SAME functions the web routes use (dependency injection), so
+// there is one implementation of every rule. Everything passed as `services` is read-only.
+// ─────────────────────────────────────────────────────────────────────────────
+require('./mcp').attachMcp(app, {
+  JWT_SECRET,
+  supabase,          // OAuth storage only (mcp_oauth_* tables, migration 057)
+  auth,              // the consent page signs the user in with the existing CFO login
+  onOAuthEvent: (ev) => recordAudit({
+    actorUserId: ev.user_id ?? null, channel: 'mcp', entityType: 'mcp_oauth',
+    entityId: ev.client_id ?? null, action: ev.action,
+    after: ev.grant_id ? { grant_id: ev.grant_id, client_name: ev.client_name ?? undefined }
+      : (ev.client_name ? { client_name: ev.client_name } : null),
+  }),
+  services: {
+    // identity → company. Read-only: a lookup can never bootstrap a workspace
+    // (ensureDefaultBusiness would; findDefaultBusiness never does).
+    listAccessibleWorkspaces: (userId) => require('./lib/workspaceAccess').listAccessibleWorkspaces(supabase, userId),
+    findDefaultBusiness,
+    resolveBusinessReadOnly: (req) => _resolveActiveBusiness(supabase, (uid) => findDefaultBusiness(uid), req),
+    // role / plan gates — identical to the web routes
+    canViewBusinessFinance, canUploadDocument, hasDocumentsAccess, canApproveFinancialRecord,
+    // Per-document visibility for manager/employee — the SAME rule as GET /api/documents:
+    // their own uploads, or documents linked to a request they created.
+    canAccessDocument: async (biz, userId, doc) => {
+      if (canViewAllDocuments(biz.role)) return true;
+      const [withLinks] = await attachLinks(biz, [doc]);
+      return userCanAccessDoc(biz, userId, biz.role, withLinks || doc);
+    },
+    // read capabilities
+    buildAiCfoContext, buildRequiredDocuments,
+    loadDocumentScoped, readDocumentForIntake, readTextForIntake, analyzeDocumentReading,
+    findDocumentDuplicate, linkedInvoiceSettlement, invoiceReadinessPreview,
+    // write capability (only registered when MCP_WRITE_TOOLS_ENABLED=true): pending drafts
+    canCreateFinancialRequest, isSupportedTelegramCurrency, normalizeCurrency,
+    createPendingPayableDraft,
+    // documents (Phase 2 · B) — the same functions the Document Center routes use
+    canManageDocuments,
+    listDocumentsForUser,
+    signedDocumentUrl: (biz, userId, doc) => signedDocumentUrl(biz, userId, doc, { mode: 'view', channel: 'mcp' }),
+    storeDocumentBytes: (biz, userId, input) => storeDocumentBytes(biz, userId, { ...input, channel: 'mcp' }),
+    issueUploadLink,
+    publicDocument: (doc) => publicDocRow(doc),
+    linkDocument: (biz, doc, targetType, targetId, userId) => linkDocument(biz, doc, targetType, targetId, userId, 'mcp'),
+    unlinkDocument: async (biz, doc, linkId, userId) => {
+      const { error } = await supabase.rpc('rpc_document_unlink', {
+        p_link_id: linkId, p_document_id: doc.id, p_business_id: biz.business.id, p_actor: userId, p_channel: 'mcp',
+      });
+      if (error) return { ok: false, error: /not found/i.test(error.message) ? 'link_not_found' : 'unlink_failed' };
+      return { ok: true };
+    },
+    documentLinks: async (biz, doc) => ((await attachLinks(biz, [doc]))[0] || {}).links || [],
+    // A debt of THIS business, for link targets — type and approval state only.
+    loadDebtScoped: async (biz, id) => {
+      const { data } = await supabase.from('debts').select('id, type, approval_status, status, created_by_user_id')
+        .eq('id', id).eq('business_id', biz.business.id).limit(1);
+      return data?.[0] || null;
+    },
+  },
+  webAppUrl: process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app',
+});
+
+// Liveness probe — JSON, never the SPA shell. No DB call (pure process liveness).
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'helm-finance-web', ts: new Date().toISOString() });
+});
+
+// Unknown /api/* → JSON 404, NOT the SPA HTML shell. Registered after every real
+// /api route (incl. personalFundingRouter above) so it only catches misses. Keeps API
+// clients from receiving 200 + index.html for a mistyped/removed endpoint.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'not_found', path: req.originalUrl });
+});
+
+// SPA catch-all — MUST be the last route so it never shadows API endpoints.
+app.get('*', (req, res) => {
+  res.sendFile('index.html', { root: 'client/dist' });
+});
+
+const PORT = process.env.PORT || 3001;
+// Loud startup warning: email auth is ON but no provider is configured (and not in dev
+// return-code mode) → magic links will NOT be delivered. Fail visibly, not silently.
+if (EMAIL_AUTH_ENABLED && EMAIL_PROVIDER !== 'resend' && !EMAIL_AUTH_DEV_RETURN_CODE) {
+  console.warn('[email-auth] WARNING: EMAIL_AUTH_ENABLED=true but no email provider is configured ' +
+    '(set EMAIL_PROVIDER=resend + RESEND_API_KEY + EMAIL_FROM + APP_BASE_URL). Magic links will NOT be ' +
+    'delivered — do not enable the production UI until this is fixed.');
+}
+
+app.listen(PORT, () => {
+  console.log(`Helm Finance Web running on port ${PORT}`);
+  if (process.env.NODE_ENV !== 'test') {
+    fx.initScheduler();
+  }
+});

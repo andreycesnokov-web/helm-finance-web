@@ -1,0 +1,13 @@
+# Supabase
+.branches
+.temp
+snippets
+
+# Local-only integration-test scaffolding (NOT production schema — do not commit)
+_local_test_base.sql
+_local_setup.js
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

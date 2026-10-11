@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Radar — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.nav{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:10px;color:#3D556E;font-size:14px;font-weight:600}
+.nav:hover{background:#F4F6F8;color:#003366}
+.grp{font-size:12px;font-weight:700;color:#5A6E82;padding:0 12px;margin:0 0 4px}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.chip{font-family:inherit;font-size:14px;font-weight:700;border-radius:999px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.row{display:grid;grid-template-columns:72px minmax(0,1fr) 170px 130px 130px;gap:16px;align-items:center;padding:14px 0;border-top:1px solid #EDF1F5;font-size:14px}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="radar" hint-size="248px,100%"></dc-import>
+
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Radar</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Where your cash goes in the next 30 days · 2 Oct – 1 Nov</p>
+</div>
+<div role="group" aria-label="Forecast horizon" style="display: flex; background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 12px; padding: 4px; gap: 4px;">
+<button class="btn" style="height: 34px; border: none; background: #003366; color: #FFFFFF;">30 days</button>
+<button class="btn" style="height: 34px; border: none; color: #5A6E82;">60 days<span class="tag" style="background: #E6F1FB; color: #1565C0;">Founder</span></button>
+<button class="btn" style="height: 34px; border: none; color: #5A6E82;">90 days<span class="tag" style="background: #E6F1FB; color: #1565C0;">Founder</span></button>
+</div>
+</header>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 24px; padding: 28px 28px 22px; display: flex; flex-direction: column; gap: 22px;">
+<div style="display: grid; grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); gap: 24px; align-items: end;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Expected cash on 1 Nov</span>
+<span class="num" style="font-size: 40px; font-weight: 800; letter-spacing: -0.5px;">Rp 105.6M</span>
+<span style="font-size: 14px; color: #3D556E;">Down Rp 17.3M from today</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 24px; border-left: 1px solid #EDF1F5;">
+<span style="font-size: 14px; font-weight: 600; color: #5A6E82;">Lowest point</span>
+<span class="num" style="font-size: 24px; font-weight: 800;">Rp 92.1M</span>
+<span style="font-size: 14px; color: #3D556E;">8 Oct, before Bali Resort pays</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 24px; border-left: 1px solid #EDF1F5;">
+<span style="font-size: 14px; font-weight: 600; color: #8B5A08;">Worst case · lowest</span>
+<span class="num" style="font-size: 24px; font-weight: 800; color: #8B5A08;">Rp 42.9M</span>
+<span style="font-size: 14px; color: #3D556E;">30 Oct · Sinar 2 weeks late, Mitra unpaid</span>
+</div>
+</div>
+
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 10px;">
+<svg viewBox="-8 -8 1076 296" role="img" aria-label="Projected cash balance from 2 October to 1 November. Expected: lowest Rp 92.1M on 8 October, Rp 105.6M on 1 November. Worst case: lowest Rp 42.9M on 30 October." style="width: 100%; height: auto; display: block; font-family: 'Manrope', sans-serif;">
+<line x1="0" y1="25.0" x2="1000" y2="25.0" stroke="#EDF1F5" stroke-width="1"/>
+<line x1="0" y1="100.0" x2="1000" y2="100.0" stroke="#EDF1F5" stroke-width="1"/>
+<line x1="0" y1="175.0" x2="1000" y2="175.0" stroke="#EDF1F5" stroke-width="1"/>
+<line x1="0" y1="250.0" x2="1000" y2="250.0" stroke="#C2CFDB" stroke-width="1"/>
+<text x="1010" y="29.0" font-size="12" fill="#5A6E82">150M</text>
+<text x="1010" y="104.0" font-size="12" fill="#5A6E82">100M</text>
+<text x="1010" y="179.0" font-size="12" fill="#5A6E82">50M</text>
+<text x="1010" y="254.0" font-size="12" fill="#5A6E82">0</text>
+<polygon points="0.0,65.6 33.3,65.5 33.3,46.7 100.0,46.4 100.0,82.4 133.3,82.2 133.3,92.2 200.0,91.8 200.0,65.6 266.7,65.2 266.7,79.9 433.3,79.0 433.3,81.3 433.3,81.3 433.3,83.1 466.7,82.9 466.7,10.6 600.0,9.9 600.0,33.3 766.7,32.4 766.7,86.4 933.3,85.5 933.3,85.8 1000.0,85.4 1000.0,113.6 933.3,113.3 933.3,185.6 933.3,185.6 933.3,185.3 766.7,184.6 766.7,130.6 600.0,129.9 600.0,106.5 433.3,105.9 433.3,104.1 433.3,104.1 433.3,101.8 266.7,101.2 266.7,86.5 200.0,86.2 200.0,112.4 133.3,112.2 133.3,102.2 100.0,102.1 100.0,66.1 0.0,65.6" fill="#3399FF" opacity="0.10"/>
+<path d="M0.0 65.6 L100.0 66.1 L100.0 102.1 L133.3 102.2 L133.3 112.2 L200.0 112.4 L200.0 86.2 L266.7 86.5 L266.7 101.2 L433.3 101.8 L433.3 104.1 L433.3 104.1 L433.3 105.9 L600.0 106.5 L600.0 129.9 L766.7 130.6 L766.7 184.6 L933.3 185.3 L933.3 185.6 L933.3 185.6 L933.3 113.3 L1000.0 113.6" fill="none" stroke="#B5740B" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round"/>
+<path d="M0.0 65.6 L100.0 65.7 L100.0 101.7 L133.3 101.8 L133.3 111.8 L200.0 111.8 L200.0 85.6 L266.7 85.6 L266.7 100.3 L433.3 100.5 L433.3 102.7 L433.3 102.7 L433.3 104.5 L466.7 104.5 L466.7 32.2 L600.0 32.4 L600.0 55.8 L700.0 55.8 L700.0 37.1 L766.7 37.1 L766.7 91.1 L933.3 91.3 L933.3 91.6 L1000.0 91.7" fill="none" stroke="#003366" stroke-width="3" stroke-linejoin="round"/>
+<circle cx="0" cy="65.6" r="5" fill="#003366"/>
+<circle cx="200.0" cy="111.8" r="6" fill="#FFFFFF" stroke="#003366" stroke-width="3"/>
+<circle cx="933.3" cy="185.6" r="6" fill="#FFFFFF" stroke="#B5740B" stroke-width="3"/>
+<text x="210.0" y="135.8" font-size="13" font-weight="700" fill="#003366">Lowest · Rp 92.1M</text>
+<text x="921.3" y="207.6" font-size="13" font-weight="700" fill="#8B5A08" text-anchor="end">Worst case · Rp 42.9M</text>
+<text x="0" y="282" font-size="12" fill="#5A6E82">Today</text>
+<text x="233.3" y="282" font-size="12" fill="#5A6E82" text-anchor="middle">9 Oct</text>
+<text x="466.7" y="282" font-size="12" fill="#5A6E82" text-anchor="middle">16 Oct</text>
+<text x="700.0" y="282" font-size="12" fill="#5A6E82" text-anchor="middle">23 Oct</text>
+<text x="933.3" y="282" font-size="12" fill="#5A6E82" text-anchor="middle">30 Oct</text>
+</svg>
+<figcaption style="display: flex; gap: 20px; font-size: 13px; color: #3D556E; align-items: center;">
+<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 18px; height: 3px; background: #003366; border-radius: 2px;"></span>Expected</span>
+<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 18px; height: 10px; background: #D6EAFF; border-radius: 3px;"></span>Range from best to worst case</span>
+<span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 18px; height: 0; border-top: 2px dashed #B5740B;"></span>Worst case · Sinar 2 weeks late, Mitra unpaid, costs +5%</span>
+</figcaption>
+</figure>
+
+<div style="border-top: 1px solid #EDF1F5; padding-top: 20px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; align-items: baseline; gap: 12px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">What if…</h3>
+<span style="font-size: 14px; color: #5A6E82;">Try a decision before you make it. Nothing is saved.</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+<button class="chip" aria-pressed="true" style="background: #FBF1DF; border-color: #B5740B; color: #8B5A08;">Worst case</button>
+<button class="chip">Sinar Abadi pays 2 weeks late</button>
+<button class="chip">Collect CV Mitra Bali this week</button>
+<button class="chip">Pay Para Legals on 17 Oct</button>
+<button class="chip">Hire 1 person · Rp 8M/month</button>
+<button class="chip">Revenue −20%</button>
+<a class="chip" style="color: #1565C0;" href="AskPanel.dc.html"><svg class="ic" viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M12 5v14M5 12h14"/></svg>Ask your own</a>
+</div>
+<div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; background: #F4F6F8; border-radius: 14px; padding: 14px 16px;">
+<span style="width: 40px; height: 40px; border-radius: 12px; background: #FFFFFF; color: #003366; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg></span>
+<span style="font-size: 15px; line-height: 1.5;">In the worst case cash falls to <strong>Rp 42.9M on 30 Oct</strong> — about 20 days of spending. Collecting CV Mitra Bali (Rp 12.5M) this week lifts that low to Rp 55.4M.</span>
+<a class="btn btn-p" href="Bills.dc.html">Send reminder</a>
+</div>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 24px; display: flex; flex-direction: column;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><h3 style="margin: 0; font-size: 18px; font-weight: 800;">Key dates</h3><span style="font-size: 13px; color: #5A6E82;">Payments of Rp 1M or more · daily sales and day-to-day costs (≈ Rp 1.4M each) are in the line as averages</span></div>
+<div role="group" aria-label="Filter key dates" style="display: flex; background: #F4F6F8; border-radius: 10px; padding: 3px; gap: 3px;"><button class="btn" style="height: 32px; border: none; background: #FFFFFF; color: #003366;">All</button><button class="btn" style="height: 32px; border: none; background: transparent; color: #5A6E82;">Coming in</button><button class="btn" style="height: 32px; border: none; background: transparent; color: #5A6E82;">Going out</button></div>
+</div>
+<div class="row" style="border-top: none; font-size: 12px; font-weight: 700; color: #5A6E82; padding: 6px 0;"><span>Date</span><span>What</span><span>Status</span><span style="text-align: right;">Amount</span><span style="text-align: right;">Cash after</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">5 Oct</span><span style="font-weight: 600;">Payroll · 6 people</span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Scheduled</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 24.0M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 98.8M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">6 Oct</span><span style="font-weight: 600;">Office rent · Denpasar · after PPh 4(2)</span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Scheduled</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 6.7M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 92.2M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">8 Oct</span><span style="font-weight: 600;">PT Bali Resort Group</span><span><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Usually on time</span></span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 17.5M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 109.6M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">10 Oct</span><span style="font-weight: 600;">PT Para Legals Indonesia · after PPh 23</span><span><span class="tag" style="background: #E6F1FB; color: #1565C0;">Waiting for approval</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 9.8M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 99.8M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">15 Oct</span><span style="font-weight: 600;">Taxes · PPh 21, 23 and 4(2)</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Deadline</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 1.48M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 98.2M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">15 Oct</span><span style="font-weight: 600;">BPJS Ketenagakerjaan</span><span><span class="tag" style="background: #FBF1DF; color: #8B5A08;">Deadline</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 1.2M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 97.0M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">16 Oct</span><span style="font-weight: 600;">PT Sinar Abadi</span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">Paid 11 days late last time</span></span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 48.2M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 145.2M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">20 Oct</span><span style="font-weight: 600;">Cleaning chemicals · supplier</span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Scheduled</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 15.6M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 129.5M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">23 Oct</span><span style="font-weight: 600;">CV Mitra Bali</span><span><span class="tag" style="background: #FBEAEA; color: #C62828;">Late · promised 23 Oct</span></span><span class="num" style="text-align: right; font-weight: 800; color: #0F7A52;">+Rp 12.5M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 141.9M</span></div>
+<div class="row"><span class="num" style="font-weight: 700;">25 Oct</span><span style="font-weight: 600;">Location fees · 30 machines</span><span><span class="tag" style="background: #F4F6F8; color: #3D556E;">Every month</span></span><span class="num" style="text-align: right; font-weight: 800;">−Rp 36.0M</span><span class="num" style="text-align: right; color: #3D556E;">Rp 105.9M</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 6px; padding: 14px 16px; background: #F4F6F8; border-radius: 12px; font-size: 14px; color: #3D556E;"><span>Showing 10 of 11 dates · 1 smaller payment under Rp 1M (Rp 200K loan interest) is in the line but not listed</span><a href="Transactions.dc.html" style="font-weight: 700; white-space: nowrap;">Show all 11</a></div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1560}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

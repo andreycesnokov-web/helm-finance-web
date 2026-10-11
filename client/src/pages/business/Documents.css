@@ -1,0 +1,288 @@
+/* ============================================================================
+   Document Workbench — an action queue, not an instructional page.
+   Brandbook tokens only: Navy #003366, Electric Blue #3399FF, White,
+   Pale Grey #F4F6F8. Same idiom as the Invoice Workbench.
+   Class prefix: doc-
+   ========================================================================== */
+
+/* ── summary (compact) — each card jumps to the view it counts ──────────── */
+.doc-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.doc-sum {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 14px 15px;
+  border: 1px solid var(--border-default); border-radius: 16px; text-align: left;
+  background: var(--surface-card); box-shadow: var(--shadow-sm);
+  font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.doc-sum:hover { border-color: var(--brand-electric-blue); }
+.doc-sum.is-current { border-color: var(--brand-navy); box-shadow: var(--shadow-md, var(--shadow-sm)); }
+.doc-sum-label { font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted); line-height: 1.3; }
+.doc-sum-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 700; line-height: 1.1; color: var(--brand-navy); }
+.doc-sum-meta { font-size: 11.5px; line-height: 1.4; color: var(--text-muted); }
+
+/* ── primary view switch: work queue vs storage ─────────────────────────── */
+.doc-views {
+  display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 16px;
+  border: 1px solid var(--border-default); border-radius: 999px; background: var(--brand-pale-grey);
+}
+.doc-view {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 6px 16px;
+  border: 0; border-radius: 999px; background: transparent; font: inherit;
+  font-size: 13.5px; font-weight: 700; color: var(--text-secondary); cursor: pointer;
+  transition: background .16s ease, color .16s ease;
+}
+.doc-view:hover { color: var(--brand-navy); }
+.doc-view.is-active { background: var(--surface-card); color: var(--brand-navy); box-shadow: var(--shadow-sm); }
+.doc-view.is-active .doc-tab-n { background: var(--brand-pale-grey); color: var(--brand-navy); }
+
+/* ── section ────────────────────────────────────────────────────────────── */
+.doc-section {
+  padding: 20px 22px; margin-bottom: 18px;
+  border: 1px solid var(--border-default); border-radius: 20px;
+  background: var(--surface-card); box-shadow: var(--shadow-sm);
+}
+.doc-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.doc-section-title { margin: 0 0 4px; font-family: var(--font-display); font-size: 18px; line-height: 1.3; color: var(--brand-navy); }
+.doc-section-sub { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+
+.doc-note { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--text-secondary); max-width: 84ch; }
+.doc-note-muted { margin-top: 12px; font-size: 12.5px; color: var(--text-muted); }
+.doc-error { color: var(--danger); font-weight: 600; }
+.doc-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.doc-need { font-style: normal; color: var(--warning); font-weight: 700; }
+.doc-tag {
+  display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px;
+  background: var(--brand-pale-grey); border: 1px solid var(--border-subtle);
+  color: var(--text-muted); font-size: 10.5px; font-weight: 800; white-space: nowrap;
+}
+
+/* ── tabs ───────────────────────────────────────────────────────────────── */
+.doc-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.doc-tab {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 8px 14px;
+  border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-card);
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--text-secondary); cursor: pointer;
+  transition: background .16s ease, color .16s ease, border-color .16s ease;
+}
+.doc-tab:hover { background: var(--surface-card-muted); color: var(--brand-navy); }
+.doc-tab.is-active { background: var(--brand-navy); border-color: transparent; color: var(--brand-white); }
+.doc-tab-n {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700; padding: 1px 7px;
+  border-radius: 999px; background: var(--brand-pale-grey); color: var(--text-muted);
+}
+.doc-tab.is-active .doc-tab-n { background: rgba(255, 255, 255, .18); color: var(--brand-white); }
+
+/* ── rows ───────────────────────────────────────────────────────────────── */
+.doc-rows { display: flex; flex-direction: column; gap: 10px; }
+.doc-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+  padding: 16px 17px; border: 1px solid var(--border-subtle); border-radius: 16px;
+  background: var(--surface-card); transition: border-color .16s ease;
+}
+.doc-row:hover { border-color: var(--brand-electric-blue); }
+.doc-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.doc-row-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.doc-row-type { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.doc-row-name { font-size: 14.5px; font-weight: 700; color: var(--brand-navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-row-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--text-secondary); }
+.doc-row-meta em { font-style: normal; color: var(--warning); font-weight: 600; }
+.doc-row-gap { font-size: 12px; font-weight: 600; color: var(--warning); }
+.doc-row-actions { display: flex; gap: 6px; flex-wrap: wrap; flex: 0 0 auto; justify-content: flex-end; max-width: 48%; }
+
+/* ── empty ──────────────────────────────────────────────────────────────── */
+.doc-empty {
+  display: flex; align-items: flex-start; gap: 14px; padding: 20px; flex-wrap: wrap;
+  border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--brand-pale-grey);
+}
+.doc-empty-ic {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  flex: 0 0 auto; border-radius: 12px; background: var(--surface-card);
+  border: 1px solid var(--border-default); color: var(--brand-electric-blue-ink);
+}
+.doc-empty > div { flex: 1; min-width: 200px; }
+.doc-empty-title { margin: 0 0 4px; font-size: 14.5px; font-weight: 800; color: var(--brand-navy); }
+
+/* ── company vault ──────────────────────────────────────────────────────────
+   A storage area, not a work queue. Same Workbench bones as .doc-section, but
+   quieter: pale ground, softer row borders, no hover lift, no action colour
+   unless a row genuinely has an open question. */
+.doc-vault {
+  padding: 20px 22px; margin-bottom: 18px;
+  border: 1px solid var(--border-subtle); border-radius: 20px;
+  background: var(--brand-pale-grey);
+}
+.doc-vault .doc-section-title { color: var(--brand-navy); }
+.doc-vault .doc-rows { margin-bottom: 4px; }
+.doc-vault .doc-row {
+  border-color: var(--border-subtle); background: var(--surface-card); box-shadow: none;
+}
+.doc-vault .doc-row:hover { border-color: var(--border-default); }
+.doc-vault .doc-row-meta { color: var(--text-muted); }
+.doc-vault .doc-note-muted { margin-top: 14px; }
+
+.doc-vault-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.doc-vault-search {
+  flex: 1 1 240px; min-width: 0; min-height: 36px; padding: 8px 13px;
+  border: 1px solid var(--border-default); border-radius: 999px;
+  background: var(--surface-card); font: inherit; font-size: 13px; color: var(--text-primary);
+}
+.doc-vault-search::placeholder { color: var(--text-muted); }
+.doc-vault-toggle {
+  display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+  font-size: 12.5px; font-weight: 600; color: var(--text-secondary); cursor: pointer;
+}
+
+.doc-vault-empty {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 22px 20px;
+  border: 1px dashed var(--border-default); border-radius: 16px; background: var(--surface-card);
+}
+
+/* A suggested classification is the only "open question" a vault row can carry. */
+.doc-vrow.is-suggested { border-left: 3px solid var(--warning); }
+.doc-vrow-note { font-size: 12px; font-weight: 600; color: var(--warning); }
+
+/* ── drawer ─────────────────────────────────────────────────────────────── */
+.doc-drawer-scrim { position: fixed; inset: 0; z-index: 60; background: var(--surface-overlay); display: flex; justify-content: flex-end; }
+.doc-drawer {
+  width: min(460px, 100%); height: 100%; overflow-y: auto; padding: 24px;
+  background: var(--surface-card); box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 18px;
+}
+.doc-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.doc-drawer-eyebrow { font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted); }
+.doc-drawer-title { margin: 4px 0 0; font-family: var(--font-display); font-size: 19px; line-height: 1.3; color: var(--brand-navy); overflow-wrap: anywhere; }
+.doc-drawer-x {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.doc-drawer-x:hover { background: var(--surface-card-muted); color: var(--brand-navy); }
+.doc-drawer-sec { display: flex; flex-direction: column; gap: 7px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle); }
+.doc-drawer-label { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; color: var(--text-muted); }
+.doc-drawer-sec > .cfo-btn { align-self: flex-start; margin-top: 4px; }
+.doc-kv { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; font-size: 13px; }
+.doc-kv > span:first-child { color: var(--text-muted); flex: 0 0 auto; }
+.doc-kv > span:last-child { color: var(--text-primary); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.doc-drawer-actions { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+.doc-drawer-actions > .cfo-btn { width: 100%; }
+
+/* ── classify picker ────────────────────────────────────────────────────── */
+.doc-pick-list { display: flex; flex-direction: column; gap: 8px; }
+.doc-pick {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 13px; text-align: left;
+  border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface-card);
+  font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .16s ease, background .16s ease;
+}
+.doc-pick:hover:not(:disabled) { border-color: var(--brand-electric-blue); background: var(--brand-pale-grey); }
+.doc-pick:disabled { opacity: .45; cursor: default; }
+.doc-pick-title { font-size: 13.5px; font-weight: 700; color: var(--brand-navy); }
+.doc-pick-sub { font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); }
+
+/* ── bottom strip (the only remaining explanation) ──────────────────────── */
+.doc-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 16px 18px; border-radius: 16px;
+  background: var(--brand-pale-grey); border: 1px solid var(--border-subtle);
+}
+.doc-strip-main { display: flex; flex-direction: column; gap: 3px; min-width: 240px; flex: 1; }
+.doc-strip-title { font-size: 13px; font-weight: 800; color: var(--brand-navy); }
+.doc-strip-flow { font-size: 12.5px; font-weight: 700; color: var(--brand-electric-blue-ink); }
+.doc-strip-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.doc-section :is(button):focus-visible,
+.doc-vault :is(button, input):focus-visible,
+.doc-views :is(button):focus-visible,
+.doc-summary :is(button):focus-visible,
+.doc-drawer :is(button):focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .doc-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .doc-row { flex-direction: column; }
+  .doc-row-actions { max-width: none; justify-content: flex-start; width: 100%; }
+}
+@media (max-width: 640px) {
+  .doc-section, .doc-vault { padding: 18px; }
+  .doc-summary { grid-template-columns: 1fr; }
+  .doc-drawer { width: 100%; padding: 20px; }
+  .doc-note, .doc-row-meta { font-size: 14px; }
+  .doc-tab, .doc-view { min-height: 40px; }
+  .doc-views { display: flex; width: 100%; }
+  .doc-view { flex: 1; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-row, .doc-tab, .doc-pick, .doc-sum, .doc-view { transition: none !important; }
+}
+
+/* Classify pickers render as a grid inside an inline panel (a single tall column
+   inside a drawer becomes an unusable scroll on a wide screen). */
+.doc-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.doc-drawer .doc-pick-grid { grid-template-columns: 1fr; }
+
+/* ── AI intake on a document row ──────────────────────────────────────────────
+   The summary the Document Intake Orchestrator stored. It sits under the row head,
+   above the existing field line, so scanning the queue answers "what is this and what
+   does it need?" without opening anything. */
+.doc-ai-row { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 2px; }
+.doc-ai-head { font-size: 12.5px; font-weight: 700; color: var(--brand-navy); }
+.doc-ai-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+.doc-ai-line { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.doc-ai-pair { font-size: 11.5px; color: var(--text-muted); }
+.doc-ai-hint { font-size: 11px; color: var(--text-muted); font-style: italic; }
+/* A document nobody has analysed states that plainly, and offers the one button
+   that changes it — an empty space here is what made the page look dead. */
+.doc-ai-none { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.doc-ai-run {
+  align-self: flex-start; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--brand-navy); background: none; border: 0; padding: 0;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.doc-ai-run:disabled { color: var(--text-muted); cursor: default; text-decoration: none; }
+
+/* Ordered, because the next actions are a sequence: review, then counterparty,
+   then the record, then the accountant. */
+.doc-ai-next { margin: 2px 0 6px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.doc-ai-next li { font-size: 12.5px; color: var(--text-body); }
+
+/* The zero-write counterparty suggestion, once fetched. */
+.doc-cp-suggest {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 8px;
+  padding: 10px; border: 1px solid var(--border-subtle); border-radius: 10px;
+  background: var(--surface-card-muted);
+}
+
+/* Manual field entry — the way out of an unreadable scan. */
+.doc-field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin: 8px 0; }
+.doc-drawer .doc-field-grid { grid-template-columns: 1fr; }
+.doc-field { display: flex; flex-direction: column; gap: 4px; }
+.doc-field > span { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
+.doc-field input, .doc-field select {
+  font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border-subtle); background: var(--surface-card); color: var(--text-body);
+}
+.doc-field input:focus-visible, .doc-field select:focus-visible { outline: 2px solid var(--brand-navy); outline-offset: 1px; }
+
+/* A disagreement between what the user uploaded and what the document says. Amber, not
+   red: nothing is wrong yet — the two readings simply differ and a person decides. */
+.doc-ai-conflict {
+  font-size: 12px; font-weight: 600; line-height: 1.45;
+  color: var(--warning);
+}
+
+/* A just-uploaded row. The list is long and sorted by date, so "it is at the top"
+   is not good enough — the row the user just created says which one it is. */
+.doc-row.is-fresh {
+  border-color: var(--brand-blue, #3399FF);
+  box-shadow: 0 0 0 2px rgba(51, 153, 255, .16);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .doc-row.is-fresh { animation: doc-fresh-in 900ms ease-out; }
+  @keyframes doc-fresh-in {
+    from { background: var(--info-soft, #EFF6FF); }
+    to   { background: transparent; }
+  }
+}
+
+/* The document's parties, shown side by side so a pairing can be judged at a glance
+   rather than trusted. */
+.doc-cp-parties { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }

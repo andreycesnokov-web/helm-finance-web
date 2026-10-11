@@ -1,0 +1,272 @@
+/* ============================================================================
+   Wallets & Accounts.
+   Page-specific layout only. Every surface, colour, radius and shadow comes from
+   the shared system (shell/shell.css + brand/tokens.css); nothing here declares
+   a token or re-styles a shared component.
+   Class prefix: acct-
+   ========================================================================== */
+
+/* ── the page's vertical rhythm ─────────────────────────────────────────────
+   ONE gap between top-level sections, set once, exactly as AI CFO does it.
+
+   .hf-page is a plain block with padding and no gap, and .cfo-card carries no
+   margin, so sections were spaced by whichever margin each block happened to
+   bring — 12px under the tabs, 16px under the list, nothing between the cards.
+   A flex column with one gap fixes the page at once and lets a section that
+   renders null (the backfill banner, the legacy panel) collapse without leaving
+   a double gap behind, which stacked margins do not.
+
+   18px, matching AI CFO. */
+.acct-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: stretch;
+  min-width: 0;
+}
+/* ── the wallet list ────────────────────────────────────────────────────────
+   A list, not a stack of cards. Each wallet was an .hf-card with its own border
+   and shadow, so eight wallets read as eight unrelated objects; they are rows of
+   one object now, which is what a list of accounts is. */
+.acct-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.acct-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 0 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.acct-row:last-child { border-bottom: 0; }
+
+/* The row itself is the button: the whole card is the target, and a keyboard
+   reaches it. It was a div with onClick, with the two action buttons nested
+   inside — unreachable by keyboard, and invalid nesting besides. */
+.acct-row-open {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  min-height: 60px;
+  padding: 12px 4px 12px 14px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.acct-row:hover { background: var(--surface-card-muted); }
+.acct-row-open:focus-visible { outline-offset: -3px; }
+
+.acct-row-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  /* One neutral treatment for every wallet type. The page carried a private
+     seven-colour palette keyed by currency (#E1F5EE, #EEF2FF, #FEF3C7 …) that
+     belonged to no token layer, and it coloured the icon by CURRENCY while the
+     icon depicts the TYPE — so a USD cash box and a USD bank account were the
+     same colour as each other and a different colour from an IDR cash box. */
+  background: var(--info-soft);
+  color: var(--brand-navy);
+}
+/* A wallet whose balance cannot be vouched for is quieter, not alarming. */
+.acct-row-ic.is-unproven { background: var(--surface-card-muted); color: var(--text-muted); }
+.acct-row-ic svg { width: 20px; height: 20px; }
+
+.acct-row-main { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
+.acct-row-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  /* A long wallet name wraps rather than being cut off with an ellipsis — the
+     name is how a person identifies the account, so it is the last thing that
+     may be truncated. break-word, NOT anywhere: `anywhere` breaks mid-word at
+     the first opportunity, which turned "BCA · Operating" into "BCA · Opera /
+     ting" the moment the column narrowed. Words break only when a single word
+     genuinely cannot fit. */
+  overflow-wrap: break-word;
+  line-height: 1.3;
+}
+.acct-row-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.acct-chip {
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.6;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-card-muted);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.acct-chip-cur { background: var(--info-soft); color: var(--brand-navy); }
+/* Not red: a currency this release cannot total is a gap in the product, not a
+   fault in the user's data. Amber says "unfinished", which is true. */
+.acct-chip-cur.is-unproven { background: var(--warning-soft); color: var(--warning-ink); }
+.acct-chip-scope.is-business { background: var(--info-soft); color: var(--brand-navy); }
+/* A wallet carrying THIS COMPANY'S business_id but flagged personal is an
+   ambiguous record: business_id establishes that the row belongs to the company,
+   the flag claims the money does not, and migration 017's backfill assigned
+   wallets to businesses without ever looking at scope. So the chip is marked
+   rather than muted — the same amber the untotalled-currency chip wears, which
+   says "unfinished", not "wrong". Nothing about the row is the user's fault, and
+   nothing here reclassifies it.
+   See _specs/accounts-personal-scope-ambiguity.md. */
+.acct-chip-scope.is-personal { background: var(--warning-soft); color: var(--warning-ink); }
+
+.acct-row-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  text-align: end;
+}
+.acct-row-balance {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* Red only for a real negative balance. */
+.acct-row-balance.is-neg { color: var(--danger); }
+/* An unavailable balance is a dash in muted ink — never a zero, and never red,
+   which would read as a negative. */
+.acct-row-balance.is-missing { color: var(--text-muted); font-weight: 600; }
+.acct-row-sub { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+.acct-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.acct-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 9px;
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.acct-iconbtn:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.acct-iconbtn svg { width: 14px; height: 14px; }
+@media (prefers-reduced-motion: reduce) { .acct-iconbtn { transition: none; } }
+
+/* The share, as a short meter under the figure it describes.
+   It ran the width of the row along its bottom edge at first, where it sat on
+   top of the row border and read as a broken rule rather than a measure. A
+   56px track under the amount belongs to the number it is a share of. */
+.acct-row-meter {
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin-top: 1px;
+  border-radius: 2px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+.acct-row-meter-fill { display: block; height: 100%; background: var(--brand-electric-blue); }
+.acct-row-meter-fill.is-neg { background: var(--danger); }
+
+/* ── add another wallet ─────────────────────────────────────────────────────
+   Closes a list that already has content. Deliberately smaller than the zero
+   state — mark at 34px against the zero state's 60px, one line of explanation
+   instead of two, and a secondary button rather than a primary one, because the
+   primary add control is already in the page header. */
+.acct-addmore {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+.acct-addmore-sym { width: 34px; height: 34px; flex-shrink: 0; opacity: .9; }
+.acct-addmore-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.acct-addmore-title { margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.acct-addmore-sub { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+.acct-addmore .cfo-btn { flex-shrink: 0; min-height: 40px; }
+
+/* ── supporting panels ──────────────────────────────────────────────────── */
+.acct-about-text { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+
+.acct-legacy-sub { margin: 0 0 12px; font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); }
+.acct-legacy-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+
+.acct-loading { padding: 30px; text-align: center; color: var(--text-muted); font-size: 13.5px; }
+
+/* ── the Add / Edit form ────────────────────────────────────────────────────
+   The sheet, its inputs and its labels are the product's existing .modal-*
+   classes, untouched — this is a design pass on Accounts, not a rewrite of every
+   modal in the app. What is local here is the form's own rhythm, which was a
+   marginBottom on each individual field. */
+.acct-form-title {
+  margin: 0 0 18px;
+  font-family: var(--font-ui);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.acct-form-field { margin-bottom: 14px; }
+.acct-form-optional { font-weight: 400; color: var(--text-muted); }
+.acct-form-hint { margin: 6px 0 14px; font-size: 11.5px; color: var(--text-muted); }
+.acct-form-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+/* A full-width button inside the sheet. .cfo-btn is inline-flex, so it needs to
+   be told to fill the row; the shared layer has no block modifier. */
+.acct-form-actions .cfo-btn { width: 100%; min-height: 46px; }
+
+/* ── narrow screens ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .acct-addmore { flex-wrap: wrap; }
+  .acct-addmore .cfo-btn { width: 100%; min-height: 44px; }
+  .acct-iconbtn { width: 40px; height: 40px; }
+}
+
+/* A phone cannot hold four columns — icon, identity, money, actions — without
+   crushing the identity column, and a crushed identity column is where a wallet
+   name starts breaking mid-word. The row goes to two lines well before 320px:
+   identity above, money below, each with the full width.
+
+   560px, not 380px. At 380 a 390px phone missed the breakpoint entirely and got
+   the crushed four-column row — which is exactly what the mobile screenshot
+   caught. */
+@media (max-width: 560px) {
+  .acct-row-open { flex-wrap: wrap; padding-inline: 12px; }
+  /* The icon keeps the name company on the first line — left on its own above
+     the name it reads as an orphan. The money takes the second line in full. */
+  .acct-row-ic { order: 1; }
+  /* flex-basis 0, not auto: `auto` sizes the column to its content, so the
+     name wrapped onto its own line and left the icon orphaned above it.
+     With 0 it shrinks to the space beside the icon instead. */
+  .acct-row-main { order: 2; flex: 1 1 0; }
+  .acct-row-amount {
+    order: 3;
+    flex: 1 1 100%;
+    align-items: flex-start;
+    text-align: start;
+    padding-top: 2px;
+  }
+  /* The balance must never be the thing that gives way. */
+  .acct-row-balance { white-space: normal; overflow-wrap: anywhere; }
+  .acct-row-actions { align-self: flex-start; padding-top: 14px; }
+}

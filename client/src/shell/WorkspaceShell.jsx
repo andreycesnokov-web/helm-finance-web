@@ -1,0 +1,181 @@
+// WorkspaceShell — single app frame for BOTH Personal and Business workspaces.
+// Official logo, desktop sidebar, mobile header + drawer, Workspace Switcher,
+// workspace-aware nav and a private/shared footer badge. Content via children.
+//
+// Differences between Personal and Business are CONTENT/ACCESS only (the `nav`
+// config + `workspace.type`), never component identity.
+import { useState } from 'react'
+import WorkspaceSwitcher from './WorkspaceSwitcher'
+import { Icon } from './ui'
+
+const LOGO_WORDMARK = '/brand/logo_main_navy_transparent_2400.png'
+const FUNDING_UI_ENABLED = import.meta.env.VITE_PERSONAL_FUNDING_UI_ENABLED === 'true'
+
+// Workspace settings is deliberately NOT a nav item. It configures the workspace
+// rather than navigating within it, so it sits in the sidebar footer as a utility
+// row. `Team` stays in the nav: Team manages people, settings manages configuration.
+// The destinations are unchanged — only the entry point moved.
+export const SETTINGS_DESTINATION = {
+  personal: { key: 'settings', label: 'Workspace settings', to: '/personal/settings' },
+  business: { key: 'settings', label: 'Workspace settings', to: '/business/settings' },
+}
+
+// Nav configs — labels are i18n keys at call sites; here plain for V1.
+export const PERSONAL_NAV = [
+  { items: [
+    { key: 'overview', label: 'Overview', to: '/personal', icon: <Icon.pulse /> },
+    { key: 'accounts', label: 'Accounts', to: '/personal/accounts', icon: <Icon.wallet /> },
+    { key: 'transactions', label: 'Transactions', to: '/personal/transactions', icon: <Icon.list /> },
+  ] },
+  { title: 'Funding', items: [
+    { key: 'funding', label: 'Business Funding', to: '/personal/funding', icon: <Icon.fund /> },
+    { key: 'connections', label: 'Connections', to: '/personal/connections', icon: <Icon.link /> },
+  ] },
+  { title: 'More', items: [
+    { key: 'documents', label: 'Documents', to: '/personal/documents', icon: <Icon.doc /> },
+    { key: 'cfo', label: 'Personal AI CFO', to: '/personal/cfo', icon: <Icon.cfo /> },
+  ] },
+]
+
+// Labels are stable EN strings here (consistent across the shell); "AI Accountant"
+// matches the legacy label. Non-migrated items point at legacy routes so access is
+// never lost during the migration (Pulse/Accounts use the new premium routes).
+export const BUSINESS_NAV = [
+  // Always visible. With ONBOARDING_ENABLED off the page renders an explanatory
+  // "not enabled yet" state rather than dead-linking or erroring.
+  { title: 'Get started', items: [
+    { key: 'onboarding', label: 'Onboarding', to: '/business/onboarding', icon: <Icon.play /> },
+  ] },
+  { title: 'Overview', items: [
+    { key: 'pulse', label: 'Pulse', to: '/business/pulse', icon: <Icon.pulse /> },
+    { key: 'radar', label: 'Radar', to: '/business/radar', icon: <Icon.radar /> },
+    { key: 'cfo', label: 'AI CFO', to: '/business/ai-cfo', icon: <Icon.cfo /> },
+    { key: 'accountant', label: 'AI Accountant', to: '/business/accountant', icon: <Icon.acct /> },
+  ] },
+  { title: 'Finance', items: [
+    { key: 'transactions', label: 'Transactions', to: '/business/transactions', icon: <Icon.list /> },
+    { key: 'accounts', label: 'Accounts', to: '/business/accounts', icon: <Icon.wallet /> },
+    { key: 'invoices', label: 'Invoices', to: '/business/invoices', icon: <Icon.doc /> },
+    { key: 'receivables', label: 'Receivables', to: '/business/receivables', icon: <Icon.down /> },
+    { key: 'payables', label: 'Payables', to: '/business/payables', icon: <Icon.up /> },
+    // Always visible — renders a premium locked page when the gate is off (no dead link,
+    // no Personal/Funding backend calls, no migrations required).
+    { key: 'counterparties', label: 'Counterparties', to: '/business/counterparties', icon: <Icon.users /> },
+    { key: 'funding', label: 'Funding & Investors', to: '/business/funding-investors', icon: <Icon.fund /> },
+    { key: 'bankimport', label: 'Bank Import', to: '/business/bank-import', icon: <Icon.bank /> },
+    // Read-only view of money that arrived (gateway/bank/manual). Renders an
+    // explanatory empty state when the backend feature is off, so there is no dead link.
+    { key: 'incomingpayments', label: 'Incoming Payments', to: '/business/incoming-payments', icon: <Icon.down /> },
+    // Provider routing config. Stores no credentials; renders an explanatory empty state
+    // when the backend feature is off, so there is no dead link.
+    { key: 'paymentconnections', label: 'Payment Connections', to: '/business/payment-connections', icon: <Icon.link /> },
+  ] },
+  { title: 'Operations', items: [
+    { key: 'intercompany', label: 'Intercompany', to: '/business/intercompany', icon: <Icon.link /> },
+    { key: 'payroll', label: 'Payroll', to: '/business/payroll', icon: <Icon.team /> },
+    { key: 'approvals', label: 'Approvals', to: '/business/approvals', icon: <Icon.check /> },
+    { key: 'team', label: 'Team', to: '/business/team', icon: <Icon.users /> },
+    { key: 'documents', label: 'Documents', to: '/business/documents', icon: <Icon.doc /> },
+  ] },
+]
+
+/**
+ * Sidebar footer utility.
+ *
+ * What was here before was a badge reading "Shared team workspace" — a label that
+ * looked clickable, was not, and explained nothing. It now carries the workspace
+ * settings entry point: one button, one accessible name, gear on the left, the
+ * workspace's own state as the supporting line, chevron on the right.
+ *
+ * Deliberately ONE interactive element. A row with a nested link inside a button
+ * gives a screen reader two overlapping controls for one action.
+ */
+function WorkspaceSettings({ workspace, onNavigate }) {
+  const isPersonal = workspace?.type === 'personal'
+  const dest = isPersonal ? SETTINGS_DESTINATION.personal : SETTINGS_DESTINATION.business
+  // Derived from the workspace, not assumed: a personal workspace is not shared.
+  const subtitle = isPersonal ? 'Personal workspace' : 'Shared team workspace'
+  return (
+    <button
+      type="button"
+      className="cfo-side-settings"
+      onClick={() => onNavigate?.(dest)}
+      aria-label={`Workspace settings — ${subtitle}`}
+    >
+      <span className="cfo-side-settings-icon" aria-hidden="true"><Icon.cog /></span>
+      <span className="cfo-side-settings-text">
+        <span className="cfo-side-settings-title">Workspace settings</span>
+        <span className="cfo-side-settings-sub">{subtitle}</span>
+      </span>
+      <span className="cfo-side-settings-chev" aria-hidden="true"><Icon.chev /></span>
+    </button>
+  )
+}
+
+function Nav({ groups, activeKey, onNavigate }) {
+  return (
+    <nav className="cfo-nav">
+      {groups.map((g, gi) => (
+        <div key={gi}>
+          {g.title && <div className="cfo-navgroup-title">{g.title}</div>}
+          {g.items.map(it => (
+            <button key={it.key} className={`cfo-navitem${activeKey === it.key ? ' is-active' : ''}`}
+              onClick={() => onNavigate?.(it)} disabled={it.disabled}>
+              {it.icon}{it.label}
+            </button>
+          ))}
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+export default function WorkspaceShell({ workspaces, activeId, onSelectWorkspace, nav, mobileNav, activeKey, onNavigate, children }) {
+  const [drawer, setDrawer] = useState(false)
+  const all = [...(workspaces?.personal || []), ...(workspaces?.business || [])]
+  const active = all.find(w => String(w.id) === String(activeId)) || all[0]
+  const isPersonal = active?.type === 'personal'
+
+  const SwitcherEl = <WorkspaceSwitcher workspaces={workspaces} activeId={activeId} onSelect={onSelectWorkspace} />
+  const go = (it) => { setDrawer(false); onNavigate?.(it) }
+
+  return (
+    <div className="cfo-shell">
+      {/* desktop sidebar */}
+      <aside className="cfo-sidebar">
+        <div className="cfo-brand"><img src={LOGO_WORDMARK} alt="CFO AI — Financial OS" /></div>
+        {SwitcherEl}
+        <Nav groups={nav} activeKey={activeKey} onNavigate={onNavigate} />
+        <div className="cfo-side-foot">
+          <WorkspaceSettings workspace={active} onNavigate={onNavigate} />
+        </div>
+      </aside>
+
+      {/* mobile header */}
+      <header className="cfo-mobilehead">
+        {/* The full lockup, small — a bare symbol is not identifiable as CFO AI to
+            anyone who has not already learned it. */}
+        <img className="cfo-mobilebrand" src={LOGO_WORDMARK} alt="CFO AI — Financial OS" />
+        <button
+          className="cfo-burger"
+          aria-label="Open navigation menu"
+          aria-expanded={drawer}
+          onClick={() => setDrawer(true)}
+        ><span /><span /><span /></button>
+      </header>
+
+      {/* mobile drawer */}
+      <div className={`cfo-drawer-scrim${drawer ? ' is-open' : ''}`} onClick={() => setDrawer(false)} />
+      <div className={`cfo-drawer${drawer ? ' is-open' : ''}`}>
+        <div className="cfo-brand"><img src={LOGO_WORDMARK} alt="CFO AI" /></div>
+        {SwitcherEl}
+        <Nav groups={mobileNav || nav} activeKey={activeKey} onNavigate={go} />
+        <div className="cfo-side-foot">
+          <WorkspaceSettings workspace={active} onNavigate={go} />
+        </div>
+      </div>
+
+      <main className="cfo-main"><div className="cfo-main-inner">{children}</div></main>
+    </div>
+  )
+}

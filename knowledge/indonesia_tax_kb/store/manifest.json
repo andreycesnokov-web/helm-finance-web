@@ -1,0 +1,830 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "PP34_2017": {
+      "versions": [
+        {
+          "sha256": "2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6",
+          "downloaded_at": "2026-10-05T22:55:07.616234+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf",
+          "metadata": {
+            "id": "PP34_2017",
+            "document_number": "PP 34 Tahun 2017",
+            "title": "Pajak Penghasilan atas Penghasilan dari Persewaan Tanah dan/atau Bangunan",
+            "authority": "Presiden Republik Indonesia",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pp-34-tahun-2017",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/fulltext/2017/34TAHUN2017PP.pdf",
+            "publication_date": "2017-09-11",
+            "effective_from": "2018-01-02",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "pph_final_rent"
+            ],
+            "relationships": [
+              {
+                "type": "repeals",
+                "target": "PP29_1996"
+              },
+              {
+                "type": "repeals",
+                "target": "PP5_2002"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6.pdf",
+          "extraction": "extracted/2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:07.616234+00:00",
+          "status": "downloaded",
+          "sha256": "2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6"
+        }
+      ],
+      "current_sha256": "2f5af8d0c92628fa4f1a0607b41bc20a25cc76b74878dc678b2a24f0f29ddad6"
+    },
+    "PMK141_2015": {
+      "versions": [
+        {
+          "sha256": "cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4",
+          "downloaded_at": "2026-10-05T22:55:08.840244+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf",
+          "metadata": {
+            "id": "PMK141_2015",
+            "document_number": "PMK 141/PMK.03/2015",
+            "title": "Jenis Jasa Lain Pasal 23",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/141-pmk-03-2015",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/fulltext/2015/141~PMK.03~2015Per.pdf",
+            "publication_date": "2015-07-27",
+            "effective_from": "2015-08-26",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "pph23"
+            ],
+            "relationships": [
+              {
+                "type": "repeals",
+                "target": "PMK244_2008"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4.pdf",
+          "extraction": "extracted/cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:08.840244+00:00",
+          "status": "downloaded",
+          "sha256": "cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4"
+        }
+      ],
+      "current_sha256": "cd107a9b7de8ad12b6eff1e3cf64f512b712f63ce58e62b3dba2a35d6ccbf1f4"
+    },
+    "PP55_2022": {
+      "versions": [
+        {
+          "sha256": "110443f869e4ef2314a2752dd0f57744c9d1f3c07bce233c62ac9d6151a0aaf6",
+          "downloaded_at": "2026-10-05T22:55:10.320814+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/cab6ec99-3dbc-47c6-adbf-ea5f0f7117d6/55TAHUN2022PP.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/cab6ec99-3dbc-47c6-adbf-ea5f0f7117d6/55TAHUN2022PP.pdf",
+          "metadata": {
+            "id": "PP55_2022",
+            "document_number": "PP 55 Tahun 2022",
+            "title": "Penyesuaian Pengaturan di Bidang Pajak Penghasilan",
+            "authority": "Presiden Republik Indonesia",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pp-55-tahun-2022",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/cab6ec99-3dbc-47c6-adbf-ea5f0f7117d6/55TAHUN2022PP.pdf",
+            "publication_date": "2022-12-20",
+            "effective_from": "2022-12-20",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "business_regimes"
+            ],
+            "relationships": [
+              {
+                "type": "amended_by",
+                "target": "PP20_2026"
+              },
+              {
+                "type": "repeals",
+                "target": "PP23_2018"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/110443f869e4ef2314a2752dd0f57744c9d1f3c07bce233c62ac9d6151a0aaf6.pdf",
+          "extraction": "extracted/110443f869e4ef2314a2752dd0f57744c9d1f3c07bce233c62ac9d6151a0aaf6.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:10.320814+00:00",
+          "status": "downloaded",
+          "sha256": "110443f869e4ef2314a2752dd0f57744c9d1f3c07bce233c62ac9d6151a0aaf6"
+        }
+      ],
+      "current_sha256": "110443f869e4ef2314a2752dd0f57744c9d1f3c07bce233c62ac9d6151a0aaf6"
+    },
+    "PP20_2026": {
+      "versions": [
+        {
+          "sha256": "3aadd85768e7dc3dd5f8431178ee0dd1d03d631835a493288563692de7cf8520",
+          "downloaded_at": "2026-10-05T22:55:18.015562+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/d057ff82-50e7-4127-b66b-f704a36f071d/2026pp020.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/d057ff82-50e7-4127-b66b-f704a36f071d/2026pp020.pdf",
+          "metadata": {
+            "id": "PP20_2026",
+            "document_number": "PP 20 Tahun 2026",
+            "title": "Perubahan atas PP 55 Tahun 2022",
+            "authority": "Presiden Republik Indonesia",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pp-20-tahun-2026",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/d057ff82-50e7-4127-b66b-f704a36f071d/2026pp020.pdf",
+            "publication_date": "2026-04-22",
+            "effective_from": null,
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "business_regimes"
+            ],
+            "relationships": [
+              {
+                "type": "amends",
+                "target": "PP55_2022"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/3aadd85768e7dc3dd5f8431178ee0dd1d03d631835a493288563692de7cf8520.pdf",
+          "extraction": "extracted/3aadd85768e7dc3dd5f8431178ee0dd1d03d631835a493288563692de7cf8520.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:18.015562+00:00",
+          "status": "downloaded",
+          "sha256": "3aadd85768e7dc3dd5f8431178ee0dd1d03d631835a493288563692de7cf8520"
+        }
+      ],
+      "current_sha256": "3aadd85768e7dc3dd5f8431178ee0dd1d03d631835a493288563692de7cf8520"
+    },
+    "PP58_2023": {
+      "versions": [
+        {
+          "sha256": "69b2e76e54fceba8a49afe73fd5385e9d343c27012f6bda49f657f7fb722cf5f",
+          "downloaded_at": "2026-10-05T22:55:19.863270+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/e47c3fc4-a912-4bf1-bcad-335fee3f71f8/2023pp058.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/e47c3fc4-a912-4bf1-bcad-335fee3f71f8/2023pp058.pdf",
+          "metadata": {
+            "id": "PP58_2023",
+            "document_number": "PP 58 Tahun 2023",
+            "title": "Tarif PPh Pasal 21 atas Penghasilan Sehubungan dengan Pekerjaan, Jasa, atau Kegiatan Wajib Pajak Orang Pribadi",
+            "authority": "Presiden Republik Indonesia",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pp-58-tahun-2023",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/e47c3fc4-a912-4bf1-bcad-335fee3f71f8/2023pp058.pdf",
+            "publication_date": "2023-12-27",
+            "effective_from": "2024-01-01",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "pph21"
+            ],
+            "relationships": [
+              {
+                "type": "repeals",
+                "target": "PP80_2010"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/69b2e76e54fceba8a49afe73fd5385e9d343c27012f6bda49f657f7fb722cf5f.pdf",
+          "extraction": "extracted/69b2e76e54fceba8a49afe73fd5385e9d343c27012f6bda49f657f7fb722cf5f.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:19.863270+00:00",
+          "status": "downloaded",
+          "sha256": "69b2e76e54fceba8a49afe73fd5385e9d343c27012f6bda49f657f7fb722cf5f"
+        }
+      ],
+      "current_sha256": "69b2e76e54fceba8a49afe73fd5385e9d343c27012f6bda49f657f7fb722cf5f"
+    },
+    "PMK168_2023": {
+      "versions": [
+        {
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858",
+          "downloaded_at": "2026-10-05T22:55:21.801521+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf",
+          "metadata": {
+            "id": "PMK168_2023",
+            "document_number": "PMK 168 Tahun 2023",
+            "title": "Petunjuk Pelaksanaan Pemotongan Pajak atas Penghasilan sehubungan dengan Pekerjaan, Jasa, atau Kegiatan Orang Pribadi",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-168-tahun-2023",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/e60a82e0-b218-40f5-9d18-b924aa1e11ce/2023pmkeuangan168.pdf",
+            "publication_date": "2023-12-29",
+            "effective_from": "2024-01-01",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "pph21",
+              "pph26"
+            ],
+            "relationships": [],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858.pdf",
+          "extraction": "extracted/6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:21.801521+00:00",
+          "status": "downloaded",
+          "sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858"
+        }
+      ],
+      "current_sha256": "6b06a241f9cd6fc64eacf3ee6b5cc6a8d78571a699d3cb7e039d6e5a56c30858"
+    },
+    "PMK164_2023": {
+      "versions": [
+        {
+          "sha256": "b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc",
+          "downloaded_at": "2026-10-05T22:55:28.414938+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf",
+          "metadata": {
+            "id": "PMK164_2023",
+            "document_number": "PMK 164 Tahun 2023",
+            "title": "Tata Cara Pengenaan PPh Peredaran Bruto Tertentu dan Kewajiban Pelaporan Usaha untuk Dikukuhkan sebagai PKP",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-164-tahun-2023",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/a99b8e80-9694-46ab-8de1-63c2484aa636/2023pmkeuangan164.pdf",
+            "publication_date": "2023-12-29",
+            "effective_from": null,
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "business_regimes",
+              "ppn_pkp"
+            ],
+            "relationships": [
+              {
+                "type": "repeals",
+                "target": "PMK197_2013"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc.pdf",
+          "extraction": "extracted/b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:28.414938+00:00",
+          "status": "downloaded",
+          "sha256": "b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc"
+        }
+      ],
+      "current_sha256": "b3786674c43db1ff960462ba4a232f08666313ee715287da87bb833e5f7ebccc"
+    },
+    "PMK131_2024": {
+      "versions": [
+        {
+          "sha256": "bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd",
+          "downloaded_at": "2026-10-05T22:55:32.605338+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf",
+          "metadata": {
+            "id": "PMK131_2024",
+            "document_number": "PMK 131 Tahun 2024",
+            "title": "Perlakuan PPN atas Impor, Penyerahan BKP/JKP dan Pemanfaatan dari Luar Daerah Pabean",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-131-tahun-2024",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/ad276b82-94bd-4197-b409-af33e2842cd6/2024pmkeuangan131.pdf",
+            "publication_date": "2024-12-31",
+            "effective_from": "2025-01-01",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "ppn_pkp"
+            ],
+            "relationships": [],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd.pdf",
+          "extraction": "extracted/bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:32.605338+00:00",
+          "status": "downloaded",
+          "sha256": "bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd"
+        }
+      ],
+      "current_sha256": "bd2b45907407c6640a6313500adb87c5a95854d79df3b53c1f5064ace71305cd"
+    },
+    "PMK11_2025": {
+      "versions": [
+        {
+          "sha256": "373a13e091cc697145b6624aa450c3dc60c8594501e900685964584152b35b6c",
+          "downloaded_at": "2026-10-05T22:55:33.584434+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/52955502-8733-4fdd-98ce-bb03c31cda0b/2025pmkeuangan11.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/52955502-8733-4fdd-98ce-bb03c31cda0b/2025pmkeuangan11.pdf",
+          "metadata": {
+            "id": "PMK11_2025",
+            "document_number": "PMK 11 Tahun 2025",
+            "title": "Ketentuan Nilai Lain sebagai DPP dan Besaran Tertentu PPN",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-11-tahun-2025",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/52955502-8733-4fdd-98ce-bb03c31cda0b/2025pmkeuangan11.pdf",
+            "publication_date": "2025-02-04",
+            "effective_from": "2025-02-04",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "ppn_pkp"
+            ],
+            "relationships": [
+              {
+                "type": "amended_by",
+                "target": "PMK53_2025"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/373a13e091cc697145b6624aa450c3dc60c8594501e900685964584152b35b6c.pdf",
+          "extraction": "extracted/373a13e091cc697145b6624aa450c3dc60c8594501e900685964584152b35b6c.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:33.584434+00:00",
+          "status": "downloaded",
+          "sha256": "373a13e091cc697145b6624aa450c3dc60c8594501e900685964584152b35b6c"
+        }
+      ],
+      "current_sha256": "373a13e091cc697145b6624aa450c3dc60c8594501e900685964584152b35b6c"
+    },
+    "PMK53_2025": {
+      "versions": [
+        {
+          "sha256": "8e01b291898f145c1b87649b9dbf53308a8e3cb75537eb954202c4afde1ebce5",
+          "downloaded_at": "2026-10-05T22:55:36.706381+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/f5252d58-c4a6-45c3-87b7-cb3b6c3abbf9/2025pmkeuangan053.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/f5252d58-c4a6-45c3-87b7-cb3b6c3abbf9/2025pmkeuangan053.pdf",
+          "metadata": {
+            "id": "PMK53_2025",
+            "document_number": "PMK 53 Tahun 2025",
+            "title": "Perubahan atas PMK 11 Tahun 2025",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-53-tahun-2025",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/f5252d58-c4a6-45c3-87b7-cb3b6c3abbf9/2025pmkeuangan053.pdf",
+            "publication_date": "2025-07-28",
+            "effective_from": null,
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "ppn_pkp",
+              "deadlines"
+            ],
+            "relationships": [
+              {
+                "type": "amends",
+                "target": "PMK11_2025"
+              },
+              {
+                "type": "amends",
+                "target": "PMK81_2024"
+              },
+              {
+                "type": "amended_by",
+                "target": "PMK1_2026"
+              },
+              {
+                "type": "amended_by",
+                "target": "PMK54_2025"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/8e01b291898f145c1b87649b9dbf53308a8e3cb75537eb954202c4afde1ebce5.pdf",
+          "extraction": "extracted/8e01b291898f145c1b87649b9dbf53308a8e3cb75537eb954202c4afde1ebce5.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:36.706381+00:00",
+          "status": "downloaded",
+          "sha256": "8e01b291898f145c1b87649b9dbf53308a8e3cb75537eb954202c4afde1ebce5"
+        }
+      ],
+      "current_sha256": "8e01b291898f145c1b87649b9dbf53308a8e3cb75537eb954202c4afde1ebce5"
+    },
+    "PMK81_2024": {
+      "versions": [
+        {
+          "sha256": "b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574",
+          "downloaded_at": "2026-10-05T22:55:37.461638+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf",
+          "metadata": {
+            "id": "PMK81_2024",
+            "document_number": "PMK 81 Tahun 2024",
+            "title": "Ketentuan Perpajakan dalam Rangka Pelaksanaan Sistem Inti Administrasi Perpajakan",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-81-tahun-2024",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/637047be-3dba-4347-aba1-98fa7fd5ab3f/2024pmkeuangan081.pdf",
+            "publication_date": "2024-10-18",
+            "effective_from": "2025-01-01",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "deadlines",
+              "pph25_29",
+              "ppn_pkp"
+            ],
+            "relationships": [
+              {
+                "type": "amended_by",
+                "target": "PMK1_2026"
+              },
+              {
+                "type": "amended_by",
+                "target": "PMK54_2025"
+              },
+              {
+                "type": "amended_by",
+                "target": "PMK53_2025"
+              },
+              {
+                "type": "amended_by",
+                "target": "PMK11_2025"
+              },
+              {
+                "type": "repeals",
+                "target": "PMK242_2014"
+              },
+              {
+                "type": "repeals",
+                "target": "PMK243_2014"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574.pdf",
+          "extraction": "extracted/b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:55:37.461638+00:00",
+          "status": "downloaded",
+          "sha256": "b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574"
+        }
+      ],
+      "current_sha256": "b8f385dee2a8684c24f718c5b2413910760d7273236f9d0d27d2da4cf2892574"
+    },
+    "PMK1_2026": {
+      "versions": [
+        {
+          "sha256": "d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af",
+          "downloaded_at": "2026-10-06T04:25:08.930589+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/b5f99bff-f689-4e4f-ae3a-7c6a9a4cfe8a/2026pmkeuangan001.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/b5f99bff-f689-4e4f-ae3a-7c6a9a4cfe8a/2026pmkeuangan001.pdf",
+          "metadata": {
+            "id": "PMK1_2026",
+            "document_number": "PMK 1 Tahun 2026",
+            "title": "Perubahan Keempat atas PMK 81 Tahun 2024",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-1-tahun-2026",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/b5f99bff-f689-4e4f-ae3a-7c6a9a4cfe8a/2026pmkeuangan001.pdf",
+            "publication_date": "2026-01-22",
+            "effective_from": null,
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "deadlines",
+              "ppn_pkp"
+            ],
+            "relationships": [
+              {
+                "type": "amends",
+                "target": "PMK81_2024"
+              },
+              {
+                "type": "amends",
+                "target": "PMK53_2025"
+              },
+              {
+                "type": "amends",
+                "target": "PMK54_2025"
+              }
+            ],
+            "verification_status": "download_failed",
+            "checked_at": "2026-10-06",
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified",
+              "two_download_timeouts; exact_current_amendment_text_not_read"
+            ],
+            "downloaded_at": null,
+            "sha256": null,
+            "read_scope": [],
+            "selected_index_scope": []
+          },
+          "blob": "blobs/d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af.pdf",
+          "extraction": "extracted/d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:56:14.277336+00:00",
+          "status": "failed",
+          "issue": "TimeoutError: The read operation timed out"
+        },
+        {
+          "at": "2026-10-05T22:58:26.520999+00:00",
+          "status": "failed",
+          "issue": "TimeoutError: The read operation timed out"
+        },
+        {
+          "at": "2026-10-06T04:25:08.930589+00:00",
+          "status": "downloaded",
+          "sha256": "d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af"
+        }
+      ],
+      "current_sha256": "d2a1ffe926a020c178e88348e974a9199e6fc746ef7884bb72e12a5cbc29a2af"
+    },
+    "PMK54_2025": {
+      "versions": [
+        {
+          "sha256": "77857b932602e5c46431155b82d3ebcfc3111e9289927b218f4316445a09b3f0",
+          "downloaded_at": "2026-10-05T22:59:01.668821+00:00",
+          "resolved_url": "https://jdih.kemenkeu.go.id/api/download/454dde57-6a75-40ef-9afe-ff66077074db/2025pmkeuangan054.pdf",
+          "original_url": "https://jdih.kemenkeu.go.id/api/download/454dde57-6a75-40ef-9afe-ff66077074db/2025pmkeuangan054.pdf",
+          "metadata": {
+            "id": "PMK54_2025",
+            "document_number": "PMK 54 Tahun 2025",
+            "title": "Perubahan Ketiga atas PMK 81 Tahun 2024",
+            "authority": "Menteri Keuangan",
+            "publisher": "JDIH Kementerian Keuangan",
+            "language": "id",
+            "original_url": "https://jdih.kemenkeu.go.id/dok/pmk-54-tahun-2025",
+            "download_url": "https://jdih.kemenkeu.go.id/api/download/454dde57-6a75-40ef-9afe-ff66077074db/2025pmkeuangan054.pdf",
+            "publication_date": "2025-07-28",
+            "effective_from": "2025-08-01",
+            "effective_to": null,
+            "date_status": "provisional_until_article_check",
+            "topics": [
+              "deadlines",
+              "ppn_pkp"
+            ],
+            "relationships": [
+              {
+                "type": "amends",
+                "target": "PMK81_2024"
+              },
+              {
+                "type": "amends",
+                "target": "PMK53_2025"
+              },
+              {
+                "type": "amended_by",
+                "target": "PMK1_2026"
+              }
+            ],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "current_amendment_chain_not_certified"
+            ]
+          },
+          "blob": "blobs/77857b932602e5c46431155b82d3ebcfc3111e9289927b218f4316445a09b3f0.pdf",
+          "extraction": "extracted/77857b932602e5c46431155b82d3ebcfc3111e9289927b218f4316445a09b3f0.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:59:01.668821+00:00",
+          "status": "downloaded",
+          "sha256": "77857b932602e5c46431155b82d3ebcfc3111e9289927b218f4316445a09b3f0"
+        }
+      ],
+      "current_sha256": "77857b932602e5c46431155b82d3ebcfc3111e9289927b218f4316445a09b3f0"
+    },
+    "DJP_SDSN_2023": {
+      "versions": [
+        {
+          "sha256": "45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc",
+          "downloaded_at": "2026-10-05T22:59:05.015700+00:00",
+          "resolved_url": "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf",
+          "original_url": "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf",
+          "metadata": {
+            "id": "DJP_SDSN_2023",
+            "document_number": "UU KUP / UU PPh / UU PPN s.t.d.t.d. UU 6/2023",
+            "title": "SDSN Undang-Undang Perpajakan Edisi 2023",
+            "authority": "DJP",
+            "publisher": "Direktorat Jenderal Pajak",
+            "language": "id",
+            "original_url": "https://www.pajak.go.id/index.php/id/sdsn-undang-undang-perpajakan-edisi-2023",
+            "download_url": "https://www.pajak.go.id/sites/default/files/2023-05/SDSN%202023%207.1_0.pdf",
+            "publication_date": null,
+            "effective_from": null,
+            "effective_to": null,
+            "date_status": "per_provision_required",
+            "topics": [
+              "pph23",
+              "pph26",
+              "pph25_29",
+              "business_regimes",
+              "deadlines",
+              "ppn_pkp"
+            ],
+            "relationships": [],
+            "verification_status": "located",
+            "checked_at": null,
+            "professional_review": null,
+            "unresolved_issues": [
+              "official_consolidation_not_individual_promulgated_instruments",
+              "later_statutory_amendments_require_check"
+            ]
+          },
+          "blob": "blobs/45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc.pdf",
+          "extraction": "extracted/45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc.json",
+          "verification_status": "downloaded_unverified",
+          "checked_at": null,
+          "unresolved_issues": [
+            "amendment_chain_and_extraction_require_review"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "at": "2026-10-05T22:59:05.015700+00:00",
+          "status": "downloaded",
+          "sha256": "45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc"
+        }
+      ],
+      "current_sha256": "45716e25368d0218b53857841a22decd123897902e6fe24b71a25b17f4336dfc"
+    }
+  }
+}

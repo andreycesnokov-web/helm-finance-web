@@ -1,0 +1,6 @@
+[
+ {"id":"RENT_COMMENCEMENT_CONFLICT","topics":["pph_final_rent"],"sources":["PP34_2017"],"issue":"JDIH metadata says 6 September 2017; PP34 Pasal7 says 2 January 2018. Use operative text, retain metadata disagreement.","status":"identified_in_primary_text"},
+ {"id":"RENT_DEPOSIT_STALE","topics":["pph_final_rent","deadlines"],"sources":["PMK81_2024"],"issue":"Legacy summary/chat says next-month day10. PMK81 Pasal94(2) provides day15 for listed taxes from 2025; verify later amendments and exceptions before answering a concrete due date.","status":"requires_period_specific_review"},
+ {"id":"UMKM_TRANSITION","topics":["business_regimes"],"sources":["PP55_2022","PP20_2026"],"issue":"PP20 changes eligible entity types, deletes Pasal59 and preserves specified transitional uses. Turnover alone cannot establish 0.5% eligibility.","status":"primary_provisions_read"},
+ {"id":"VAT_BASE_CONFUSION","topics":["ppn_pkp"],"sources":["PMK131_2024","PMK11_2025","PMK53_2025","PMK1_2026"],"issue":"12% statutory rate and 11/12 base are distinct. PMK131 has category exclusions and January2025 transition. PMK11/53 govern particular bases; do not generalize a scalar 11% rate.","status":"consolidation_required"}
+]

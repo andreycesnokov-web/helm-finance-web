@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sidebar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.sb-ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sb-nav{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none}
+.sb-grp{font-size:12px;font-weight:700;color:#5A6E82;padding:0 12px;margin:0 0 4px}
+.sb-badge{font-size:12px;font-weight:800;border-radius:999px;padding:2px 8px;font-variant-numeric:tabular-nums}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<aside style="width: 248px; min-height: 100vh; box-sizing: border-box; background: #FFFFFF; border-right: 1px solid #DDE5EC; padding: 22px 16px; display: flex; flex-direction: column; gap: 20px; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px;">
+<img src="/_blob/d686945ebf91157e8d05a4e2e61c6202" alt="" style="width: 32px; height: 32px;">
+<span style="font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 18px; letter-spacing: 0.5px;">CFO AI</span>
+</div>
+<a style="text-decoration: none; font-family: inherit; display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #DDE5EC; border-radius: 12px; background: #FFFFFF; cursor: pointer; text-align: left; color: #003366;" href="Personal.dc.html">
+<span style="width: 34px; height: 34px; border-radius: 9px; background: #003366; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;">N</span>
+<span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0;">
+<span style="font-size: 14px; font-weight: 700;">Nusantara Facilities</span>
+<span style="font-size: 12px; color: #5A6E82;">Company · Owner</span>
+</span>
+<svg class="sb-ic" viewBox="0 0 24 24" style="width: 16px; height: 16px; color: #5A6E82;"><path d="M6 9l6 6 6-6"/></svg>
+</a>
+<a style="text-decoration: none; font-family: inherit; font-size: 14px; font-weight: 700; border-radius: 10px; height: 44px; padding: 0 14px; border: 1px solid #1565C0; background: #1565C0; color: #FFFFFF; cursor: pointer; display: flex; align-items: center; justify-content: space-between;" href="MobileAdd.dc.html">
+<span style="display: flex; align-items: center; gap: 8px;"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</span>
+<span style="font-size: 12px; font-weight: 600; opacity: 0.85;">text · voice · invoice</span>
+</a>
+<nav style="display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<p class="sb-grp">Overview</p>
+<a class="sb-nav" href="Main.dc.html" style="{{s.pulse}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Pulse</a>
+<a class="sb-nav" href="Radar.dc.html" style="{{s.radar}}"><svg class="sb-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Radar</a>
+<a class="sb-nav" href="Performance.dc.html" style="{{s.performance}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></svg>Performance</a>
+<a class="sb-nav" href="AICFO.dc.html" style="{{s.cfo}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>AI CFO</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<p class="sb-grp">Money</p>
+<a class="sb-nav" href="Accounts.dc.html" style="{{s.accounts}}"><svg class="sb-ic" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/></svg>Accounts</a>
+<a class="sb-nav" href="Transactions.dc.html" style="{{s.transactions}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span style="flex-grow: 1;">Transactions</span><span class="sb-badge" style="background: #FBF1DF; color: #8B5A08;">3</span></a>
+<a class="sb-nav" href="Funding.dc.html" style="{{s.funding}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M12 2v20M17 6.5C17 4.6 14.8 3.5 12 3.5S7 4.6 7 6.5 9 9.3 12 10s5 2 5 4-2.2 3.5-5 3.5-5-1.4-5-3.3"/></svg>Funding</a>
+<a class="sb-nav" href="Assets.dc.html" style="{{s.assets}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/></svg>Assets &amp; balance</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<p class="sb-grp">Obligations</p>
+<a class="sb-nav" href="Bills.dc.html" style="{{s.bills}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span style="flex-grow: 1;">Bills &amp; invoices</span><span class="sb-badge" style="background: #FBEAEA; color: #C62828;">1 late</span></a>
+<a class="sb-nav" href="Payroll.dc.html" style="{{s.payroll}}"><svg class="sb-ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 8h5M19.5 5.5v5"/></svg>Payroll</a>
+<a class="sb-nav" href="Approvals.dc.html" style="{{s.approvals}}"><svg class="sb-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span style="flex-grow: 1;">Approvals</span><span class="sb-badge" style="background: #E6F1FB; color: #1565C0;">2</span></a>
+<a class="sb-nav" href="Counterparties.dc.html" style="{{s.counterparties}}"><svg class="sb-ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 20a6 6 0 0 0-2.5-4.9"/></svg>Counterparties</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<p class="sb-grp">Accounting</p>
+<a class="sb-nav" href="Documents.dc.html" style="{{s.documents}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>Documents</a>
+<a class="sb-nav" href="Accountant.dc.html" style="{{s.accountant}}"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7M8 11h7"/></svg>AI Accountant</a>
+</div>
+</nav>
+<div style="margin-top: auto; border-top: 1px solid #EDF1F5; padding-top: 14px; display: flex; flex-direction: column; gap: 2px;">
+<a class="sb-nav" href="Settings.dc.html" style="{{s.settings}}"><svg class="sb-ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>Settings</a>
+<a class="sb-nav" href="AdminOverview.dc.html" style="color: #8B5A08;"><svg class="sb-ic" viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/></svg>Platform admin<span class="sb-badge" style="margin-left: auto; background: #FBF1DF; color: #8B5A08;">Only you</span></a>
+<a class="sb-nav" href="Personal.dc.html" style="color: #3D556E;"><svg class="sb-ic" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Switch to Personal</a>
+</div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["pulse","radar","performance","cfo","accounts","transactions","funding","assets","bills","payroll","approvals","counterparties","documents","accountant","settings"],"default":"pulse"},"$preview":{"width":248,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'pulse';
+    const keys = ['pulse','radar','performance','cfo','accounts','transactions','funding','assets','bills','payroll','approvals','counterparties','documents','accountant','settings'];
+    const s = {};
+    keys.forEach((k) => {
+      s[k] = k === active ? 'background: #E6F1FB; color: #003366;' : 'color: #3D556E;';
+    });
+    return { s };
+  }
+}
+</script>
+</body>
+</html>

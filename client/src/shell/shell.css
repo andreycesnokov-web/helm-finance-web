@@ -1,0 +1,907 @@
+/* ============================================================================
+   CFO AI — Shared Premium Component System (Phase 1)
+   One component system for BOTH Personal and Business workspaces. Brand tokens
+   only (src/brand/tokens.css). Personal vs Business differ in CONTENT/ACCESS,
+   never in component quality or identity. Class prefix: cfo-
+   ========================================================================== */
+
+/* ── App shell (sidebar + mobile header + content) ───────────────────────── */
+.cfo-shell{--side:288px;min-height:100vh;background:var(--surface-page);color:var(--text-primary);
+  font-family:var(--font-ui);font-size:15px;line-height:var(--line-normal);display:grid;grid-template-columns:var(--side) 1fr}
+.cfo-shell *{box-sizing:border-box}
+.cfo-mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+/* The sidebar itself no longer scrolls: the NAV scrolls, so the wordmark, the
+   switcher and the settings footer stay put and long navigation cannot push the
+   footer out of view or slide under it. */
+.cfo-sidebar{background:var(--surface-card);border-right:1px solid var(--border-default);
+  padding:20px 16px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;
+  overflow:hidden;min-height:0}
+/* Desktop wordmark: the official lockup PNG has ~45% empty transparent canvas on
+   the right (viewBox 0 0 900 220, artwork ends ~x480). We clip ONLY that transparent
+   padding with an overflow window — the asset itself is unmodified (no rescale of a
+   single axis, no recolor, no rebuild). Result: prominent, readable CFO AI / FINANCIAL
+   OS at ~48px tall (≈1.7× the previous rendered size), with clear space preserved. */
+/* flex:0 0 auto because the sidebar is a column flex box with height:100vh: once
+   the nav is longer than the viewport every child shrinks, and this one — whose
+   whole job is to be a fixed 48px clipping window — collapsed to 0 and let the
+   workspace switcher draw straight over the wordmark. */
+.cfo-brand{flex:0 0 auto;height:48px;width:138px;overflow:hidden;margin:0 4px 6px}
+.cfo-brand img{height:48px;width:auto;max-width:none;display:block}
+.cfo-nav{display:flex;flex-direction:column;gap:2px;margin-top:2px;
+  flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  /* room for the scrollbar so it never sits on top of the labels */
+  padding-right:4px;margin-right:-4px;
+  /* The business nav (21 items) is taller than any laptop viewport, so it scrolls.
+     Two things keep a scrolled list from looking broken. A full row of bottom
+     clearance so the last item (Payment Connections lands on the fold at 900px) is
+     never jammed mid-glyph against the footer divider, and a soft bottom fade one
+     row tall so whatever sits on the fold reads as "there is more below" rather
+     than a label sliced in half. The clearance (40px) is taller than the fade
+     (36px), so when you scroll to the end the final item clears the fade and is
+     fully crisp — the fade is the affordance, the clearance is the actual fix. */
+  padding-bottom:40px;
+  scroll-padding-block-end:40px;
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent);
+          mask-image:linear-gradient(to bottom,#000 calc(100% - 36px),transparent)}
+.cfo-navgroup-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:14px 12px 6px}
+.cfo-navitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:var(--radius-sm);
+  color:var(--text-secondary);text-decoration:none;font-weight:600;font-size:14px;border:0;background:none;cursor:pointer;width:100%;text-align:left}
+.cfo-navitem:hover{background:var(--surface-card-muted)}
+.cfo-navitem.is-active{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-navitem svg{width:18px;height:18px;flex-shrink:0;opacity:.85}
+.cfo-navitem.is-active svg{color:var(--brand-electric-blue);opacity:1}
+.cfo-navitem:disabled{opacity:.45;cursor:default}
+.cfo-side-foot{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;
+  padding-top:12px;margin-top:4px;border-top:1px solid var(--border-subtle)}
+
+/* Workspace settings — quieter than navigation, unmistakably interactive.
+   One button, one accessible name, a full-row target at least 44px tall. */
+.cfo-side-settings{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-height:44px;
+  padding:8px 10px;
+  border:1px solid transparent;
+  border-radius:var(--radius-md);
+  background:none;
+  text-align:left;
+  cursor:pointer;
+  color:var(--text-secondary);
+  font-family:inherit;
+}
+.cfo-side-settings:hover{background:var(--surface-card-muted);color:var(--text-primary)}
+.cfo-side-settings:active{background:var(--border-subtle)}
+.cfo-side-settings[aria-current="page"],
+.cfo-side-settings.is-active{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-side-settings-icon{display:inline-flex;color:var(--text-muted)}
+.cfo-side-settings:hover .cfo-side-settings-icon{color:var(--brand-navy)}
+.cfo-side-settings-icon svg{width:17px;height:17px}
+.cfo-side-settings-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+.cfo-side-settings-title{
+  font-size:13.5px;font-weight:700;color:var(--text-primary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cfo-side-settings-sub{
+  font-size:11.5px;color:var(--text-muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.cfo-side-settings-chev{display:inline-flex;color:var(--text-muted);transform:rotate(-90deg)}
+.cfo-side-settings-chev svg{width:15px;height:15px}
+
+.cfo-mobilehead{display:none;align-items:center;gap:10px;background:var(--surface-card);
+  border-bottom:1px solid var(--border-default);padding:11px 16px;position:sticky;top:0;z-index:20}
+/* The compact lockup. Height-bound so the asset stays crisp and uncropped, and
+   vertically centred by the header's own align-items.
+
+   NOTE: the lockup PNG carries ~47% transparent canvas to the right (opaque
+   artwork ends at x1271 of 2400, measured off the file), so this <img> reserves
+   ~58px it never paints. Cropping it the way the desktop wordmark does needs a
+   wrapper element with an overflow window — doing it here with object-fit means
+   the element's box no longer matches the asset's aspect ratio, which is exactly
+   what the distortion guard in renderedPreview.test.mjs exists to catch. Left
+   as-is deliberately: the dead box changes nothing on screen, because the burger
+   is pinned right with margin-left:auto. */
+.cfo-mobilebrand{height:30px;width:auto;max-width:60vw;display:block;flex:0 0 auto}
+/* A thumb target, not a pointer target: 44px of tappable area around a 20px glyph. */
+.cfo-burger{margin-left:auto;background:none;border:0;display:inline-flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:0;
+  min-width:44px;min-height:44px;border-radius:var(--radius-md)}
+.cfo-burger:hover{background:var(--surface-card-muted)}
+.cfo-burger span{width:20px;height:2px;background:var(--text-primary);border-radius:2px}
+.cfo-main{min-width:0;padding:26px 30px 56px}
+.cfo-main-inner{max-width:1180px;margin:0 auto}
+
+/* mobile drawer */
+.cfo-drawer-scrim{position:fixed;inset:0;background:var(--surface-overlay);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+.cfo-drawer-scrim.is-open{opacity:1;pointer-events:auto}
+.cfo-drawer{position:fixed;top:0;left:0;bottom:0;width:280px;background:var(--surface-card);z-index:41;
+  transform:translateX(-100%);transition:transform .22s ease;padding:18px 14px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+.cfo-drawer.is-open{transform:translateX(0)}
+
+/* ── Workspace switcher ──────────────────────────────────────────────────── */
+.cfo-switch{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:1px solid var(--border-default);
+  border-radius:var(--radius-md);background:var(--surface-card-muted);cursor:pointer;text-align:left;position:relative}
+.cfo-switch:hover{border-color:var(--border-strong)}
+.cfo-switch-ava{width:34px;height:34px;border-radius:9px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px}
+.cfo-switch-ava.personal{background:var(--brand-navy)}
+.cfo-switch-ava.business{background:var(--brand-electric-blue)}
+.cfo-switch-text{display:flex;flex-direction:column;flex:1;min-width:0}
+.cfo-switch-name{font-weight:700;font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfo-switch-type{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--text-muted);font-family:var(--font-mono)}
+.cfo-switch-chev{color:var(--text-muted);flex-shrink:0}
+.cfo-switch-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface-card);
+  border:1px solid var(--border-default);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:8px;z-index:50;max-height:420px;overflow-y:auto}
+.cfo-switch-grouptitle{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:700;padding:10px 10px 5px}
+.cfo-switch-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;border:0;background:none;width:100%;text-align:left}
+.cfo-switch-opt:hover{background:var(--surface-card-muted)}
+.cfo-switch-opt.is-active{background:var(--info-soft)}
+.cfo-switch-opt .cfo-switch-ava{width:30px;height:30px;border-radius:8px;font-size:13px}
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+/* ── Page hero ──────────────────────────────────────────────────────────────
+   A defined band, not a bare stack: a left content zone, a right control zone,
+   a hairline rule that gives the page a top edge, and — on a header with no
+   controls — one brand symbol set inside a reserved column at the far right.
+
+   --head-safe is the width that column claims, applied to the header only when it
+   has no control zone (see the media query below). A header that carries badges,
+   context or actions holds its natural right edge instead and drops the mark, so a
+   decorative symbol can never displace a control or sit behind one. Change the
+   mark's size and the column follows; there is no second number to remember. */
+.cfo-pagehead{
+  /* index.css sets body to a system stack, so --font-ui (Manrope) never reaches
+     ordinary text and the brand's UI face is effectively inert product-wide.
+     Fixing body is a 21-page change and belongs to its own PR; the shared
+     surfaces this one owns opt in explicitly so the pilot is typographically
+     what the Brand Book says it is. */
+  font-family:var(--font-ui);
+  /* Sits fully inside the band with clear space around it. It used to hang 26px
+     off the right edge, which read as an icon accidentally clipped by the layout
+     rather than as a watermark someone placed — so this one is never cropped.
+     That is the visible difference between the two branding layers: the hero mark
+     is whole and barely there, the flagship card's mark is bigger and cropped.
+
+     132px was too large for the job. On a header with no eyebrow the band is only
+     ~133px tall, so a 132px mark filled it edge to edge with no clear space and
+     read as clipped anyway; and reserving its column pushed a right-aligned
+     primary action ~160px in from the content's right edge. Smaller mark, smaller
+     column, and the height is capped below so a short band can never clip it. */
+  --head-mark:88px;
+  --head-inset:14px;
+  --head-safe:calc(var(--head-mark) + var(--head-inset) + 18px);
+  position:relative;
+  overflow:hidden;
+  display:flex;
+  align-items:flex-start;
+  gap:20px 28px;
+  flex-wrap:wrap;
+  padding:0 0 18px;
+  margin-bottom:26px;
+  border-bottom:1px solid var(--border-subtle);
+}
+/* The mark only appears where there is room for it — and never where it would sit
+   behind a control. A header that carries a control zone (.cfo-pagehead-right:
+   badges, context, actions) keeps its natural right edge so the primary action is
+   never pushed inward, and drops the decorative mark rather than weakening the
+   layout. A header with no controls reserves the mark's clear-space column and
+   shows it. The mark is absolutely positioned in both cases, so it never
+   contributes to layout sizing; the reserved column is a padding on the header
+   itself, applied only when the mark is actually painted. */
+.cfo-pagehead-mark{display:none}
+@media (min-width:900px){
+  .cfo-pagehead:not(:has(.cfo-pagehead-right)){padding-right:var(--head-safe)}
+  .cfo-pagehead:not(:has(.cfo-pagehead-right)) .cfo-pagehead-mark{
+    display:block;
+    position:absolute;
+    right:var(--head-inset);
+    top:50%;
+    transform:translateY(-50%);
+    /* Never taller than the band it sits in, so it keeps its clear space instead
+       of being cropped by a short header. width:auto + aspect-ratio holds the
+       official proportions — the mark is never distorted to fit. */
+    height:min(var(--head-mark), calc(100% - 28px));
+    width:auto;
+    aspect-ratio:1;
+    /* Navy on the pale page ground carries further than white on navy does, so at
+       equal opacity this mark read as strongly as the flagship card's. Measured by
+       eye against a real screenshot of both: 3.5% here to the card's 7%. */
+    opacity:.035;
+    pointer-events:none;
+    user-select:none;
+  }
+}
+.cfo-eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-muted);font-weight:700}
+.cfo-h1{font-family:var(--font-display);font-size:30px;line-height:var(--line-tight);margin:4px 0 0;color:var(--brand-navy)}
+/* The control zone hugs its contents and holds the right edge. margin-left:auto
+   (rather than justify-content on the parent) keeps it right-aligned even when a
+   long title pushes it onto its own line — it used to drop to the left there,
+   leaving the whole right side of the header empty. */
+.cfo-pagehead-right{
+  display:flex;
+  flex:0 0 auto;
+  margin-left:auto;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:10px;
+}
+.cfo-pagehead-context{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.cfo-pagehead-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.cfo-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:999px;white-space:nowrap}
+.cfo-badge svg{width:13px;height:13px}
+.cfo-badge-private{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-badge-shared{background:var(--surface-card-muted);color:var(--text-secondary);border:1px solid var(--border-default)}
+.cfo-badge-success{background:var(--success-soft);color:var(--success)}
+.cfo-badge-warning{background:var(--warning-soft);color:var(--warning)}
+.cfo-badge-danger{background:var(--danger-soft);color:var(--danger)}
+.cfo-badge-info{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-badge-neutral{background:var(--surface-card-muted);color:var(--text-muted)}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.cfo-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-ui);font-weight:700;
+  font-size:14px;border-radius:var(--radius-md);padding:10px 16px;cursor:pointer;border:1px solid transparent;line-height:1}
+.cfo-btn svg{width:16px;height:16px}
+/* The token layer owns this pair. --brand-electric-blue is the brand accent, not an
+   action surface: white on #3399FF is 2.94:1, which fails WCAG AA for button text.
+   --action-primary is the accessible ink of that same blue (#1565C0, 5.68:1). */
+.cfo-btn-primary{background:var(--action-primary);color:var(--action-primary-text);box-shadow:var(--shadow-sm)}
+.cfo-btn-primary:hover{background:var(--action-primary-hover)}
+.cfo-btn-secondary{background:var(--brand-navy);color:#fff}
+.cfo-btn-secondary:hover{background:#00284f}
+.cfo-btn-ghost{background:var(--surface-card);border-color:var(--border-default);color:var(--text-primary)}
+.cfo-btn-ghost:hover{background:var(--surface-card-muted)}
+.cfo-btn-danger{background:var(--danger);color:#fff}
+.cfo-btn:disabled{opacity:.5;cursor:default}
+.cfo-btn-sm{padding:7px 12px;font-size:13px}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.cfo-card{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+.cfo-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.cfo-card-title{font-size:14px;font-weight:800;color:var(--text-primary)}
+.cfo-grid{display:grid;gap:16px}
+.cfo-grid-2{grid-template-columns:1fr 1fr}
+.cfo-grid-3{grid-template-columns:repeat(3,1fr)}
+.cfo-grid-4{grid-template-columns:repeat(4,1fr)}
+
+/* Summary / hero card (navy) */
+.cfo-summary{
+  font-family:var(--font-ui);            /* see .cfo-pagehead — body is a system stack */
+  position:relative;
+  overflow:hidden;
+  background:var(--brand-navy);
+  color:#fff;
+  border-radius:var(--radius-lg);
+  padding:24px 26px;
+  box-shadow:var(--shadow-md);
+}
+/* The card reserves the mark's column in its own padding. Only when it is the
+   flagship — an ordinary summary card keeps its full width. */
+.cfo-summary.cfo-flagship{padding-right:var(--mark-safe)}
+
+/* ── the flagship brand watermark ───────────────────────────────────────────
+   ONE implementation, worn by every surface carrying a page's headline money
+   figure: the shared SummaryCard when a page passes `flagship`, and Pulse's
+   hand-built .pulse-cash. Both wear .cfo-flagship and neither restyles the mark,
+   so the product's two navy heroes cannot drift apart again — they already did
+   once, when one drew the symbol and the other drew a graph-paper grid.
+
+   Two branding layers, deliberately unequal:
+     page hero   .cfo-pagehead-mark   132px @ 4.5%  — ambient, contextual
+     flagship    .cfo-flagship-mark   168px @ 7%    — the brand moment
+   The hero is the weaker of the two on purpose. Change one, look at both.
+
+   The card edge crops the mark on purpose: a symbol sitting wholly inside the
+   card reads as an icon someone parked there, while one running off the edge
+   reads as the surface itself being branded.
+
+   The crop is a FRACTION of the mark, not a fixed number of pixels. The mark's
+   height is capped to the card, so a shallow card (Wallets, ~146px) renders a
+   smaller mark than a tall one (Pulse, ~249px); a fixed pixel crop then ate a
+   bigger share of the small one — 46px left Pulse at 73% but Wallets at 61%,
+   only a fragment. --mark-inside is the share kept inside the card, and the mark
+   is pushed off by the rest of ITS OWN width via translateX(%), which is relative
+   to the element. So one shared primitive keeps the same visible share on a tall
+   card, a wide shallow card and a phone, with a different absolute crop on each —
+   no page-specific positioning, no per-card token.
+
+   --mark-safe is the column the mark claims, and each flagship surface adds it to
+   its own padding-right. That is what guarantees the label, the figure and the
+   supporting line are never set over the mark. Change --mark-size or --mark-inside
+   and the safe area follows; there is no second number to keep in step. */
+.cfo-flagship{
+  --mark-size:168px;
+  --mark-inside:.74;                     /* share of the mark kept inside the card */
+  --mark-gap:20px;                       /* clear space between text and mark */
+  --mark-safe:calc(var(--mark-size) * var(--mark-inside) + var(--mark-gap));
+  position:relative;
+  overflow:hidden;
+  /* Establishes a stacking context, which is what lets the mark sit at z-index
+     -1: behind every child, still in front of the card's own navy background.
+     Without it, -1 would drop the mark behind that background and it would
+     simply never be seen. */
+  isolation:isolate;
+}
+.cfo-flagship-mark{
+  position:absolute;
+  /* Structurally behind the text, not merely faint enough to get away with it.
+     Nothing readable can ever paint under it, whatever a page puts in the card. */
+  z-index:-1;
+  /* Anchor the right edge to the card edge, then push the mark off by the share
+     of its OWN width that is meant to hang over — translateX(%) is relative to the
+     element, so the visible fraction is constant while the absolute crop follows
+     the mark's rendered size on each card. */
+  right:0;
+  top:50%;
+  transform:translateY(-50%) translateX(calc((1 - var(--mark-inside)) * 100%));
+  /* Cropped by the right edge on purpose — never by the top and bottom as well.
+     A summary card is only as tall as its contents, and Accounts' is 146px, so a
+     flat 168px mark came out clipped on three sides and stopped reading as a
+     symbol. Capping the height to the card keeps the crop deliberate: one edge,
+     always the right one, whatever the card's height. */
+  height:min(var(--mark-size), calc(100% - 28px));
+  width:auto;
+  aspect-ratio:1;
+  opacity:.07;
+  pointer-events:none;
+  user-select:none;
+}
+/* Phone: a smaller, quieter mark and a much narrower reserved column, because
+   the figure needs the width more than the brand does. It is kept rather than
+   dropped — this is the one surface where the product's brand moment lives, and
+   the app header above it shows the compact lockup, not this symbol. */
+@media (max-width:640px){
+  /* A smaller, quieter mark; the same --mark-inside keeps the visible share, and a
+     tighter gap keeps the reserved column off the figure on a narrow card. */
+  .cfo-flagship{
+    --mark-size:92px;
+    --mark-gap:12px;
+  }
+  .cfo-flagship-mark{opacity:.05}
+}
+/* ── page header ───────────────────────────────────────────────────────────
+   Title and description sit together on the left; context chips and actions
+   collect on the right and wrap underneath on narrow screens rather than
+   squeezing the title. */
+/* Grows to fill the row, but never past a comfortable measure — a description
+   should not run 120 characters wide just because the window is. */
+.cfo-pagehead-text{min-width:0;flex:1 1 min(420px,100%);max-width:74ch}
+.cfo-pagehead-desc{
+  margin:6px 0 0;
+  max-width:64ch;
+  color:var(--text-secondary);
+  font-size:var(--text-sm);
+  line-height:var(--line-normal);
+}
+@media (max-width:640px){
+  .cfo-pagehead{flex-direction:column;align-items:stretch;gap:14px;padding-bottom:16px;margin-bottom:20px}
+  /* Badges hug their text; only the actions box goes full width (see :357). */
+  .cfo-pagehead-right{justify-content:flex-start;align-items:flex-start;flex-direction:column;gap:12px;width:100%;margin-left:0}
+  .cfo-pagehead-context{width:auto;justify-content:flex-start}
+  .cfo-pagehead-actions{flex-wrap:wrap;justify-content:flex-start;gap:12px}
+  .cfo-pagehead-text{max-width:100%}
+  .cfo-pagehead-desc{font-size:var(--text-sm)}
+  /* A page-level action is a thumb target, not a pointer target. 36px was usable
+     and mean; 44px is the size a finger actually expects. Scoped to the page
+     header so dense in-page controls elsewhere keep their own sizing. */
+  .cfo-pagehead-actions :is(.cfo-btn,.btn,button,a[role="button"]),
+  .cfo-state-actions :is(.cfo-btn,.btn,button,a[role="button"]){
+    min-height:44px;
+    padding-top:0;
+    padding-bottom:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+}
+
+/* Focus is visible everywhere, in the brand accent rather than the UA default. */
+/* Focus belongs to the control, not to the container it happens to sit in. These
+   rules were scoped to the page header and the summary card, so the same button
+   showed a brand ring in one place and the browser's 1px default in another. */
+.cfo-btn:focus-visible,
+.cfo-input:focus-visible,
+.cfo-side-settings:focus-visible,
+.cfo-navitem:focus-visible,
+.cfo-burger:focus-visible,
+.cfo-pagehead-actions :is(button,a):focus-visible,
+.cfo-summary :is(button,a):focus-visible{
+  outline:var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset:var(--focus-ring-offset);
+  border-radius:var(--radius-sm);
+}
+/* On the navy surfaces no blue reads as a ring — #3399FF on #003366 is 1.55:1 and
+   the accessible ink is 1.20:1. White is the only ring that survives there. */
+.cfo-summary :is(button,a):focus-visible,
+.pulse-cash :is(button,a):focus-visible{
+  outline-color:var(--brand-white);
+}
+
+/* ── financial numerals ────────────────────────────────────────────────────
+   Applied to figures a person may compare against another figure. Deliberately
+   NOT applied to body copy or controls. */
+.fin{
+  font-family:var(--font-num);
+  font-variant-numeric:var(--num-features);
+  font-feature-settings:'tnum' 1,'lnum' 1;
+}
+
+@media (max-width:640px){
+  .cfo-summary{padding:20px}
+}
+.cfo-summary-label{font-size:13px;color:#AFC6DE;font-weight:600}
+.cfo-summary-value{font-family:var(--font-display);font-size:40px;line-height:1.1;margin-top:6px}
+/* An abbreviated headline amount is short by construction, so it never needs to
+   wrap — and must not be allowed to, because "Rp 152." above "5M" is not a
+   figure anyone can read. The exact amount underneath may wrap freely. */
+.cfo-summary-value.is-compact{white-space:nowrap;overflow-wrap:normal}
+
+/* More than one currency in the card: one labelled amount each, and no combined
+   figure, because there is no rate in this product that could produce one. They
+   are set smaller than a single headline would be — three totals competing at
+   40px is a wall, and none of them is THE number the way a lone total is. */
+.cfo-summary-currencies{display:flex;flex-wrap:wrap;gap:6px 26px;align-items:baseline}
+.cfo-summary-cur{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cfo-summary-cur-code{
+  font-family:var(--font-ui);font-size:11px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:#AFC6DE;
+}
+.cfo-summary-cur-amt{font-size:26px;line-height:1.05;white-space:nowrap}
+@media (max-width:640px){
+  .cfo-summary-currencies{gap:10px 18px}
+  .cfo-summary-cur-amt{font-size:21px}
+}
+/* Wallets exist but no balance can be stated for them — either no currency is
+   set, or the currency's native balance is not yet provable. The card says so
+   rather than printing a number it cannot stand behind. */
+.cfo-summary-nototal{font-size:22px;color:#C5D6E7;font-family:var(--font-ui);font-weight:700}
+
+/* ── balances by currency (design preview only) ─────────────────────────────
+   The approved future model, in two alternatives. Deliberately NOT a navy hero
+   per currency: three competing heroes make a page with no subject, and the one
+   thing this layout must never suggest is that any figure is the sum of the
+   others. A currency is a row — code, amount, and its exact figure and count —
+   and the rows sit as peers. */
+/* The approved future multi-currency model's styles are NOT here. They live in
+   pages/DesignPreview.css under the dsp- prefix, so that shipping them is
+   impossible while the model is preview-only: this stylesheet is in every
+   production bundle, and dead rules for an inactive feature are exactly the kind
+   of thing that quietly becomes active. They move here in the PR that activates
+   Alternative 2 — see pages/walletsSummaryConcepts.jsx. */
+.cfo-summary-meta{display:flex;align-items:center;gap:8px;margin-top:12px;color:#C5D6E7;font-size:13px;flex-wrap:wrap}
+.cfo-summary-meta .dot{color:var(--brand-electric-blue);display:inline-flex}
+.cfo-summary-row{display:flex;gap:32px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);flex-wrap:wrap}
+.cfo-summary-k{display:block;font-size:12px;color:#AFC6DE}
+.cfo-summary-v{display:block;font-weight:800;font-size:18px;margin-top:3px;font-family:var(--font-mono)}
+.cfo-summary-v.pos{color:#7FE3B6}.cfo-summary-v.neg{color:#FFB4A8}
+/* On navy, the ink warning (#B5740B) is unreadable; this is the same amber lifted
+   for a dark surface, matching how .pos and .neg are lifted above. */
+.cfo-summary-v.warn{color:#FFD08A}
+
+/* Money / asset card */
+.cfo-money{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm)}
+.cfo-money-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
+.cfo-money-asset{font-family:var(--font-mono);font-weight:700;font-size:13px;padding:4px 9px;border-radius:7px}
+.cfo-money-asset.fiat{background:var(--info-soft);color:var(--brand-navy)}
+.cfo-money-asset.crypto{background:#EDEAFB;color:#3B2F8A}
+.cfo-money-sub{font-size:11.5px;color:var(--text-muted)}
+.cfo-money-native{font-size:21px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.cfo-money-unit{font-size:13px;color:var(--text-muted)}
+.cfo-money-rep{font-size:13px;color:var(--text-secondary);margin-top:4px}
+.cfo-money-ts{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-muted);margin-top:10px}
+.cfo-money-ts.stale{color:var(--warning)}
+.cfo-money-ts svg{width:13px;height:13px}
+
+/* Stat */
+.cfo-stat{display:flex;flex-direction:column;gap:3px}
+.cfo-stat-k{font-size:12px;color:var(--text-muted)}
+.cfo-stat-v{font-size:17px;font-weight:700;color:var(--text-primary);font-family:var(--font-mono)}
+.cfo-stat-v.pos{color:var(--success)}.cfo-stat-v.neg{color:var(--danger)}
+/* A short runway warns rather than alarms — the same rule Pulse's KPIs follow. */
+.cfo-stat-v.warn{color:var(--warning)}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.cfo-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border-default);margin-bottom:18px;overflow-x:auto}
+.cfo-tab{padding:10px 14px;border:0;background:none;font-family:var(--font-ui);font-weight:700;font-size:14px;
+  color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.cfo-tab.is-active{color:var(--brand-navy);border-bottom-color:var(--brand-electric-blue)}
+
+/* ── Table / list ────────────────────────────────────────────────────────── */
+.cfo-table{width:100%;border-collapse:collapse;font-size:14px}
+.cfo-table th{text-align:left;font-size:12px;color:var(--text-muted);font-weight:700;text-transform:uppercase;
+  letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid var(--border-default)}
+.cfo-table td{padding:12px;border-bottom:1px solid var(--border-subtle);color:var(--text-primary)}
+.cfo-table tr:last-child td{border-bottom:0}
+.cfo-table tbody tr:hover{background:var(--surface-card-muted)}
+.cfo-table .num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+.cfo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.cfo-list-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border-subtle)}
+.cfo-list-item:last-child{border-bottom:0}
+.cfo-list-ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+.cfo-list-ic.in{background:var(--success-soft);color:var(--success)}
+.cfo-list-ic.out{background:var(--danger-soft);color:var(--danger)}
+.cfo-list-ic.neutral{background:var(--surface-card-muted);color:var(--text-secondary)}
+.cfo-list-main{display:flex;flex-direction:column;flex:1;min-width:0}
+.cfo-list-label{font-size:14px;font-weight:600;color:var(--text-primary)}
+.cfo-list-sub{font-size:11.5px;color:var(--text-muted)}
+.cfo-list-amt{font-size:14px;font-weight:700;white-space:nowrap;font-family:var(--font-mono)}
+.cfo-pos{color:var(--success)}.cfo-neg{color:var(--danger)}
+.cfo-chip{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;margin-left:8px}
+.cfo-chip-soft{background:var(--info-soft);color:var(--brand-navy);font-weight:600}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+.cfo-skel{background:linear-gradient(90deg,#EAEFF4 25%,#F4F7FA 37%,#EAEFF4 63%);background-size:400% 100%;
+  animation:cfosh 1.3s ease infinite;border-radius:8px}
+@keyframes cfosh{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media (prefers-reduced-motion:reduce){.cfo-skel{animation:none}}
+.cfo-state{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-lg);
+  padding:52px 28px;text-align:center;box-shadow:var(--shadow-sm)}
+.cfo-state-sym{width:60px;height:60px;opacity:.9;margin-bottom:8px}
+.cfo-state-ic{display:inline-flex;width:52px;height:52px;border-radius:14px;align-items:center;justify-content:center;margin-bottom:10px}
+.cfo-state-ic.danger{background:var(--danger-soft);color:var(--danger)}
+.cfo-state-ic.danger svg{width:24px;height:24px}
+.cfo-state-h{font-family:var(--font-display);font-size:22px;color:var(--brand-navy);margin:6px 0 6px}
+.cfo-state-p{color:var(--text-secondary);max-width:440px;margin:0 auto 22px;font-size:14px}
+.cfo-state-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.cfo-modal-scrim{position:fixed;inset:0;background:var(--surface-overlay);z-index:60;display:flex;align-items:center;justify-content:center;padding:20px}
+.cfo-modal{background:var(--surface-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);max-width:460px;width:100%;padding:24px}
+.cfo-modal-title{font-size:18px;font-weight:800;color:var(--brand-navy);margin:0 0 8px}
+.cfo-modal-body{color:var(--text-secondary);font-size:14px;margin-bottom:20px}
+.cfo-modal-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* ── Action menu ─────────────────────────────────────────────────────────── */
+.cfo-menu-wrap{position:relative;display:inline-block}
+.cfo-menu{position:absolute;right:0;top:calc(100% + 4px);background:var(--surface-card);border:1px solid var(--border-default);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:6px;min-width:170px;z-index:55}
+.cfo-menu-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;
+  border:0;background:none;width:100%;text-align:left;font-size:14px;color:var(--text-primary);font-weight:500}
+.cfo-menu-item:hover{background:var(--surface-card-muted)}
+.cfo-menu-item.danger{color:var(--danger)}
+
+.cfo-iconbtn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border-default);background:var(--surface-card);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-secondary)}
+.cfo-iconbtn:hover{background:var(--surface-card-muted)}
+
+/* ── Global overflow guard — no horizontal page overflow on any premium page ─ */
+html, body, #root { max-width: 100%; overflow-x: hidden; }
+/* #root is display:flex in the legacy app; the shell must fill it (was sizing to
+   content → ~840px with empty space on the right on every Business page). */
+.cfo-shell { width: 100%; flex: 1 1 100%; }
+.cfo-shell, .cfo-main, .cfo-main-inner { max-width: 100%; min-width: 0; }
+.cfo-summary, .cfo-card, .cfo-money { min-width: 0; }
+.cfo-summary-value { overflow-wrap: anywhere; }
+
+/* ── Stable application shell (desktop) ──────────────────────────────────────
+   The premium shell must behave like a real SaaS app: the left rail never moves,
+   the work area is the only thing that scrolls.
+
+   Why the old behaviour was broken: index.css sets
+       html, body { overflow-x: hidden }  and  #root { display:flex; min-height:100dvh }
+   A non-visible `overflow-x` forces the computed `overflow-y` to `auto`, so html/body/
+   #root all become scroll boxes — but #root is sized by `min-height`, so it GROWS with
+   content instead of scrolling. `position: sticky` on .cfo-sidebar then resolves against
+   a box that never scrolls, so it silently stopped sticking and rode up with the page.
+
+   The fix does not fight that and does not touch html/body/#root (legacy `Layout` pages
+   live there too and still need normal document scrolling). Instead the shell is made
+   self-contained: fixed to the viewport, sidebar switched off sticky to a plain
+   full-height column with its own overflow, and .cfo-main as the single scroll container.
+
+   Applies to the premium shell in BOTH sections (Personal + Business) — it is one
+   component system. Mobile is untouched: below 1025px the sidebar is display:none and the
+   document scrolls naturally, which is the right behaviour on a phone. */
+@media (min-width: 1025px) {
+  .cfo-shell {
+    height: 100vh;              /* fallback for browsers without dvh */
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: 100%;
+    overflow: hidden;
+  }
+  .cfo-sidebar {
+    position: static;           /* sticky needed a scrollport that never existed */
+    top: auto;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .cfo-main {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* Belt and braces: no document scrollbar behind the shell. Scoped with :has() so pages
+     that do NOT render the premium shell (legacy Layout routes) keep document scrolling.
+     Browsers without :has() simply skip this line; the rules above already do the work. */
+  body:has(.cfo-shell) { overflow: hidden; }
+}
+
+/* ── Responsive table → stacked cards on mobile (DebtsView / Transactions) ─── */
+.cfo-mcards { display: none; }
+.cfo-dcard{background:var(--surface-card);border:1px solid var(--border-default);border-radius:var(--radius-md);padding:14px;box-shadow:var(--shadow-sm)}
+.cfo-dcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cfo-dcard-name{font-weight:700;font-size:14px;min-width:0;overflow-wrap:anywhere}
+.cfo-dcard-amt{font-family:var(--font-mono);font-weight:800;font-size:16px;white-space:nowrap;flex-shrink:0}
+.cfo-dcard-amt.pos{color:var(--success)}.cfo-dcard-amt.neg{color:var(--danger)}
+.cfo-dcard-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:12px;color:var(--text-muted)}
+.cfo-dcard-meta .cfo-mono{white-space:nowrap}
+.cfo-dcard-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+
+/* form grid for the AI Accountant profile (stacks on mobile) */
+.cfo-form2{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+@media (max-width:640px){.cfo-form2{grid-template-columns:1fr}}
+
+/* preview banner — compact on mobile */
+@media (max-width:640px){
+  .cfo-preview-banner{padding:5px 10px;gap:8px;font-size:11px}
+  .cfo-preview-banner .cfo-pb-sub{display:none}
+  .cfo-preview-banner .cfo-pb-state{margin-left:auto}
+  .cfo-preview-banner .cfo-pb-state button{padding:3px 7px;font-size:11px}
+}
+
+/* ── Legacy-page harmonization inside the premium shell ─────────────────────
+   Wrapped legacy modules (AI CFO, Radar, Accounts, Payroll, Documents, Settings,
+   Team, Approvals, Bank Import) use .hf-page/.hf-card. Normalize them to the premium
+   width/header/card system WITHOUT touching their markup/logic. Scoped to .cfo-main
+   so the standalone legacy app is unaffected. */
+.cfo-main .hf-page, .cfo-main .cfo-page, .cfo-main .page { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
+.cfo-main .hf-page-header { margin-bottom: 22px; }
+.cfo-main .hf-page-title { font-family: var(--font-display); font-size: 30px; color: var(--brand-navy); letter-spacing: -0.4px; }
+.cfo-main .hf-page-subtitle { color: var(--text-muted); }
+.cfo-main .hf-card { border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.cfo-main .hf-card:hover { box-shadow: var(--shadow-md); }
+/* tame stray narrow inline columns so desktop content fills the shell width */
+.cfo-main .hf-page > [style*="max-width: 480"], .cfo-main .hf-page > [style*="max-width:480"] { max-width: 100% !important; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width:1024px){
+  /* One column on a phone. The rows must be pinned too: they are implicit `auto`
+     otherwise, and a grid taller than its content stretches them by default — so on
+     a short page the mobile header absorbed the slack and grew to 274px of mostly
+     empty white before the content began. */
+  .cfo-shell{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .cfo-sidebar{display:none}
+  .cfo-mobilehead{display:flex}
+  .cfo-main{padding:18px 18px 48px}
+  .cfo-grid-4{grid-template-columns:repeat(2,1fr)}
+  .cfo-grid-3{grid-template-columns:1fr 1fr}
+  .cfo-grid-2{grid-template-columns:1fr}
+  .cfo-table-wrap{overflow-x:auto}
+  .cfo-drawer{width:min(86vw,340px)}
+  /* A drawer row is a thumb target, not a pointer target. 36px is the right
+     density for the desktop sidebar and too mean for a phone, so the 44px
+     minimum is scoped here rather than applied to .cfo-navitem globally — the
+     same call already made for the page-header actions. */
+  .cfo-drawer .cfo-navitem{min-height:44px}
+}
+@media (max-width:640px){
+  .cfo-main{padding:14px 20px 44px}
+  .cfo-h1{font-size:24px}
+  .cfo-summary-value{font-size:30px}
+  .cfo-grid-4{grid-template-columns:1fr 1fr}
+  .cfo-pagehead-actions{width:100%;display:grid;grid-template-columns:1fr}
+  .cfo-pagehead-actions .cfo-btn{min-width:0;padding-left:10px;padding-right:10px;white-space:nowrap}
+  .cfo-summary-row{gap:18px}
+  /* tables hide; stacked cards show */
+  .cfo-rtable{display:none}
+  .cfo-mcards{display:flex;flex-direction:column;gap:10px}
+}
+@media (max-width:380px){
+  .cfo-grid-4{grid-template-columns:1fr}
+}
+
+/* ── Additive utilities (Personal Account v1; safe for Business — unused there) ── */
+.cfo-input{width:100%;padding:10px 12px;border:1px solid var(--border-default);border-radius:10px;background:var(--surface-card);color:var(--text-primary);font-size:14px;font-family:inherit;box-sizing:border-box}
+.cfo-input:focus{outline:none;border-color:var(--brand-electric-blue)}
+.cfo-mt{margin-top:16px}
+
+/* Personal Account v1 mobile app layer. Desktop keeps the shared Business shell;
+   phones get the compact consumer-finance pattern from the product references. */
+.personal-overview-subtitle{margin:-8px 0 18px;color:var(--text-muted);font-size:14px}
+.personal-mobile-meta{display:none}
+.personal-bottom-nav,.personal-fab{display:none}
+.personal-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.personal-choice-grid button,.personal-invite-choice{border:1px solid var(--border-default);background:var(--surface-card-muted);border-radius:12px;padding:14px;text-align:left;color:var(--text-primary);font-family:var(--font-ui)}
+.personal-choice-grid button{cursor:pointer}
+.personal-choice-grid b,.personal-invite-choice b{display:block;font-size:14px;margin-bottom:5px}
+.personal-choice-grid span,.personal-invite-choice span{display:block;font-size:12px;color:var(--text-muted);line-height:1.4}
+.personal-invite-choice{grid-column:1 / -1}
+.personal-invite-choice > div,.personal-inline-invite{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.personal-plan-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.personal-wallet-actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.personal-wallet-right{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-left:auto;flex-shrink:0}
+.personal-plan-row.compact{margin-top:14px}
+.personal-plan-pill{border:1px solid var(--border-default);border-radius:12px;padding:12px;background:var(--surface-card-muted)}
+.personal-plan-pill b{display:block;font-size:13px;color:var(--brand-navy);margin-bottom:4px}
+.personal-plan-pill span{font-size:11.5px;color:var(--text-muted);line-height:1.35}
+.personal-small-note{font-size:12px;color:var(--text-muted);margin:10px 2px 0;line-height:1.4}
+.personal-ai-card{background:#EBF4FF;border-color:#CFE6FF}
+.personal-ai-card .cfo-card-title{color:var(--brand-navy)}
+.personal-currency-note .cfo-list-amt,
+.personal-tx-day-head span:last-child,
+.personal-monthly-badge,
+.personal-version{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.personal-recurring-note{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.personal-recurring-note b{display:block;color:var(--brand-navy);font-size:14px}
+.personal-recurring-note p{margin:3px 0 0;color:var(--text-muted);font-size:12px;line-height:1.4}
+.personal-monthly-badge{background:var(--brand-pale-grey);color:var(--brand-navy);font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px}
+.personal-tx-groups{display:flex;flex-direction:column;gap:18px}
+.personal-tx-day-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:6px;color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.personal-tx-day-head span:last-child{text-transform:none;letter-spacing:0;color:var(--brand-navy)}
+.personal-cfo-runway{margin-top:18px;padding:16px;border:1px solid var(--border-default);border-radius:14px;background:var(--surface-card-muted);display:grid;gap:4px}
+.personal-cfo-runway span{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:700}
+.personal-cfo-runway b{font-family:var(--font-mono);font-size:48px;line-height:1;color:var(--brand-navy)}
+.personal-cfo-runway small{font-size:12px;color:var(--text-secondary)}
+.personal-prompt-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.personal-prompt-row button{border:1px solid var(--border-default);background:var(--surface-card);color:var(--brand-navy);border-radius:999px;padding:8px 11px;font-family:var(--font-ui);font-size:12px;font-weight:700}
+.personal-category-bars{display:flex;flex-direction:column;gap:12px}
+.personal-category-bar{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.personal-category-bar div div{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--text-primary)}
+.personal-category-bar div div span{font-family:var(--font-mono);font-weight:700}
+.personal-category-bar em{display:block;height:5px;background:var(--border-subtle);border-radius:999px;margin-top:6px;overflow:hidden}
+.personal-category-bar i{display:block;height:100%;background:var(--brand-electric-blue);border-radius:999px}
+.personal-profile-head{display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.personal-profile-copy{display:flex;flex-direction:column;gap:3px;min-width:180px;flex:1}
+.personal-profile-copy b{font-size:18px;color:var(--brand-navy)}
+.personal-profile-copy span{font-size:13px;color:var(--text-muted)}
+.personal-profile-copy em{width:max-content;background:var(--info-soft);color:var(--brand-navy);font-style:normal;font-weight:700;font-size:12px;border-radius:999px;padding:4px 9px}
+.personal-profile-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.personal-profile-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0 16px}
+.personal-version{text-align:center;color:var(--text-muted);font-size:11px;margin:18px 0}
+.personal-business-form{display:flex;flex-direction:column;gap:12px}
+.personal-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.personal-separation-copy{border:1px solid var(--border-default);background:var(--surface-card-muted);border-radius:12px;padding:12px;color:var(--text-secondary);font-size:13px;line-height:1.45}
+.personal-upgrade-prompt{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;background:var(--warning-soft,#fff7e6)}
+.personal-upgrade-prompt p{margin:4px 0 0;color:var(--text-secondary);font-size:13px;line-height:1.4}
+
+@media (max-width:640px){
+  .personal-app{padding-bottom:86px}
+  .personal-overview{width:100%;max-width:100%;overflow:hidden}
+  .cfo-shell:has(.personal-app){background:#F6F8FB}
+  .cfo-shell:has(.personal-app) .cfo-mobilehead{height:64px;padding:10px 22px;background:#fff;border-bottom:1px solid #E7ECF2}
+  .cfo-shell:has(.personal-app) .cfo-mobilesym{width:42px;height:42px}
+  .cfo-shell:has(.personal-app) .cfo-badge-private{background:#F8FAFC;border:1px solid #E1E8F0;color:#30465F;font-weight:800}
+  .cfo-shell:has(.personal-app) .cfo-burger span{width:24px;height:3px;background:#0B1628}
+  .cfo-shell:has(.personal-app) .cfo-main{padding:20px 14px 96px}
+  .cfo-shell:has(.personal-app) .cfo-main-inner{max-width:430px;margin:0 auto}
+  .personal-overview .cfo-card,
+  .personal-overview .cfo-summary{width:100%;max-width:100%;min-width:0;margin-left:0}
+  .personal-overview .cfo-pagehead{margin-bottom:8px}
+  .personal-overview .cfo-pagehead-actions{display:none}
+  .personal-overview .cfo-eyebrow{font-size:11px;letter-spacing:.15em;color:#7C8A9D}
+  .personal-overview .cfo-h1{font-size:26px;line-height:1.05;letter-spacing:-.02em;margin-top:5px}
+  .personal-overview-subtitle{font-size:14px;line-height:1.35;margin:7px 0 14px;color:#52657C}
+  .personal-mobile-meta{display:none}
+  .personal-overview .cfo-summary{border-radius:12px;padding:18px 18px;margin-top:4px;box-shadow:0 10px 24px rgba(0,32,63,.15);background:#0A1730}
+  /* The shorthand above resets padding-right, so the flagship reclaims its
+     reserved column here rather than losing it to a more specific rule. */
+  .personal-overview .cfo-summary.cfo-flagship{padding-right:var(--mark-safe)}
+  .personal-overview .cfo-summary-label{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#AFC1D4}
+  .personal-overview .cfo-summary-value{font-size:29px;line-height:1.05;margin-top:8px;letter-spacing:-.01em;overflow-wrap:anywhere}
+  .personal-overview .cfo-summary-meta{font-size:12px;margin-top:12px;line-height:1.35;color:#CAD7E5}
+  .personal-overview .cfo-summary-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:16px;padding-top:14px}
+  .personal-overview .cfo-summary-k{font-size:10px;color:#AFC2D4;text-transform:none;white-space:normal}
+  .personal-overview .cfo-summary-v{font-size:13px;line-height:1.15;margin-top:5px;overflow-wrap:anywhere}
+  .personal-overview .cfo-card{border-radius:10px;padding:15px 14px;background:#fff;border-color:#DDE5EF;box-shadow:0 4px 12px rgba(12,31,56,.06)}
+  .personal-overview .cfo-card-title{font-size:15px}
+  .personal-overview .cfo-grid.cfo-grid-2{gap:14px}
+  .personal-overview .cfo-list-item{align-items:center;padding:11px 0}
+  .personal-overview .cfo-list-ic{width:34px;height:34px;border-radius:9px;background:#F0F3F7}
+  .personal-overview .cfo-list-label{font-size:13px}
+  .personal-overview .cfo-list-sub{font-size:10px;text-transform:uppercase}
+  .personal-overview .cfo-list-amt{font-size:12px;white-space:nowrap;text-align:right}
+  .personal-overview .cfo-state{padding:28px 14px;border-radius:12px}
+  .personal-overview .cfo-state-h{font-size:17px}
+  .personal-overview .cfo-state-p{font-size:13px}
+  .personal-overview .cfo-btn{border-radius:10px;min-height:42px}
+  .personal-overview .cfo-btn-primary{background:#0057FF}
+  .personal-choice-grid{grid-template-columns:1fr}
+  .personal-form-grid{grid-template-columns:1fr}
+  .personal-upgrade-prompt{align-items:flex-start;flex-direction:column}
+  .personal-invite-choice > div,.personal-inline-invite{grid-template-columns:1fr}
+  .personal-plan-row{grid-template-columns:1fr}
+  .personal-plan-row.compact{display:none}
+  .personal-wallet-list .cfo-list-item{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:center}
+  .personal-wallet-list .cfo-list-main{min-width:0}
+  .personal-wallet-list .cfo-list-sub{text-transform:none;line-height:1.25}
+  .personal-wallet-list .personal-wallet-right{width:auto;margin-left:0;justify-content:flex-end;grid-column:3;grid-row:1}
+  .personal-wallet-list .personal-wallet-right .cfo-list-amt{font-size:13px;white-space:nowrap}
+  .personal-bottom-nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:35;display:grid;grid-template-columns:repeat(5,1fr);width:min(430px,100vw);height:64px;background:#fff;border-top:1px solid #DFE6EF;box-shadow:0 -8px 22px rgba(12,31,56,.08);padding:5px 12px 7px}
+  .personal-bottom-nav button{border:0;background:none;color:#6C7B8E;font-family:var(--font-ui);font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:12px;cursor:pointer}
+  .personal-bottom-nav svg{width:18px;height:18px}
+  .personal-bottom-nav button.is-active{color:#0057FF}
+  .personal-bottom-nav button:nth-child(3){color:#0B1628}
+  .personal-bottom-nav button:nth-child(3) span{width:30px;height:30px;border-radius:999px;border:1px solid #D4DCE7;display:flex;align-items:center;justify-content:center;background:#fff}
+  .personal-fab{display:flex;position:fixed;right:18px;bottom:76px;z-index:36;width:52px;height:52px;border-radius:999px;border:0;background:#0057FF;color:#fff;box-shadow:0 12px 24px rgba(0,87,255,.32);align-items:center;justify-content:center}
+  .personal-fab svg{width:24px;height:24px}
+  .personal-app > .cfo-pagehead .cfo-pagehead-actions{display:none}
+  .personal-app > .cfo-card,
+  .personal-app > .cfo-state{border-radius:10px;box-shadow:0 4px 12px rgba(12,31,56,.06)}
+}
+
+@media (max-width:380px){
+  .personal-overview .cfo-summary{padding:16px}
+  .personal-overview .cfo-summary-value{font-size:25px}
+  .personal-overview .cfo-summary-row{gap:6px}
+  .personal-overview .cfo-summary-v{font-size:12px}
+}
+.cfo-mb{margin-bottom:16px}
+
+/* ── Platform Admin Dashboard (internal console) ────────────────────────────
+   Scoped to .admin-dash so no customer-facing page is affected. Uses the same
+   tokens as the product shell so the console matches the standard CFO AI look. */
+.admin-dash{min-height:100vh;background:var(--surface-page,var(--bg))}
+.admin-dash-body{max-width:1180px;margin:0 auto;padding:22px 28px 48px}
+.admin-dash-sub{margin:-10px 0 22px;font-size:13.5px;color:var(--text-secondary);line-height:1.5}
+
+/* Tabs */
+.admin-dash-tabs{display:flex;gap:8px;flex-wrap:wrap;padding:14px 28px 0;max-width:1180px;margin:0 auto}
+.admin-dash-tab{padding:7px 15px;border-radius:999px;text-decoration:none;font-size:13px;font-weight:600;
+  background:var(--surface-card-muted);color:var(--text-secondary);border:1px solid var(--border-subtle);transition:background .15s,color .15s}
+.admin-dash-tab:hover{background:var(--surface-card);color:var(--text-primary)}
+.admin-dash-tab.is-active{background:var(--brand-navy);color:#fff;border-color:var(--brand-navy)}
+
+/* Overview / activity stat cards */
+.admin-dash-cards{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.admin-dash-stat{position:relative;background:var(--surface-card);border:1px solid var(--border-default);
+  border-radius:var(--radius-lg);padding:16px 18px 15px;box-shadow:var(--shadow-sm);overflow:hidden}
+.admin-dash-stat::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--stat-accent,var(--border-default))}
+.admin-dash-stat.is-clickable{cursor:pointer;transition:box-shadow .15s,transform .15s}
+.admin-dash-stat.is-clickable:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.admin-dash-stat.is-clickable:focus-visible{outline:2px solid var(--brand-blue,#3399FF);outline-offset:2px}
+.admin-dash-stat-k{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-muted)}
+.admin-dash-stat-v{font-family:var(--font-display);font-size:26px;line-height:1.15;color:var(--text-primary);margin:6px 0 3px}
+.admin-dash-stat-h{font-size:11.5px;color:var(--text-muted)}
+
+/* Metric rows inside cards */
+.admin-dash-row{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  padding:9px 0;border-bottom:1px solid var(--border-subtle)}
+.admin-dash-row:last-of-type{border-bottom:0}
+.admin-dash-row-k{font-size:13px;color:var(--text-secondary);min-width:0}
+.admin-dash-row-hint{display:block;font-size:11px;color:var(--text-muted);margin-top:1px}
+.admin-dash-row-v{font-size:14px;font-weight:600;color:var(--text-primary);text-align:right;white-space:nowrap}
+.admin-dash-row-v.is-strong{font-size:16px;font-weight:800}
+
+/* Unavailable metric — muted, never reads as zero */
+.admin-dash-na{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;
+  background:var(--surface-card-muted);color:var(--text-muted);border:1px solid var(--border-subtle)}
+
+.admin-dash-section{margin-top:20px}
+.admin-dash-sectionhead{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text-muted);margin:0 0 12px}
+.admin-dash-note{margin-top:12px;font-size:12px;color:var(--text-muted);line-height:1.55}
+.admin-dash-note a{color:var(--brand-blue,#3399FF)}
+.admin-dash-code{font-family:var(--font-mono,monospace);font-size:12.5px}
+.admin-dash-muted{background:var(--surface-card-muted)}
+
+/* Feature-flag chips (booleans only — never values) */
+.admin-dash-flags{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.admin-dash-flag{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  padding:4px 10px;border-radius:999px;background:var(--surface-card-muted);color:var(--text-muted);border:1px solid var(--border-subtle)}
+.admin-dash-flag-dot{width:6px;height:6px;border-radius:50%;background:var(--text-muted)}
+.admin-dash-flag.is-on{background:var(--success-soft);color:var(--success);border-color:transparent}
+.admin-dash-flag.is-on .admin-dash-flag-dot{background:var(--success)}
+
+/* Warnings — informational amber, not an error state */
+.admin-dash-warnlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.admin-dash-warnlist li{font-size:12.5px;line-height:1.5;color:var(--warning,#92400e);
+  background:var(--warning-soft,#FEF3C7);border-radius:10px;padding:9px 12px}
+
+.admin-dash-denied{display:flex;gap:14px;align-items:flex-start}
+.admin-dash-denied-t{font-size:16px;font-weight:800;color:var(--text-primary)}
+
+@media (max-width:640px){
+  .admin-dash-body{padding:16px 14px 36px}
+  .admin-dash-tabs{padding:12px 14px 0}
+  .admin-dash-cards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .admin-dash-stat-v{font-size:22px}
+}

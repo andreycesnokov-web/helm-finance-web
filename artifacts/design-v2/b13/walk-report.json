@@ -1,0 +1,1817 @@
+{
+ "screens": {
+  "desktop /business/pulse": {
+   "links": 27,
+   "buttons": 2,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/payables/d1",
+    "/business/receivables"
+   ]
+  },
+  "desktop /business/radar": {
+   "links": 23,
+   "buttons": 17,
+   "disabled": 3,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "30 days",
+    "[off] 60 daysFounder",
+    "[off] 90 daysFounder",
+    "Show as table",
+    "Worst case",
+    "PT Test Resort pays 2 weeks late",
+    "Collect CV Sample Client this week",
+    "Pay PT Contractor Demo 2 weeks later",
+    "Revenue −20%",
+    "If you approve PT Example Supplies",
+    "[off] Hire 1 person",
+    "Ask your own",
+    "All",
+    "Coming in",
+    "Going out"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/receivables",
+    "/business/payables/d1",
+    "/business/payables/d3",
+    "/business/payables/d7"
+   ]
+  },
+  "desktop /business/performance": {
+   "links": 24,
+   "buttons": 6,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Export",
+    "Ask AI CFO",
+    "Show as table"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/performance/cash",
+    "/business/performance/forecast",
+    "/business/performance/groups",
+    "/business/performance?month=2026-09&compare=2026-08&focus=costs"
+   ]
+  },
+  "desktop /business/performance/cash": {
+   "links": 21,
+   "buttons": 5,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Export",
+    "Show as table"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/performance/cash",
+    "/business/performance/forecast"
+   ]
+  },
+  "desktop /business/performance/forecast": {
+   "links": 23,
+   "buttons": 5,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Show as table",
+    "Plan it with AI CFO"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/performance/cash",
+    "/business/performance/forecast",
+    "/business/receivables"
+   ]
+  },
+  "desktop /business/performance/groups": {
+   "links": 19,
+   "buttons": 4,
+   "disabled": 1,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Use 1 suggestions",
+    "[off] Save 0 changes"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/settings/classic"
+   ]
+  },
+  "desktop /business/ai-cfo": {
+   "links": 22,
+   "buttons": 10,
+   "disabled": 1,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Why?",
+    "[off] Send",
+    "Can I afford a new machine next month?",
+    "Why is runway shorter than last month?",
+    "What if revenue drops 20%?",
+    "Write a one-page investor update"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/receivables",
+    "/business/ai-cfo/classic"
+   ]
+  },
+  "desktop /business/accounts": {
+   "links": 25,
+   "buttons": 2,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/bank-import",
+    "/business/accounts/manage"
+   ]
+  },
+  "desktop /business/transactions": {
+   "links": 19,
+   "buttons": 9,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Export",
+    "Review 2",
+    "All",
+    "Money in",
+    "Money out",
+    "Transfers",
+    "Needs review · 2"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/transactions/classic"
+   ]
+  },
+  "desktop /business/funding-investors": {
+   "links": 20,
+   "buttons": 4,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Record funding",
+    "Mark paid today"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/intercompany"
+   ]
+  },
+  "desktop /business/assets": {
+   "links": 18,
+   "buttons": 2,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/assets/new"
+   ]
+  },
+  "desktop /business/assets/new": {
+   "links": 24,
+   "buttons": 10,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Save asset",
+    "Add PDFs or photosThe invoice is filed in Document",
+    "Machines and equipment",
+    "Vehicles",
+    "Computers and phones",
+    "Furniture and fit-out",
+    "Buildings",
+    "Other"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard"
+   ]
+  },
+  "desktop /business/payables": {
+   "links": 24,
+   "buttons": 15,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Add a bill",
+    "New invoice",
+    "Owed to you · 2 invoicesRp 33.4MRp 14.1M late · Rp",
+    "You owe · 4 billsRp 28.9MRp 8.4M waiting for your ",
+    "To pay",
+    "To collect",
+    "All",
+    "Open",
+    "Paid",
+    "Mark paid"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/payables/d1",
+    "/business/payables/d3",
+    "/business/payables/d5",
+    "/business/payables/d6",
+    "/business/payables/d7",
+    "/business/payables/classic"
+   ]
+  },
+  "desktop /business/receivables": {
+   "links": 20,
+   "buttons": 13,
+   "disabled": 1,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Add a bill",
+    "New invoice",
+    "Owed to you · 2 invoicesRp 33.4MRp 14.1M late · Rp",
+    "You owe · 4 billsRp 28.9MRp 8.4M waiting for your ",
+    "To pay",
+    "To collect",
+    "All",
+    "Open",
+    "Paid",
+    "[off] Send reminderComing soon",
+    "Mark received"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/receivables/d2",
+    "/business/receivables/d4",
+    "/business/receivables/classic"
+   ]
+  },
+  "desktop /business/payables/d1": {
+   "links": 23,
+   "buttons": 6,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Reject",
+    "Ask for details",
+    "Approve",
+    "Mark checked"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/accountant?tab=packages"
+   ]
+  },
+  "desktop /business/receivables/d4": {
+   "links": 23,
+   "buttons": 4,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Mark checked",
+    "Record tax withheld by the customer"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/receivables"
+   ]
+  },
+  "desktop /business/payroll": {
+   "links": 19,
+   "buttons": 3,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Ask AI CFO"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/payroll/manage"
+   ]
+  },
+  "desktop /business/approvals": {
+   "links": 19,
+   "buttons": 7,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Waiting · 1",
+    "Decided",
+    "Reject",
+    "Ask for details",
+    "Approve"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/payables/d1",
+    "/business/team"
+   ]
+  },
+  "desktop /business/counterparties": {
+   "links": 24,
+   "buttons": 8,
+   "disabled": 1,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Keep both",
+    "[off] MergeNot available yet",
+    "All · 5",
+    "Customers · 2",
+    "Suppliers · 3",
+    "Missing details · 1"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/counterparties/manage",
+    "/business/counterparties/new",
+    "/business/counterparties/c1/edit",
+    "/business/counterparties/c2/edit",
+    "/business/counterparties/c3/edit",
+    "/business/counterparties/c5/edit",
+    "/business/counterparties/c4/edit"
+   ]
+  },
+  "desktop /business/counterparties/new": {
+   "links": 26,
+   "buttons": 17,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Save counterparty",
+    "Supplier",
+    "Customer",
+    "Both",
+    "Landlord",
+    "Lender",
+    "PT",
+    "CV",
+    "Person",
+    "Foreign company",
+    "Other",
+    "PKP",
+    "Not PKP",
+    "Unknown"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard"
+   ]
+  },
+  "desktop /business/counterparties/c5/edit": {
+   "links": 24,
+   "buttons": 17,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Save counterparty",
+    "Supplier",
+    "Customer",
+    "Both",
+    "Landlord",
+    "Lender",
+    "PT",
+    "CV",
+    "Person",
+    "Foreign company",
+    "Other",
+    "PKP",
+    "Not PKP",
+    "Unknown"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard"
+   ]
+  },
+  "desktop /business/documents": {
+   "links": 20,
+   "buttons": 5,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Add PDFs or photosOr send them to the CFO AI bot i",
+    "Needs a look · 2",
+    "September 2026 · 0"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/documents/classic"
+   ]
+  },
+  "desktop /business/accountant": {
+   "links": 27,
+   "buttons": 8,
+   "disabled": 3,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "[off] Send to your accountant for reviewReview workflow ",
+    "[off] Download package (PDF + files)Not available yet",
+    "[off] Send",
+    "When do I become PKP?",
+    "What does my accountant still need?",
+    "Which suppliers need a withholding slip?"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/accountant/classic",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile",
+    "/business/bank-import"
+   ]
+  },
+  "desktop /business/accountant?tab=packages": {
+   "links": 22,
+   "buttons": 11,
+   "disabled": 1,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "All · 3",
+    "Not complete · 3",
+    "Money out",
+    "Money in",
+    "Payroll",
+    "28 SeptPayroll−Rp 21MIn progress",
+    "27 SeptCV Sample ClientInvoice 0007+Rp 14.1MMissin",
+    "26 SeptMarketplace order−Rp 380KNo category",
+    "[off] Download folderNot available yet"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/accountant/classic",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile"
+   ]
+  },
+  "desktop /business/accountant?tab=taxes": {
+   "links": 23,
+   "buttons": 4,
+   "disabled": 2,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "[off] Get billing codesComing soon",
+    "[off] Reminder settingsComing soon"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/accountant/classic",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile",
+    "/accountant/calendar"
+   ]
+  },
+  "desktop /business/accountant/tax-profile": {
+   "links": 25,
+   "buttons": 2,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/accountant/classic",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile"
+   ]
+  },
+  "desktop /business/settings": {
+   "links": 25,
+   "buttons": 3,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "Change targets"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/settings/classic",
+    "/business/accountant/tax-profile",
+    "/business/team",
+    "/business/bank-import",
+    "/business/payment-connections"
+   ]
+  },
+  "desktop /business/more": {
+   "links": 30,
+   "buttons": 3,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal",
+    "DDemo Trading CoSwitch company or go to Personal"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard"
+   ]
+  },
+  "desktop /business/onboarding": {
+   "links": 22,
+   "buttons": 2,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoCompany · owner",
+    "Switch to Personal"
+   ],
+   "linkTargets": [
+    "/business/add",
+    "/business/pulse",
+    "/business/radar",
+    "/business/performance",
+    "/business/ai-cfo",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/onboarding/classic",
+    "/business/accountant/tax-profile",
+    "/business/bank-import",
+    "/business/team"
+   ]
+  },
+  "desktop /admin": {
+   "links": 0,
+   "buttons": 16,
+   "disabled": 0,
+   "buttonTexts": [
+    "Pulse",
+    "Radar",
+    "CFO AI",
+    "Transactions",
+    "Accounts",
+    "Invoices",
+    "Receivables",
+    "Payables",
+    "Payroll🔒",
+    "Tasks",
+    "Approvals🔒",
+    "Team",
+    "AI Accountant",
+    "Documents",
+    "Bank import",
+    ""
+   ],
+   "linkTargets": []
+  },
+  "desktop /admin/businesses": {
+   "links": 7,
+   "buttons": 7,
+   "disabled": 1,
+   "buttonTexts": [
+    "All · 2",
+    "Paying · 0",
+    "Trial · 1",
+    "Needs attention · 2",
+    "Demo Trading CoHF-001 · since 24 AugFounder · tria",
+    "Second Demo LtdHF-002 · since 3 SeptFree0/223 Sept",
+    "[off] Request support accessWaiting for the grant design"
+   ],
+   "linkTargets": [
+    "/admin/dashboard",
+    "/admin/businesses",
+    "/admin/system",
+    "/admin",
+    "/business/pulse",
+    "/admin/businesses/b1/tools"
+   ]
+  },
+  "desktop /admin/system": {
+   "links": 5,
+   "buttons": 0,
+   "disabled": 0,
+   "buttonTexts": [],
+   "linkTargets": [
+    "/admin/dashboard",
+    "/admin/businesses",
+    "/admin/system",
+    "/admin",
+    "/business/pulse"
+   ]
+  },
+  "phone /business/pulse": {
+   "links": 17,
+   "buttons": 0,
+   "disabled": 0,
+   "buttonTexts": [],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/radar",
+    "/business/payables/d1",
+    "/business/receivables",
+    "/business/accountant",
+    "/business/transactions",
+    "/business/payables",
+    "/business/pulse",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/radar": {
+   "links": 13,
+   "buttons": 15,
+   "disabled": 3,
+   "buttonTexts": [
+    "30 days",
+    "[off] 60 daysFounder",
+    "[off] 90 daysFounder",
+    "Show as table",
+    "Worst case",
+    "PT Test Resort pays 2 weeks late",
+    "Collect CV Sample Client this week",
+    "Pay PT Contractor Demo 2 weeks later",
+    "Revenue −20%",
+    "If you approve PT Example Supplies",
+    "[off] Hire 1 person",
+    "Ask your own",
+    "All",
+    "Coming in",
+    "Going out"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/receivables",
+    "/business/payables/d1",
+    "/business/payables/d3",
+    "/business/funding-investors",
+    "/business/payables/d7",
+    "/business/transactions",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/performance": {
+   "links": 14,
+   "buttons": 4,
+   "disabled": 0,
+   "buttonTexts": [
+    "Export",
+    "Ask AI CFO",
+    "Show as table"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/performance",
+    "/business/performance/cash",
+    "/business/performance/forecast",
+    "/business/performance/groups",
+    "/business/performance?month=2026-09&compare=2026-08&focus=costs",
+    "/business/transactions",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/performance/cash": {
+   "links": 11,
+   "buttons": 3,
+   "disabled": 0,
+   "buttonTexts": [
+    "Export",
+    "Show as table"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/performance",
+    "/business/performance/cash",
+    "/business/performance/forecast",
+    "/business/funding-investors",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/performance/forecast": {
+   "links": 13,
+   "buttons": 3,
+   "disabled": 0,
+   "buttonTexts": [
+    "Show as table",
+    "Plan it with AI CFO"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/performance",
+    "/business/performance/cash",
+    "/business/performance/forecast",
+    "/business/radar",
+    "/business/payables",
+    "/business/receivables",
+    "/business/pulse",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/performance/groups": {
+   "links": 9,
+   "buttons": 2,
+   "disabled": 1,
+   "buttonTexts": [
+    "Use 1 suggestions",
+    "[off] Save 0 changes"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/performance",
+    "/business/settings/classic",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/ai-cfo": {
+   "links": 12,
+   "buttons": 8,
+   "disabled": 1,
+   "buttonTexts": [
+    "Why?",
+    "[off] Send",
+    "Can I afford a new machine next month?",
+    "Why is runway shorter than last month?",
+    "What if revenue drops 20%?",
+    "Write a one-page investor update"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/radar",
+    "/business/receivables",
+    "/business/payables",
+    "/business/payroll",
+    "/business/ai-cfo/classic",
+    "/business/pulse",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/accounts": {
+   "links": 15,
+   "buttons": 0,
+   "disabled": 0,
+   "buttonTexts": [],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/bank-import",
+    "/business/accounts/manage",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/transactions": {
+   "links": 9,
+   "buttons": 7,
+   "disabled": 0,
+   "buttonTexts": [
+    "Export",
+    "Review 2",
+    "All",
+    "Money in",
+    "Money out",
+    "Transfers",
+    "Needs review · 2"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/add",
+    "/business/transactions/classic",
+    "/business/pulse",
+    "/business/radar",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/funding-investors": {
+   "links": 10,
+   "buttons": 2,
+   "disabled": 0,
+   "buttonTexts": [
+    "Record funding",
+    "Mark paid today"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/ai-cfo",
+    "/business/intercompany",
+    "/business/radar",
+    "/business/pulse",
+    "/business/add"
+   ]
+  },
+  "phone /business/assets": {
+   "links": 8,
+   "buttons": 0,
+   "disabled": 0,
+   "buttonTexts": [],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/assets/new",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/assets/new": {
+   "links": 14,
+   "buttons": 8,
+   "disabled": 0,
+   "buttonTexts": [
+    "Save asset",
+    "Add PDFs or photosThe invoice is filed in Document",
+    "Machines and equipment",
+    "Vehicles",
+    "Computers and phones",
+    "Furniture and fit-out",
+    "Buildings",
+    "Other"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/assets",
+    "/business/documents",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/payables": {
+   "links": 14,
+   "buttons": 13,
+   "disabled": 0,
+   "buttonTexts": [
+    "Add a bill",
+    "New invoice",
+    "Owed to you · 2 invoicesRp 33.4MRp 14.1M late · Rp",
+    "You owe · 4 billsRp 28.9MRp 8.4M waiting for your ",
+    "To pay",
+    "To collect",
+    "All",
+    "Open",
+    "Paid",
+    "Mark paid"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/payables/d1",
+    "/business/payables/d3",
+    "/business/payables/d5",
+    "/business/payables/d6",
+    "/business/payables/d7",
+    "/business/payables/classic",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/receivables": {
+   "links": 10,
+   "buttons": 11,
+   "disabled": 1,
+   "buttonTexts": [
+    "Add a bill",
+    "New invoice",
+    "Owed to you · 2 invoicesRp 33.4MRp 14.1M late · Rp",
+    "You owe · 4 billsRp 28.9MRp 8.4M waiting for your ",
+    "To pay",
+    "To collect",
+    "All",
+    "Open",
+    "Paid",
+    "[off] Send reminderComing soon",
+    "Mark received"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/receivables/d2",
+    "/business/receivables/d4",
+    "/business/receivables/classic",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/payables/d1": {
+   "links": 13,
+   "buttons": 4,
+   "disabled": 0,
+   "buttonTexts": [
+    "Reject",
+    "Ask for details",
+    "Approve",
+    "Mark checked"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/payables",
+    "/business/counterparties",
+    "/business/radar",
+    "/business/documents",
+    "/business/accountant?tab=packages",
+    "/business/pulse",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/receivables/d4": {
+   "links": 13,
+   "buttons": 2,
+   "disabled": 0,
+   "buttonTexts": [
+    "Mark checked",
+    "Record tax withheld by the customer"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/receivables",
+    "/business/counterparties",
+    "/business/radar",
+    "/business/documents",
+    "/business/pulse",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/payroll": {
+   "links": 9,
+   "buttons": 1,
+   "disabled": 0,
+   "buttonTexts": [
+    "Ask AI CFO"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/payroll/manage",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/approvals": {
+   "links": 9,
+   "buttons": 5,
+   "disabled": 0,
+   "buttonTexts": [
+    "Waiting · 1",
+    "Decided",
+    "Reject",
+    "Ask for details",
+    "Approve"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/payables/d1",
+    "/business/team",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/counterparties": {
+   "links": 14,
+   "buttons": 6,
+   "disabled": 1,
+   "buttonTexts": [
+    "Keep both",
+    "[off] MergeNot available yet",
+    "All · 5",
+    "Customers · 2",
+    "Suppliers · 3",
+    "Missing details · 1"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/counterparties/manage",
+    "/business/counterparties/new",
+    "/business/counterparties/c1/edit",
+    "/business/counterparties/c2/edit",
+    "/business/counterparties/c3/edit",
+    "/business/counterparties/c5/edit",
+    "/business/counterparties/c4/edit",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/counterparties/new": {
+   "links": 16,
+   "buttons": 15,
+   "disabled": 0,
+   "buttonTexts": [
+    "Save counterparty",
+    "Supplier",
+    "Customer",
+    "Both",
+    "Landlord",
+    "Lender",
+    "PT",
+    "CV",
+    "Person",
+    "Foreign company",
+    "Other",
+    "PKP",
+    "Not PKP",
+    "Unknown"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/ai-cfo",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add"
+   ]
+  },
+  "phone /business/counterparties/c5/edit": {
+   "links": 14,
+   "buttons": 15,
+   "disabled": 0,
+   "buttonTexts": [
+    "Save counterparty",
+    "Supplier",
+    "Customer",
+    "Both",
+    "Landlord",
+    "Lender",
+    "PT",
+    "CV",
+    "Person",
+    "Foreign company",
+    "Other",
+    "PKP",
+    "Not PKP",
+    "Unknown"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/documents": {
+   "links": 10,
+   "buttons": 3,
+   "disabled": 0,
+   "buttonTexts": [
+    "Add PDFs or photosOr send them to the CFO AI bot i",
+    "Needs a look · 2",
+    "September 2026 · 0"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/documents/classic",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/accountant": {
+   "links": 17,
+   "buttons": 6,
+   "disabled": 3,
+   "buttonTexts": [
+    "[off] Send to your accountant for reviewReview workflow ",
+    "[off] Download package (PDF + files)Not available yet",
+    "[off] Send",
+    "When do I become PKP?",
+    "What does my accountant still need?",
+    "Which suppliers need a withholding slip?"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/accountant/classic",
+    "/business/accountant",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile",
+    "/business/bank-import",
+    "/business/transactions",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/accountant?tab=packages": {
+   "links": 12,
+   "buttons": 9,
+   "disabled": 1,
+   "buttonTexts": [
+    "All · 3",
+    "Not complete · 3",
+    "Money out",
+    "Money in",
+    "Payroll",
+    "28 SeptPayroll−Rp 21MIn progress",
+    "27 SeptCV Sample ClientInvoice 0007+Rp 14.1MMissin",
+    "26 SeptMarketplace order−Rp 380KNo category",
+    "[off] Download folderNot available yet"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/accountant/classic",
+    "/business/accountant",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/accountant?tab=taxes": {
+   "links": 13,
+   "buttons": 2,
+   "disabled": 2,
+   "buttonTexts": [
+    "[off] Get billing codesComing soon",
+    "[off] Reminder settingsComing soon"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/accountant/classic",
+    "/business/accountant",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile",
+    "/accountant/calendar",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/accountant/tax-profile": {
+   "links": 15,
+   "buttons": 0,
+   "disabled": 0,
+   "buttonTexts": [],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/settings",
+    "/business/accountant/classic",
+    "/business/accountant",
+    "/business/accountant?tab=packages",
+    "/business/accountant?tab=taxes",
+    "/business/accountant/tax-profile",
+    "/business/documents",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/settings": {
+   "links": 15,
+   "buttons": 1,
+   "disabled": 0,
+   "buttonTexts": [
+    "Change targets"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/settings/classic",
+    "/business/accountant/tax-profile",
+    "/business/team",
+    "/business/bank-import",
+    "/business/payment-connections",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/more": {
+   "links": 20,
+   "buttons": 1,
+   "disabled": 0,
+   "buttonTexts": [
+    "DDemo Trading CoSwitch company or go to Personal"
+   ],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/performance",
+    "/business/accounts",
+    "/business/transactions",
+    "/business/funding-investors",
+    "/business/assets",
+    "/business/payables",
+    "/business/payroll",
+    "/business/counterparties",
+    "/business/documents",
+    "/business/accountant",
+    "/business/settings",
+    "/admin/dashboard",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /business/onboarding": {
+   "links": 12,
+   "buttons": 0,
+   "disabled": 0,
+   "buttonTexts": [],
+   "linkTargets": [
+    "/business/more",
+    "/business/approvals",
+    "/business/onboarding/classic",
+    "/business/accountant/tax-profile",
+    "/business/bank-import",
+    "/business/team",
+    "/business/pulse",
+    "/business/radar",
+    "/business/add",
+    "/business/ai-cfo"
+   ]
+  },
+  "phone /admin": {
+   "links": 0,
+   "buttons": 6,
+   "disabled": 0,
+   "buttonTexts": [
+    "Pulse",
+    "Add",
+    "Radar",
+    "CFO AI",
+    "Accounts",
+    "Settings"
+   ],
+   "linkTargets": []
+  },
+  "phone /admin/businesses": {
+   "links": 6,
+   "buttons": 7,
+   "disabled": 1,
+   "buttonTexts": [
+    "All · 2",
+    "Paying · 0",
+    "Trial · 1",
+    "Needs attention · 2",
+    "Demo Trading CoHF-001 · since 24 AugFounder · tria",
+    "Second Demo LtdHF-002 · since 3 SeptFree0/223 Sept",
+    "[off] Request support accessWaiting for the grant design"
+   ],
+   "linkTargets": [
+    "/business/pulse",
+    "/admin/dashboard",
+    "/admin/businesses",
+    "/admin/system",
+    "/admin/businesses/b1/tools"
+   ]
+  },
+  "phone /admin/system": {
+   "links": 4,
+   "buttons": 0,
+   "disabled": 0,
+   "buttonTexts": [],
+   "linkTargets": [
+    "/business/pulse",
+    "/admin/dashboard",
+    "/admin/businesses",
+    "/admin/system"
+   ]
+  }
+ },
+ "badLinks": [],
+ "silentDisabled": [],
+ "errors": [],
+ "overflow": [],
+ "linksFollowed": 59
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add asset</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.card{background:#FFFFFF;border:1px solid #DDE5EC;border-radius:20px}
+.kpi{padding:18px 20px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kl{font-size:13px;font-weight:600;color:#5A6E82}
+.kv{font-size:24px;font-weight:800}
+.ks{font-size:13px;color:#3D556E;line-height:1.45}
+.lg{display:inline-flex;align-items:center;gap:8px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.wf{display:grid;grid-template-columns:170px minmax(0,1fr) 110px;gap:14px;align-items:center;padding:9px 0;font-size:14px}
+.wf>*{min-width:0}
+.trk{position:relative;height:22px}
+.cl{display:grid;grid-template-columns:minmax(0,1fr) 96px 96px;gap:12px;padding:9px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.cl>*{min-width:0}
+details summary{cursor:pointer;font-size:13px;font-weight:700;color:#1565C0;list-style:none}
+.tb{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.tb th,.tb td{padding:6px 8px;border-top:1px solid #EDF1F5;text-align:right;white-space:nowrap}
+.tb th:first-child,.tb td:first-child{text-align:left}
+.tb th{color:#5A6E82;font-weight:700}
+
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="assets" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<a href="Assets.dc.html" style="font-size: 13px; font-weight: 700;">Assets &amp; balance</a>
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">Add asset</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Drop the purchase invoice — CFO AI fills in the rest and tells you which documents are missing</p>
+</div>
+<div style="display: flex; gap: 10px;"><a class="btn" href="Assets.dc.html">Cancel</a><a class="btn btn-p" href="Assets.dc.html">Save asset</a></div>
+</header>
+
+<section style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;"><div class="card" style="padding: 16px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px;"><span class="num" style="width: 28px; height: 28px; border-radius: 50%; background: #003366; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">1</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 800;">Drop the invoice</span><span style="font-size: 13px; line-height: 1.5; color: #3D556E;">PDF, photo or a forwarded email. Several items on one invoice become separate assets.</span></span></div><div class="card" style="padding: 16px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px;"><span class="num" style="width: 28px; height: 28px; border-radius: 50%; background: #003366; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">2</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 800;">AI fills the details</span><span style="font-size: 13px; line-height: 1.5; color: #3D556E;">Name, price, date, supplier and the asset type. Everything it read is marked "from invoice".</span></span></div><div class="card" style="padding: 16px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px;"><span class="num" style="width: 28px; height: 28px; border-radius: 50%; background: #003366; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">3</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 800;">Check and add documents</span><span style="font-size: 13px; line-height: 1.5; color: #3D556E;">The list on the right changes with the asset type. Missing ones can wait — you get a reminder.</span></span></div><div class="card" style="padding: 16px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px;"><span class="num" style="width: 28px; height: 28px; border-radius: 50%; background: #003366; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800;">4</span><span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 14px; font-weight: 800;">Save</span><span style="font-size: 13px; line-height: 1.5; color: #3D556E;">It joins the register. Each month its wear and tear (depreciation) goes into Performance. It never counts twice as a cost.</span></span></div></section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+<section class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">1 · Purchase invoice</h3>
+<div style="display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid #DDE5EC; border-radius: 14px; background: #F4F6F8;">
+<span style="width: 44px; height: 44px; border-radius: 10px; background: #FFFFFF; color: #C62828; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800;">PDF</span>
+<span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">INV-2210_motor_dealer.pdf</span><span style="font-size: 12px; color: #0F7A52; font-weight: 700;">Read by AI · 1 item found</span></span>
+<button class="btn" style="height: 34px;">Replace</button>
+</div>
+<div style="display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 64px; border: 2px dashed #C2CFDB; border-radius: 14px; font-size: 14px; color: #3D556E;"><svg class="ic" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Drop more files, or take a photo from your phone</div>
+</section>
+
+<section class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">2 · Details</h3><span style="font-size: 12px; color: #5A6E82;">Check what AI read · everything can be changed</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+<label style="display: flex; flex-direction: column; gap: 6px; grid-column: span 2;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">What is it<span class="tag" style="background: #E6F1FB; color: #1565C0;">From invoice</span></span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Delivery motorbike</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Asset type<span class="tag" style="background: #E6F1FB; color: #1565C0;">AI suggested</span></span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Vehicles</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Quantity</span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">1</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Price<span class="tag" style="background: #E6F1FB; color: #1565C0;">From invoice</span></span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Rp 26.0M</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Bought on<span class="tag" style="background: #E6F1FB; color: #1565C0;">From invoice</span></span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">1 Oct 2026</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Supplier<span class="tag" style="background: #E6F1FB; color: #1565C0;">From invoice</span></span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">PT [Motor dealer]</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Paid from</span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Not linked yet · pick the bank payment</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Where it is</span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Workshop</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 6px;"><span style="display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; color: #3D556E;">Who looks after it</span><span style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid #C2CFDB; border-radius: 12px; font-size: 15px; background: #FFFFFF; min-width: 0;"><span class="num" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Budi Santoso</span></span></label>
+</div>
+</section>
+
+<section class="card" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 10px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">3 · Wear and tear</h3>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Useful life</span><span class="num" style="font-size: 18px; font-weight: 800;">4 years</span><span style="font-size: 12px; color: #5A6E82;">Tax group 1 · vehicles</span></div>
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Cost a month</span><span class="num" style="font-size: 18px; font-weight: 800;">Rp 541.7K</span><span style="font-size: 12px; color: #5A6E82;">Straight line, 48 months</span></div>
+<div style="background: #F4F6F8; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 12px; font-weight: 600; color: #5A6E82;">Starts</span><span class="num" style="font-size: 18px; font-weight: 800;">October 2026</span><span style="font-size: 12px; color: #5A6E82;">Month it was bought</span></div>
+</div>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #5A6E82;">Over Rp 5M, so it is an asset, not a monthly cost. The price includes VAT — the company isn't PKP, so VAT can't be reclaimed and is part of the cost. The useful life follows the tax rules for this type; Rina confirms it at month close.</p>
+</section>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+<section class="card" style="padding: 20px 22px 10px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;"><h3 style="margin: 0; font-size: 17px; font-weight: 800;">Documents for a vehicle</h3><span class="num" style="font-size: 13px; font-weight: 700; color: #5A6E82;">1 of 4 required</span></div>
+<div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M20 6L9 17l-5-5"/></svg></span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Purchase invoice</span><span style="font-size: 12px; line-height: 1.45; color: #5A6E82;">Required · proves the price and the date. Read by AI.</span></span><span style="font-size: 13px; color: #0F7A52; font-weight: 700;">Added</span></div><div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5;"><span style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid #B5740B; box-sizing: border-box;"></span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Payment proof</span><span style="font-size: 12px; line-height: 1.45; color: #5A6E82;">Required · bank transfer or receipt. Link the bank payment and this fills itself.</span></span><a class="btn" style="height: 34px;" href="Transactions.dc.html">Link payment</a></div><div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5;"><span style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid #B5740B; box-sizing: border-box;"></span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">BPKB · ownership book</span><span style="font-size: 12px; line-height: 1.45; color: #5A6E82;">Required for vehicles · must be in the company's name, not yours</span></span><a class="btn" style="height: 34px;" href="Documents.dc.html">Upload</a></div><div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5;"><span style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid #B5740B; box-sizing: border-box;"></span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">STNK · registration</span><span style="font-size: 12px; line-height: 1.45; color: #5A6E82;">Required for vehicles · CFO AI reminds you before it expires</span></span><a class="btn" style="height: 34px;" href="Documents.dc.html">Upload</a></div><div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5;"><span style="width: 26px; height: 26px; border-radius: 50%; border: 2px dashed #C2CFDB; box-sizing: border-box;"></span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Photo with frame number</span><span style="font-size: 12px; line-height: 1.45; color: #5A6E82;">Recommended · helps the accountant and any audit</span></span><a class="btn" style="height: 34px;" href="Documents.dc.html">Upload</a></div><div style="display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid #EDF1F5;"><span style="width: 26px; height: 26px; border-radius: 50%; border: 2px dashed #C2CFDB; box-sizing: border-box;"></span><span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 14px; font-weight: 700;">Insurance policy</span><span style="font-size: 12px; line-height: 1.45; color: #5A6E82;">Optional · we add the renewal date to reminders</span></span><a class="btn" style="height: 34px;" href="Documents.dc.html">Upload</a></div>
+<p style="margin: 10px 0 8px; font-size: 12px; line-height: 1.5; color: #5A6E82;">You can save now. Missing documents show on the asset as "Documents missing" and in Rina's month-close list.</p>
+</section>
+<section class="card" style="padding: 20px 22px 10px;">
+<h3 style="margin: 0 0 6px; font-size: 17px; font-weight: 800;">What to upload, by type</h3>
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid #EDF1F5; font-size: 13px; line-height: 1.5;"><span style="font-weight: 700;">Machines and equipment</span><span style="color: #3D556E;">Invoice, payment proof, delivery note or handover (BAST), warranty, photo with serial number</span></div><div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid #EDF1F5; font-size: 13px; line-height: 1.5;"><span style="font-weight: 700;">Vehicles</span><span style="color: #3D556E;">All of the above, plus BPKB, STNK and insurance</span></div><div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid #EDF1F5; font-size: 13px; line-height: 1.5;"><span style="font-weight: 700;">Computers and phones</span><span style="color: #3D556E;">Invoice, payment proof, serial number</span></div><div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid #EDF1F5; font-size: 13px; line-height: 1.5;"><span style="font-weight: 700;">Furniture and fit-out</span><span style="color: #3D556E;">Invoice, payment proof; for renovation also the contract and BAST</span></div><div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid #EDF1F5; font-size: 13px; line-height: 1.5;"><span style="font-weight: 700;">Buildings</span><span style="color: #3D556E;">Purchase deed (AJB), certificate, building permit (PBG), tax receipts</span></div><div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid #EDF1F5; font-size: 13px; line-height: 1.5;"><span style="font-weight: 700;">Imported goods</span><span style="color: #3D556E;">Also the customs import document (PIB)</span></div>
+</section>
+</div>
+</div>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

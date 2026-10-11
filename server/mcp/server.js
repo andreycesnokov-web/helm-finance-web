@@ -1,0 +1,123 @@
+// MCP protocol handler — Streamable HTTP, stateless.
+//
+// CommonJS module that lazy-loads the ESM MCP SDK on first request (the SDK is ESM-only;
+// the rest of the backend is CommonJS). Stateless transport: a fresh McpServer + transport
+// is built per request, as the SDK's stateless pattern recommends. This file is a thin
+// boundary — it contains NO accounting logic; tool handlers live in tools.js and call the
+// existing CFO services injected from server/index.js.
+
+const { phase1Tools, writeTools } = require('./tools');
+const { canWriteDrafts } = require('./auth');
+const { memberships } = require('./context');
+
+const SERVER_INSTRUCTIONS = [
+  'CFO AI (CFO Finance) MCP server. CFO AI is the system of record for accounting and documents;',
+  'these tools are a read-only interface to it (Phase 1) — nothing you call here saves or changes',
+  'data. Always call get_company_context first to learn which company the user can act in — never',
+  'guess a company_id. Tools return structured data computed by CFO Finance; present it to the user',
+  'and do not recompute financial figures yourself. To analyze an invoice the user gave you, pass its',
+  'full text to analyze_invoice; amounts you read are treated as a model reading and need confirmation.',
+].join(' ');
+
+// Appended only when write tools are enabled (MCP_WRITE_TOOLS_ENABLED=true).
+const WRITE_INSTRUCTIONS = [
+  'Exception to read-only: submit_invoice_draft creates a payable DRAFT that waits for the user\'s',
+  'approval inside CFO AI. Use it only when the user asks to send an invoice to CFO, after showing them',
+  'the analyze_invoice result. It never pays anything; tell the user to confirm the draft in CFO AI.',
+].join(' ');
+
+let _sdk = null;
+async function loadSdk() {
+  if (!_sdk) {
+    const [mcp, http] = await Promise.all([
+      import('@modelcontextprotocol/sdk/server/mcp.js'),
+      import('@modelcontextprotocol/sdk/server/streamableHttp.js'),
+    ]);
+    _sdk = { McpServer: mcp.McpServer, StreamableHTTPServerTransport: http.StreamableHTTPServerTransport };
+  }
+  return _sdk;
+}
+
+// How the server introduces itself to AI clients (MCP `serverInfo`): brand name, a short
+// description, the website and the official CFO AI app icon — navy for light UIs, white for
+// dark ones. Icons need absolute URLs, so they are only advertised when the public base URL
+// is known (MCP_PUBLIC_BASE_URL / APP_BASE_URL).
+function serverInfo(baseUrl) {
+  const info = {
+    name: 'cfo-finance-mcp',
+    title: 'CFO AI',
+    version: '0.4.0',
+    description: 'CFO AI — Financial OS: your companies, financial position, missing documents and invoice analysis (read-only).',
+  };
+  if (baseUrl) {
+    info.websiteUrl = baseUrl;
+    info.icons = [
+      { src: `${baseUrl}/brand/app_icon_navy_rounded_1024.png`, mimeType: 'image/png', sizes: ['1024x1024'], theme: 'light' },
+      { src: `${baseUrl}/brand/app_icon_navy_rounded.svg`, mimeType: 'image/svg+xml', sizes: ['any'], theme: 'light' },
+      { src: `${baseUrl}/brand/app_icon_white_rounded_1024.png`, mimeType: 'image/png', sizes: ['1024x1024'], theme: 'dark' },
+      { src: `${baseUrl}/brand/app_icon_white_rounded.svg`, mimeType: 'image/svg+xml', sizes: ['any'], theme: 'dark' },
+    ];
+  }
+  return info;
+}
+
+// Build a configured McpServer for the given identity context. Transport-agnostic, so it
+// can be driven by the HTTP transport (production) or an in-memory client (tests).
+async function buildServer(ctx) {
+  const { McpServer } = await loadSdk();
+  // Write tools need BOTH the server flag and, for OAuth callers, the cfo:drafts grant.
+  const withWrite = !!(ctx && ctx.writeToolsEnabled && canWriteDrafts(ctx.mcpUser));
+  const server = new McpServer(
+    serverInfo(ctx && ctx.baseUrl),
+    { instructions: withWrite ? `${SERVER_INSTRUCTIONS} ${WRITE_INSTRUCTIONS}` : SERVER_INSTRUCTIONS },
+  );
+  const all = withWrite ? [...phase1Tools(ctx), ...writeTools(ctx)] : phase1Tools(ctx);
+  const roles = await companyRoles(ctx);
+  // UX only: list the tools the user can use in at least one of their companies. Every call
+  // still re-checks the role in the company it acts in — hiding a tool is never the gate.
+  // A predicate that cannot be evaluated keeps the tool listed: the filter must never be the
+  // reason a request fails.
+  const usable = (t) => !t.availableFor || roles.some((r) => {
+    try { return t.availableFor(r, ctx.services); } catch { return true; }
+  });
+  const tools = roles ? all.filter(usable) : all;
+  for (const t of tools) {
+    server.registerTool(t.name, t.config, t.handler);
+  }
+  return server;
+}
+
+// The user's roles across their COMPANY workspaces (personal workspaces are not served by these
+// tools). null = unknown (no identity, no memberships, or the lookup failed) → no filtering;
+// the per-call checks then answer with the real reason (no_business, forbidden_role, …).
+async function companyRoles(ctx) {
+  const s = ctx && ctx.services;
+  const uid = ctx && ctx.mcpUser && ctx.mcpUser.userId;
+  if (uid == null || !s || typeof s.listAccessibleWorkspaces !== 'function') return null;
+  try {
+    const rows = await memberships(ctx);
+    const roles = [...new Set((rows || [])
+      .filter((m) => m && m.role && !(m.businesses && m.businesses.type === 'personal'))
+      .map((m) => m.role))];
+    return roles.length ? roles : null;
+  } catch {
+    return null;
+  }
+}
+
+async function handleMcpRequest(req, res, ctx) {
+  const { StreamableHTTPServerTransport } = await loadSdk();
+  const server = await buildServer(ctx);
+
+  // Stateless: no session id generator. New transport per request.
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  res.on('close', () => {
+    try { transport.close(); } catch { /* noop */ }
+    try { server.close(); } catch { /* noop */ }
+  });
+
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
+}
+
+module.exports = { handleMcpRequest, buildServer, serverInfo, SERVER_INSTRUCTIONS, WRITE_INSTRUCTIONS };

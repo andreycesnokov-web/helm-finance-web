@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI Accountant — desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1565C0;text-decoration:none}a:hover{color:#003366}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.btn{font-family:inherit;font-size:14px;font-weight:700;border-radius:10px;height:40px;padding:0 16px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.btn-p{background:#1565C0;border-color:#1565C0;color:#FFFFFF}
+.tag{font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;display:inline-block}
+.ck{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.tx{display:grid;grid-template-columns:64px minmax(0,1fr) 110px 120px;gap:12px;align-items:center;padding:13px 0;border-top:1px solid #EDF1F5;font-size:14px}
+.chip{font-family:inherit;font-size:14px;font-weight:600;border-radius:999px;min-height:38px;padding:8px 14px;border:1px solid #DDE5EC;background:#FFFFFF;color:#003366;cursor:pointer;text-align:left}
+a.btn-p,a.btn-p:hover{color:#FFFFFF}
+a.btn:hover,a.chip:hover{filter:brightness(0.97)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); background: #F4F6F8; font-family: 'Manrope', 'Segoe UI', sans-serif; color: #003366;">
+<dc-import name="Sidebar" active="accountant" hint-size="248px,100%"></dc-import>
+<main style="padding: 32px 40px 48px;">
+<div style="max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px;">
+
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Archivo Black', 'Manrope', sans-serif; font-size: 30px; font-weight: 400;">AI Accountant</h1>
+<p style="margin: 0; font-size: 15px; color: #3D556E;">Closes the month and keeps taxes on time — your accountant confirms</p>
+</div>
+<button class="btn">September 2026<svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M6 9l6 6 6-6"/></svg></button>
+</header>
+
+<nav aria-label="AI Accountant sections" style="display: flex; gap: 26px; border-bottom: 1px solid #DDE5EC;">
+<a href="Accountant.dc.html" aria-current="page" style="font-size: 14px; font-weight: 700; color: #003366; padding: 10px 2px; border-bottom: 2px solid #003366;">Month close</a>
+<a href="AccountantPackages.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Documents by transaction</a>
+<a href="AccountantTaxes.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Tax calendar</a>
+<a href="CompanyProfile.dc.html" style="font-size: 14px; font-weight: 700; color: #5A6E82; padding: 10px 2px;">Tax profile</a>
+</nav>
+
+<section style="background: #003366; color: #FFFFFF; border-radius: 24px; padding: 28px 30px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 32px; align-items: center;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<span style="font-size: 14px; font-weight: 600; color: #C9D8E8;">September close</span>
+<h2 style="margin: 0; font-size: 26px; font-weight: 800; line-height: 1.25;">88% ready. Three payment proofs and two categories stand between you and a closed month.</h2>
+<div style="height: 8px; border-radius: 8px; background: #1E4D7A;"><div style="width: 88%; height: 8px; border-radius: 8px; background: #3399FF;"></div></div>
+<span class="num" style="font-size: 14px; color: #C9D8E8;">36 of 41 records complete · accountant: Rina, not started</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; align-items: stretch;">
+<a class="btn btn-p" style="justify-content: center; height: 46px; background: #FFFFFF; border-color: #FFFFFF; color: #003366;" href="AccountantPackages.dc.html">Send to Rina for review</a>
+<button class="btn" style="justify-content: center; height: 46px; background: transparent; border-color: #3D6A96; color: #FFFFFF;">Download package (PDF + files)</button>
+<span style="font-size: 12px; color: #C9D8E8; text-align: center;">You can send now — Rina will see what is still missing.</span>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 22px 10px;">
+<h3 style="margin: 0 0 4px; font-size: 17px; font-weight: 800;">To finish September</h3>
+<div class="ck"><span style="width: 24px; height: 24px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M20 6L9 17l-5-5"/></svg></span><span>Bank statements · BCA and Mandiri</span><span style="color: #5A6E82;">Done</span></div>
+<div class="ck"><span style="width: 24px; height: 24px; border-radius: 50%; background: #E5F4EE; color: #0F7A52; display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M20 6L9 17l-5-5"/></svg></span><span>Invoices issued · 2, all with documents</span><span style="color: #5A6E82;">Done</span></div>
+<div class="ck"><span style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid #B5740B;"></span><span>3 payment proofs missing<br><span style="font-size: 12px; color: #5A6E82;">Kimia Bersih, office rent, payroll</span></span><a class="btn" href="AccountantPackages.dc.html">See packages</a></div>
+<div class="ck"><span style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid #B5740B;"></span><span>2 September transactions without a category</span><a class="btn" href="Transactions.dc.html">Review</a></div>
+<div class="ck"><span style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C2CFDB;"></span><span>Accountant review</span><span style="color: #5A6E82;">After you send</span></div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 22px 10px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px;">
+<h3 style="margin: 0; font-size: 17px; font-weight: 800;">Taxes due in October · <span class="num">Rp 1.48M</span></h3>
+<a href="AccountantTaxes.dc.html" style="font-size: 13px; font-weight: 700;">Full calendar</a>
+</div>
+<div class="tx"><span class="num" style="font-weight: 700; color: #5A6E82;">15 Oct</span><span>PPh 21 · September salaries</span><span class="num" style="text-align: right; font-weight: 800;">Rp 120K</span><span style="text-align: right;"><span class="tag" style="background: #E5F4EE; color: #0F7A52;">Ready to pay</span></span></div>
+<div class="tx"><span class="num" style="font-weight: 700; color: #5A6E82;">15 Oct</span><span>PPh 23 · services paid in September</span><span class="num" style="text-align: right; font-weight: 800;">Rp 620K</span><span style="text-align: right;"><span class="tag" style="background: #FBF1DF; color: #8B5A08;">2 slips to make</span></span></div>
+<div class="tx"><span class="num" style="font-weight: 700; color: #5A6E82;">15 Oct</span><span>PPh 4(2) · office rent, 10%</span><span class="num" style="text-align: right; font-weight: 800;">Rp 740K</span><span style="text-align: right;"><span class="tag" style="background: #FBF1DF; color: #8B5A08;">1 slip to make</span></span></div>
+<div class="tx"><span class="num" style="font-weight: 700; color: #5A6E82;">20 Oct</span><span>Monthly tax reports · 2 SPT Masa</span><span class="num" style="text-align: right; color: #5A6E82;">—</span><span style="text-align: right;"><span class="tag" style="background: #F4F6F8; color: #3D556E;">Rina files</span></span></div>
+<p style="margin: 10px 0 6px; font-size: 12px; line-height: 1.5; color: #5A6E82;">Amounts come from verified tax rules and your records. Not PKP, so no PPN this month. Rina confirms before anything is paid.</p>
+</section>
+</div>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE5EC; border-radius: 20px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px;">
+<label for="acc-ask" style="font-size: 17px; font-weight: 800;">Ask about taxes and documents</label>
+<div style="display: flex; align-items: center; gap: 10px; border: 1px solid #C2CFDB; border-radius: 14px; padding: 6px 6px 6px 16px;">
+<input id="acc-ask" placeholder="e.g. Do I need to withhold tax on the Para Legals bill?" style="flex-grow: 1; border: none; outline: none; font-family: inherit; font-size: 15px; color: #003366; background: transparent; height: 40px;">
+<a class="btn btn-p" aria-label="Send" style="width: 44px; padding: 0; justify-content: center;" href="AskPanel.dc.html"><svg class="ic" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg></a>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<a class="chip" href="AskPanel.dc.html">When do I become PKP?</a>
+<a class="chip" href="AskPanel.dc.html">What does Rina still need?</a>
+<a class="chip" href="AskPanel.dc.html">Which suppliers need a bukti potong?</a>
+<a class="chip" href="CompanyProfile.dc.html" style="display: inline-flex; align-items: center;">Tax profile</a>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

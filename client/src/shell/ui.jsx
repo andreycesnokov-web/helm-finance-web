@@ -1,0 +1,316 @@
+// CFO AI — shared UI primitives (Phase 1). One set for Personal + Business.
+// Brand-token styled (shell.css). Stateless/presentational; no business logic.
+import { useState, useRef, useEffect, Fragment } from 'react'
+
+/* ── icons (stroke = currentColor) ─────────────────────────────────────────── */
+export const Icon = {
+  lock:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>,
+  users:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>,
+  plus:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" {...p}><line x1="12" y1="6" x2="12" y2="18"/><line x1="6" y1="12" x2="18" y2="12"/></svg>,
+  chev:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><polyline points="6 9 12 15 18 9"/></svg>,
+  warn:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  dot:    (p) => <svg viewBox="0 0 24 24" {...p}><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>,
+  dots:   (p) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>,
+  pulse:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  radar:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+  wallet: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  list:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
+  fund:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  link:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></svg>,
+  doc:    (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+  cfo:    (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  cog:    (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  team:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  check:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+  down:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  up:     (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>,
+  acct:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>,
+  bank:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M3 21h18"/><path d="M3 10h18"/><path d="M5 6l7-3 7 3"/><path d="M4 10v11M20 10v11M9 10v11M15 10v11"/></svg>,
+  card:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>,
+  phone:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg>,
+  globe:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20"/><path d="M12 2a15 15 0 0 0 0 20"/></svg>,
+  coffee: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4Z"/><path d="M16 10h2a3 3 0 0 1 0 6h-2"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>,
+  car:    (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M5 11l2-5h10l2 5"/><rect x="3" y="11" width="18" height="7" rx="2"/><circle cx="7" cy="18" r="1"/><circle cx="17" cy="18" r="1"/></svg>,
+  bag:    (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M6 7h12l1 14H5Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>,
+  cloud:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M17.5 18H8a5 5 0 1 1 1.1-9.88A6 6 0 0 1 20 11.5 3.5 3.5 0 0 1 17.5 18Z"/></svg>,
+  book:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z"/></svg>,
+  play:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" {...p}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>,
+  arrowDown: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" {...p}><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>,
+  transfer: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" {...p}><path d="M7 7h12l-3-3"/><path d="M17 17H5l3 3"/></svg>,
+}
+
+/* ── primitives ─────────────────────────────────────────────────────────────*/
+// className merges rather than replaces. The spread used to sit after the
+// computed class, so any caller passing className silently deleted
+// `cfo-btn cfo-btn-primary` and got an unstyled button.
+export const Btn = ({ variant = 'primary', sm, icon, className = '', children, ...p }) => (
+  <button
+    className={`cfo-btn cfo-btn-${variant}${sm ? ' cfo-btn-sm' : ''}${className ? ' ' + className : ''}`}
+    {...p}
+  >{icon}{children}</button>
+)
+
+export const StatusBadge = ({ tone = 'neutral', icon, children }) => (
+  <span className={`cfo-badge cfo-badge-${tone}`}>{icon}{children}</span>
+)
+
+// The same official symbol in navy, for the light page-hero band.
+export const HEAD_SYMBOL = '/brand/symbol_navy_transparent.svg'
+
+// The same official symbol in white, for the navy financial surfaces. Both files
+// are the identical geometry shipped in client/public/brand and differ only in
+// fill, so the product never draws two different marks.
+export const FLAGSHIP_MARK = '/brand/symbol_white_transparent.svg'
+
+/**
+ * The brand watermark a flagship financial card wears.
+ *
+ * There are exactly two branding layers in the product and they are deliberately
+ * unequal: the page hero carries a very faint contextual mark, and the one navy
+ * card carrying the page's headline figure carries a stronger cropped one. This
+ * is that second layer, and it is one component so Pulse's hand-built cash card
+ * and the shared SummaryCard cannot drift into two different treatments again.
+ *
+ * Size, opacity, crop, safe area and mobile behaviour all live in `.cfo-flagship`
+ * in shell.css. A surface opts in by wearing that class; it does not get to
+ * restyle the mark.
+ *
+ * Decorative: empty alt and aria-hidden, so it is absent from the accessibility
+ * tree entirely.
+ */
+export const FlagshipMark = () => (
+  <img className="cfo-flagship-mark" src={FLAGSHIP_MARK} alt="" aria-hidden="true" />
+)
+
+/**
+ * The header every business-workspace page wears.
+ *
+ * There were two of these: this component, and a hand-rolled `.hf-page-header`
+ * div copied across Accounts, AI CFO, Approvals and Invoices. They disagreed on
+ * whether a page gets a description, where the action sits, and whether the
+ * title is an <h1> at all — five pages shipped no <h1> whatsoever. One contract
+ * now, so a page can leave a slot empty but cannot reinvent it.
+ *
+ * @param eyebrow    small label above the title (optional)
+ * @param title      the page name — always rendered as the page's single <h1>
+ * @param description one sentence on what the page is for (optional but expected)
+ * @param primaryAction the one thing this page is for (optional)
+ * @param secondaryActions supporting actions, shown before the primary (optional)
+ * @param context    status chips / metadata, wrapped below on narrow screens
+ * @param actions    legacy slot, kept so unmigrated pages keep working
+ */
+export const PageHeader = ({
+  eyebrow, title, description, primaryAction, secondaryActions, context, actions,
+}) => (
+  <div className="cfo-pagehead">
+    {/* The band's branded corner: one official symbol, cropped by the band edge,
+        at low opacity. It lives in a reserved column that neither the text zone
+        nor the control zone can enter (see --head-safe), so it is never behind
+        anything anyone has to read. Decorative, so it is inert to a reader. */}
+    <img className="cfo-pagehead-mark" src={HEAD_SYMBOL} alt="" aria-hidden="true" />
+    <div className="cfo-pagehead-text">
+      {eyebrow && <div className="cfo-eyebrow">{eyebrow}</div>}
+      <h1 className="cfo-h1">{title}</h1>
+      {description && <p className="cfo-pagehead-desc">{description}</p>}
+    </div>
+    {(primaryAction || secondaryActions || context || actions) && (
+      <div className="cfo-pagehead-right">
+        {/* Context (metadata badges) and actions (controls) are separate boxes on
+            purpose. On mobile the actions box becomes a full-width grid so a
+            primary button spans the screen — right for buttons, wrong for badges,
+            which stretched edge to edge while they shared that box. */}
+        {context && <div className="cfo-pagehead-context">{context}</div>}
+        {(actions || secondaryActions || primaryAction) && (
+          <div className="cfo-pagehead-actions">
+            {actions}
+            {secondaryActions}
+            {primaryAction}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+)
+
+export const Card = ({ title, action, children, className = '', style }) => (
+  <section className={`cfo-card ${className}`} style={style}>
+    {(title || action) && <div className="cfo-card-head"><span className="cfo-card-title">{title}</span>{action}</div>}
+    {children}
+  </section>
+)
+
+/**
+ * Summary / hero card — the page's dominant financial figure.
+ *
+ * `flagship` marks this as the ONE card that carries the page's headline money
+ * figure: Pulse's total cash, Accounts' total balance. It is opt-in and off by
+ * default, because the meaning is editorial rather than visual — a page decides
+ * which of its cards is the flagship, and only that one earns the brand mark.
+ * Ordinary summary cards, KPI tiles, panels and tables stay unbranded.
+ *
+ * The prop is named for that role and not for what it draws, so the branding
+ * treatment can change without every call site having to be re-read.
+ *
+ * `compact` says the headline figure is an ABBREVIATED amount — "Rp 152.5M" —
+ * with the exact figure carried in `meta` beneath it. That is the hierarchy Pulse
+ * uses, and it changes one thing here: an abbreviated amount must never wrap,
+ * because half of "152.5M" on a second line is not a number. A card passing the
+ * full figure as its headline keeps the existing wrapping behaviour, which is
+ * what a long exact amount needs.
+ *
+ * `metrics` = [{k, v, tone}]
+ */
+export const SummaryCard = ({ label, value, meta, metrics, flagship = false, compact = false }) => (
+  <section className={`cfo-summary${flagship ? ' cfo-flagship' : ''}`}>
+    {flagship && <FlagshipMark />}
+    <div className="cfo-summary-label">{label}</div>
+    <div className={`cfo-summary-value${compact ? ' is-compact' : ''}`}>{value}</div>
+    {meta && <div className="cfo-summary-meta">{meta}</div>}
+    {metrics && (
+      <div className="cfo-summary-row">
+        {metrics.map((m, i) => (
+          <div key={i}><span className="cfo-summary-k">{m.k}</span><span className={`cfo-summary-v ${m.tone || ''}`}>{m.v}</span></div>
+        ))}
+      </div>
+    )}
+  </section>
+)
+
+// Native-asset money card. Never used to sum across assets.
+export const MoneyCard = ({ asset, kind = 'Fiat', sub, native, unit, reporting, ts, stale }) => (
+  <div className="cfo-money">
+    <div className="cfo-money-top">
+      <span className={`cfo-money-asset ${kind.toLowerCase() === 'crypto' ? 'crypto' : 'fiat'}`}>{asset}</span>
+      <span className="cfo-money-sub">{sub || kind}</span>
+    </div>
+    <div className="cfo-money-native">{native} {unit && <span className="cfo-money-unit">{unit}</span>}</div>
+    {reporting && <div className="cfo-money-rep">{reporting}</div>}
+    {ts && <div className={`cfo-money-ts${stale ? ' stale' : ''}`}>{stale && <Icon.warn />}{ts}</div>}
+  </div>
+)
+
+export const Stat = ({ k, v, tone }) => (
+  <div className="cfo-stat"><span className="cfo-stat-k">{k}</span><span className={`cfo-stat-v ${tone || ''}`}>{v}</span></div>
+)
+
+export const PageTabs = ({ tabs, active, onChange }) => (
+  <div className="cfo-tabs" role="tablist">
+    {tabs.map(t => (
+      <button key={t.key} role="tab" aria-selected={active === t.key}
+        className={`cfo-tab${active === t.key ? ' is-active' : ''}`} onClick={() => onChange(t.key)}>{t.label}</button>
+    ))}
+  </div>
+)
+
+export const LoadingSkeleton = ({ rows = 3, height = 16, gap = 12, width = '100%' }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap }}>
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} className="cfo-skel" style={{ height, width: typeof width === 'function' ? width(i) : width }} />
+    ))}
+  </div>
+)
+
+export const EmptyState = ({ symbol, title, description, actions }) => (
+  <div className="cfo-state">
+    {symbol && <img src={symbol} alt="" className="cfo-state-sym" aria-hidden="true" />}
+    <h2 className="cfo-state-h">{title}</h2>
+    {description && <p className="cfo-state-p">{description}</p>}
+    {actions && <div className="cfo-state-actions">{actions}</div>}
+  </div>
+)
+
+export const ErrorState = ({ title = 'Something went wrong', description, onRetry, retryLabel = 'Try again' }) => (
+  <div className="cfo-state">
+    <span className="cfo-state-ic danger"><Icon.warn /></span>
+    <h2 className="cfo-state-h">{title}</h2>
+    {description && <p className="cfo-state-p">{description}</p>}
+    {onRetry && <Btn onClick={onRetry}>{retryLabel}</Btn>}
+  </div>
+)
+
+export const ConfirmationModal = ({ open, title, children, confirmLabel = 'Confirm', cancelLabel = 'Cancel', tone = 'primary', onConfirm, onCancel }) => {
+  if (!open) return null
+  return (
+    <div className="cfo-modal-scrim" onClick={onCancel}>
+      <div className="cfo-modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+        <h3 className="cfo-modal-title">{title}</h3>
+        <div className="cfo-modal-body">{children}</div>
+        <div className="cfo-modal-actions">
+          <Btn variant="ghost" onClick={onCancel}>{cancelLabel}</Btn>
+          <Btn variant={tone} onClick={onConfirm}>{confirmLabel}</Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const ActionMenu = ({ items }) => {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [])
+  return (
+    <div className="cfo-menu-wrap" ref={ref}>
+      <button className="cfo-iconbtn" aria-label="Actions" onClick={() => setOpen(o => !o)}><Icon.dots width="18" height="18" /></button>
+      {open && (
+        <div className="cfo-menu" role="menu">
+          {items.map((it, i) => (
+            <button key={i} role="menuitem" className={`cfo-menu-item${it.danger ? ' danger' : ''}`}
+              onClick={() => { setOpen(false); it.onClick?.() }}>{it.icon}{it.label}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ResponsiveTable: real <table> on desktop; on mobile each row becomes a stacked card.
+// columns = [{key, label, num, render}], rows = array of objects, rowKey = fn
+// `expandedKey` + `renderExpanded` are OPTIONAL and additive: when omitted (every existing
+// call site) the table renders exactly as before. When provided, the matching row is marked
+// and a full-width row carrying the panel is inserted directly beneath it.
+export const ResponsiveTable = ({ columns, rows, rowKey, onRowClick, expandedKey = null, renderExpanded = null }) => (
+  <div className="cfo-table-wrap">
+    <table className="cfo-table">
+      <thead><tr>{columns.map(c => <th key={c.key} className={c.num ? 'num' : ''}>{c.label}</th>)}</tr></thead>
+      <tbody>
+        {rows.map((r, i) => {
+          const key = rowKey ? rowKey(r) : i
+          const isOpen = expandedKey != null && key === expandedKey
+          return (
+            <Fragment key={key}>
+              <tr className={isOpen ? 'is-rp-open' : undefined}
+                onClick={onRowClick ? () => onRowClick(r) : undefined} style={onRowClick ? { cursor: 'pointer' } : undefined}>
+                {columns.map(c => <td key={c.key} className={c.num ? 'num' : ''}>{c.render ? c.render(r) : r[c.key]}</td>)}
+              </tr>
+              {isOpen && renderExpanded && (
+                <tr className="cfo-row-exp">
+                  <td colSpan={columns.length}>{renderExpanded(r)}</td>
+                </tr>
+              )}
+            </Fragment>
+          )
+        })}
+      </tbody>
+    </table>
+  </div>
+)
+
+// DataList: icon + label/sub + amount rows (transactions, activity, repayments…)
+export const DataList = ({ items }) => (
+  <ul className="cfo-list">
+    {items.map((it, i) => (
+      <li key={it.id || i} className="cfo-list-item">
+        {(it.icon || it.dir) && <span className={`cfo-list-ic ${it.dir || it.iconTone || 'neutral'}`}>{it.icon || (it.dir === 'in' ? '↓' : it.dir === 'out' ? '↑' : '•')}</span>}
+        <span className="cfo-list-main">
+          <span className="cfo-list-label">{it.label}{it.tag && <span className="cfo-chip cfo-chip-soft">{it.tag}</span>}</span>
+          {it.sub && <span className="cfo-list-sub">{it.sub}</span>}
+        </span>
+        {it.amount && <span className={`cfo-list-amt ${it.amountTone || ''}`}>{it.amount}</span>}
+        {it.action}
+      </li>
+    ))}
+  </ul>
+)

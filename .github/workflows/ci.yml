@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop, 'integration/**', 'feature/**', 'fix/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install server deps
+        run: npm install --no-audit --no-fund
+
+      - name: Server syntax check
+        run: node --check server/index.js
+
+      - name: Install client deps
+        run: npm install --no-audit --no-fund
+        working-directory: client
+
+      - name: Build client
+        run: npm run build
+        working-directory: client
+
+  postgres-atomic-concurrency:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run PostgreSQL 2-Connection Concurrency Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresIndependentConnections.test.js
+
+      - name: Run PostgreSQL Migration 068 Document Linking Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresBankImportBatchDocumentLinking.test.js
+
+      - name: Run PostgreSQL Real HTTP API Bank Import Batch Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresBankImportBatchHttpApi.test.js
+
+      - name: Run PostgreSQL Real Bank Reconciliation & Transaction Linking Flow Tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresBankReconciliationFlow.test.js
