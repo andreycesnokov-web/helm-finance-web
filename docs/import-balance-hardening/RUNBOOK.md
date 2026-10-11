@@ -94,6 +94,8 @@ Read-only live catalog проверен: PG17.6, девять таблиц/217 �
 
 Для будущей staging run `tests/integration/financialWriterPreflight.sql`: BEGIN READ ONLY/ROLLBACK, catalog/grants/triggers/columns, counts duplicates/provenance/legacy currency+scope. Не чинить найденные реальные деньги автоматически. Для отсутствующих RPC сверять ожидаемый manifest/список функций, отсутствие строк в query не означает pass.
 
+Дополнительный live read-only count: **один wallet scope mismatch**; orphan wallets, NULL-wallet legacy, duplicate names, explicit/legacy currency mismatch и dangling import matches —0. Это не классификация денег и не разрешение менять scope. Нужен authoritative review конкретной записи до staging data rehearsal. bank_import_row_id отсутствует, поэтому provenance/duplicate import probes отмечены NOT RUN, а не0. Receipt table/guarded RPCs отсутствуют; development branch API вернул пустой список, отдельный staging target здесь не установлен.
+
 После отдельно разрешённого staging schema apply: проверить grants и role boundary; согласованный reload PostgREST schema cache владельцем staging; проверить наличие всех guarded RPC без fallback; только потом совместимый backend/client и HTTP acceptance. В данном задании внешних apply/reload/deploy не было.
 
 Staging отдельная приёмка: реальные JWT/service-role/RLS, schema/cache mismatch, UI error/replay/reload, переключение компаний и Personal, historical import/manual/PATCH races, blocked writers, load. `SECURITY INVOKER` и grants в smoke не заменяют эту проверку.

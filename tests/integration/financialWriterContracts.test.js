@@ -185,7 +185,19 @@ test(`${mode}: controlled HTTP error mapping (injected SQLSTATE/transport/missin
 });
 test(`${mode}: read-only preflight runs on full schema without mutating synthetic money`,async()=>{
   const n=await rows();const exec=embedded?sql.exec.bind(sql):sql.query.bind(sql);
-  await exec(fs.readFileSync(path.join(root,'tests/integration/financialWriterPreflight.sql'),'utf8'));assert.equal(await rows(),n);
+  const preflight=fs.readFileSync(path.join(root,'tests/integration/financialWriterPreflight.sql'),'utf8');
+  await exec(preflight);assert.equal(await rows(),n);
+  // The same preflight must report missing prerequisites on the authoritative
+  // pre-069 base, rather than abort or pretend its provenance counts are zero.
+  let baseDb,baseSql;
+  try {
+    if(embedded){const {PGlite}=require('@electric-sql/pglite');baseSql=new PGlite();await baseSql.waitReady;await baseSql.exec('CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;');await baseSql.exec(fs.readFileSync(path.join(root,'tests/fixtures/schema/prod_public_schema_2026-10-08.sql'),'utf8'));}
+    else {baseDb=await require('./_prodSchemaDb').createProdSchemaDatabase('hf_preflight_base');assert.ok(baseDb);baseSql=new(require('pg').Client)({connectionString:baseDb.connectionString});await baseSql.connect();}
+    const column=await baseSql.query("SELECT count(*) n FROM information_schema.columns WHERE table_schema='public' AND table_name='transactions' AND column_name='bank_import_row_id'");assert.equal(Number(column.rows[0].n),0);
+    const results=await (embedded?baseSql.exec(preflight):baseSql.query(preflight));
+    assert.ok(results.some(r=>r.rows?.some(row=>row.name==='rpc_create_business_wallet'&&Number(row.signatures_present)===0)));
+    assert.equal(Number((await baseSql.query('SELECT count(*) n FROM public.transactions')).rows[0].n),0);
+  } finally {if(embedded)await baseSql?.close();else {await baseSql?.end();if(baseDb)await baseDb.drop();}}
 });
 test(`${mode}: failed Personal delete cannot report success or affect Business money`,async()=>{
   const pw=randomUUID();
