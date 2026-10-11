@@ -232,9 +232,17 @@ test('cross-currency transfer preserves explicitly supplied native legs without 
   await rejected(c.query("SELECT rpc_record_debt_payment($1,101,1,$2,10,'USD',10,1,'test','2026-10-10','wrong','wrong',NULL,now())",[A,F]),'debt_currency_mismatch');
 });
 test('real Express HTTP plus real PostgreSQL: PATCH, RPC absence, permissions, replay and stale version',async()=>{
+  // Keep the original 25 SQL qualification cases. This HTTP case now needs the
+  // full integrated schema and receipt migration; never emulate the new RPC.
+  const {createIntegratedDatabase}=require('./_integratedSchemaDb');
+  process.env.DATABASE_URL=input;const full=await createIntegratedDatabase('cfo_balance_http');
+  const legacyClient=c;c=new Client({connectionString:full.connectionString});await c.connect();
+  await c.query('INSERT INTO users(id) VALUES(101),(202),(303)');
+  await c.query("INSERT INTO businesses(id,owner_user_id,name,type) VALUES($1,101,'A','business'),($2,202,'B','business')",[A,B]);
+  await c.query("INSERT INTO wallets(id,user_id,business_id,name,currency,type,scope) VALUES($1,101,$5,'A cash','IDR','bank','business'),($2,101,$5,'A other','IDR','bank','business'),($3,202,$6,'B cash','IDR','bank','business'),($4,101,$5,'A USD','USD','bank','business')",[W,V,X,F,A,B]);
   await reset();await c.query("INSERT INTO business_members(business_id,user_id,role,status) VALUES ($1,101,'owner','active'),($2,202,'owner','active'),($1,303,'auditor','active')",[A,B]);
-  const { createRealPgSupabase }=require('./_balancePgSupabase');const u=new URL(input);u.pathname=`/${database}`;
-  const db=createRealPgSupabase(u.href);const Module=require('node:module');const load=Module._load;
+  const { createRealPgSupabase }=require('./_realPgSupabase');
+  const db=createRealPgSupabase(full.connectionString);const Module=require('node:module');const load=Module._load;
   const http=require('node:http');const listen=http.Server.prototype.listen;let server;
   http.Server.prototype.listen=function(...args){server=this;return listen.apply(this,args);};
   Object.assign(process.env,{PORT:'0',NODE_ENV:'test',JWT_SECRET:'synthetic-balance-http-secret',SUPABASE_URL:'http://127.0.0.1:1',SUPABASE_SECRET_KEY:'synthetic',BOT_TOKEN:'synthetic',TELEGRAM_WEBHOOK_SECRET:'synthetic'});
@@ -257,7 +265,7 @@ test('real Express HTTP plus real PostgreSQL: PATCH, RPC absence, permissions, r
     // to it when its required guarded entry point is genuinely absent.
     const signature=(await c.query("SELECT oid::regprocedure::text signature FROM pg_proc WHERE proname='rpc_record_debt_payment_guarded'")).rows[0].signature;
     await c.query(`ALTER FUNCTION ${signature} RENAME TO test_missing_guarded`);
-    try { r=await api('POST','/api/debts/1/pay',{wallet_id:W,amount:10,date:'2026-10-10'});assert.equal(r.status,503,JSON.stringify(r));assert.equal(r.data.error,'balance_rpc_unavailable');assert.equal(await balance(),'80.00'); }
+    try { r=await api('POST','/api/debts/1/pay',{wallet_id:W,amount:10,date:'2026-10-10',idempotency_key:'missing-guarded'});assert.equal(r.status,503,JSON.stringify(r));assert.equal(r.data.error,'balance_rpc_unavailable');assert.equal(await balance(),'80.00'); }
     finally { await c.query(`ALTER FUNCTION ${signature.replace('rpc_record_debt_payment_guarded','test_missing_guarded')} RENAME TO rpc_record_debt_payment_guarded`); }
     // Both HTTP requests read the same version before either enters the RPC.
     // A read barrier establishes overlap; real PostgreSQL chooses one winner.
@@ -272,9 +280,10 @@ test('real Express HTTP plus real PostgreSQL: PATCH, RPC absence, permissions, r
     await reset();r=await api('POST','/api/debts/1/pay',{wallet_id:W,amount:70,date:'2026-10-10',idempotency_key:'complete'});assert.equal(r.status,200,JSON.stringify(r));const completed=await snapshot();
     r=await api('POST','/api/debts/1/pay',{wallet_id:W,amount:70,date:'2026-10-10',idempotency_key:'complete'});assert.equal(r.status,200,JSON.stringify(r));assert.equal(r.data.is_replay,true);assert.deepEqual(await snapshot(),completed);
     await reset();r=await api('POST','/api/payroll/payments',{employee_name:'Synthetic',wallet_id:W,currency:'IDR',amount:20,payment_date:'2026-10-10'});assert.equal(r.status,200,JSON.stringify(r));assert.equal(await balance(),'80.00');
-    await reset();r=await api('POST','/api/transactions/batch',{transactions:[{type:'expense',amount:20,wallet_id:W,currency:'IDR',scope:'business',transaction_date:'2026-10-10'}]});assert.equal(r.status,200,JSON.stringify(r));assert.equal(r.data.saved,1);assert.equal(await balance(),'80.00');
+    await reset();r=await api('POST','/api/transactions/batch',{request_key:'full-http-batch',transactions:[{type:'expense',amount:20,wallet_id:W,currency:'IDR',scope:'business',transaction_date:'2026-10-10'}]});assert.equal(r.status,200,JSON.stringify(r));assert.equal(r.data.saved,1);assert.equal(await balance(),'80.00');
   } finally {
     Module._load=load;http.Server.prototype.listen=listen;
-    if(server)await new Promise(r=>server.close(r));await db.pool.end();
+    if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}await db.pool.end();
+    await c.end();c=legacyClient;await full.drop();
   }
 });

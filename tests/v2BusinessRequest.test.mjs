@@ -40,10 +40,12 @@ test('no business identity fails closed before a write', async () => {
   assert.equal(n, 0)
 })
 test('stale network failure is rejected as stale, not as a current save error', async () => {
-  let reject
-  globalThis.fetch = () => new Promise((_, r) => { reject = r })
+  let reject, notifyStarted
+  const started = new Promise(resolve => { notifyStarted = resolve })
+  globalThis.fetch = () => new Promise((_, r) => { reject = r; notifyStarted() })
   const identity = { token: 'synthetic', businessId: 'A', isCurrent: () => getActiveBusinessId() === 'A' }
   const pending = apiFetch('/wallets', identity, { method: 'POST', body: {} })
+  await started
   setActiveBusinessId('B'); reject(new Error('network'))
   await assert.rejects(pending, { code: 'workspace_changed' })
 })

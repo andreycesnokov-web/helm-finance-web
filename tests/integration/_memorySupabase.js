@@ -202,7 +202,7 @@ const client = {
     }
     // Metadata-only compatibility for the legacy PATCH route tests. Financial
     // mutation/race proofs use postgresBusinessBalance, never this emulator.
-    if (name === 'rpc_insert_business_transactions') {
+    if (name === 'rpc_insert_business_transactions' || name === 'rpc_insert_business_transactions_once') {
       // Storage shape only. Atomic balances and replay are proved on PostgreSQL.
       const rows = args.p_rows.map(row => ({ ...row, id: nextId('transactions'), business_id: args.p_business_id }));
       table('transactions').push(...rows);
@@ -387,7 +387,7 @@ const client = {
 
       const resultData = {
         ok: true,
-        is_fully_paid: isFullyPaid,
+        isFullyPaid,
         remaining: Math.max(0, total - newPaid),
         paid_amount: newPaid,
         status: newStatus,

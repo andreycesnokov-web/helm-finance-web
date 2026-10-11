@@ -52,13 +52,15 @@ test.before(async () => {
   // Reserve a local port before starting the real app (no production connection).
   const reserve = http.createServer(); await new Promise((r) => reserve.listen(0, '127.0.0.1', r));
   const port = reserve.address().port; await new Promise((r) => reserve.close(r)); base = `http://127.0.0.1:${port}`;
-  app = spawn(process.execPath, [path.resolve(__dirname, '../../server/index.js')], { env: { PATH: process.env.PATH, NODE_ENV: 'test', PORT: String(port), SUPABASE_URL: `http://127.0.0.1:${db.address().port}`, SUPABASE_SECRET_KEY: 'synthetic', BOT_TOKEN: 'synthetic', TELEGRAM_WEBHOOK_SECRET: 'synthetic', JWT_SECRET: SECRET }, stdio: 'ignore' });
+  app = spawn(process.execPath, [path.resolve(__dirname, '../../server/index.js')], { env: { PATH: process.env.PATH, NODE_ENV: 'test', PORT: String(port), SUPABASE_URL: `http://127.0.0.1:${db.address().port}`, SUPABASE_SECRET_KEY: 'synthetic', BOT_TOKEN: 'synthetic', TELEGRAM_WEBHOOK_SECRET: 'synthetic', JWT_SECRET: SECRET }, stdio: ['ignore','pipe','pipe'] });
+  let startup='';const capture=chunk=>{startup=(startup+String(chunk)).slice(-8000)};
+  app.stdout.on('data',capture);app.stderr.on('data',capture);app.on('error',capture);
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) {
     try { if ((await fetch(`${base}/api/health`)).ok) return; } catch {}
     await new Promise((r) => setTimeout(r, 25));
   }
-  throw new Error('isolated HTTP app did not start');
+  throw new Error(`isolated HTTP app did not start (exit=${app.exitCode}): ${startup}`);
 });
 test.beforeEach(() => {
   profiles = { [A]: { id: 'profile-A', business_id: A, country: 'Indonesia', jurisdiction: 'ID', npwp: '000111', accounting_method: 'unchanged', primary_kbli: '00111' }, [B]: { id: 'profile-B', business_id: B, country: 'Indonesia', jurisdiction: 'ID', npwp: '000222' } };

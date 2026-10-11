@@ -1,4 +1,24 @@
 const BASE = '/api'
+const pendingCreates = new Map()
+
+// Only guarded keyed RPCs support these receipts. Preserve an unknown
+// intent across a page reload without storing the financial payload or token.
+async function createIntent(path, token, businessId, options) {
+  const field = /^\/debts\/[^/]+\/pay$/.test(path) ? 'idempotency_key' : path === '/wallets/transfer' ? 'transfer_id' : 'request_key'
+  const payload = { ...options.body }; delete payload[field]
+  const bytes = new TextEncoder().encode(JSON.stringify([token, businessId, path, payload]))
+  const hash = await crypto.subtle.digest('SHA-256', bytes)
+  const storageKey = 'financialCreateIntent:' + Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('')
+  let key = pendingCreates.get(storageKey)
+  try { key ||= localStorage.getItem(storageKey) } catch { /* private mode */ }
+  key ||= options.body[field] || crypto.randomUUID()
+  pendingCreates.set(storageKey, key)
+  try { localStorage.setItem(storageKey, key) } catch { /* memory survives while the page is open */ }
+  return { key, field, clear() {
+    pendingCreates.delete(storageKey)
+    try { localStorage.removeItem(storageKey) } catch { /* */ }
+  } }
+}
 
 // Active business workspace — set by useAccess after /access/status,
 // or by a future business switcher. All financial API calls carry it.
@@ -24,6 +44,21 @@ export function consumePostLoginRedirect() {
 }
 
 export async function apiFetch(path, token, options = {}) {
+  const mutation = !['GET', 'HEAD'].includes(String(options.method || 'GET').toUpperCase())
+    && /^\/(transactions|wallets|debts|payroll|bank-imports?|personal\/(wallets|transactions)|funding)(\/|$)/.test(path)
+  const unconfirmed = (cause) => {
+    if (!mutation) throw cause
+    let lang = 'en'; try { lang = localStorage.getItem('hf_lang') || 'en' } catch { /* */ }
+    const messages = {
+      en: 'The result could not be confirmed. Refresh the operation status before resubmitting. Keep the original payment or transfer request open.',
+      ru: 'Результат не подтверждён. Обновите статус операции перед повтором. Сохраните открытым текущий платёж или перевод.',
+      id: 'Hasil belum terkonfirmasi. Muat ulang status sebelum mengirim lagi. Pertahankan permintaan pembayaran atau transfer ini.'
+    }
+    const err = new Error(messages[lang] || messages.en)
+    err.code = 'financial_outcome_unknown'; err.cause = cause
+    err.data = { error: err.code, outcome: 'unknown', automatic_retry: false }
+    throw err
+  }
   // V2 forms pass an explicit request identity. Bare tokens keep the legacy API.
   const scoped = token && typeof token === 'object'
   const identity = scoped ? token : null
@@ -36,6 +71,12 @@ export async function apiFetch(path, token, options = {}) {
   }
   assertCurrent()
   const businessId = scoped ? identity.businessId : (options.headers?.['x-business-id'] || getActiveBusinessId())
+  const keyedPayment = /^\/debts\/[^/]+\/pay$/.test(path) || path === '/wallets/transfer'
+  const guardedCreate = String(options.method).toUpperCase() === 'POST' && options.body
+    && !options.headers?.['Idempotency-Key'] && !options.headers?.['idempotency-key']
+    && (keyedPayment || (!options.body.request_key && (['/wallets','/transactions/batch'].includes(path) || /^\/wallets\/[^/]+\/adjust-balance$/.test(path))))
+  const intent = guardedCreate ? await createIntent(path, scoped ? identity.token : token, businessId, options) : null
+  assertCurrent()
   const res = await fetch(BASE + path, {
     ...options,
     headers: {
@@ -45,17 +86,29 @@ export async function apiFetch(path, token, options = {}) {
       ...options.headers,
       ...(scoped ? { 'x-business-id': businessId } : {})
     },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  }).catch((e) => { assertCurrent(); throw e })
+    body: options.body ? JSON.stringify(intent ? { ...options.body, [intent.field]: intent.key } : options.body) : undefined
+  }).catch((e) => { assertCurrent(); return unconfirmed(e) })
   let data = null
-  const text = await res.text().catch((e) => { assertCurrent(); throw e })
+  const text = await res.text().catch((e) => { assertCurrent(); return unconfirmed(e) })
   assertCurrent()
+  if (mutation && res.ok && !text) return unconfirmed(new Error('Empty financial response'))
   try {
     data = text ? JSON.parse(text) : {}
-  } catch {
+  } catch (parseError) {
+    // A successful HTML/proxy response is not a confirmed financial booking.
+    if (res.ok) return unconfirmed(parseError)
     data = { error: text || res.statusText || 'Request failed' }
   }
+  if (mutation && res.ok && (data?.error || data?.ok === false))
+    return unconfirmed(new Error('Financial response did not confirm success'))
   if (!res.ok) {
+    // A proxy/backend 5xx can arrive after commit. Only an explicit database
+    // rollback permits treating it as cancelled; retain the original intent.
+    if (mutation && res.status >= 500 && data?.outcome !== 'rolled_back')
+      return unconfirmed(new Error(data?.message || data?.error || `HTTP ${res.status}`))
+    // Preserve the key on unknown outcomes. A definitive refusal did not book
+    // this create; an edited payload naturally receives a different intent key.
+    if (data?.outcome !== 'unknown' && data?.error !== 'financial_outcome_unknown') intent?.clear()
     // Stale/inaccessible workspace: clear the active id so the next load re-picks a
     // valid one (WorkspaceProvider refetches /api/workspaces). Only on explicit 403.
     if (res.status === 403 && data?.error === 'workspace_not_accessible' && getActiveBusinessId() === businessId) {
@@ -64,10 +117,11 @@ export async function apiFetch(path, token, options = {}) {
     // Keep the whole error payload: routes return actionable detail alongside the
     // code (e.g. upload-init 409 duplicate carries existing_document_id). Callers
     // that only read err.message/err.status are unaffected.
-    const err = new Error(data?.error || `Request failed with status ${res.status}`)
+    const err = new Error(data?.message || data?.error || `Request failed with status ${res.status}`)
     err.status = res.status; err.code = data?.error || null; err.data = data
     throw err
   }
+  intent?.clear()
   return data
 }
 

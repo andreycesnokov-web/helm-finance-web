@@ -75,6 +75,8 @@ const BASE = `http://127.0.0.1:${process.env.PORT}/api`;
 const tok = (u) => jwt.sign({ userId: u }, process.env.JWT_SECRET);
 
 async function postPay(debtId, body) {
+  // Each scenario starts a new explicit intent; replay scenarios reuse their key.
+  body = { idempotency_key: require("node:crypto").randomUUID(), ...body };
   const headers = {
     'content-type': 'application/json',
     authorization: `Bearer ${tok(USER)}`,
@@ -233,7 +235,8 @@ const t = async (name, fn) => {
     const debt = (mem.__db.debts || []).find(d => d.id === 'debt-usd-1');
     assert.equal(debt.paid_amount, 400);
     assert.equal(debt.status, 'partial');
-    assert.equal(debt.is_settled, undefined);
+    assert.equal(debt.is_settled, false);
+    assert.equal(debt.settled_at, null, "Partial payment never settles the obligation");
   });
 
   await t('7. Same-currency completion payment (USD -> USD) succeeds and marks debt settled', async () => {
@@ -279,27 +282,21 @@ const t = async (name, fn) => {
     assert.equal(debt.is_settled, true);
   });
 
-  await t('9. Request without wallet_id (legacy contract): creates transaction in debtCurrency, does not bypass currency check', async () => {
-    const txCountBefore = (mem.__db.transactions || []).length;
-    const res = await postPay('debt-usd-2', {
-      amount: 250,
-      account: 'Petty Cash USD',
-      date: '2026-10-04',
-    });
-
-    assert.equal(res.status, 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(res.body.ok, true);
-    assert.equal(res.body.remaining, 250);
-
-    const tx = (mem.__db.transactions || []).slice(txCountBefore)[0];
-    assert.ok(tx, 'Transaction created');
+  await t('9. Unknown legacy account requires an explicit wallet; refusal changes no money', async () => {
+    const before = (mem.__db.transactions || []).length;
+    const old = { ...mem.__db.debts.find(d => d.id === 'debt-usd-2') };
+    const res = await postPay('debt-usd-2', { amount: 250, account: 'Petty Cash USD', date: '2026-10-04' });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'wallet_required');
+    assert.equal(mem.__db.transactions.length, before);
+    assert.deepEqual(mem.__db.debts.find(d => d.id === old.id), old);
+    const selected = await postPay(old.id, { amount: 250, wallet_id: 'w-usd-a', date: '2026-10-04', idempotency_key: 'legacy-selection-9' });
+    assert.equal(selected.status, 200);
+    assert.equal(mem.__db.transactions.length, before + 1);
+    const tx = mem.__db.transactions.at(-1);
+    assert.equal(tx.wallet_id, 'w-usd-a');
     assert.equal(tx.amount_original, 250);
-    assert.equal(tx.currency_original, 'USD', 'Strictly matches debtCurrency');
-    assert.equal(tx.wallet_id, null, 'wallet_id is null');
-    assert.equal(tx.source, 'Petty Cash USD');
-
-    const debt = (mem.__db.debts || []).find(d => d.id === 'debt-usd-2');
-    assert.equal(debt.paid_amount, 250);
+    assert.equal(tx.currency_original, 'USD');
   });
 
   await t('10. USD debt payment without wallet_id where account matches IDR wallet name: rejected before mutation, native wallet and pulse balances untouched', async () => {
@@ -390,52 +387,25 @@ const t = async (name, fn) => {
     assert.equal(pulseAfter.body.totalBalance, pulseBefore.body.totalBalance - 1630000);
   });
 
-  await t('12. USD debt payment without wallet_id and unmatched account name: creates unlinked tx, native wallets untouched, unlinkedTotal debited in pulse', async () => {
-    const txCountBefore = (mem.__db.transactions || []).length;
-    const debtBefore = { ...(mem.__db.debts || []).find(d => d.id === 'debt-usd-2') };
-
-    const walletsBefore = await getWallets();
-    const wiseBefore = walletsBefore.body.wallets.find(w => w.name === 'Wise USD');
-    const bcaBefore = walletsBefore.body.wallets.find(w => w.name === 'BCA IDR');
-
-    const pulseBefore = await getPulse();
-
-    const res = await postPay('debt-usd-2', {
-      amount: 50,
-      account: 'External Wire',
-      date: '2026-10-04',
-    });
-
-    assert.equal(res.status, 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(res.body.ok, true);
-
-    // Verify unlinked transaction fields
-    const tx = (mem.__db.transactions || []).slice(txCountBefore)[0];
-    assert.ok(tx, 'Transaction created');
-    assert.equal(tx.amount_original, 50);
-    assert.equal(tx.currency_original, 'USD');
-    assert.equal(tx.wallet_id, null, 'wallet_id remains null for unlinked');
-    assert.equal(tx.source, 'External Wire');
-    assert.equal(tx.amount_idr, 815000);
-
-    // Debt updated
-    const debtAfter = (mem.__db.debts || []).find(d => d.id === 'debt-usd-2');
-    assert.equal(debtAfter.paid_amount, debtBefore.paid_amount + 50);
-
-    // Wallets: Neither Wise USD nor BCA IDR native balances are touched
-    const walletsAfter = await getWallets();
-    const wiseAfter = walletsAfter.body.wallets.find(w => w.name === 'Wise USD');
-    const bcaAfter = walletsAfter.body.wallets.find(w => w.name === 'BCA IDR');
-    assert.equal(wiseAfter.balance, wiseBefore.balance, 'Wise USD balance untouched');
-    assert.equal(bcaAfter.balance, bcaBefore.balance, 'BCA IDR balance untouched');
-
-    // Pulse: Native wallet balances untouched; totalBalance debited by 815,000 IDR via unlinkedTotal
-    const pulseAfter = await getPulse();
-    const pulseWiseAfter = pulseAfter.body.accounts.find(a => a.name === 'Wise USD');
-    const pulseBcaAfter = pulseAfter.body.accounts.find(a => a.name === 'BCA IDR');
-    assert.equal(pulseWiseAfter.balance, wiseBefore.balance);
-    assert.equal(pulseBcaAfter.balance, bcaBefore.balance);
-    assert.equal(pulseAfter.body.totalBalance, pulseBefore.body.totalBalance - 815000);
+  await t('12. Unmatched External Wire cannot create an unlinked NEW payment or change pulse', async () => {
+    const before = mem.__db.transactions.length;
+    const old = { ...mem.__db.debts.find(d => d.id === 'debt-usd-2') };
+    const walletsBefore = await getWallets(), pulseBefore = await getPulse();
+    const res = await postPay(old.id, { amount: 50, account: 'External Wire', date: '2026-10-04' });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'wallet_required');
+    assert.equal(mem.__db.transactions.length, before);
+    assert.deepEqual(mem.__db.debts.find(d => d.id === old.id), old);
+    const walletsAfter = await getWallets(), pulseAfter = await getPulse();
+    const balances = rows => rows.map(w => [w.id, w.name, w.currency, w.balance]);
+    assert.deepEqual(balances(walletsAfter.body.wallets), balances(walletsBefore.body.wallets));
+    assert.equal(walletsAfter.body.total_balance_idr, walletsBefore.body.total_balance_idr);
+    assert.deepEqual(balances(pulseAfter.body.accounts), balances(pulseBefore.body.accounts));
+    assert.equal(pulseAfter.body.totalBalance, pulseBefore.body.totalBalance);
+    const body = { amount: 50, wallet_id: 'w-usd-a', date: '2026-10-04', idempotency_key: 'legacy-selection-12' };
+    assert.equal((await postPay(old.id, body)).status, 200);
+    assert.equal((await postPay(old.id, body)).body.is_replay, true);
+    assert.equal(mem.__db.transactions.length, before + 1);
   });
 
   console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);

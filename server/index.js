@@ -13,7 +13,7 @@ const SETTLE = require('./lib/invoiceSettlement');
 const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
 const WL = require('./lib/walletLedger');
-const { balanceFailure, nativeInputIsExact } = require('./lib/balanceFailure');
+const { balanceFailure, databaseFailureBody, nativeInputIsExact } = require('./lib/balanceFailure');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
@@ -107,7 +107,10 @@ const APP_BASE_URL = process.env.APP_BASE_URL || '';
 // (migration 043) — so production is safe before 043 is applied. When ON, the
 // active-business endpoints + resolver are live and from-receipt routes via the selection.
 const TELEGRAM_ACTIVE_BUSINESS_ENABLED = process.env.TELEGRAM_ACTIVE_BUSINESS_ENABLED === 'true';
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
+// Node20 remains the repository's CI contract. The locked Realtime SDK needs
+// an explicit transport there, even when this server does not subscribe.
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY,
+  typeof globalThis.WebSocket === 'function' ? {} : { realtime: { transport: require('ws') } });
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
@@ -642,9 +645,10 @@ app.post('/api/personal/wallets', personalGate, auth, async (req, res) => {
       name: name.trim(), type, currency: (currency || ws.base_currency || 'IDR').toUpperCase(),
       color: color || null, is_active: true, created_by_user_id: req.user.userId,
     }).select().single();
-    if (error) return res.status(500).json({ error: 'wallet_create_failed' });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: 'wallet_create_failed' }); }
     res.status(201).json({ wallet: { ...data, balance: 0 } });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // PATCH /api/personal/wallets/:id — owner-scoped (must belong to this personal ws).
@@ -657,9 +661,10 @@ app.patch('/api/personal/wallets/:id', personalGate, auth, async (req, res) => {
     const patch = { updated_at: new Date().toISOString() };
     for (const k of ['name', 'color', 'sort_order', 'is_active']) if (k in (req.body || {})) patch[k] = req.body[k];
     const { data, error } = await supabase.from('wallets').update(patch).eq('id', req.params.id).select().single();
-    if (error) return res.status(400).json({ error: 'wallet_update_failed' });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(400).json({ error: 'wallet_update_failed' }); }
     res.json({ wallet: data });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // DELETE /api/personal/wallets/:id — blocked if it has transactions.
@@ -673,9 +678,10 @@ app.delete('/api/personal/wallets/:id', personalGate, auth, async (req, res) => 
       .eq('business_id', ws.id).eq('scope', 'personal').eq('wallet_id', req.params.id);
     if (count) return res.status(409).json({ error: 'wallet_not_empty', message: 'Move or delete its transactions first.' });
     const { error } = await supabase.from('wallets').delete().eq('id', req.params.id);
-    if (error) return res.status(400).json({ error: 'wallet_delete_failed' });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(400).json({ error: 'wallet_delete_failed' }); }
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/personal/transactions — paged, strict scope.
@@ -731,7 +737,7 @@ app.post('/api/personal/transactions', personalGate, auth, async (req, res) => {
         { ...base, type: 'expense', wallet_id: from.id, amount_original: amount, amount_idr: idrOf(from.currency, amount), currency_original: from.currency },
         { ...base, type: 'income', wallet_id: to.id, amount_original: amount, amount_idr: idrOf(to.currency, amount), currency_original: to.currency },
       ]).select();
-      if (error) return res.status(500).json({ error: 'transfer_failed' });
+      if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: 'transfer_failed' }); }
       return res.status(201).json({ transactions: data });
     }
 
@@ -742,9 +748,10 @@ app.post('/api/personal/transactions', personalGate, auth, async (req, res) => {
       type: b.kind, amount_original: amount, amount_idr: idrOf(w.currency, amount), currency_original: w.currency,
       wallet_id: w.id, category: b.category || null, description: b.note || null, transaction_date: date,
     }).select().single();
-    if (error) return res.status(500).json({ error: 'transaction_failed' });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: 'transaction_failed' }); }
     res.status(201).json({ transaction: data });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // PATCH /api/personal/transactions/:id — single legs only (transfer legs are immutable here).
@@ -781,9 +788,10 @@ app.patch('/api/personal/transactions/:id', personalGate, auth, async (req, res)
     }
     if (!Object.keys(patch).length) return res.status(400).json({ error: 'nothing_to_update' });
     const { data, error } = await supabase.from('transactions').update(patch).eq('id', req.params.id).select().single();
-    if (error) return res.status(400).json({ error: 'transaction_update_failed' });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(400).json({ error: 'transaction_update_failed' }); }
     res.json({ transaction: data });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // DELETE /api/personal/transactions/:id — a transfer leg deletes BOTH legs.
@@ -794,13 +802,13 @@ app.delete('/api/personal/transactions/:id', personalGate, auth, async (req, res
       .eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal').limit(1);
     const row = rows?.[0];
     if (!row) return res.status(404).json({ error: 'transaction_not_found' });
-    if (PW.isTransferLeg(row)) {
-      await supabase.from('transactions').delete().eq('business_id', ws.id).eq('scope', 'personal').eq('source', row.source);
-    } else {
-      await supabase.from('transactions').delete().eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal');
-    }
+    const removal = PW.isTransferLeg(row)
+      ? await supabase.from('transactions').delete().eq('business_id', ws.id).eq('scope', 'personal').eq('source', row.source)
+      : await supabase.from('transactions').delete().eq('id', req.params.id).eq('business_id', ws.id).eq('scope', 'personal');
+    if (removal.error) throw removal.error;
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // GET /api/personal/categories — seeded personal categories, grouped.
@@ -835,6 +843,35 @@ function canCreateConfirmedFinancialRecord(role) { return ['owner', 'ceo', 'admi
 function canApproveFinancialRecord(role)       { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 function canManagePayroll(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 function canManageWallets(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
+async function replayFinancialCreate(req, res, biz, operation, intent) {
+  if (!req.body.request_key) return false;
+  const { data, error } = await supabase.from('financial_write_requests').select('intent,result')
+    .eq('business_id', biz.business.id).eq('actor_user_id', req.user.userId)
+    .eq('operation', operation).eq('request_key', req.body.request_key).maybeSingle();
+  if (error) {
+    if (balanceFailure(res, error)) return true;
+    if (['42P01','PGRST205'].includes(error.code)) {
+      res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Financial create receipts require the writer migration.' });
+      return true;
+    }
+    throw error;
+  }
+  if (!data) return false;
+  if (!require('node:util').isDeepStrictEqual(data.intent, intent)) {
+    res.status(409).json({ error: 'idempotency_key_mismatch' }); return true;
+  }
+  if (operation === 'wallet_create') {
+    const { data: wallet, error: walletError } = await supabase.from('wallets').select('*')
+      .eq('id', data.result.wallet.id).eq('business_id', biz.business.id).maybeSingle();
+    if (walletError) throw walletError;
+    if (!wallet) {
+      res.status(409).json({ error: 'financial_intent_invalidated', message: 'The original wallet was created and later removed. Refresh before starting another create.' });
+      return true;
+    }
+    res.json({ wallet, is_replay: true }); return true;
+  }
+  res.json({ ...data.result, is_replay: true }); return true;
+}
 function canUseAiCfo(role)                     { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
 // Category structure: who may create/edit/archive business categories.
 // Accountant may PROPOSE (create) but not restructure (edit/archive).
@@ -1367,7 +1404,7 @@ app.get('/api/debts', auth, async (req, res) => {
   if (type) query = query.eq('type', type);
   // By default include all (not just unsettled) so UI can show paid history
   const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
   res.json(await enrichDebtsFor(biz.business.id, data));
 });
 
@@ -1397,6 +1434,7 @@ app.post('/api/debts', auth, async (req, res) => {
       }
     }
   } catch (limitErr) {
+    if (balanceFailure(res, limitErr)) return;
     console.warn('[debts] limit check failed:', limitErr.message);
   }
   const biz = await requireBusiness(req, res);
@@ -1411,6 +1449,8 @@ app.post('/api/debts', auth, async (req, res) => {
     ...bizWriteFields(biz, userId),
     original_amount: amount,  // lock original amount; never mutate this
     paid_amount:     0,
+    is_settled:      false,
+    settled_at:      null,
     status:          'open',
     source_channel:   req.body.source_channel  || 'web',
     approval_status:  confirmed ? (req.body.approval_status || 'approved') : 'pending_approval',
@@ -1418,7 +1458,7 @@ app.post('/api/debts', auth, async (req, res) => {
   };
   const { data, error } = await supabase.from('debts')
     .insert(insertRow).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
   res.json(computeDebtStatus(data));
 });
 
@@ -1464,9 +1504,10 @@ app.patch('/api/debts/:id', auth, async (req, res) => {
 
     const { data, error } = await supabase.from('debts')
       .update(updates).eq('id', debt.id).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
     res.json(computeDebtStatus(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 app.patch('/api/debts/:id/settle', auth, async (req, res) => {
@@ -1474,33 +1515,11 @@ app.patch('/api/debts/:id/settle', auth, async (req, res) => {
   if (!biz) return;
   if (!canCreateConfirmedFinancialRecord(biz.role))
     return res.status(403).json({ error: 'Your role does not allow settling records' });
-  // Fetch debt first to know original_amount (business-scoped)
-  const { data: debts } = await supabase.from('debts')
-    .select('*').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
-  const debt = debts?.[0];
-  if (!debt) return res.status(404).json({ error: 'Debt not found' });
-  const fullAmount = Number(debt?.original_amount || debt?.amount || 0);
-  // A recorded withholding already settles its part: paid_amount covers only the rest, so
-  // paid_amount + withholding never exceeds the bill (batch 10). No withholding → as before.
-  const withheld = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
-  const { data, error } = await supabase.from('debts')
-    .update({
-      is_settled:   true,
-      settled_at:   new Date().toISOString(),
-      status:       'paid',
-      paid_amount:  Math.max(0, fullAmount - withheld),
-    })
-    .eq('id', debt.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
-  await recordAudit({
-    businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
-    entityType: 'debt', entityId: debt.id, action: 'debt_settled',
-    before: { status: debt.status, paid_amount: debt.paid_amount ?? null, is_settled: debt.is_settled ?? null },
-    after: { status: data.status, paid_amount: data.paid_amount, is_settled: true, withheld },
-  });
-  res.json(computeDebtStatus({ ...data, withholding_allocated: withheld }));
+  // No supported client calls this legacy route. Paid state must come from an
+  // atomic payment or the explicit invoice allocation workflow, never a checkbox.
+  res.status(409).json({ error: 'confirmed_payment_required',
+    message: 'Record the payment with a wallet, or use the supported invoice settlement workflow.', automatic_retry: false });
 });
-
 // ─────────────────────────────────────────────────────────────────────────────
 // TELEGRAM ROLE MODEL
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1785,7 +1804,7 @@ async function approveDebtHandler(req, res) {
         status:               'open',   // activate the record
       })
       .eq('id', existing.id).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
     // Notify creator only on a real state change (pending → approved).
     if (existing.approval_status !== 'approved')
       notifyRequestCreatorViaTelegram({ debt: data, event: 'approved', actorUserId: userId, actorRole: biz.role });
@@ -1821,7 +1840,7 @@ async function rejectDebtHandler(req, res) {
         status:               'cancelled',
       })
       .eq('id', rows[0].id).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
     if (rows[0].approval_status !== 'rejected')
       notifyRequestCreatorViaTelegram({ debt: data, event: 'rejected', actorUserId: userId, actorRole: biz.role, reason: reason || null });
     res.json(computeDebtStatus(data));
@@ -1855,11 +1874,12 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
         last_action_channel: channel,
       })
       .eq('id', rows[0].id).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
 
     notifyRequestCreatorViaTelegram({ debt: data, event: 'request_info', actorUserId: userId, actorRole: biz.role, note: note || null });
     res.json(computeDebtStatus(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // ── PATCH /api/debts/:id/checklist — bill checklist: accountant check (Design v2 P-05) ──
@@ -1891,7 +1911,7 @@ app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
       .eq('id', before.id).eq('business_id', biz.business.id)
       .select('id, accountant_checked_at, accountant_checked_by').single();
     if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
 
     const pick = (r) => ({ accountant_checked_at: r.accountant_checked_at ?? null, accountant_checked_by: r.accountant_checked_by ?? null });
     await recordAudit({
@@ -1900,7 +1920,8 @@ app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
       before: pick(before), after: pick(data),
     });
     res.json({ id: data.id, checklist: pick(data) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // ── POST /api/debts/:id/withholding — record a withholding on a bill or invoice ─────
@@ -1967,7 +1988,8 @@ app.post('/api/debts/:id/withholding', auth, async (req, res) => {
     });
     res.json({ withholding: rec, allocation: alloc,
       debt: computeDebtStatus({ ...raw, withholding_allocated: withheldBefore + v.amount, withholding_waiting_slip: !v.slip }) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // ── GET /api/withholding-slips — read-only: withholding records and their slips ──────
@@ -4250,6 +4272,8 @@ async function runAtomicBankConfirm({ biz, batch, plan, actorUserId, flow }) {
     p_plan: plan, p_flow: flow,
   });
   if (error) {
+    const conflict = databaseFailureBody(error);
+    if (conflict) return conflict;
     const msg = String(error.message || '');
     if (error.code === 'PGRST202' || error.code === '42883' || /rpc_confirm_bank_import/.test(msg) && /(does not exist|Could not find)/i.test(msg)) {
       console.error('[bank-import] rpc_confirm_bank_import missing — migration 069 not applied');
@@ -7374,7 +7398,7 @@ app.post('/api/debts/from-telegram', async (req, res) => {
     };
 
     const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
 
     // Notify admin+ members about a pending submission (fire-and-forget)
     if (!isPrivileged) {
@@ -7413,7 +7437,8 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       created_by:      submitterUser.name || telegram_id,
       role:            memberRole,
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
 });
 
 // ── MCP write: pending payable draft from an invoice ─────────────────────────
@@ -8773,6 +8798,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     if (!biz) return;
     if (!canCreateConfirmedFinancialRecord(biz.role))
       return res.status(403).json({ error: 'Your role does not allow creating confirmed transactions. Submit a request instead.' });
+    if (await replayFinancialCreate(req, res, biz, 'transaction_batch', transactions)) return;
 
     // ── Input validation ─────────────────────────────────────────────────────
     if (!Array.isArray(transactions) || transactions.length === 0) {
@@ -8831,6 +8857,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         }
       }
     } catch (limitErr) {
+      if (balanceFailure(res, limitErr)) return;
       // Fail open — don't block transactions if limit check itself errors
       console.warn('[transactions/batch] limit check failed:', limitErr.message);
     }
@@ -9051,8 +9078,9 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
     if (!rows.length) return res.json({ saved: 0 });
     if (typeof supabase.rpc !== 'function')
       return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic batch recording requires migration 070' });
-    const { data, error } = await supabase.rpc('rpc_insert_business_transactions', {
+    const { data, error } = await supabase.rpc('rpc_insert_business_transactions_once', {
       p_business_id: biz.business.id, p_user_id: userId, p_rows: rows,
+      p_request_key: req.body.request_key || null, p_intent: req.body.transactions,
     });
     if (error) {
       if (error.code === 'PGRST202' || /function.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
@@ -9060,7 +9088,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       throw error;
     }
     if (data?.saved == null) return res.status(500).json({ error: 'atomic_batch_failed' });
-    res.json({ saved: data.saved });
+    res.json(data);
   } catch (e) {
     if (balanceFailure(res, e)) return;
     if (e.message && e.message.startsWith('fx_rate_unavailable:')) {
@@ -10592,6 +10620,8 @@ app.post('/api/wallets', auth, async (req, res) => {
     if (!biz) return;
     if (!canManageWallets(biz.role))
       return res.status(403).json({ error: 'Your role does not allow managing wallets' });
+    const { request_key: existingKey, ...createIntent } = req.body;
+    if (await replayFinancialCreate(req, res, biz, 'wallet_create', createIntent)) return;
 
     // ── Feature gate: wallet limit ───────────────────────────────────────────
     const access = await getCurrentAccess(userId);
@@ -10633,6 +10663,7 @@ app.post('/api/wallets', auth, async (req, res) => {
           obFxRes = await fx.toIdr(Math.abs(ob), cur);
         }
       } catch (err) {
+        if (balanceFailure(res, err)) return;
         return res.status(400).json({
           error: 'fx_rate_unavailable',
           message: `Cannot initialize wallet: exchange rate for currency ${cur} is unavailable.`,
@@ -10641,46 +10672,25 @@ app.post('/api/wallets', auth, async (req, res) => {
       }
     }
 
-    const { data: wallet, error: wErr } = await supabase
-      .from('wallets')
-      .insert({
-        ...bizWriteFields(biz, userId),
-        name,
-        currency:    currency    || 'IDR',
-        type:        type        || null,
-        entity_name: entity_name || null,
-        color:       color       || null,
-        sort_order:  sort_order  || 0,
-        scope:       walletScope,
-      })
-      .select()
-      .single();
-    if (wErr) throw wErr;
-
-    // Insert opening balance transaction if provided and non-zero
-    if (ob !== 0 && obFxRes) {
-      await supabase.from('transactions').insert({
-        ...bizWriteFields(biz, userId),
-        type:             ob > 0 ? 'income' : 'expense',
-        amount_original:  Math.abs(ob),
-        currency_original: cur,
-        amount_idr:       obFxRes.amount_idr,
-        booked_rate:      obFxRes.booked_rate,
-        rate_source:      obFxRes.rate_source,
-        // Marked so the classifier identifies this as seeded balance, never revenue.
-        // The description carries the same signal, so wallets created before this
-        // marker existed still classify correctly.
-        category:         'Opening balance',
-        description:      `Opening balance · ${name}`,
-        source:           'wallet_opening_balance',
-        is_opening_balance: true,
-        wallet_id:        wallet.id,
-        scope:            walletScope,
-      });
-    }
-
-    res.json({ wallet });
+    // Wallet and opening movement commit in one guarded transaction.
+    const opening = ob !== 0 && obFxRes ? {
+      type: ob > 0 ? 'income' : 'expense', amount_original: Math.abs(ob), currency_original: cur,
+      amount_idr: obFxRes.amount_idr, booked_rate: obFxRes.booked_rate, rate_source: obFxRes.rate_source,
+      description: 'Opening balance · ' + name,
+    } : null;
+    const { request_key, ...intent } = req.body;
+    const { data, error } = await supabase.rpc('rpc_create_business_wallet', {
+      p_business_id: biz.business.id, p_user_id: userId, p_request_key: request_key || null, p_intent: intent,
+      p_wallet: { name, currency: cur, type: type || null, entity_name: entity_name || null,
+        color: color || null, sort_order: sort_order || 0, scope: walletScope }, p_opening: opening,
+    });
+    if (error && balanceFailure(res, error)) return;
+    if (error && ['PGRST202','42883'].includes(error.code))
+      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic wallet creation requires the financial writer migration.' });
+    if (error) throw error;
+    res.json(data);
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     res.status(500).json({ error: e.message });
   }
 });
@@ -10757,29 +10767,8 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
     if (!canManageWallets(biz.role))
       return res.status(403).json({ error: 'Your role does not allow managing wallets' });
 
-    // The currency of an account with transactions is fixed: every amount on it is in that currency.
-    if (currency !== undefined) {
-      const { data: cur } = await supabase.from('wallets').select('currency').eq('id', id).or(bizOrFilter(biz)).limit(1);
-      if (cur?.[0] && String(cur[0].currency || 'IDR').toUpperCase() !== String(currency || 'IDR').toUpperCase()) {
-        const { count } = await supabase.from('transactions').select('id', { count: 'exact', head: true }).or(bizOrFilter(biz)).eq('wallet_id', id);
-        if (count > 0) return res.status(409).json({ error: 'currency_locked', message: 'This account already has transactions; its currency cannot change.' });
-      }
-    }
-
-    // If renaming, sync source text on legacy transactions for balance continuity
-    if (name) {
-      const { data: exRows } = await supabase
-        .from('wallets').select('name').eq('id', id).or(bizOrFilter(biz)).limit(1);
-      const existing = exRows?.[0];
-      if (existing && existing.name !== name) {
-        await supabase.from('transactions')
-          .update({ source: name })
-          .or(bizOrFilter(biz))
-          .eq('source', existing.name);
-      }
-    }
-
-    const updates = { updated_at: new Date().toISOString() };
+    // One guarded transaction; existing legacy source text is never rewritten.
+    const updates = {};
     if (name         !== undefined) updates.name        = name;
     if (currency     !== undefined) updates.currency    = currency;
     if (type         !== undefined) updates.type        = type;
@@ -10789,16 +10778,16 @@ app.put('/api/wallets/:id', auth, async (req, res) => {
     if (scope        !== undefined) updates.scope       = scope;
     if (is_active === true)         updates.is_active   = true;   // restore from the archive (archiving is DELETE)
 
-    const { data, error } = await supabase
-      .from('wallets')
-      .update(updates)
-      .eq('id', id)
-      .or(bizOrFilter(biz))
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('rpc_update_business_wallet', {
+      p_business_id: biz.business.id, p_user_id: userId, p_wallet_id: id, p_updates: updates,
+    });
+    if (error && balanceFailure(res, error)) return;
+    if (error && (error.code === 'PGRST202' || error.code === '42883'))
+      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Wallet update requires the financial writer migration.' });
     if (error) throw error;
     res.json({ wallet: data });
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     res.status(500).json({ error: e.message });
   }
 });
@@ -10818,112 +10807,22 @@ app.delete('/api/wallets/:id', auth, async (req, res) => {
     if (error) throw error;
     res.json({ ok: true });
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     res.status(500).json({ error: e.message });
   }
 });
 
-// POST /api/wallets/backfill
-// Creates wallets from distinct transactions.source values for THIS user only.
-// Never touches other users. Skips sources that already exist as wallet names.
-app.post('/api/wallets/backfill', auth, async (req, res) => {
-  const userId = req.user.userId;
-  try {
-    const { data: txs, error: tErr } = await supabase
-      .from('transactions')
-      .select('source')
-      .eq('user_id', userId)
-      .not('source', 'is', null);
-    if (tErr) throw tErr;
-
-    const sources = [...new Set((txs || []).map(t => t.source).filter(Boolean))];
-    if (sources.length === 0) return res.json({ created: 0, wallets: [] });
-
-    const { data: existing } = await supabase
-      .from('wallets').select('name').eq('user_id', userId);
-    const existingNames = new Set((existing || []).map(w => w.name));
-
-    const toCreate = sources.filter(s => !existingNames.has(s));
-    if (toCreate.length === 0) return res.json({ created: 0, wallets: [] });
-
-    const rows = toCreate.map((name, i) => ({
-      user_id:  userId,
-      name,
-      // Heuristic: name contains '$' or 'usd' (case-insensitive) → USD wallet
-      currency: /\$|usd/i.test(name) ? 'USD' : 'IDR',
-      type:     null,
-      sort_order: i,
-    }));
-
-    const { data: created, error: cErr } = await supabase
-      .from('wallets').insert(rows).select();
-    if (cErr) throw cErr;
-
-    res.json({ created: (created || []).length, wallets: created || [] });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+// Legacy user-wide writers could change Business and Personal source bindings
+// and guessed currency from names. No current UI calls accounts/*; backfill is
+// reachable. Refuse mutation until an explicit scoped data-review workflow exists.
+const legacyAccountReview = (_req, res) => res.status(409).json({
+  error: 'legacy_wallet_review_required',
+  message: 'Existing account history needs a workspace and currency review before linking or renaming. No records were changed.',
+  automatic_retry: false,
 });
-
-// --- Accounts API ---------------------------------------------------------
-
-app.post('/api/accounts/adjust', auth, async (req, res) => {
-  const { name, diff, type } = req.body
-  if (!name || diff === undefined) return res.status(400).json({ error: 'Missing fields' })
-  const { error } = await supabase.from('transactions').insert({
-    user_id: req.user.userId,
-    type: diff > 0 ? 'income' : 'expense',
-    amount_original: Math.abs(diff),
-    currency_original: 'IDR',
-    amount_idr: Math.abs(diff),
-    description: `Balance adjustment · ${name}`,
-    source: name,
-    scope: type || 'personal',
-  })
-  if (error) return res.status(500).json({ error: error.message })
-  res.json({ ok: true })
-})
-
-app.post('/api/accounts/delete', auth, async (req, res) => {
-  const { name } = req.body
-  if (!name) return res.status(400).json({ error: 'Missing name' })
-  const { error } = await supabase.from('transactions')
-    .update({ source: null })
-    .eq('user_id', req.user.userId)
-    .eq('source', name)
-  if (error) return res.status(500).json({ error: error.message })
-  res.json({ ok: true })
-})
-
-app.post('/api/accounts/rename', auth, async (req, res) => {
-  const { oldName, newName, type } = req.body
-  if (!oldName || !newName) return res.status(400).json({ error: 'Missing fields' })
-  // Update all transactions where source = oldName
-  const updates = { source: newName }
-  if (type !== undefined) updates.scope = type
-  const { error } = await supabase.from('transactions')
-    .update(updates)
-    .eq('user_id', req.user.userId)
-    .eq('source', oldName)
-  if (error) return res.status(500).json({ error: error.message })
-  res.json({ ok: true })
-})
-
-
-app.post('/api/accounts', auth, async (req, res) => {
-  const { name, type, balance } = req.body
-  const { error } = await supabase.from('transactions').insert({
-    user_id: req.user.userId,
-    type: 'income',
-    amount_original: balance || 0,
-    currency_original: 'IDR',
-    amount_idr: balance || 0,
-    description: `Opening balance · ${name}`,
-    source: name,
-    scope: type || 'personal',
-  })
-  if (error) return res.status(500).json({ error: error.message })
-  res.json({ ok: true })
-})
+app.post('/api/wallets/backfill', auth, legacyAccountReview);
+for (const route of ['/api/accounts','/api/accounts/adjust','/api/accounts/delete','/api/accounts/rename'])
+  app.post(route, auth, legacyAccountReview);
 
 // --- Platform Admin guard -------------------------------------------------
 
@@ -10955,7 +10854,7 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
       return res.status(400).json({ error: 'target_balance is required' });
     }
     const targetNum = Number(target_balance);
-    if (isNaN(targetNum)) {
+    if (!nativeInputIsExact(target_balance) || !Number.isFinite(targetNum)) {
       return res.status(400).json({ error: 'target_balance must be a number' });
     }
     if (!reason || !String(reason).trim()) {
@@ -10968,6 +10867,8 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
     if (!canManageWallets(biz.role)) {
       return res.status(403).json({ error: 'Only business owner, admin or CFO can adjust wallet balances' });
     }
+    const { request_key, ...intent } = req.body;
+    if (await replayFinancialCreate(req, res, biz, 'wallet_adjust', intent)) return;
     const bizOr = bizOrFilter(biz);
 
     // Load wallet — business-scoped
@@ -11000,15 +10901,6 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
 
     const delta = targetNum - currentBalance;
 
-    if (delta === 0) {
-      return res.json({
-        ok: true,
-        message: 'Balance is already at target — no correction needed.',
-        current_balance: currentBalance,
-        delta: 0,
-      });
-    }
-
     const txDate = transaction_date
       ? new Date(transaction_date).toISOString()
       : new Date().toISOString();
@@ -11016,35 +10908,21 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
     const cur = (wallet.currency || 'IDR').toUpperCase();
     const fxRes = await fx.toIdr(delta, cur, txDate.slice(0, 10));
 
-    const { data: corrTx, error: cErr } = await supabase
-      .from('transactions')
-      .insert({
-        ...bizWriteFields(biz, userId),
-        type:              'correction',
-        amount_original:   delta,
-        currency_original: cur,
-        amount_idr:        fxRes.amount_idr,
-        booked_rate:       fxRes.booked_rate,
-        rate_source:       fxRes.rate_source,
-        description:       `Balance correction: ${String(reason).trim()}`,
-        source:            wallet.name,
-        wallet_id:         wallet.id,
-        scope:             wallet.scope || 'business',
-        category:          'Balance Correction',
-        created_at:        txDate,
-      })
-      .select('id')
-      .single();
-    if (cErr) throw cErr;
-
-    res.json({
-      ok:               true,
-      previous_balance: currentBalance,
-      delta,
-      new_balance:      targetNum,
-      transaction_id:   corrTx.id,
+    const { data, error } = await supabase.rpc('rpc_adjust_business_wallet', {
+      p_business_id: biz.business.id, p_user_id: userId, p_wallet_id: walletId,
+      p_request_key: request_key || null, p_intent: intent,
+      p_expected_balance: currentBalance, p_target: targetNum,
+      p_correction: { amount_original: delta, currency_original: cur, amount_idr: fxRes.amount_idr,
+        booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source,
+        description: 'Balance correction: ' + String(reason).trim(), transaction_date: txDate.slice(0,10) },
     });
+    if (error && balanceFailure(res, error)) return;
+    if (error && ['PGRST202','42883'].includes(error.code))
+      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic adjustment requires the financial writer migration.' });
+    if (error) throw error;
+    res.json(data);
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     if (e.message && e.message.startsWith('fx_rate_unavailable:')) {
       const cur = e.message.split(':')[1] || '';
       return res.status(400).json({
@@ -11108,7 +10986,9 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
     const fromCur = (fromWallet.currency || 'IDR').toUpperCase();
     const toCur   = (toWallet.currency || 'IDR').toUpperCase();
     const txDate  = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
-    const transferId = req.body.transfer_id || crypto.randomUUID();
+    if (!req.body.transfer_id)
+      return res.status(400).json({ error: 'idempotency_key_required', message: 'Keep a stable transfer_id for this transfer.' });
+    const transferId = req.body.transfer_id;
     const transferRef = `xfer:${transferId}`;
     const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
 
@@ -11236,6 +11116,7 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
       }
       return res.status(500).json({ error: 'atomic_transfer_failed', message: 'No response from transfer RPC' });
     } catch (rpcErr) {
+      if (balanceFailure(res, rpcErr)) return;
       console.error('[wallets/transfer] Fatal RPC execution error:', rpcErr.message);
       return res.status(500).json({ error: 'atomic_transfer_failed', message: rpcErr.message });
     }
@@ -12289,103 +12170,13 @@ app.get('/api/admin/access-audit', auth, requireAdmin, async (req, res) => {
 // Super-admin only. Creates a signed correction transaction to bring the wallet
 // balance to target_balance.  NEVER modifies wallet.balance directly.
 // correction type: affects wallet balance + total cash, excluded from income/expense KPIs.
-app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, async (req, res) => {
-  try {
-    const adminUserId = req.user.userId;
-    const walletId    = req.params.id;
-    const { target_balance, reason, transaction_date } = req.body;
-
-    if (target_balance === undefined || target_balance === null) {
-      return res.status(400).json({ error: 'target_balance is required' });
-    }
-    const targetNum = Number(target_balance);
-    if (isNaN(targetNum)) {
-      return res.status(400).json({ error: 'target_balance must be a number' });
-    }
-    if (!reason || !String(reason).trim()) {
-      return res.status(400).json({ error: 'reason is required' });
-    }
-
-    // Load wallet (no user_id filter — admin can adjust any wallet)
-    const { data: wallet, error: wErr } = await supabase
-      .from('wallets')
-      .select('id, user_id, name, currency, scope')
-      .eq('id', walletId)
-      .single();
-    if (wErr || !wallet) return res.status(404).json({ error: 'Wallet not found' });
-
-    // Compute current balance in wallet native currency
-    const { data: txs, error: tErr } = await supabase
-      .from('transactions')
-      .select('wallet_id, source, type, amount_original, amount_idr')
-      .eq('user_id', wallet.user_id);
-    if (tErr) throw tErr;
-
-    const related = (txs || []).filter(t =>
-      t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name)
-    );
-    const currentBalance = related.reduce((sum, t) => {
-      const amt = Number(t.amount_original ?? t.amount_idr ?? 0);
-      if (WALLET_CASH_IN.includes(t.type))  return sum + amt;
-      if (WALLET_CASH_OUT.includes(t.type)) return sum - amt;
-      if (t.type === 'correction')           return sum + amt;
-      return sum;
-    }, 0);
-
-    const delta = targetNum - currentBalance;
-
-    if (delta === 0) {
-      return res.json({
-        ok: true,
-        message: 'Balance is already at target — no correction needed.',
-        current_balance: currentBalance,
-        delta: 0,
-      });
-    }
-
-    // Create correction transaction (signed delta stored in amount fields)
-    const txDate = transaction_date
-      ? new Date(transaction_date).toISOString()
-      : new Date().toISOString();
-
-    const cur = (wallet.currency || 'IDR').toUpperCase();
-    const fxRes = await fx.toIdr(delta, cur, txDate.slice(0, 10));
-
-    const corrRow = {
-      user_id:           wallet.user_id,
-      type:              'correction',
-      amount_original:   delta,                              // signed: + increase, − decrease
-      currency_original: cur,
-      amount_idr:        fxRes.amount_idr,                   // signed
-      booked_rate:       fxRes.booked_rate,
-      rate_source:       fxRes.rate_source,
-      description:       `Balance correction: ${String(reason).trim()} [admin:${adminUserId}]`,
-      source:            wallet.name,
-      wallet_id:         wallet.id,
-      scope:             wallet.scope || 'business',
-      category:          'Balance Correction',
-      created_at:        txDate,
-    };
-
-    const { data: corrTx, error: cErr } = await supabase
-      .from('transactions')
-      .insert(corrRow)
-      .select('id')
-      .single();
-    if (cErr) throw cErr;
-
-    res.json({
-      ok:               true,
-      previous_balance: currentBalance,
-      delta,
-      new_balance:      targetNum,
-      transaction_id:   corrTx.id,
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+app.post('/api/admin/wallets/:id/adjust-balance', auth, requireAdmin, (_req, res) => {
+  // The legacy override guessed a user-wide balance and wrote an unscoped row.
+  // Keep the access guard; refuse money mutation pending a scoped atomic protocol.
+  res.status(409).json({ error: 'wallet_adjustment_review_required',
+    message: 'Use the Business wallet adjustment in its verified workspace. A platform override needs a separate scoped review.',
+    automatic_retry: false });
 });
-
 // --- Profile ---------------------------------------------------------------
 
 app.get('/api/profile', auth, async (req, res) => {
@@ -12428,12 +12219,13 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   let payWallet = null;
   if (wallet_id) {
     const { data: wRows } = await supabase.from('wallets')
-      .select('id, name, scope, currency, type').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
+      .select('id, name, scope, currency, type, is_active').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
     if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet' });
     payWallet = wRows[0];
   } else if (account && typeof account === 'string' && account.trim()) {
     const { data: nameRows } = await supabase.from('wallets')
-      .select('id, name, scope, currency, type').eq('name', account.trim()).or(bizOrFilter(biz)).limit(1);
+      .select('id, name, scope, currency, type, is_active').eq('name', account.trim()).or(bizOrFilter(biz)).limit(2);
+    if (nameRows?.length > 1) return res.status(409).json({ error: 'wallet_name_ambiguous', message: 'Select the wallet explicitly.' });
     if (nameRows?.length) {
       payWallet = nameRows[0];
     }
@@ -12487,6 +12279,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
       fxRes = await fx.toIdr(paymentAmount, cur, txDate);
     }
   } catch (fxErr) {
+    if (balanceFailure(res, fxErr)) return;
     return res.status(400).json({
       error: 'fx_rate_unavailable',
       message: `Cannot record payment: exchange rate for currency ${cur} is unavailable.`,
@@ -12496,6 +12289,8 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
 
   // Idempotency key handling
   const idempotencyKey = (req.headers['idempotency-key'] || req.body?.idempotency_key || '').toString().trim();
+  if (!idempotencyKey || idempotencyKey.length > 128)
+    return res.status(400).json({ error: 'idempotency_key_required', message: 'Keep a stable payment request key before retrying.' });
   const requestHash = crypto.createHash('sha256').update(JSON.stringify({
     debt_id: String(debt.id),
     amount: paymentAmount,
@@ -12526,6 +12321,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
         }
       }
     } catch (idempErr) {
+      if (balanceFailure(res, idempErr)) return;
       console.warn('[debts:pay] Idempotency lookup skipped:', idempErr.message);
     }
   }
@@ -12540,6 +12336,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
       message: 'A valid active business wallet is required to record a payment',
     });
   }
+  if (payWallet.is_active === false) return res.status(409).json({ error: 'wallet_inactive', message: 'Choose an active wallet.' });
   // After the replay check: a replay of a recorded payment is answered above, never refused.
   if (debt.type === 'payable' && await refuseNegativeOutflow(res, biz, payWallet, paymentAmount)) return;
 
@@ -12605,7 +12402,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
       }
       return res.json({
         ok: true,
-        isFullyPaid: rpcRes.data.is_fully_paid,
+        isFullyPaid: rpcRes.data.isFullyPaid ?? rpcRes.data.is_fully_paid,
         remaining: Math.max(0, Number(rpcRes.data.remaining)),
         debt: computeDebtStatus({ ...rpcRes.data.debt, withholding_allocated: withheld }),
       });
@@ -12613,6 +12410,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
 
     return res.status(500).json({ error: 'atomic_payment_failed', message: 'No response from payment RPC' });
   } catch (rpcErr) {
+    if (balanceFailure(res, rpcErr)) return;
     console.error('[debts:pay] Fatal RPC execution error:', rpcErr.message);
     return res.status(500).json({ error: 'atomic_payment_failed', message: rpcErr.message });
   }
@@ -14297,20 +14095,19 @@ app.delete('/api/businesses/:id', auth, async (req, res) => {
     if (total > 0)
       return res.status(409).json({ error: 'business_not_empty', counts, message: 'This business has financial data and cannot be deleted yet.' });
 
-    // ATOMIC hard delete: a SINGLE delete of the business row. business_members has
-    // ON DELETE CASCADE, so memberships are removed in the same statement/transaction
-    // — no risk of a partial delete (orphaned members with no business). If any RESTRICT
-    // FK still references this business (it shouldn't: counts are proven zero above),
-    // the delete fails wholesale and we return a clean error — nothing is partially
-    // removed. We do NOT touch migration-037 tables (e.g. user_workspace_preferences);
-    // their FK to businesses is ON DELETE SET NULL when present, and absent in prod
-    // (037 not applied) — either way no manual cleanup is needed here.
-    const { error: delErr } = await supabase.from('businesses').delete().eq('id', businessId);
+    // HTTP counts are advisory. The RPC enters the gate before parent locks,
+    // rechecks emptiness and deletes with its FK actions in one transaction.
+    const { data: deleted, error: delErr } = await supabase.rpc('rpc_delete_empty_business', {
+      p_business_id: businessId, p_user_id: userId, p_confirm: confirm,
+    });
+    if (delErr && balanceFailure(res, delErr)) return;
+    if (delErr && (delErr.code === 'PGRST202' || delErr.code === '42883'))
+      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Business deletion requires the financial writer migration.' });
     if (delErr) return res.status(409).json({ error: 'delete_blocked', message: 'This business has related records and cannot be deleted yet.' });
-
-    const next = businessWorkspaces.find(x => x.business_id !== businessId);
-    res.json({ ok: true, deleted_business_id: businessId, next_business_id: next?.business_id || null });
+    if (!deleted?.ok) return res.status(409).json({ error: deleted?.error || 'delete_blocked', counts: deleted?.counts });
+    res.json(deleted);
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     res.status(500).json({ error: e.message });
   }
 });
@@ -14408,6 +14205,7 @@ app.post('/api/payroll/employees', auth, async (req, res) => {
     if (error) throw error;
     res.json({ employee: data });
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     res.status(500).json({ error: e.message });
   }
 });
@@ -14441,6 +14239,7 @@ app.patch('/api/payroll/employees/:id', auth, async (req, res) => {
     if (error) throw error;
     res.json({ employee: data });
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     res.status(500).json({ error: e.message });
   }
 });
@@ -14460,6 +14259,7 @@ app.delete('/api/payroll/employees/:id', auth, async (req, res) => {
     if (error) throw error;
     res.json({ success: true });
   } catch (e) {
+    if (balanceFailure(res, e)) return;
     res.status(500).json({ error: e.message });
   }
 });

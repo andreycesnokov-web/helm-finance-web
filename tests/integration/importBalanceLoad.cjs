@@ -15,12 +15,12 @@ async function connect() {
   const c = new Client({ connectionString: db.connectionString }); await c.connect();
   await c.query("SET statement_timeout='15s'; SET lock_timeout='10s'"); return c;
 }
-async function company() {
-  const f = { biz: id(), wallet: id(), statements: [], patchVersion: 0 };
-  await setup.query("INSERT INTO businesses(id,name,owner_user_id,type) VALUES($1,'Load synthetic',93001,'business')", [f.biz]);
-  await setup.query("INSERT INTO wallets(id,business_id,user_id,name,currency,scope,type) VALUES($1,$2,93001,'Load cash','IDR','business','bank')", [f.wallet, f.biz]);
-  await setup.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'income',10000,10000,'IDR',$2,'business','2026-05-10')", [f.biz, f.wallet]);
-  f.patchId = (await setup.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'expense',1,1,'IDR',$2,'business','2026-05-10') RETURNING id", [f.biz, f.wallet])).rows[0].id;
+async function company(scope='business') {
+  const f = { biz: id(), wallet: id(), scope, statements: [], patchVersion: 0, expectedBalance: 9999 };
+  await setup.query("INSERT INTO businesses(id,name,owner_user_id,type) VALUES($1,'Load synthetic',93001,$2)", [f.biz, scope]);
+  await setup.query("INSERT INTO wallets(id,business_id,user_id,name,currency,scope,type) VALUES($1,$2,93001,'Load cash','IDR',$3,'bank')", [f.wallet, f.biz, scope]);
+  await setup.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'income',10000,10000,'IDR',$2,$3,'2026-05-10')", [f.biz, f.wallet, scope]);
+  f.patchId = (await setup.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'expense',1,1,'IDR',$2,$3,'2026-05-10') RETURNING id", [f.biz, f.wallet, scope])).rows[0].id;
   return f;
 }
 async function statement(f, count = 20) {
@@ -32,23 +32,28 @@ async function statement(f, count = 20) {
   return { batch, plan: rows.map(r => ({ row_id: r.id, action: 'create', type: 'expense', scope: 'business', expected_amount: 1, expected_date: '2026-05-10', currency: 'IDR', amount_idr: 1, booked_rate: 1, rate_source: 'identity' })) };
 }
 const confirm = (c, f, s) => c.query("SELECT rpc_confirm_bank_import($1,$2,93001,93001,$3::jsonb,'review') r", [f.biz, s.batch, JSON.stringify(s.plan)]);
-const income = (c, f) => c.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'income',1,1,'IDR',$2,'business','2026-05-10')", [f.biz, f.wallet]);
+const income = (c, f) => c.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'income',1,1,'IDR',$2,$3,'2026-05-10')", [f.biz, f.wallet, f.scope]);
 async function round(concurrency, mode) {
-  // Fresh database per trial: avoid TRUNCATE/FSM artefacts on this managed filesystem
-  // and keep identical initial dataset size at every concurrency level.
+  // Fresh database per trial. The previous XX000 run is invalid; its cause is
+  // unproven. Do not infer an FSM/filesystem diagnosis from this methodology.
   await setup.end(); await observer.end(); await db.drop();
   db = await createIntegratedDatabase('cfo_load_trial'); setup = await connect(); observer = await connect();
   await setup.query('INSERT INTO users(id) VALUES(93001)');
   const iterations = mode === 'mixed' ? Math.max(6, Math.ceil(60 / concurrency)) : mode === 'long_import_A' ? 10 : Math.max(30, Math.ceil(120 / concurrency));
   const companies = [], clients = [];
+  // One Personal workspace per owner is a real schema constraint. Model this
+  // user's shared Personal wallet alongside independent Business workspaces.
+  const personal = mode === 'personal_parallel_business' ? await company('personal') : null;
   for (let i = 0; i < concurrency; i++) {
     const f = await company();
+    if (personal) f.personal = personal;
     if (mode === 'mixed') for (let j = 0; j < iterations; j++) f.statements.push(await statement(f));
     companies.push(f); clients.push(await connect());
   }
-  let longClient, longPromise, longMs = null;
+  let longClient, longPromise, longMs = null, longCompany;
   if (mode === 'long_import_A') {
     const a = await company(), s = await statement(a, 500); longClient = await connect();
+    longCompany=a;
     // Deliberate 1ms per ledger row: controlled long-import contention, not a production duration forecast.
     await setup.query(`CREATE OR REPLACE FUNCTION test_slow_import() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.business_id='${a.biz}'::uuid THEN PERFORM pg_sleep(0.001); END IF; RETURN NULL; END $$`);
     await setup.query('CREATE TRIGGER test_slow_import AFTER INSERT ON transactions FOR EACH ROW EXECUTE FUNCTION test_slow_import()');
@@ -68,7 +73,7 @@ async function round(concurrency, mode) {
   })();
   const start = performance.now();
   await Promise.all(clients.map(async (c, i) => {
-    const f = companies[i];
+    const f = mode === 'metadata_parallel_money' ? companies[Math.floor(i/2)*2] : companies[i];
     for (let j = 0; j < iterations; j++) {
       const t = performance.now();
       try {
@@ -79,17 +84,32 @@ async function round(concurrency, mode) {
           await c.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'expense',1,1,'IDR',$2,'business','2026-05-10')", [f.biz, f.wallet]);
           const patched = await c.query('SELECT rpc_patch_business_transaction($1,93001,$2,$3,$4::jsonb,false) r', [f.biz, f.patchId, f.patchVersion, JSON.stringify({ description: `load-${j}` })]);
           f.patchVersion = Number(patched.rows[0].r.balance_version);
-        } else await income(c, f);
+        } else if (mode === 'metadata_parallel_money' && i%2===0) {
+          await c.query('UPDATE wallets SET color=$2 WHERE id=$1',[f.wallet,`load-${j}`]);
+        } else await income(c, mode === 'personal_parallel_business' && j%2 ? f.personal : f);
         await c.query('COMMIT'); succeeded++;
+        if(mode==='mixed') f.expectedBalance-=21;
+        else if(mode!=='metadata_parallel_money' || i%2!==0) {
+          (mode==='personal_parallel_business' && j%2 ? f.personal : f).expectedBalance++;
+        }
       } catch (e) { errors[e.code || e.message] = (errors[e.code || e.message] || 0) + 1; error_examples[e.code || 'unknown'] = e.message; await c.query('ROLLBACK'); }
       latencies.push(performance.now() - t);
     }
   }));
   const elapsedMs = performance.now() - start;
-  if (longPromise) await longPromise;
+  if (longPromise) { await longPromise; longCompany.expectedBalance-=500; }
   sampling = false; await sample;
   for (const c of clients) await c.end(); if (longClient) { await longClient.end(); await setup.query('DROP TRIGGER test_slow_import ON transactions'); }
+  const finalBalances=[];
+  for(const f of [...companies,...(personal?[personal]:[]),...(longCompany?[longCompany]:[])]) {
+    const actual=Number((await setup.query('SELECT fn_wallet_ledger_balance($1) b',[f.wallet])).rows[0].b);
+    finalBalances.push({business:f.biz,wallet:f.wallet,scope:f.scope,expected:f.expectedBalance,actual,ok:actual===f.expectedBalance});
+  }
+  const provenance=(await setup.query("SELECT count(*)::int n FROM transactions t JOIN bank_import_rows r ON r.id=t.bank_import_row_id WHERE t.business_id<>r.business_id")).rows[0].n;
   const r = { mode, concurrency, iterations, attempts: latencies.length, succeeded, throughput_ops_s: succeeded / (elapsedMs / 1000), elapsed_ms: elapsedMs,
+    dataset:{initial_native_balance:9999,per_mixed_import_rows:20,long_import_rows:500,companies:companies.length,personal_companies:personal?1:0},
+    raw_latency_ms:latencies,raw_gate_roundtrip_ms:waits,
+    correctness:{final_balances:finalBalances,cross_business_provenance:provenance,ok:finalBalances.every(x=>x.ok)&&provenance===0},
     latency_ms: { p50: quantile(latencies, .5), p95: quantile(latencies, .95), p99: quantile(latencies, .99), max: quantile(latencies, 1) },
     gate_roundtrip_ms: { p50: quantile(waits, .5), p95: quantile(waits, .95), p99: quantile(waits, .99), max: quantile(waits, 1) },
     max_observed_waiters: maxWaiters, timeout_count: (errors['55P03'] || 0) + (errors['57014'] || 0), deadlock_count: errors['40P01'] || 0, errors, error_examples, long_import_ms: longMs };
@@ -123,7 +143,7 @@ async function diagnostics() {
   try {
     await setup.query('INSERT INTO users(id) VALUES(93001)');
     const environment = { node: process.version, postgres: (await setup.query('SHOW server_version')).rows[0].server_version, cpu_model: os.cpus()[0].model, visible_cpus: os.cpus().length, cpu_cgroup: readLimit('/sys/fs/cgroup/cpu.max'), memory_cgroup: readLimit('/sys/fs/cgroup/memory.max'), total_memory_bytes: os.totalmem(), platform: os.platform(), arch: os.arch(), notes: 'SQL loopback; explicit gate measurement adds roundtrips; nearest-rank empirical quantiles; no warm production dataset, HTTP, FX, AI or Storage; controlled slow import.' };
-    for (const mode of ['independent_writes', 'mixed', 'long_import_A']) for (const n of [1, 5, 20, 50]) await round(n, mode);
+    for (const mode of ['independent_writes', 'mixed', 'long_import_A','personal_parallel_business','metadata_parallel_money']) for (const n of [1, 5, 20, 50]) await round(n, mode);
     await diagnostics();
     const output = { environment, results };
     if (process.argv[2]) fs.writeFileSync(process.argv[2], JSON.stringify(output, null, 2) + '\n');

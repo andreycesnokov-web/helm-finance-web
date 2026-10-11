@@ -98,6 +98,12 @@ class Query {
 
 function createRealPgSupabase(connectionString) {
   const pool = new Pool({ connectionString, max: 8 });
+  return createSqlSupabase(pool);
+}
+
+// Injectable SQL executor for explicitly labelled embedded SQL smoke tests.
+// Concurrency tests must still use real independent pg connections.
+function createSqlSupabase(pool) {
   return {
     pool,
     from: (table) => new Query(pool, table),
@@ -121,4 +127,4 @@ function createRealPgSupabase(connectionString) {
   };
 }
 
-module.exports = { createRealPgSupabase };
+module.exports = { createRealPgSupabase, createSqlSupabase };
