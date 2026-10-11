@@ -291,6 +291,7 @@ export default function Accounts() {
         method: 'POST',
         body: {
           target_balance:   targetNum,
+          expected_balance: adjustWallet.balance,
           reason:           adjustForm.reason.trim(),
           transaction_date: adjustForm.transaction_date || undefined,
         },

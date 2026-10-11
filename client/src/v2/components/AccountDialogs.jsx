@@ -96,7 +96,7 @@ export function AdjustBalanceDialog({ wallet, onClose, onSaved }) {
     <Modal title={t('accd.adjTitle')} onClose={onClose}
       footer={<><button type="button" className="v2-btn v2-btn-secondary" onClick={onClose}>{t('set.cancel')}</button>
         <button type="button" className="v2-btn v2-btn-primary" disabled={busy || !ok}
-          onClick={() => run(() => adjustWalletBalance(request, wallet.id, { target_balance: target, transaction_date: f.date, reason: f.reason.trim() }))}>{t('accd.adjCreate')}</button></>}>
+          onClick={() => run(() => adjustWalletBalance(request, wallet.id, { target_balance: target, expected_balance: wallet.balance, transaction_date: f.date, reason: f.reason.trim() }))}>{t('accd.adjCreate')}</button></>}>
       <p className="v2-sec">{t('accd.now', { name: wallet.name })} <strong className="v2-num">{money(wallet.balance, { currency: cur, full: true })}</strong></p>
       <div className="v2-field-row">
         <label className="v2-field"><span className="v2-field-label">{t('accd.bankBalance')}</span>
