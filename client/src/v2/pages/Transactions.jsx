@@ -27,7 +27,7 @@ function CategoryPicker({ tx, categories, onSaved }) {
     const v = e.target.value
     if (!v) return
     setBusy(true); setErr(null)
-    try { await setTransactionCategory(token, tx.id, v); onSaved() }
+    try { await setTransactionCategory(token, tx.id, v, tx.balance_version); onSaved() }
     catch (x) { setErr(actionError(x) === 'forbidden' ? t('dec.forbidden') : actionError(x)) }
     finally { setBusy(false) }
   }

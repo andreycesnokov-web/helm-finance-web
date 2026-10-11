@@ -87,6 +87,7 @@ function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWalle
   const [catDraft, setCatDraft] = useState(tx?.category || '')
   const [catSaving, setCatSaving] = useState(false)
   const [catSaved, setCatSaved] = useState(false)
+  const [catError, setCatError] = useState('')
   useEffect(() => { setCatDraft(tx?.category || ''); setCatSaved(false) }, [tx?.id, tx?.category])
 
   if (!tx) return null
@@ -94,9 +95,9 @@ function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWalle
   const catDirty = (catDraft || '') !== (tx.category || '')
   const saveCat = async () => {
     if (!onSaveCategory || !catDirty) return
-    setCatSaving(true)
+    setCatSaving(true); setCatError('')
     try { await onSaveCategory(tx.id, catDraft.trim() || null); setCatSaved(true) }
-    catch { /* keep draft so user can retry */ }
+    catch (e) { setCatError(e.message || 'Unable to save. Reload the transaction before retrying.') }
     finally { setCatSaving(false) }
   }
 
@@ -163,6 +164,7 @@ function TxInlinePanel({ tx, refDirections = [], refActivityTypes = [], refWalle
               </button>
             )}
             {catSaved && !catDirty && <span style={{ fontSize: 12, color: 'var(--green-dark)' }}>✓</span>}
+            {catError && <span role="alert" style={{ color: 'var(--red-dark)' }}>{catError}</span>}
           </div>
         </div>
         <div>
@@ -564,8 +566,10 @@ export default function Transactions() {
 
   // Save an edited category and patch local state in place
   const saveCategory = async (txId, category) => {
-    const updated = await apiFetch(`/transactions/${txId}`, token, { method: 'PATCH', body: { category } })
-    setTxs(prev => prev.map(t => t.id === txId ? { ...t, category: updated.category } : t))
+    const version = txs.find(t => t.id === txId)?.balance_version
+    if (version == null) throw new Error('Reload the transaction before editing.')
+    const updated = await apiFetch(`/transactions/${txId}`, token, { method: 'PATCH', body: { category, expected_version: version } })
+    setTxs(prev => prev.map(t => t.id === txId ? { ...t, category: updated.category, balance_version: updated.balance_version } : t))
   }
 
   // ── Load from API ─────────────────────────────────────────────────────────

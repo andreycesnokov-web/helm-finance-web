@@ -259,7 +259,8 @@ export default function Accounts() {
             type:            resolvedType,
             entity_name:     form.entity_name || null,
             opening_balance: Number(form.opening_balance) || 0,
-            sort_order:      wallets.length,
+            // Keep create intent stable after a committed response is lost.
+            // The refreshed list length includes that wallet and cannot be reused.
             scope:           form.scope || 'business',
           },
         })

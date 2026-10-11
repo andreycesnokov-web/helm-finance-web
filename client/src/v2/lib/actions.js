@@ -50,8 +50,10 @@ export const requestDebtInfo = (token, id, note) =>
 export const updateTransaction = (token, id, body) =>
   apiFetch(`/transactions/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
 
-export const setTransactionCategory = (token, id, category) =>
-  updateTransaction(token, id, { category })
+export const setTransactionCategory = (token, id, category, expectedVersion) => {
+  if (expectedVersion == null) return Promise.reject(new Error('Reload the transaction before editing.'))
+  return updateTransaction(token, id, { category, expected_version: expectedVersion })
+}
 
 export const createCounterparty = (token, body) =>
   apiFetch('/counterparties', token, { method: 'POST', body })
