@@ -57,3 +57,20 @@ test('gateway/backend 5xx preserves the original money intent instead of assumin
     assert.equal(sent[0].request_key,sent[1].request_key);
   }
 });
+
+test('a later refusal cannot discard a key whose earlier commit outcome remains unknown',async()=>{
+  for(const [path,field] of [['/wallets','request_key'],['/transactions/batch','request_key'],['/debts/23/pay','idempotency_key'],['/wallets/transfer','transfer_id'],['/wallets/synthetic/adjust-balance','request_key']]) {
+    for(const status of [400,403,409]) {
+      const body={amount:5,wallet_id:'synthetic',description:`refusal-${status}`},sent=[],committed=new Set();
+      let bookings=0;
+      globalThis.fetch=async(_url,opts)=>{const key=JSON.parse(opts.body)[field];sent.push(key);committed.add(key);bookings++;throw Error('response lost after synthetic commit')};
+      await assert.rejects(api.apiFetch(path,'synthetic',{method:'POST',body}),e=>e.code==='financial_outcome_unknown');
+      globalThis.fetch=async(_url,opts)=>{sent.push(JSON.parse(opts.body)[field]);return{ok:false,status,text:async()=>JSON.stringify({error:status===403?'business_write_forbidden':status===400?'fx_rate_unavailable':'financial_conflict',...(status===409?{outcome:'rolled_back',outcome_scope:'failed_database_transaction'}:{})})}};
+      await assert.rejects(api.apiFetch(path,'synthetic',{method:'POST',body}),e=>e.status===status);
+      const reloaded=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync(new URL('../client/src/lib/api.js',import.meta.url),'utf8')).toString('base64')+`#refusal-${encodeURIComponent(path)}-${status}`);
+      globalThis.fetch=async(_url,opts)=>{const key=JSON.parse(opts.body)[field];sent.push(key);const replay=committed.has(key);if(!replay){committed.add(key);bookings++}return{ok:true,status:200,text:async()=>JSON.stringify({ok:true,is_replay:replay})}};
+      await reloaded.apiFetch(path,'synthetic',{method:'POST',body});
+      assert.equal(sent[2],sent[0],`${path}: ${status} discarded the unresolved intent`);assert.equal(bookings,1);
+    }
+  }
+});

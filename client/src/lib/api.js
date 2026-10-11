@@ -106,9 +106,9 @@ export async function apiFetch(path, token, options = {}) {
     // rollback permits treating it as cancelled; retain the original intent.
     if (mutation && res.status >= 500 && data?.outcome !== 'rolled_back')
       return unconfirmed(new Error(data?.message || data?.error || `HTTP ${res.status}`))
-    // Preserve the key on unknown outcomes. A definitive refusal did not book
-    // this create; an edited payload naturally receives a different intent key.
-    if (data?.outcome !== 'unknown' && data?.error !== 'financial_outcome_unknown') intent?.clear()
+    // A refusal/rollback of THIS attempt cannot resolve a prior lost response.
+    // Keep the same intent until confirmed success; retrying a known rollback
+    // under the same key is also safe. Edited payloads have a different hash.
     // Stale/inaccessible workspace: clear the active id so the next load re-picks a
     // valid one (WorkspaceProvider refetches /api/workspaces). Only on explicit 403.
     if (res.status === 403 && data?.error === 'workspace_not_accessible' && getActiveBusinessId() === businessId) {

@@ -1,17 +1,19 @@
 # Воспроизведение и staging-приёмка
 
+Текущий статус и точные команды другого штатного PG17 окружения: PG17_ACCEPTANCE_CHECKPOINT.md. Новая квалификация имеет приоритет над историческими наблюдениями ниже; предыдущие load числа не результаты нового tree.
+
 ## Версии и применение
 
-Этот incremental patch применяется **только** к tree `7da5352d81f1a889fa1e0e7b5bf7d92b6274ce6d`: исторический cloud candidate `265cfa8419dee9508e64ebf4a6a81c05a593a121`, ветка fix/import-balance-integration. Полный исходный cumulative patch имеет базу main `fb03df57c0cb7f89e45d879c2d4c635359a45408`. Выберите один способ восстановления: candidate archive либо cumulative patch на его правильной базе. Не применяйте вместе constituent patches и cumulative patch.
+Текущий acceptance incremental patch применяется **только** к HEAD `7b6b1a292922f9d813b3c575c91c1a5d16af9ba6`, tree `2a5c50f614502e6d56b7bcb8ff6add4ce7337114`. Новая локальная ветка fix/pg17-financial-acceptance. Историческая база предыдущего hardening patch: tree `7da5352d81f1a889fa1e0e7b5bf7d92b6274ce6d`, cloud candidate `265cfa8419dee9508e64ebf4a6a81c05a593a121`; исходный cumulative patch имеет базу main `fb03df57c0cb7f89e45d879c2d4c635359a45408`. Не применять общий патч одновременно с составляющими.
 
-В этой Windows-сессии кандидат восстановлен из проверенных bytes/manifest и Git archive в отдельный checkout. Его локальный synthetic baseline commit `fb26b0735d85f31e6ee4339706ffa5a8b2fe3300` имеет тот же tree, но **не является** историческим cloud commit. Новая локальная ветка fix/financial-writer-contracts. Итоговые HEAD/tree, incremental SHA и clean-apply proof находятся в VERSION.json и CLEAN_APPLY.json пакета. Remote main при первоначальной проверке был указанной базой; это не бессрочное подтверждение отсутствия изменений remote.
+Сохранены исходный checkout и незакоммиченные материалы; новый worktree создан из точного hardening HEAD. Прежний локальный synthetic baseline commit `fb26b0735d85f31e6ee4339706ffa5a8b2fe3300` не является historical cloud commit. Итоговые HEAD/tree, incremental SHA и clean-apply proof находятся в VERSION.json и CLEAN_APPLY.json нового acceptance пакета. Manifest старого пакета совпал; старый Windows archive содержит CRLF text blobs, которые совпадают с Git после EOL нормализации. Новый baseline/source архив создан с `git -c core.autocrlf=false archive` и проверяется RAW по всем Git blobs. Старый архив не изменён.
 
 До установки зависимостей и после применения:
 
 ```sh
 git rev-parse 'HEAD^{tree}'
-git apply --check CFO_AI_Financial_Writer_Hardening.patch
-git apply --index CFO_AI_Financial_Writer_Hardening.patch
+git apply --check CFO_AI_Financial_Acceptance.patch
+git apply --index CFO_AI_Financial_Acceptance.patch
 git write-tree
 git diff --cached --check
 ```
@@ -51,7 +53,7 @@ DATABASE_URL=postgresql://TEST_ADMIN@127.0.0.1:TEST_PORT/postgres \
 
 Повторить Node20 и Node22 в разные каталоги. Runner отказывает при не-loopback URL; недоступный PG даёт exit=1 и environment-blocker.json, не зелёный skip. `HF_REQUIRE_FULL_CHECKS=1` и `HF_EMBEDDED_SQL=0` установлены runner. Не убирать skip/error detection ради зелёного результата.
 
-Наборы: совместные 31 SQL/11 HTTP; исходные balance26/import24/restrict14; новые writer-contracts18 и races12; client outcome7; V2 57; financial44; load20 trials. Числа — ожидаемый состав, при изменении тестов проверять фактический TAP. Старый standalone businessIsolation script раньше молча пропускал исполнение: его **16 исходных assertions** теперь выполняются внутри writer-contracts на полной disposable schema, отдельный скрытый skip исключён. Не складывать 16 asserts и 18 TAP cases как независимые suite counts.
+Наборы: совместные31 SQL/11 HTTP; исходные balance26/import24/restrict14; новые writer-contracts20 и races15; client outcome8; audit-evidence5; V2 57; financial44; обе сборки; load20 trials. Числа — ориентир состава, проверять фактический TAP. Старый standalone businessIsolation script раньше молча пропускал исполнение: его **16 исходных assertions** выполняются внутри writer-contracts на полной disposable schema, count OK записей и итог passed/failed проверяется. Не складывать16 asserts и20 TAP cases как независимые suite counts. Hidden skips, incomplete counters, nonzero exit и duplicate load trials не засчитываются. Load запрещён после failed correctness/build gate.
 
 Все новые SQL/HTTP/race/load базы используют полный snapshot `tests/fixtures/schema/prod_public_schema_2026-10-08.sql` + заданные миграции. Из исходного balance26 первые25 сохраняют legacy минимальную schema как отдельную compatibility-квалификацию; последний HTTP case перенесён на полный integrated fixture. Этот факт не скрывать. Старые mocks/PGlite unit suites также не выдавать за full PG schema acceptance.
 
@@ -65,7 +67,7 @@ DATABASE_URL=postgresql://TEST_ADMIN@127.0.0.1:TEST_PORT/postgres \
 HF_EMBEDDED_SQL=1 node --test --test-reporter=tap tests/integration/financialWriterContracts.test.js
 ```
 
-Выполнено на Node20/22, 18 pass, 0 fail, 0 skip. Движок PGlite сообщает **PostgreSQL18.3**; single connection SQL + настоящий локальный Express с SQL adapter. Это проверяет тела функций, rollback и HTTP contract, **не PG17 sessions, PostgREST/JWT/RLS/cache или load**. Personal flag включён только внутри тестового процесса для synthetic boundary/error assertions; реальные flags не менялись.
+Выполнено заново на Node20/22,20 pass,0 fail,0 skip. Движок PGlite сообщает **PostgreSQL18.3**; single connection SQL + настоящий локальный Express с SQL adapter. Это проверяет тела функций, rollback и HTTP contract, **не PG17 sessions, PostgREST/JWT/RLS/cache или load**. Personal flag включён только внутри тестового процесса для synthetic boundary/error assertions; реальные flags не менялись.
 
 ## Нагрузка
 
@@ -102,8 +104,8 @@ Staging отдельная приёмка: реальные JWT/service-role/RLS
 
 ## Повторы и восстановление
 
-Ключи обязательны для Business pay/transfer/manual batch/wallet create/adjust. SDK/client не делает blind retry. После network/неподтверждённого 5xx сохраняет intent key; сначала refresh/status review, затем тот же key. При известном rollback повтор возможен как новое действие; не удалять неизвестный intent ради «починки». Login token change, private storage/reload, edited payload требуют отдельной сверки; полного operation-history recovery UI пока нет. Receipt replay является историческим ответом, а не гарантией текущего balance. Wallet create replay читает current wallet и отказывает, если тот удалён. Не чистить receipts автоматически при reset, не сокращать retention без отдельного reconciliation проекта.
+Ключи обязательны для Business pay/transfer/manual batch/wallet create/adjust. SDK/client не делает blind retry. После network/неподтверждённого 5xx, 400/403/409 и known rollback текущей попытки сохраняет intent key до подтверждённого успеха; сначала refresh/status review, затем тот же key. Rollback новой попытки не разрешает удалить прошлый неизвестный intent. Login token change, private storage/reload, edited payload требуют отдельной сверки; полного operation-history recovery UI пока нет. Receipt replay является историческим ответом, а не гарантией текущего balance. Wallet create replay читает current wallet и отказывает, если тот удалён. Не чистить receipts автоматически при reset, не сокращать retention без отдельного reconciliation проекта. Полный review: ACCEPTANCE_RECEIPTS.md.
 
-Намеренные compatibility breaks: unkeyed pay/transfer/batch/create/adjust отказывают; legacy accounts/backfill, fake settle и unscoped platform adjustment отказывают. Текущие UI используют keyed apiFetch; backfill button ещё требует продуктового legacy review и показывает отказ. Не включать Personal/bridge dark features: unkeyed Personal money retry и funding currency/retry не закрыты.
+Намеренные compatibility breaks: unkeyed pay/transfer/batch/create/adjust отказывают; legacy accounts/backfill, fake settle и unscoped platform adjustment отказывают. Текущие UI используют keyed apiFetch; обе Classic backfill кнопки заменены пояснением о separate company/currency mapping review. Найденных UI callers fake settle и unscoped admin adjustment нет; внешний consumer inventory не подтверждён. Не включать Personal/bridge dark features: unkeyed Personal money retry и funding currency/retry не закрыты.
 
 Перед staging rehearsal сделать backup и проверить восстановление на disposable копии по отдельному утверждённому плану. При ошибке schema/backend/cache сначала остановить новые финансовые writes и сверить версии. Не снимать balance/gate/provenance guards в production ради доступности; не откатывать частично код с несовместимой schema. Safe rollback/forward-fix должен быть проверен на staging с receipts и настоящим data inventory. Production/HCI recovery здесь не выполнялось.

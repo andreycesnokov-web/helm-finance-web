@@ -27,21 +27,23 @@ async function rpc(c,name,args){const entries=Object.entries(args);return (await
 async function balance(w=W){return Number((await o.query('SELECT fn_wallet_ledger_balance($1) b',[w])).rows[0].b)}
 async function pending(fn){return fn().then(value=>({value}),error=>({error}))}
 async function race(first,second){await a.query('BEGIN');await first(a);const p=pending(()=>second(b));await blocked(a,b);await a.query('COMMIT');return p}
+function money(c,type,amount,w=W){const row={type,amount_original:amount,amount_idr:amount,currency_original:'IDR',wallet_id:w,scope:'business',transaction_date:'2026-10-04'};return rpc(c,'rpc_insert_business_transactions_once',{p_business_id:B,p_user_id:owner,p_request_key:randomUUID(),p_intent:row,p_rows:[row]})}
+const metadata=(c,w,updates)=>rpc(c,'rpc_update_business_wallet',{p_business_id:B,p_user_id:owner,p_wallet_id:w,p_updates:updates});
 test('same-wallet concurrent expenses recheck balance, losing write is rolled back',async()=>{
- const r=await race(c=>insert(c,'expense',70),c=>insert(c,'expense',70));assert.match(r.error?.message||'',/^insufficient_balance:/);assert.equal(await balance(),30);
+ const r=await race(c=>money(c,'expense',70),c=>money(c,'expense',70));assert.match(r.error?.message||'',/^insufficient_balance:/);assert.equal(await balance(),30);
  assert.equal(Number((await o.query("SELECT count(*) n FROM transactions WHERE type='expense'")).rows[0].n),1);
 });
 test('independent wallet writes serialize at retained gate without cross-wallet money movement',async()=>{
- const r=await race(c=>insert(c,'expense',20,W),c=>insert(c,'expense',30,V));assert.ifError(r.error);assert.equal(await balance(W),80);assert.equal(await balance(V),70);
+ const r=await race(c=>money(c,'expense',20,W),c=>money(c,'expense',30,V));assert.ifError(r.error);assert.equal(await balance(W),80);assert.equal(await balance(V),70);
 });
 test('metadata currency update cannot race a first ledger write',async()=>{
  const empty=randomUUID();await a.query("INSERT INTO wallets(id,business_id,user_id,name,currency,scope) VALUES($1,$2,$3,'Empty','USD','business')",[empty,B,owner]);
- const r=await race(c=>c.query("UPDATE wallets SET currency='IDR' WHERE id=$1",[empty]),c=>insert(c,'income',1,empty,B,'USD'));
+ const r=await race(c=>metadata(c,empty,{currency:'IDR'}),c=>insert(c,'income',1,empty,B,'USD'));
  assert.match(r.error?.message||'',/^currency_mismatch:/);assert.equal(await balance(empty),0);
- const r2=await race(c=>insert(c,'income',1,empty),c=>c.query("UPDATE wallets SET currency='USD' WHERE id=$1",[empty]));assert.match(r2.error?.message||'',/^wallet_metadata_locked:/);assert.equal(await balance(empty),1);
+ const r2=await race(c=>money(c,'income',1,empty),c=>metadata(c,empty,{currency:'USD'}));assert.match(r2.error?.message||'',/^wallet_metadata_locked:/);assert.equal(await balance(empty),1);
 });
 test('legacy NULL-wallet name cannot be renamed after concurrent ledger arrival',async()=>{
- const r=await race(c=>insert(c,'income',5,null,B,'IDR','Cash A'),c=>c.query("UPDATE wallets SET name='Renamed' WHERE id=$1",[W]));assert.match(r.error?.message||'',/^wallet_legacy_name_locked:/);assert.equal(await balance(W),105);
+ const r=await race(c=>insert(c,'income',5,null,B,'IDR','Cash A'),c=>metadata(c,W,{name:'Renamed'}));assert.match(r.error?.message||'',/^wallet_legacy_name_locked:/);assert.equal(await balance(W),105);
 });
 test('delete-empty-business vs batch income enters gate BEFORE parent tuple lock, then rechecks counts',async()=>{
  const row={type:'income',amount_original:1,amount_idr:1,currency_original:'IDR',scope:'business',source:'manual',transaction_date:'2026-10-04'};
@@ -88,6 +90,45 @@ test('late failure inside payment RPC rolls back debt, ledger and idempotency',a
  await assert.rejects(rpc(b,'rpc_record_debt_payment_guarded',{p_business_id:B,p_user_id:owner,p_debt_id:d,p_wallet_id:W,p_amount:10,p_currency:'IDR',p_amount_idr:10,p_booked_rate:1,p_rate_source:'identity',p_payment_date:'2026-10-04',p_idempotency_key:'late',p_request_hash:'late-hash'}),/late_payment_failure/);
  assert.equal(await balance(),100);assert.equal(Number((await o.query('SELECT paid_amount FROM debts WHERE id=$1',[d])).rows[0].paid_amount),0);
  assert.equal(Number((await o.query('SELECT count(*) n FROM debt_payment_idempotency')).rows[0].n),0);
+});
+test('concurrent wallet opening repeats commit one wallet and receipt; late failure commits neither',async()=>{
+ const args={p_business_id:B,p_user_id:owner,p_request_key:randomUUID(),p_intent:{name:'Opening race',amount:9},
+  p_wallet:{name:'Opening race',currency:'IDR',scope:'business'},
+  p_opening:{type:'income',amount_original:9,amount_idr:9,currency_original:'IDR',booked_rate:1,rate_source:'identity',transaction_date:'2026-10-04'}};
+ const r=await race(c=>rpc(c,'rpc_create_business_wallet',args),c=>rpc(c,'rpc_create_business_wallet',args));
+ assert.ifError(r.error);assert.equal(r.value.is_replay,true);
+ assert.equal(Number((await o.query("SELECT count(*) n FROM wallets WHERE name='Opening race'")).rows[0].n),1);
+ assert.equal(Number((await o.query('SELECT count(*) n FROM transactions WHERE wallet_id=$1',[r.value.wallet.id])).rows[0].n),1);
+ await a.query("CREATE FUNCTION test_fail_opening_race() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.is_opening_balance THEN RAISE EXCEPTION 'late_opening_failure'; END IF; RETURN NEW; END $$;CREATE TRIGGER test_fail_opening_race AFTER INSERT ON transactions FOR EACH ROW EXECUTE FUNCTION test_fail_opening_race()");
+ const failed={...args,p_request_key:randomUUID(),p_intent:{name:'Failed opening'},p_wallet:{...args.p_wallet,name:'Failed opening'}};
+ await assert.rejects(rpc(b,'rpc_create_business_wallet',failed),/late_opening_failure/);
+ assert.equal(Number((await o.query("SELECT count(*) n FROM wallets WHERE name='Failed opening'")).rows[0].n),0);
+ assert.equal(Number((await o.query('SELECT count(*) n FROM financial_write_requests WHERE request_key=$1',[failed.p_request_key])).rows[0].n),0);
+});
+test('adjustment CAS rechecks balance after a concurrent reachable manual writer',async()=>{
+ const key=randomUUID();
+ const r=await race(c=>money(c,'income',1),c=>rpc(c,'rpc_adjust_business_wallet',{
+  p_business_id:B,p_user_id:owner,p_wallet_id:W,p_request_key:key,p_intent:{target_balance:110},
+  p_expected_balance:100,p_target:110,p_correction:{amount_original:10,amount_idr:10,currency_original:'IDR',booked_rate:1,rate_source:'identity'}}));
+ assert.match(r.error?.message||'',/^transaction_version_conflict:/);assert.equal(await balance(),101);
+ assert.equal(Number((await o.query('SELECT count(*) n FROM financial_write_requests WHERE request_key=$1',[key])).rows[0].n),0);
+});
+test('import/payment and payment/PATCH use compatible barriers and preserve committed provenance',async()=>{
+ const batch=randomUUID(),row=randomUUID();
+ await a.query("INSERT INTO bank_import_batches(id,business_id,wallet_id,uploaded_by_user_id,currency,statement_start,statement_end,status,row_count) VALUES($1,$2,$3,$4,'IDR','2026-10-01','2026-10-31','review_required',1)",[batch,B,W,owner]);
+ await a.query("INSERT INTO bank_import_rows(id,batch_id,business_id,row_index,tx_date,amount,direction,review_status,description) VALUES($1,$2,$3,0,'2026-10-04',10,'out','suggested','Race import')",[row,batch,B]);
+ const debt=(await a.query("INSERT INTO debts(business_id,user_id,type,counterparty,amount,original_amount,currency,scope,approval_status) VALUES($1,$2,'payable','Import/pay race',100,100,'IDR','business','approved') RETURNING id",[B,owner])).rows[0].id;
+ const pay=(c,amount,key)=>rpc(c,'rpc_record_debt_payment_guarded',{p_business_id:B,p_user_id:owner,p_debt_id:debt,p_wallet_id:W,p_amount:amount,p_currency:'IDR',p_amount_idr:amount,p_booked_rate:1,p_rate_source:'identity',p_payment_date:'2026-10-04',p_idempotency_key:key,p_request_hash:key});
+ const plan=[{row_id:row,action:'create',type:'expense',scope:'business',expected_amount:10,expected_date:'2026-10-04',currency:'IDR',amount_idr:10,booked_rate:1,rate_source:'identity'}];
+ const imported=await race(c=>c.query("SELECT rpc_confirm_bank_import($1,$2,$3,$3,$4::jsonb,'review')",[B,batch,owner,JSON.stringify(plan)]),c=>pay(c,30,'import-pay'));
+ assert.ifError(imported.error);assert.equal(await balance(),60);
+ const initial=(await o.query("SELECT id,balance_version FROM transactions WHERE wallet_id=$1 AND type='income'",[W])).rows[0];
+ const patched=await race(c=>pay(c,50,'pay-patch'),c=>rpc(c,'rpc_patch_business_transaction',{p_business_id:B,p_user_id:owner,p_transaction_id:initial.id,p_expected_version:initial.balance_version,p_updates:{amount_original:80,amount_idr:80},p_financial:true}));
+ assert.match(patched.error?.message||'',/^insufficient_balance:/);assert.equal(await balance(),10);
+ assert.equal(Number((await o.query('SELECT paid_amount FROM debts WHERE id=$1',[debt])).rows[0].paid_amount),80);
+ assert.equal(Number((await o.query('SELECT amount_original FROM transactions WHERE id=$1',[initial.id])).rows[0].amount_original),100);
+ const evidence=(await o.query('SELECT t.amount_original,t.business_id,r.linked_transaction_id=t.id reciprocal FROM transactions t JOIN bank_import_rows r ON r.id=t.bank_import_row_id WHERE r.id=$1',[row])).rows;
+ assert.equal(evidence.length,1);assert.equal(evidence[0].business_id,B);assert.equal(Number(evidence[0].amount_original),10);assert.equal(evidence[0].reciprocal,true);
 });
 test('privileged pre-lock SQL remains OUTSIDE supported protocol; controlled 40P01 is explicit',async()=>{
  await a.query('BEGIN');await a.query('SELECT id FROM wallets WHERE id=$1 FOR UPDATE',[W]);

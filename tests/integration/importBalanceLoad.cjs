@@ -33,6 +33,7 @@ async function statement(f, count = 20) {
 }
 const confirm = (c, f, s) => c.query("SELECT rpc_confirm_bank_import($1,$2,93001,93001,$3::jsonb,'review') r", [f.biz, s.batch, JSON.stringify(s.plan)]);
 const income = (c, f) => c.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'income',1,1,'IDR',$2,$3,'2026-05-10')", [f.biz, f.wallet, f.scope]);
+function manual(c,f,type,amount){const row={type,amount_original:amount,amount_idr:amount,currency_original:'IDR',wallet_id:f.wallet,scope:'business',transaction_date:'2026-05-10'};return c.query('SELECT rpc_insert_business_transactions_once($1,93001,$2,$3::jsonb,$4::jsonb)',[f.biz,id(),JSON.stringify(row),JSON.stringify([row])]);}
 async function round(concurrency, mode) {
   // Fresh database per trial. The previous XX000 run is invalid; its cause is
   // unproven. Do not infer an FSM/filesystem diagnosis from this methodology.
@@ -43,7 +44,7 @@ async function round(concurrency, mode) {
   const companies = [], clients = [];
   // One Personal workspace per owner is a real schema constraint. Model this
   // user's shared Personal wallet alongside independent Business workspaces.
-  const personal = mode === 'personal_parallel_business' ? await company('personal') : null;
+  const personal = ['personal_parallel_business','long_import_A'].includes(mode) ? await company('personal') : null;
   for (let i = 0; i < concurrency; i++) {
     const f = await company();
     if (personal) f.personal = personal;
@@ -64,7 +65,7 @@ async function round(concurrency, mode) {
       await new Promise(r => setTimeout(r, 2));
     }
   }
-  const latencies = [], waits = [], errors = {}, error_examples = {}; let succeeded = 0, maxWaiters = 0, sampling = true;
+  const latencies = [], waits = [], errors = {}, error_examples = {},scopeLatencies={business:[],personal:[]},firstGateSamples=[]; let succeeded = 0, maxWaiters = 0, sampling = true;
   const sample = (async () => {
     while (sampling) {
       const n = Number((await observer.query("SELECT count(*) n FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'")).rows[0].n);
@@ -75,25 +76,27 @@ async function round(concurrency, mode) {
   await Promise.all(clients.map(async (c, i) => {
     const f = mode === 'metadata_parallel_money' ? companies[Math.floor(i/2)*2] : companies[i];
     for (let j = 0; j < iterations; j++) {
+      const target=(mode==='personal_parallel_business'&&j%2)||(mode==='long_import_A'&&(i+j)%2)?personal:f;
       const t = performance.now();
       try {
         await c.query('BEGIN'); const gate = performance.now();
-        await c.query('SELECT fn_ledger_writer_lock()'); waits.push(performance.now() - gate);
+        await c.query('SELECT fn_ledger_writer_lock()'); const gateMs=performance.now()-gate;waits.push(gateMs);
+        if(j===0)firstGateSamples.push({worker:i,scope:target.scope,gate_roundtrip_ms:gateMs});
         if (mode === 'mixed') {
           await confirm(c, f, f.statements[j]);
-          await c.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,93001,'expense',1,1,'IDR',$2,'business','2026-05-10')", [f.biz, f.wallet]);
+          await manual(c,f,'expense',1);
           const patched = await c.query('SELECT rpc_patch_business_transaction($1,93001,$2,$3,$4::jsonb,false) r', [f.biz, f.patchId, f.patchVersion, JSON.stringify({ description: `load-${j}` })]);
           f.patchVersion = Number(patched.rows[0].r.balance_version);
         } else if (mode === 'metadata_parallel_money' && i%2===0) {
-          await c.query('UPDATE wallets SET color=$2 WHERE id=$1',[f.wallet,`load-${j}`]);
-        } else await income(c, mode === 'personal_parallel_business' && j%2 ? f.personal : f);
+          await c.query('SELECT rpc_update_business_wallet($1,93001,$2,$3::jsonb)',[f.biz,f.wallet,JSON.stringify({color:`load-${j}`})]);
+        } else if(target.scope==='personal')await income(c,target);else await manual(c,target,'income',1);
         await c.query('COMMIT'); succeeded++;
         if(mode==='mixed') f.expectedBalance-=21;
         else if(mode!=='metadata_parallel_money' || i%2!==0) {
-          (mode==='personal_parallel_business' && j%2 ? f.personal : f).expectedBalance++;
+          target.expectedBalance++;
         }
       } catch (e) { errors[e.code || e.message] = (errors[e.code || e.message] || 0) + 1; error_examples[e.code || 'unknown'] = e.message; await c.query('ROLLBACK'); }
-      latencies.push(performance.now() - t);
+      const elapsed=performance.now()-t;latencies.push(elapsed);scopeLatencies[target.scope].push(elapsed);
     }
   }));
   const elapsedMs = performance.now() - start;
@@ -109,6 +112,8 @@ async function round(concurrency, mode) {
   const r = { mode, concurrency, iterations, attempts: latencies.length, succeeded, throughput_ops_s: succeeded / (elapsedMs / 1000), elapsed_ms: elapsedMs,
     dataset:{initial_native_balance:9999,per_mixed_import_rows:20,long_import_rows:500,companies:companies.length,personal_companies:personal?1:0},
     raw_latency_ms:latencies,raw_gate_roundtrip_ms:waits,
+    raw_scope_latency_ms:scopeLatencies,first_gate_samples:firstGateSamples,
+    method:'Business manual uses reachable keyed RPC; Personal direct-table writer preserves its existing scope. Long A alternates target scopes; at N1 only Business is initially queued under the import. Not numerically comparable with the old raw-manual/B-only long trial.',
     correctness:{final_balances:finalBalances,cross_business_provenance:provenance,ok:finalBalances.every(x=>x.ok)&&provenance===0},
     latency_ms: { p50: quantile(latencies, .5), p95: quantile(latencies, .95), p99: quantile(latencies, .99), max: quantile(latencies, 1) },
     gate_roundtrip_ms: { p50: quantile(waits, .5), p95: quantile(waits, .95), p99: quantile(waits, .99), max: quantile(waits, 1) },

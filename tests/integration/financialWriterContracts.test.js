@@ -31,6 +31,8 @@ before(async () => {
     supa=createRealPgSupabase(db.connectionString);
   }
   await sql.query('SET search_path=public,pg_catalog');
+  console.log(JSON.stringify({node:process.version,postgres:(await sql.query('SHOW server_version')).rows[0].server_version,
+    qualification:embedded?'single-session SQL smoke; not PG17 concurrency/PostgREST/JWT/RLS':'real PostgreSQL with HTTP SQL adapter; not PostgREST/JWT/RLS'}));
   await sql.query('INSERT INTO users(id) VALUES($1)',[owner]);
   await sql.query("INSERT INTO businesses(id,name,owner_user_id,type) VALUES($1,'Contract A',$4,'business'),($2,'Contract B',$4,'business'),($3,'Personal',$4,'personal')",[B,C,P,owner]);
   for(const b of [B,C,P]) await sql.query("INSERT INTO business_members(business_id,user_id,role,status) VALUES($1,$2,'owner','active')",[b,owner]);
@@ -51,10 +53,28 @@ after(async()=>{
   if(server?.listening){server.closeAllConnections();await new Promise(r=>server.close(r))}
   await supa?.pool.end(); if(embedded) await sql?.close();else {await sql?.end();if(db) await db.drop()}
 });
-async function api(method,url,body,b=B){const r=await fetch(base+url,{method,headers:{authorization:`Bearer ${token}`,'x-business-id':b,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return{status:r.status,body:await r.json()}}
+async function api(method,url,body,b=B,actorToken=token){const r=await fetch(base+url,{method,headers:{authorization:`Bearer ${actorToken}`,'x-business-id':b,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return{status:r.status,body:await r.json()}}
 async function debt(amount=1000){return (await sql.query("INSERT INTO debts(business_id,user_id,type,counterparty,amount,original_amount,currency,scope,approval_status) VALUES($1,$2,'payable','Synthetic Vendor',$3,$3,'USD','business','approved') RETURNING id",[B,owner,amount])).rows[0].id}
 async function state(id){return (await sql.query('SELECT to_json(d) j FROM debts d WHERE id=$1',[id])).rows[0].j}
 async function rows(){return Number((await sql.query('SELECT count(*) n FROM transactions')).rows[0].n)}
+test(`${mode}: staging catalog is metadata-only and runs in a read-only transaction`,async()=>{
+  const catalog=fs.readFileSync(path.join(__dirname,'stagingSchemaCatalog.sql'),'utf8');
+  // The authoritative public fixture has no policies. Add one synthetic policy
+  // to exercise role-name resolution without enabling RLS or changing data.
+  await sql.query('CREATE POLICY catalog_probe_policy ON users FOR SELECT TO authenticated USING (true)');
+  let result;
+  try { result=embedded?await sql.exec(catalog):await sql.query(catalog); }
+  finally { await sql.query('ROLLBACK');await sql.query('DROP POLICY catalog_probe_policy ON users'); }
+  const entries=result.flatMap(r=>r.rows||[]);
+  assert.equal(entries.find(r=>r.category==='runtime').item.transaction_read_only,'on');
+  for(const category of ['relations','columns','constraints','functions','triggers','indexes','policies','schema_acl','roles','sequences']){
+    assert.ok(entries.some(r=>r.category===category),`Missing ${category}`);
+  }
+  const writer=entries.find(r=>r.category==='functions'&&r.item.name==='rpc_insert_business_transactions_once');
+  assert.ok(writer);assert.match(writer.item.definition_hash,/^[a-f0-9]{32}$/);
+  assert.equal(Object.hasOwn(writer.item,'body'),false);
+  assert.deepEqual(entries.find(r=>r.category==='policies'&&r.item.name==='catalog_probe_policy').item.roles,['authenticated']);
+});
 test(`${mode}: partial/full USD + replay preserve native amount, settlement and HTTP contract`,async()=>{
   const id=await debt(); const before=await rows();
   const partial={amount:400,wallet_id:U,date:'2026-10-04',idempotency_key:randomUUID()};
@@ -217,4 +237,39 @@ test(`${mode}: existing businessIsolation script executes all assertions in disp
   const program=fs.readFileSync(path.join(root,'tests/integration/businessIsolation.test.js'),'utf8');
   const finished=vm.runInNewContext(program,{require,process:fakeProcess,fetch,URL,console:{log:s=>{logs.push(String(s));console.log('[existing isolation] '+s)}}});
   await finished;assert.equal(exitCode,0,logs.join('\n'));assert.ok(logs.some(s=>/ALL PASS/.test(s)));assert.ok(!logs.some(s=>/SKIP/.test(s)),logs.join('\n'));
+  const result=logs.find(s=>/ALL PASS/.test(s))?.match(/(\d+) passed, (\d+) failed/);
+  assert.ok(result&&Number(result[1])>0&&Number(result[2])===0);
+  assert.equal(logs.filter(s=>/^OK\s/.test(s)).length,Number(result[1]),'Nested assertion count must match its executed success records');
+});
+
+test(`${mode}: durable receipt scopes and response lost AFTER SQL commit preserve one booking`,async()=>{
+  const collaborator=85002,other=randomUUID(),otherWallet=randomUUID(),key=randomUUID();
+  await sql.query('INSERT INTO users(id) VALUES($1)',[collaborator]);
+  await sql.query("INSERT INTO business_members(business_id,user_id,role,status) VALUES($1,$2,'cfo','active')",[B,collaborator]);
+  await sql.query("INSERT INTO businesses(id,name,owner_user_id,type) VALUES($1,'Receipt other Business',$2,'business')",[other,owner]);
+  await sql.query("INSERT INTO business_members(business_id,user_id,role,status) VALUES($1,$2,'owner','active')",[other,owner]);
+  await sql.query("INSERT INTO wallets(id,business_id,user_id,name,currency,scope) VALUES($1,$2,$3,'Receipt other cash','IDR','business')",[otherWallet,other,owner]);
+  const collaboratorToken=require('jsonwebtoken').sign({userId:collaborator},secret);
+  const row={type:'income',amount:7,currency:'IDR',wallet_id:I,scope:'business',date:'2026-10-06',description:'Lost response after commit'};
+  const body={transactions:[row],request_key:key},before=await rows(),original=supa.rpc;
+  try {
+    supa.rpc=async(name,args)=>{const result=await original(name,args);return name==='rpc_insert_business_transactions_once'&&!result.error?{data:null,error:{code:'ECONNRESET',message:'synthetic response lost after committed RPC'}}:result};
+    const lost=await api('POST','/transactions/batch',body,B,collaboratorToken);assert.equal(lost.status,503);assert.equal(lost.body.outcome,'unknown');
+  } finally {supa.rpc=original}
+  assert.equal(await rows(),before+1);
+  assert.equal(Number((await sql.query('SELECT count(*) n FROM financial_write_requests WHERE actor_user_id=$1 AND request_key=$2',[collaborator,key])).rows[0].n),1);
+  await sql.query("UPDATE business_members SET role='auditor' WHERE business_id=$1 AND user_id=$2",[B,collaborator]);
+  const refused=await api('POST','/transactions/batch',body,B,collaboratorToken);assert.equal(refused.status,403);assert.equal(await rows(),before+1);
+  await sql.query("UPDATE business_members SET role='cfo' WHERE business_id=$1 AND user_id=$2",[B,collaborator]);
+  const replay=await api('POST','/transactions/batch',body,B,collaboratorToken);assert.equal(replay.status,200);assert.equal(replay.body.is_replay,true);assert.equal(await rows(),before+1);
+  const mismatch=await api('POST','/transactions/batch',{...body,transactions:[{...row,amount:8}]},B,collaboratorToken);assert.equal(mismatch.status,409);assert.equal(mismatch.body.error,'idempotency_key_mismatch');assert.equal(await rows(),before+1);
+  // Same textual key in a different actor/business is a different authorized
+  // intent, and cannot replay or reveal the first actor's result.
+  const otherActor=await api('POST','/transactions/batch',{...body,transactions:[{...row,amount:9}]});assert.equal(otherActor.status,200);assert.ok(!otherActor.body.is_replay);assert.equal(await rows(),before+2);
+  const otherBusiness=await api('POST','/transactions/batch',{...body,transactions:[{...row,wallet_id:otherWallet}]},other);assert.equal(otherBusiness.status,200);assert.ok(!otherBusiness.body.is_replay);assert.equal(await rows(),before+3);
+  const inaccessible=await api('POST','/transactions/batch',body,other,collaboratorToken);assert.equal(inaccessible.status,403);assert.equal(await rows(),before+3);
+  const created=(await sql.query("SELECT rpc_create_business_wallet($1,$2,$3,$4::jsonb,$4::jsonb,NULL) r",[B,owner,key,JSON.stringify({name:'Separate wallet operation',currency:'IDR',type:'bank',scope:'business'})])).rows[0].r;assert.ok(created.wallet.id);assert.equal(await rows(),before+3);
+  try {await sql.query('SET ROLE authenticated');await assert.rejects(sql.query('SELECT * FROM public.financial_write_requests'),e=>e.code==='42501');}
+  finally {await sql.query('RESET ROLE')}
+  assert.equal(Number((await sql.query('SELECT count(*) n FROM financial_write_requests WHERE request_key=$1',[key])).rows[0].n),4);
 });

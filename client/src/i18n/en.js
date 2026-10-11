@@ -228,6 +228,7 @@ const en = {
     legacyTitle: 'Legacy accounts not yet linked',
     legacySub: "These transaction sources don't match any wallet name. Import them or rename your wallets to match.",
     importAsWallets: 'Import as wallets',
+    legacyReviewRequired: 'Automatic import of legacy account names is paused. Existing transactions remain unchanged. Review each account’s company, currency and wallet mapping before linking it.',
     importing: 'Importing…',
     adjustBalance: 'Adjust Balance',
     currentBalance: 'Current balance',
