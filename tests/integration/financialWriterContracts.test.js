@@ -150,6 +150,26 @@ test(`${mode}: unchecked settled flag and legacy settle endpoint cannot invent p
   const d=await state(id);assert.equal(d.is_settled,false);assert.equal(d.settled_at,null);assert.equal(Number(d.paid_amount),0);
   const pretend=await api('PATCH',`/debts/${id}/settle`,{});assert.equal(pretend.status,409);assert.equal(pretend.body.error,'confirmed_payment_required');assert.equal(await rows(),n);assert.deepEqual(await state(id),d);
 });
+
+test(`${mode}: HTTP correction respects the displayed snapshot after a separately committed inflow`,async()=>{
+  const reviewed=Number((await sql.query('SELECT fn_wallet_ledger_balance($1) b',[I])).rows[0].b);
+  const inflow=await api('POST','/transactions/batch',{request_key:randomUUID(),transactions:[{type:'income',amount:1,currency:'IDR',wallet_id:I,scope:'business',description:'Committed after correction form review'}]});
+  assert.equal(inflow.status,200,JSON.stringify(inflow));
+  const n=await rows(),key=randomUUID();
+  const receipts=Number((await sql.query('SELECT count(*) n FROM financial_write_requests')).rows[0].n);
+  const stale=await api('POST','/wallets/'+I+'/adjust-balance',{target_balance:reviewed+10,expected_balance:reviewed,reason:'Stale displayed balance',request_key:key});
+  assert.equal(stale.status,409,JSON.stringify(stale));assert.equal(stale.body.error,'transaction_version_conflict');
+  assert.equal(await rows(),n);assert.equal(Number((await sql.query('SELECT fn_wallet_ledger_balance($1) b',[I])).rows[0].b),reviewed+1);
+  assert.equal(Number((await sql.query('SELECT count(*) n FROM financial_write_requests')).rows[0].n),receipts);
+  for(const expected_balance of [null,'not-a-number','Infinity',{}]){
+    const bad=await api('POST','/wallets/'+I+'/adjust-balance',{target_balance:reviewed+10,expected_balance,reason:'Invalid review snapshot',request_key:randomUUID()});
+    assert.equal(bad.status,400);assert.equal(bad.body.error,'invalid_expected_balance');assert.equal(await rows(),n);
+  }
+  const body={target_balance:reviewed+10,expected_balance:reviewed+1,reason:'Explicit refreshed review',request_key:randomUUID()};
+  const accepted=await api('POST','/wallets/'+I+'/adjust-balance',body);assert.equal(accepted.status,200,JSON.stringify(accepted));
+  assert.equal(accepted.body.delta,9);assert.equal(await rows(),n+1);
+  const replay=await api('POST','/wallets/'+I+'/adjust-balance',body);assert.equal(replay.status,200);assert.equal(replay.body.is_replay,true);assert.equal(await rows(),n+1);
+});
 test(`${mode}: new payment/transfer without stable key is refused, including guarded SQL entry`,async()=>{
   const id=await debt(40),n=await rows(),old=await state(id);
   const noKey=await api('POST',`/debts/${id}/pay`,{amount:10,wallet_id:U});assert.equal(noKey.status,400);assert.equal(noKey.body.error,'idempotency_key_required');assert.deepEqual(await state(id),old);assert.equal(await rows(),n);

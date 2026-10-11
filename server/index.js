@@ -10901,6 +10901,15 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
 
     const delta = targetNum - currentBalance;
 
+    // Keep the review snapshot supplied by the correction form. The SQL RPC
+    // compares it under the ledger gate; a fresh server read must not replace it.
+    const hasExpectedBalance = Object.prototype.hasOwnProperty.call(req.body, 'expected_balance');
+    if (hasExpectedBalance && (!nativeInputIsExact(req.body.expected_balance)
+      || !Number.isFinite(Number(req.body.expected_balance)))) {
+      return res.status(400).json({ error: 'invalid_expected_balance' });
+    }
+    const expectedBalance = hasExpectedBalance ? req.body.expected_balance : currentBalance;
+
     const txDate = transaction_date
       ? new Date(transaction_date).toISOString()
       : new Date().toISOString();
@@ -10911,7 +10920,7 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
     const { data, error } = await supabase.rpc('rpc_adjust_business_wallet', {
       p_business_id: biz.business.id, p_user_id: userId, p_wallet_id: walletId,
       p_request_key: request_key || null, p_intent: intent,
-      p_expected_balance: currentBalance, p_target: targetNum,
+      p_expected_balance: expectedBalance, p_target: targetNum,
       p_correction: { amount_original: delta, currency_original: cur, amount_idr: fxRes.amount_idr,
         booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source,
         description: 'Balance correction: ' + String(reason).trim(), transaction_date: txDate.slice(0,10) },
