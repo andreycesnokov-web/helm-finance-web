@@ -16,6 +16,9 @@ test('confirmation requires matching acknowledgement and fresh own read; no hidd
 test('switching actor during write stops confirmation and follow-up read',async()=>{
  let active=true,reads=0;await assert.rejects(confirmedAccountProfile({...request,isCurrent:()=>active},body,{write:async()=>{active=false;return{profile:p}},read:async()=>{reads++}}),/account_actor_changed/);assert.equal(reads,0)
 })
+test('read refusal after acknowledged write remains unknown rather than clearing a pending attempt',async()=>{
+ let writes=0;await assert.rejects(confirmedAccountProfile(request,body,{write:async()=>{writes++;return{profile:p}},read:async()=>{throw Object.assign(Error('read_forbidden'),{status:403})}}),error=>error.message==='account_save_unconfirmed'&&error.status===undefined);assert.equal(writes,1)
+})
 test('draft/recovery belongs only to actor and contains no token or arbitrary fields',()=>{
  writeAccountDraft(request,{...body,pending:true,token:'must-not-persist',avatar_url:'not-an-allowed-draft-field'})
  assert.deepEqual(readAccountDraft(request),{...body,pending:true});assert.equal(readAccountDraft({...request,token:token(-10)}),null)

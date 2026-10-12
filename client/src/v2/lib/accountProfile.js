@@ -23,7 +23,11 @@ export async function confirmedAccountProfile(request,body,{write,read}) {
  current(request)
  const acknowledgement=ownProfile(request,await write(request.token,body))
  if(!profileMatches(acknowledgement,body))throw Error('account_save_unconfirmed')
- const profile=ownProfile(request,await read(request.token))
+ // A read refusal after the write acknowledged is NOT a refused write. Keep
+ // the pending draft; only a fresh successful read can resolve this outcome.
+ let profile
+ try { profile=ownProfile(request,await read(request.token)) }
+ catch { current(request);throw Error('account_save_unconfirmed') }
  if(!profileMatches(profile,body))throw Error('account_save_unconfirmed')
  return profile
 }
