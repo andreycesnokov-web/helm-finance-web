@@ -14,6 +14,7 @@ test.beforeEach(() => {
   setActiveBusinessId('A')
 })
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
+const financialToken = 'eyJhbGciOiJIUzI1NiJ9.' + Buffer.from(JSON.stringify({ userId: 42 })).toString('base64url') + '.synthetic-signature'
 test('pinned header wins; stale completion and repeat never reach another company', async () => {
   let release, calls = []
   let alive = true
@@ -43,7 +44,7 @@ test('stale network failure is rejected as stale, not as a current save error', 
   let reject, notifyStarted
   const started = new Promise(resolve => { notifyStarted = resolve })
   globalThis.fetch = () => new Promise((_, r) => { reject = r; notifyStarted() })
-  const identity = { token: 'synthetic', businessId: 'A', isCurrent: () => getActiveBusinessId() === 'A' }
+  const identity = { token: financialToken, businessId: 'A', isCurrent: () => getActiveBusinessId() === 'A' }
   const pending = apiFetch('/wallets', identity, { method: 'POST', body: {} })
   await started
   setActiveBusinessId('B'); reject(new Error('network'))

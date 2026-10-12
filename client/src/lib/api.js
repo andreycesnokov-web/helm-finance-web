@@ -31,6 +31,9 @@ export async function apiFetch(path, token, options = {}) {
   const description = requestDescription(path)
   if (String(options.method).toUpperCase() !== 'POST' || !description || !options.body) return performApiFetch(path,token,options)
   const identity = token && typeof token === 'object' ? token : null
+  if (identity && (!identity.businessId || !identity.isCurrent())) {
+    const e = new Error('workspace_changed');e.name='AbortError';e.code='workspace_changed';throw e
+  }
   const credential = identity ? identity.token : token
   const actor = financialActor(credential)
   const business = identity ? identity.businessId : options.headers?.['x-business-id'] || getActiveBusinessId()
@@ -57,6 +60,10 @@ export async function apiFetch(path, token, options = {}) {
 }
 
 async function performApiFetch(path, token, options = {}, journal = null, assertFinancialCurrent = null) {
+  const recoveryRead = path.startsWith('/financial-operations/')
+  const readActor = recoveryRead ? financialActor(token && typeof token === 'object' ? token.token : token) : null
+  let readSessionStored = false
+  try { readSessionStored = recoveryRead && !!localStorage.getItem('hf_token') } catch {}
   const mutation = !['GET', 'HEAD'].includes(String(options.method || 'GET').toUpperCase())
     && /^\/(transactions|wallets|debts|payroll|bank-imports?|personal\/(wallets|transactions)|funding)(\/|$)/.test(path)
   const unconfirmed = (cause) => {
@@ -78,6 +85,9 @@ async function performApiFetch(path, token, options = {}, journal = null, assert
   const identity = scoped ? token : null
   const assertCurrent = () => {
     assertFinancialCurrent?.()
+    if (recoveryRead && readSessionStored && financialActor(localStorage.getItem('hf_token')) !== readActor) {
+      const err = new Error('workspace_changed');err.name='AbortError';err.code='workspace_changed';throw err
+    }
     if (identity && (!identity.businessId || !identity.isCurrent())) {
       const err = new Error('workspace_changed')
       err.name = 'AbortError'; err.code = 'workspace_changed'
@@ -94,7 +104,7 @@ async function performApiFetch(path, token, options = {}, journal = null, assert
       Authorization: `Bearer ${scoped ? identity.token : token}`,
       ...(businessId ? { 'x-business-id': businessId } : {}),
       ...options.headers,
-      ...(journal ? { Authorization: 'Bearer ' + (scoped ? identity.token : token) } : {}),
+      ...(journal || recoveryRead ? { Authorization: 'Bearer ' + (scoped ? identity.token : token) } : {}),
       ...(scoped ? { 'x-business-id': businessId } : {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined
