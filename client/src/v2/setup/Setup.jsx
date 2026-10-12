@@ -17,7 +17,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { unsavedFields } from '../lib/savedFields'
-import { COMPANY_DOCUMENT_TYPES, confirmedCompanyType, confirmCompanyDocument } from '../lib/companyDocuments'
+import { COMPANY_DOCUMENT_TYPES, confirmedCompanyType, confirmCompanyDocument, documentReadingUnavailable } from '../lib/companyDocuments'
 import { companyDraft, saveCompanyDraft, pendingCompanyCreation, submitCompanyCreation, checkCompanyCreation, finishCompanyCreation } from '../../lib/companyCreation'
 import I from '../icons'
 import { Pill, Skeleton, ErrorBox } from '../ui'
@@ -257,7 +257,7 @@ function SetupDocs() {
     invalidate()
     // Proposed AI types require an explicit user action and persisted readback.
     // An unavailable AI never becomes a fake "Read" badge.
-    patch(key,{state:type?'classified':'uploaded',type:type||null,proposed:COMPANY_TYPES.includes(ai)?ai:COMPANY_TYPES.includes(det)?det:'',title:ident?.title||'',note:ident?.summary||'',aiUnavailable:!ident})
+    patch(key,{state:type?'classified':'uploaded',type:type||null,proposed:COMPANY_TYPES.includes(ai)?ai:COMPANY_TYPES.includes(det)?det:'',title:ident?.title||'',note:ident?.summary||'',aiUnavailable:documentReadingUnavailable(ident)})
   }
   const confirmType = async (item) => {
     if(!item.proposed||!request.isCurrent())return

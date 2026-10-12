@@ -32,4 +32,8 @@ the same key/assertion checks; expected keys and product translations are unchan
 Acceptance requires actual browser upload/Storage/API/DB, explicit classification,
 refusal without false success, reload without duplicate upload, current membership
 and Business boundary checks. External AI reading remains separately unverified
-while no staging AI provider is available.
+until an actual provider response is verified. A previous diagnostic returned an
+HTTP 200 identity object with `unavailable_reason: ai_request_failed`; the UI must
+not mistake that object for a successful reading. Provider availability is not
+established by a configured key or an HTTP 200 alone. The owner authorized a new
+external AI check using only a specially created synthetic document.

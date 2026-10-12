@@ -1,5 +1,6 @@
 import { VAULT_TYPES, isConfirmedCompanyDoc } from '../../pages/business/companyVault.js'
 export const COMPANY_DOCUMENT_TYPES = VAULT_TYPES
+export function documentReadingUnavailable(identify){return !identify||typeof identify.unavailable_reason==='string'&&identify.unavailable_reason.length>0}
 // A proposal or filename hint is not proof that the document was read by AI.
 // Only a persisted human classification accepted by the existing Company Vault can
 // fill a company-document slot. Extraction/profile suggestions are separate.

@@ -1,8 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {confirmedCompanyType,confirmCompanyDocument} from '../client/src/v2/lib/companyDocuments.js'
+import {confirmedCompanyType,confirmCompanyDocument,documentReadingUnavailable} from '../client/src/v2/lib/companyDocuments.js'
 const doc=(status,type='nib',confidence='high')=>({id:'doc-A',extracted_json:{ai_intake:{doc_type:type,classification_status:status,confidence}}})
 const request={isCurrent:()=>true}
+test('HTTP200 identify object with unavailable_reason is not credited as a successful AI reading',()=>{
+ for(const response of [null,{unavailable_reason:'ai_unavailable'},{unavailable_reason:'ai_request_failed'},{unavailable_reason:'ai_timeout'}])assert.equal(documentReadingUnavailable(response),true)
+ assert.equal(documentReadingUnavailable({model:'actual-model',unavailable_reason:null}),false)
+})
 test('document checklist excludes unconfirmed proposals, archived documents and filename-only derived hints',()=>{
  assert.equal(confirmedCompanyType(doc('manually_confirmed')),'nib')
  for(const value of [doc('needs_review'),doc('auto_classified'),doc('auto_classified','nib','medium'),{...doc('manually_confirmed'),archived_at:'2026-10-12'},doc('manually_confirmed','bank_statement'),{id:'A',document_type:'nib'},{...doc('manually_confirmed'),document_type:'vendor_invoice'}])assert.equal(confirmedCompanyType(value),null)
