@@ -309,7 +309,6 @@ function SetupDocs() {
                   {x.state === 'duplicate' && t('setup.docs.st.duplicate')}
                   {x.state === 'failed' && t('setup.docs.st.failed', { msg: x.note || '' })}
                   {x.state === 'uploaded' && t('setup.docs.uploaded')}
-                  {x.state === 'classified' && t('setup.docs.classified')}
                   {x.state === 'confirming' && t('setup.docs.confirming')}
                 </span>
                 {x.aiUnavailable&&<span className="v2-small">{t('setup.docs.aiUnavailable')}</span>}

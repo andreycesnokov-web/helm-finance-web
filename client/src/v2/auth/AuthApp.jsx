@@ -342,13 +342,13 @@ export function Join() {
         {!token && !inv && <p className="v2-muted v2-small">{t('auth.r9.notIn')} <Link to="/login">{t('auth.r9.signIn')}</Link></p>}
         {inv && (
           <div className="v2-auth-invite" data-invite-preview>
-            <span className="v2-pill v2-tone-good">{t('auth.r9.ok')}</span>
+            <span className="v2-pill v2-tone-good">{t(inv.already_member?'auth.r9.alreadyJoined':'auth.r9.ok')}</span>
             <strong className="v2-auth-invite-co">{inv.business_name || inv.label || '—'}</strong>
-            <span>{t('auth.r9.role', { role: t(roleKey) !== roleKey ? t(roleKey) : inv.role })}</span>
+            <span>{t(inv.already_member?'auth.r9.currentRole':'auth.r9.role', { role: t(roleKey) !== roleKey ? t(roleKey) : inv.role })}</span>
             {t(`auth.r9.can.${inv.role}`) !== `auth.r9.can.${inv.role}` && <span className="v2-muted v2-small">{t(`auth.r9.can.${inv.role}`)}</span>}
             <div className="v2-row-gap">
               <button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={accept}>{token ? t(inv.already_member?'auth.r9.openJoined':'auth.r9.accept') : t('auth.r9.signInToAccept')}</button>
-              <button type="button" className="v2-btn v2-btn-ghost" onClick={() => { setInv(null); setCode('') }}>{t('auth.r9.decline')}</button>
+              <button type="button" className="v2-btn v2-btn-ghost" onClick={() => { lookupRevision.current++;setInv(null);setCode('') }}>{t(inv.already_member?'auth.r9.otherCode':'auth.r9.decline')}</button>
             </div>
           </div>
         )}
