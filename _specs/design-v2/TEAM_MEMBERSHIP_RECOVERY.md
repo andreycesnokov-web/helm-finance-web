@@ -30,3 +30,11 @@ Six native groups passed in a separate restored PostgreSQL17 database, with audi
 failure rollback and independent-session race. Real staging rollout and API/browser
 acceptance remain pending. Fresh private backup hashes and unchanged original data
 fingerprints are recorded. No production access changes or migration repair.
+
+Follow-up source/actual API review found the older email-OTP invitation endpoint
+still performed a separate unchecked upsert. On fcbb5c0 it granted two new members
+against one single-use code without incrementing uses_count, and granted an expired
+invitation. It now delegates to the same tested atomic membership RPC after the
+unchanged OTP identity/consumption flow. No alternate direct membership writer or
+new auth model is introduced. If the OTP response is lost, sign in with a new
+challenge and read current membership; do not reuse a consumed OTP or guess a role.

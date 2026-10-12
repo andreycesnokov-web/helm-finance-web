@@ -374,11 +374,13 @@ app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
     if (!rec) return res.status(401).json({ error: 'invalid_or_expired_code' });
     const user = await resolveOrCreateEmailUser(email);
     if (!await markCodeConsumed(rec.id, user.id)) return res.status(401).json({ error: 'invalid_or_expired_code' });
-    // attach membership (idempotent on business_id+user_id)
-    await supabase.from('business_members')
-      .upsert({ business_id: invite.business_id, user_id: user.id, role: invite.role, status: 'active' },
-              { onConflict: 'business_id,user_id' });
-    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name }, business_id: invite.business_id, role: invite.role });
+    // Preserve the existing OTP identity/consumption flow, but use the SAME
+    // atomic Business membership writer as signed-in invitation acceptance.
+    // Never bypass expiry/use limits or overwrite an existing member's role.
+    const { data: membership, error: membershipError } = await supabase.rpc('rpc_accept_business_invite', { p_actor: user.id, p_code: inviteCode.trim().toUpperCase() });
+    if (membershipError) return require('./lib/teamOperations').teamError(res, membershipError);
+    if (!membership?.ok || membership.business_id !== invite.business_id) return require('./lib/teamOperations').teamError(res, {});
+    res.json({ token: emailJwt(user, email), user: { id: user.id, display_name: user.display_name }, business_id: membership.business_id, role: membership.role });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
