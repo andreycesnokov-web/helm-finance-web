@@ -59,7 +59,7 @@ function DocRow({ d, debtsById, txById, t, lang, onOpen, company = false }) {
     target = <span>{filingText(t, filing, lang)}</span>
   } else if (txLink) {
     const tx = txById.get(String(txLink.target_id))
-    target = <Link to="/business/transactions">{tx ? t('docs.linkedTo.transaction', { d: txLabel(tx, lang) }) : t('docs.linkedTo.transactionNoDate')}</Link>
+    target = <Link to={'/business/transactions?tx=' + encodeURIComponent(txLink.target_id)}>{tx ? t('docs.linkedTo.transaction', { d: txLabel(tx, lang) }) : t('docs.linkedTo.transactionNoDate')}</Link>
   }
   const look = !company && needsLook(d)
   const kind = company ? t(`docs.vault.${verdict?.docType}`) : d.document_type ? docTypeLabel(t, d.document_type) : null

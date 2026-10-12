@@ -203,7 +203,7 @@ export default function Accounts() {
                   <li key={x.id} className="v2-acc">
                     <span className="v2-dec-ic v2-tone-info" aria-hidden="true">{x.type === 'cash' ? <I.funding /> : <I.accounts />}</span>
                     <span className="v2-acc-text">
-                      <span className="v2-dec-title">{x.name}{x.scope === 'personal' && <> <Pill tone="warn">{t('acc.labelledPersonal')}</Pill></>}</span>
+                      <span className="v2-dec-title"><Link to={'/business/accounts/' + encodeURIComponent(x.id)}>{x.name}</Link>{x.scope === 'personal' && <> <Pill tone="warn">{t('acc.labelledPersonal')}</Pill></>}</span>
                       <span className="v2-dec-meta">{[t(KIND[x.type] || 'acc.kind.other'), x.entity_name, isNonIdr ? x.currency : null].filter(Boolean).join(' · ')}</span>
                       <span className="v2-small">{fr
                         ? <>{t('acc.statementOn', { d: shortDate(fr.date, lang) })}{fr.status === 'review_required' && <> · <Link to="/business/bank-import">{t('acc.toReview')}</Link></>}</>

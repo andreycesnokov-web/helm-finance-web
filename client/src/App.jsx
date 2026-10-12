@@ -7,6 +7,7 @@ import { useTranslation } from './hooks/useTranslation'
 import { getLang, setLang } from './i18n/index'
 import { apiFetch } from './lib/api'
 import { WorkspaceProvider } from './shell/WorkspaceProvider'
+import { legacyDestination } from './lib/routeIntent'
 
 // ── Localize text from backend (AI insight strings) ──────────────────────────
 const RU_TEXT_MAP = {
@@ -575,11 +576,7 @@ const v2Auth = (page) => <Suspense fallback={null}><V2Auth page={page} /></Suspe
 // query parameters are kept. Without the flag they stay exactly as they were.
 function LegacyToV2({ to }) {
   const location = useLocation()
-  const [path, q] = to.split('?')
-  const params = new URLSearchParams(q || '')
-  new URLSearchParams(location.search || '').forEach((v, k) => params.set(k, v))
-  const qs = params.toString()
-  return <Navigate to={`${path}${qs ? '?' + qs : ''}`} replace />
+  return <Navigate to={legacyDestination(location, to)} replace />
 }
 
 // Redirect legacy /accountant addresses to /business/accountant with search query preservation (e.g. ?ask=... / ?q=...).
@@ -626,6 +623,9 @@ export default function App() {
           <Route path="/receivables"  element={DESIGN_V2 ? <LegacyToV2 to="/business/receivables" /> : <Layout><Receivables /></Layout>} />
           <Route path="/payables"     element={DESIGN_V2 ? <LegacyToV2 to="/business/payables" /> : <Layout><Payables /></Layout>} />
           <Route path="/invoices"     element={DESIGN_V2 ? <LegacyToV2 to="/business/invoices" /> : <Layout><Invoices /></Layout>} />
+          <Route path="/invoices/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/invoices" /> : <Navigate to="/invoices" replace />} />
+          <Route path="/payables/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/payables" /> : <Navigate to="/payables" replace />} />
+          <Route path="/receivables/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/receivables" /> : <Navigate to="/receivables" replace />} />
           <Route path="/payroll"      element={DESIGN_V2 ? <LegacyToV2 to="/business/payroll" /> : <Layout><Payroll /></Layout>} />
           <Route path="/tasks"        element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Tasks /></Layout>} />
           <Route path="/approvals"    element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Approvals /></Layout>} />

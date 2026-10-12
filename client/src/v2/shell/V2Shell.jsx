@@ -19,6 +19,7 @@ import { useApi } from '../data'
 import { shellCounts } from '../lib/shellCounts'
 import AskPanel from '../ai/AskPanel'
 import ErrorBoundary from '../components/ErrorBoundary'
+import { businessSwitchDestination } from '../../lib/routeIntent'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
 
@@ -39,21 +40,23 @@ export function useSwitchWorkspace() {
   const navigate = useNavigate()
   const location = useLocation()
   return async (w) => {
-    await switchTo(w)
     if (w.type === 'personal') {
       try {
         localStorage.setItem('activeWorkspaceId', 'personal')
         localStorage.setItem('last_active_workspace_id', 'personal')
       } catch { /* private mode */ }
       navigate('/account')
+      await switchTo(w)
       return
     }
     // If staying in business section, preserve current business route path (e.g. /business/accounts or /business/accountant)
     if (location.pathname && location.pathname.startsWith('/business/')) {
-      navigate(location.pathname)
+      navigate(businessSwitchDestination(location.pathname))
+      await switchTo(w)
       return
     }
     navigate('/business/pulse')
+    await switchTo(w)
   }
 }
 

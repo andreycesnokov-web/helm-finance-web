@@ -4,8 +4,9 @@
 // only) — the same call the existing Transactions page makes. Export builds a CSV of
 // the rows on screen in the browser. A row opens the transaction window (components/TransactionDialog,
 // design w2/D1): description, category, and — unless it came from a statement — account, date, amount.
-import { useMemo, useState } from 'react'
-import { useAuth } from '../../hooks/useAuth'
+import { useMemo, useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
 import I from '../icons'
 import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
@@ -20,14 +21,14 @@ const PAGE = 25
 
 function CategoryPicker({ tx, categories, onSaved }) {
   const t = useT()
-  const { token } = useAuth()
+  const request = useBusinessRequest()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const pick = async (e) => {
     const v = e.target.value
     if (!v) return
     setBusy(true); setErr(null)
-    try { await setTransactionCategory(token, tx.id, v, tx.balance_version); onSaved() }
+    try { await setTransactionCategory(request, tx.id, v, tx.balance_version); onSaved() }
     catch (x) { setErr(actionError(x) === 'forbidden' ? t('dec.forbidden') : actionError(x)) }
     finally { setBusy(false) }
   }
@@ -46,6 +47,7 @@ export default function Transactions() {
   const t = useT()
   const lang = useLang()
   const invalidate = useInvalidate()
+  const [sp, setSp] = useSearchParams()
   const [kind, setKind] = useState('all')
   const [openTx, setOpenTx] = useState(null)
   const [walletId, setWalletId] = useState('all')
@@ -57,6 +59,14 @@ export default function Transactions() {
   const cats = useApi('/cashflow-categories')
   // Every row of this company, whatever its scope label (lib/performance.js, isBizIdr).
   const all = Array.isArray(tx.data) ? tx.data : []
+  const selectedId = sp.get('tx')
+  useEffect(() => {
+    if (selectedId && !tx.loading && !tx.error) setOpenTx(all.find((x) => String(x.id) === selectedId) || null)
+  }, [selectedId, tx.data, tx.loading, tx.error])
+  const close = () => {
+    setOpenTx(null)
+    if (selectedId) setSp((old) => { const n = new URLSearchParams(old); n.delete('tx'); return n }, { replace: true })
+  }
   const walletName = Object.fromEntries((wallets.data?.wallets || []).map((w) => [String(w.id), w.name]))
   const categories = (cats.data?.categories || []).map((c) => c.name).filter(Boolean)
   const rows = useMemo(() => txFilter(all, { kind, walletId, days, q }), [all, kind, walletId, days, q])
@@ -78,6 +88,7 @@ export default function Transactions() {
   return (
     <div className="v2-page">
       {head}
+      {selectedId && !all.some((x) => String(x.id) === selectedId) && <ErrorBox error={t('route.transactionUnavailable')} />}
       {review > 0 && (
         <div className="v2-banner v2-tone-warn" role="status">
           <I.warn size={18} />
@@ -141,7 +152,7 @@ export default function Transactions() {
           {rows.length > limit && <button type="button" className="v2-btn-link" onClick={() => setLimit((l) => l + PAGE)}>{t('tx.loadMore')}</button>}
         </div>
       </Card>
-      {openTx && <TransactionDialog tx={openTx} wallets={wallets.data?.wallets || []} categories={cats.data?.categories || []} onClose={() => setOpenTx(null)} onSaved={invalidate} />}
+      {openTx && <TransactionDialog tx={openTx} wallets={wallets.data?.wallets || []} categories={cats.data?.categories || []} onClose={close} onSaved={invalidate} />}
     </div>
   )
 }

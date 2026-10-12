@@ -1,5 +1,7 @@
 // Design v2 — English (final wording from _specs/design-v2/designs).
 export default {
+  history: { title: 'Account history', note: 'Native amounts. Transfers and financing are cash movements, not revenue.', period: { all: 'All time', month: 'This month', '3m': 'Last 3 months', week: 'Last 7 days' }, page: '{start}–{end} of {total}', previous: 'Previous', next: 'Next' },
+  route: { companyUnavailable: 'This company link is invalid or you no longer have access. Choose an accessible company from your account.', transactionUnavailable: 'This transaction was not found in the selected company or is no longer available.', taxSplit: 'Invoice tax review', settlement: 'Payment and document closeout', chooseInvoice: 'Choose an invoice to review its tax treatment, payments and evidence separately.' },
   nav: {
     home: 'Home',
     addSoon: 'Not available in the new design yet',

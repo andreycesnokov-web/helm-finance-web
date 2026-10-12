@@ -15,6 +15,7 @@ const TX = require('./lib/transactionClass');
 const WL = require('./lib/walletLedger');
 const { balanceFailure, databaseFailureBody, nativeInputIsExact } = require('./lib/balanceFailure');
 const financialRecovery = require('./lib/financialRecovery');
+const walletHistory = require('./lib/walletHistory');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
@@ -10675,13 +10676,16 @@ app.post('/api/wallets', auth, async (req, res) => {
 app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
-  const { period = 'all', limit = 200 } = req.query;
+  let options;
+  try { options = walletHistory.historyOptions(req.query); }
+  catch (e) { return res.status(400).json({ error: e.message }); }
 
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role))
       return res.status(403).json({ error: 'Your role does not allow viewing wallet details' });
+    if (!walletHistory.validWalletId(id)) return res.status(404).json({ error: 'Wallet not found' });
     const bizOr = bizOrFilter(biz);
 
     const { data: wRows } = await supabase
@@ -10690,41 +10694,20 @@ app.get('/api/wallets/:id/transactions', auth, async (req, res) => {
     const wallet = wRows?.[0];
     if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
 
-    let query = supabase.from('transactions')
-      .select('*')
-      .or(bizOr)
+    const query = supabase.from('transactions')
+      .select('*', { count: 'exact' })
+      .eq('business_id', biz.business.id)
+      .or(walletHistory.walletHistoryFilter(wallet, options.from))
       .order('transaction_date', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false })
-      .limit(Number(limit));
+      .order('id', { ascending: false })
+      .range(options.offset, options.offset + options.limit - 1);
 
-    const { data: txs, error: tErr } = await query;
+    const { data: txs, count, error: tErr } = await query;
     if (tErr) throw tErr;
-
-    // Compute period boundary (if any)
-    let fromDate = null;
-    if (period !== 'all') {
-      const now = new Date();
-      if (period === 'week')        { fromDate = new Date(now); fromDate.setDate(now.getDate() - 7); }
-      else if (period === 'month')    fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      else if (period === '3m')     { fromDate = new Date(now); fromDate.setMonth(now.getMonth() - 3); }
-    }
-    const fromStr = fromDate ? fromDate.toISOString().slice(0, 10) : null;
-
-    const filtered = (txs || []).filter(t => {
-      // Wallet match: prefer wallet_id, fall back to legacy source name
-      const walletMatch = t.wallet_id === wallet.id || (!t.wallet_id && t.source === wallet.name);
-      if (!walletMatch) return false;
-
-      // Period filter: use transaction_date; fall back to created_at date for null transaction_date
-      if (fromStr) {
-        const txDate = t.transaction_date || (t.created_at ? t.created_at.slice(0, 10) : null);
-        if (!txDate || txDate < fromStr) return false;
-      }
-
-      return true;
-    });
-
-    res.json({ wallet, transactions: filtered });
+    res.json({ wallet, transactions: txs || [], period: options.period,
+      offset: options.offset, limit: options.limit, total: count,
+      has_more: Number.isInteger(count) ? options.offset + (txs || []).length < count : (txs || []).length === options.limit });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
