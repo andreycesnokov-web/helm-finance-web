@@ -19,6 +19,12 @@ is still a separate explicit user action.
 The document list is authoritative for checklist slots after invalidation. Local
 success state cannot keep an archived/missing file in a refreshed checklist.
 
+Actual read-only browser reproduction found setup URLs ignored business_id and
+read the previously selected company's documents. Setup now reuses the existing
+route-scope resolver and holds company-bound children until URL membership and
+selection resolve. Invalid/inaccessible companies do not issue document requests;
+creation itself remains actor-only. A later company switch drops old URL intent.
+
 Local diagnostic note: the existing static document/bill translation test parsed
 the last ID object incorrectly on Windows CRLF. Normalize only line endings before
 the same key/assertion checks; expected keys and product translations are unchanged.

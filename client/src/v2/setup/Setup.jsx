@@ -11,7 +11,8 @@
 //     kept only when printed in the document text; nothing is saved until "All correct";
 //   · the taxes are the tax calendar (GET /api/accountant/tax-calendar, general PMK 81/2024 deadlines).
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Outlet, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { requestedBusiness, businessSwitchDestination } from '../../lib/routeIntent'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
@@ -51,7 +52,27 @@ const typeOf = (doc) => doc?.extracted_json?.ai_intake?.doc_type || null
 
 /* ── frame: brand, company, save & exit, steps ───────────────────────────── */
 export function SetupFrame() {
-  const { active, scopeKey } = useWorkspace()
+  const t=useT(),loc=useLocation(),step=loc.pathname.startsWith('/business/setup/')
+  const { active, scopeKey,workspaces,loading,error,applyActive,refresh } = useWorkspace()
+  // The company-creation form is actor-only. Later steps must resolve their URL
+  // company before mounting any document/profile request, just like V2Frame.
+  const requested=requestedBusiness(step?loc.search:'',workspaces),resolved=useRef(null)
+  const mismatch=requested.status==='available'&&String(requested.business.id)!==String(active?.id)
+  const switchedAfterLink=mismatch&&resolved.current===loc.key
+  useEffect(()=>{
+    if(!step||loading||error)return
+    if(requested.status==='available'&&!mismatch)resolved.current=loc.key
+    if(requested.status==='available'&&mismatch&&!switchedAfterLink)applyActive(requested.business)
+    else if(requested.status==='unspecified'&&active?.type==='personal'&&workspaces.business?.[0])applyActive(workspaces.business[0])
+  },[step,loading,error,requested.status,requested.business?.id,mismatch,switchedAfterLink,loc.key,active,workspaces,applyActive])
+  if(step){
+    if(loading)return <div className="v2-root v2-boot"><Skeleton rows={4}/></div>
+    if(error)return <div className="v2-root v2-boot"><ErrorBox error={t('shell.loadError')} onRetry={refresh}/></div>
+    if(requested.status==='invalid'||requested.status==='unavailable')return <div className="v2-root v2-boot"><ErrorBox error={t('route.companyUnavailable')}/><Link className="v2-btn v2-btn-secondary" to="/account">{t('shell.companies')}</Link></div>
+    if(switchedAfterLink)return <Navigate to={businessSwitchDestination(loc.pathname)} replace/>
+    if(!workspaces.business?.length)return <Navigate to="/account" replace/>
+    if(mismatch||active?.type==='personal')return <div className="v2-root v2-boot"><Skeleton rows={4}/></div>
+  }
   return <V2DataProvider key={`${active?.id}:${scopeKey}`}><SetupChrome /></V2DataProvider>
 }
 function SetupChrome() {
