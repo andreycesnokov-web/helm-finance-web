@@ -11,7 +11,7 @@ test.beforeEach(()=>{
  globalThis.fetch=async(url,options)=>{
   assert(!options.headers['x-business-id'],'actor-only namespace has no company header')
   if(options.method==='POST'){
-   posts.push(options);result={creation_request_id:options.headers['Idempotency-Key'],business:{id,type:'business',name:body.name}}
+   posts.push(options);result={creation_request_id:options.headers['Idempotency-Key'],business:{id,type:'business',name:body.name,owner_user_id:-1}}
    throw Error('unit-only response loss after simulated commit')
   }
   reads.push(url);return new Response(JSON.stringify(result?{state:'completed',result}:{state:'not_found',safe_replay_same_key:true}))
@@ -44,4 +44,10 @@ test('unavailable durable storage or tab serialization and invalid timezone fail
  navigator.locks=null;await assert.rejects(creation.submitCompanyCreation(token(-1),body),{code:'company_serialization_required'})
  navigator.locks={request:(_key,fn)=>fn()};localStorage.setItem=()=>{throw Error('blocked')}
  await assert.rejects(creation.submitCompanyCreation(token(-1),body),{code:'company_recovery_storage_required'});assert.equal(posts.length,0)
+})
+test('a foreign actor response is never accepted as our completed company',async()=>{
+ await assert.rejects(creation.submitCompanyCreation(token(-1),body))
+ result.business.owner_user_id=-2
+ await assert.rejects(creation.checkCompanyCreation(token(-1)),{code:'company_creation_outcome_unknown'})
+ assert.equal(creation.pendingCompanyCreation(token(-1)).state,'pending');assert.equal(posts.length,1)
 })

@@ -29,6 +29,11 @@ stored in the draft. Successful creation requires an explicit Continue action.
 Tax-profile creation is no longer a silently ignored second side effect: legal
 and tax details are reviewed and explicitly saved in the profile step.
 
+Real browser reproduction found a double-click layout shift: shrinking the submit
+label moved Back under the second click. Keep the label/position stable and guard
+Back while submitting. Receipt responses use private/no-store and vary by actor
+authorization; the client also rejects results owned by another actor.
+
 ## Deployment and rollback
 
 New migration: `20261012110000_durable_company_creation.sql`. Keep existing applied

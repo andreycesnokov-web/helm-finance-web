@@ -24,6 +24,7 @@ function creationError(res,error) {
 }
 function registerCompanyCreation(app,{auth,supabase,currencies}) {
   app.post('/api/businesses',auth,async(req,res)=>{
+    res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
     let intent;
     try{intent=creationInput(req.body,currencies)}catch(e){return res.status(400).json({error:e.message})}
     const header=req.get('Idempotency-Key'),key=header||req.body?.request_key;
@@ -39,6 +40,7 @@ function registerCompanyCreation(app,{auth,supabase,currencies}) {
     }catch(e){creationError(res,e)}
   });
   app.get('/api/business-creation/:key',auth,async(req,res)=>{
+    res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
     if(!UUID.test(req.params.key))return res.status(400).json({error:'company_creation_key_required'});
     try{
       const{data,error}=await supabase.rpc('rpc_read_business_creation',{p_actor:req.user.userId,p_request_key:req.params.key.toLowerCase()});

@@ -23,7 +23,7 @@ async function request(token,path,{body,key,isCurrent}={}){
  if(!res.ok){const e=error(data.error||'company_creation_failed',res.status);e.data=data;throw e}
  return data;
 }
-function confirmed(result,key){return result?.creation_request_id===key&&UUID.test(result.business?.id||'')&&result.business?.type==='business'}
+function confirmed(result,key,actor){return result?.creation_request_id===key&&UUID.test(result.business?.id||'')&&result.business?.type==='business'&&String(result.business.owner_user_id)===actor}
 export async function submitCompanyCreation(token,body,{isCurrent}={}){
  const actor=actorOf(token),check=guard(token,isCurrent);
  if(typeof body?.name!=='string'||!body.name.trim()||body.name.trim().length>120)throw error('invalid_company_name',400);
@@ -34,7 +34,7 @@ export async function submitCompanyCreation(token,body,{isCurrent}={}){
   if(!pending){pending={actor,key:crypto.randomUUID(),body,state:'pending',started_at:Date.now()};write(PREFIX+actor,pending)}
   if(pending.state==='completed')return pending.result;
   const result=await request(token,'/businesses',{body:pending.body,key:pending.key,isCurrent});check();
-  if(!confirmed(result,pending.key))throw error('company_creation_outcome_unknown',503);
+  if(!confirmed(result,pending.key,actor))throw error('company_creation_outcome_unknown',503);
   write(PREFIX+actor,{...pending,state:'completed',result});return result;
  };
  if(!globalThis.navigator?.locks?.request)throw error('company_serialization_required');
@@ -44,7 +44,7 @@ export async function checkCompanyCreation(token,{isCurrent}={}){
  const actor=actorOf(token),check=guard(token,isCurrent),pending=pendingCompanyCreation(token);if(!pending)return null;
  const state=await request(token,'/business-creation/'+pending.key,{isCurrent});check();
  if(state.state==='completed'){
-  if(!confirmed(state.result,pending.key))throw error('company_creation_outcome_unknown',503);
+  if(!confirmed(state.result,pending.key,actor))throw error('company_creation_outcome_unknown',503);
   write(PREFIX+actor,{...pending,state:'completed',result:state.result});return state;
  }
  if(state.state!=='not_found')throw error('company_creation_outcome_unknown',503);

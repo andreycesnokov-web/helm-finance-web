@@ -176,8 +176,8 @@ export function SetupAbout() {
       <div className="v2-banner v2-tone-info"><I.info size={18} /><span className="v2-banner-text">{t('setup.about.separate')}</span></div>
       {err.form_ && <p className="v2-inline-err" role="alert">{err.form_}</p>}
       <div className="v2-setup-actions">
-        <Link to="/account" className="v2-btn v2-btn-secondary">{t('setup.back')}</Link>
-        {pending?.state==='completed'?<button type="button" className="v2-btn v2-btn-primary" disabled={busy||!checked} onClick={continueCreated}>{t('setup.creation.continue')}</button>:<button type="submit" className="v2-btn v2-btn-primary" disabled={busy}>{busy?t('setup.creating'):pending?t('setup.creation.retry'):t('setup.about.create')}</button>}
+        <Link to="/account" className="v2-btn v2-btn-secondary" aria-disabled={busy} onClick={e=>{if(busy)e.preventDefault()}}>{t('setup.back')}</Link>
+        {pending?.state==='completed'?<button type="button" className="v2-btn v2-btn-primary" disabled={busy||!checked} onClick={continueCreated}>{t('setup.creation.continue')}</button>:<button type="submit" className="v2-btn v2-btn-primary" disabled={busy} aria-busy={busy}>{pending?t('setup.creation.retry'):t('setup.about.create')}</button>}
         {pending&&<button type="button" className="v2-btn v2-btn-secondary" disabled={busy} onClick={check}>{t('setup.creation.check')}</button>}
       </div>
       <p className="v2-muted v2-small">{t('setup.about.owner')}</p>
