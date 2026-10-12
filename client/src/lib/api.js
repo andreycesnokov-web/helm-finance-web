@@ -1,24 +1,7 @@
+import { financialActor, managedFinancialRequest } from './financialRecovery.js'
+import { requestDescription } from '../../../server/lib/financialIntent.mjs'
 const BASE = '/api'
-const pendingCreates = new Map()
-
-// Only guarded keyed RPCs support these receipts. Preserve an unknown
-// intent across a page reload without storing the financial payload or token.
-async function createIntent(path, token, businessId, options) {
-  const field = /^\/debts\/[^/]+\/pay$/.test(path) ? 'idempotency_key' : path === '/wallets/transfer' ? 'transfer_id' : 'request_key'
-  const payload = { ...options.body }; delete payload[field]
-  const bytes = new TextEncoder().encode(JSON.stringify([token, businessId, path, payload]))
-  const hash = await crypto.subtle.digest('SHA-256', bytes)
-  const storageKey = 'financialCreateIntent:' + Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('')
-  let key = pendingCreates.get(storageKey)
-  try { key ||= localStorage.getItem(storageKey) } catch { /* private mode */ }
-  key ||= options.body[field] || crypto.randomUUID()
-  pendingCreates.set(storageKey, key)
-  try { localStorage.setItem(storageKey, key) } catch { /* memory survives while the page is open */ }
-  return { key, field, clear() {
-    pendingCreates.delete(storageKey)
-    try { localStorage.removeItem(storageKey) } catch { /* */ }
-  } }
-}
+let workspaceEpoch = 0
 
 // Active business workspace — set by useAccess after /access/status,
 // or by a future business switcher. All financial API calls carry it.
@@ -26,6 +9,7 @@ export function getActiveBusinessId() {
   try { return localStorage.getItem('activeBusinessId') || null } catch { return null }
 }
 export function setActiveBusinessId(id) {
+  if (getActiveBusinessId() !== (id || null)) workspaceEpoch++
   try {
     if (id) localStorage.setItem('activeBusinessId', id)
     else localStorage.removeItem('activeBusinessId')
@@ -44,10 +28,40 @@ export function consumePostLoginRedirect() {
 }
 
 export async function apiFetch(path, token, options = {}) {
+  const description = requestDescription(path)
+  if (String(options.method).toUpperCase() !== 'POST' || !description || !options.body) return performApiFetch(path,token,options)
+  const identity = token && typeof token === 'object' ? token : null
+  const credential = identity ? identity.token : token
+  const actor = financialActor(credential)
+  const business = identity ? identity.businessId : options.headers?.['x-business-id'] || getActiveBusinessId()
+  if (!actor || !business) {
+    const e = new Error('Sign in and select a Business workspace before submitting this operation.')
+    e.code = 'financial_identity_required'; e.status = 401; throw e
+  }
+  const epoch = workspaceEpoch
+  let sessionWasStored = false
+  try { sessionWasStored = !!localStorage.getItem('hf_token') } catch {}
+  const assertCurrent = () => {
+    let currentActor = actor
+    try {
+      const storedToken = localStorage.getItem('hf_token')
+      if (sessionWasStored || storedToken) currentActor = financialActor(storedToken)
+    } catch {}
+    if (currentActor !== actor || identity && !identity.isCurrent()
+        || !identity && (workspaceEpoch !== epoch || getActiveBusinessId() !== business)) {
+      const e = new Error('workspace_changed');e.name='AbortError';e.code='workspace_changed';throw e
+    }
+  }
+  return managedFinancialRequest(path,{actor,business,token:credential,assertCurrent},options,
+    (managedOptions,journal) => performApiFetch(path,token,managedOptions,journal,assertCurrent))
+}
+
+async function performApiFetch(path, token, options = {}, journal = null, assertFinancialCurrent = null) {
   const mutation = !['GET', 'HEAD'].includes(String(options.method || 'GET').toUpperCase())
     && /^\/(transactions|wallets|debts|payroll|bank-imports?|personal\/(wallets|transactions)|funding)(\/|$)/.test(path)
   const unconfirmed = (cause) => {
     if (!mutation) throw cause
+    journal?.unknown()
     let lang = 'en'; try { lang = localStorage.getItem('hf_lang') || 'en' } catch { /* */ }
     const messages = {
       en: 'The result could not be confirmed. Refresh the operation status before resubmitting. Keep the original payment or transfer request open.',
@@ -63,6 +77,7 @@ export async function apiFetch(path, token, options = {}) {
   const scoped = token && typeof token === 'object'
   const identity = scoped ? token : null
   const assertCurrent = () => {
+    assertFinancialCurrent?.()
     if (identity && (!identity.businessId || !identity.isCurrent())) {
       const err = new Error('workspace_changed')
       err.name = 'AbortError'; err.code = 'workspace_changed'
@@ -71,11 +86,6 @@ export async function apiFetch(path, token, options = {}) {
   }
   assertCurrent()
   const businessId = scoped ? identity.businessId : (options.headers?.['x-business-id'] || getActiveBusinessId())
-  const keyedPayment = /^\/debts\/[^/]+\/pay$/.test(path) || path === '/wallets/transfer'
-  const guardedCreate = String(options.method).toUpperCase() === 'POST' && options.body
-    && !options.headers?.['Idempotency-Key'] && !options.headers?.['idempotency-key']
-    && (keyedPayment || (!options.body.request_key && (['/wallets','/transactions/batch'].includes(path) || /^\/wallets\/[^/]+\/adjust-balance$/.test(path))))
-  const intent = guardedCreate ? await createIntent(path, scoped ? identity.token : token, businessId, options) : null
   assertCurrent()
   const res = await fetch(BASE + path, {
     ...options,
@@ -84,9 +94,10 @@ export async function apiFetch(path, token, options = {}) {
       Authorization: `Bearer ${scoped ? identity.token : token}`,
       ...(businessId ? { 'x-business-id': businessId } : {}),
       ...options.headers,
+      ...(journal ? { Authorization: 'Bearer ' + (scoped ? identity.token : token) } : {}),
       ...(scoped ? { 'x-business-id': businessId } : {})
     },
-    body: options.body ? JSON.stringify(intent ? { ...options.body, [intent.field]: intent.key } : options.body) : undefined
+    body: options.body ? JSON.stringify(options.body) : undefined
   }).catch((e) => { assertCurrent(); return unconfirmed(e) })
   let data = null
   const text = await res.text().catch((e) => { assertCurrent(); return unconfirmed(e) })
@@ -107,8 +118,8 @@ export async function apiFetch(path, token, options = {}) {
     if (mutation && res.status >= 500 && data?.outcome !== 'rolled_back')
       return unconfirmed(new Error(data?.message || data?.error || `HTTP ${res.status}`))
     // A refusal/rollback of THIS attempt cannot resolve a prior lost response.
-    // Keep the same intent until confirmed success; retrying a known rollback
-    // under the same key is also safe. Edited payloads have a different hash.
+    // The shared recovery module retains the identity and reads its receipt.
+    // Edited payloads cannot silently replace an unresolved financial intent.
     // Stale/inaccessible workspace: clear the active id so the next load re-picks a
     // valid one (WorkspaceProvider refetches /api/workspaces). Only on explicit 403.
     if (res.status === 403 && data?.error === 'workspace_not_accessible' && getActiveBusinessId() === businessId) {
@@ -121,7 +132,6 @@ export async function apiFetch(path, token, options = {}) {
     err.status = res.status; err.code = data?.error || null; err.data = data
     throw err
   }
-  intent?.clear()
   return data
 }
 

@@ -6,6 +6,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { apiFetch, setActiveBusinessId } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
+import FinancialRecovery from '../components/FinancialRecovery'
 
 const Ctx = createContext(null)
 export const useWorkspace = () => useContext(Ctx)
@@ -122,6 +123,7 @@ export function WorkspaceProvider({ children }) {
   return (
     <Ctx.Provider value={{ workspaces, active, loading, error, scopeKey, selectionRef, switchTo, refresh: load, applyActive }}>
       {children}
+      <FinancialRecovery />
     </Ctx.Provider>
   )
 }

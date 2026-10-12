@@ -126,7 +126,7 @@ test(`${mode}: atomic wallet opening and manual create receipts prevent duplicat
   await exec('DROP TRIGGER test_fail_opening ON transactions; DROP FUNCTION test_fail_opening();');
   const empty={name:'Removed receipt wallet',currency:'IDR',request_key:randomUUID()},e=await api('POST','/wallets',empty);assert.equal(e.status,200);
   await sql.query('DELETE FROM wallets WHERE id=$1',[e.body.wallet.id]);
-  const removed=await api('POST','/wallets',empty);assert.equal(removed.status,409);assert.equal(removed.body.error,'financial_intent_invalidated');assert.equal(await rows(),n+1);
+  const removed=await api('POST','/wallets',empty);assert.equal(removed.status,200);assert.equal(removed.body.is_replay,true);assert.equal(removed.body.result_is_historical,true);assert.equal(removed.body.wallet.id,e.body.wallet.id);assert.equal(removed.body.recovery.current_objects[0].state,'removed');assert.equal(await rows(),n+1);
   const tx={type:'income',amount:17,currency:'IDR',wallet_id:I,scope:'business',date:'2026-10-05',description:'Receipt transaction'},batch={transactions:[tx],request_key:randomUUID()};
   assert.equal((await api('POST','/transactions/batch',batch)).status,200);assert.equal((await api('POST','/transactions/batch',batch)).status,200);assert.equal(await rows(),n+2);
   const bad=await api('POST','/transactions/batch',{...batch,transactions:[{...tx,amount:18}]});assert.equal(bad.status,409);assert.equal(bad.body.error,'idempotency_key_mismatch');assert.equal(await rows(),n+2);

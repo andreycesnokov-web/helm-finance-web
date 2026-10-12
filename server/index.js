@@ -14,6 +14,7 @@ const docA = require('./lib/documentAccess');
 const TX = require('./lib/transactionClass');
 const WL = require('./lib/walletLedger');
 const { balanceFailure, databaseFailureBody, nativeInputIsExact } = require('./lib/balanceFailure');
+const financialRecovery = require('./lib/financialRecovery');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
@@ -843,35 +844,16 @@ function canCreateConfirmedFinancialRecord(role) { return ['owner', 'ceo', 'admi
 function canApproveFinancialRecord(role)       { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 function canManagePayroll(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
 function canManageWallets(role)                { return ['owner', 'ceo', 'admin', 'cfo'].includes(role); }
-async function replayFinancialCreate(req, res, biz, operation, intent) {
+async function replayFinancialCreate(req, res, biz, operation, rawIntent) {
+  if (req.body.request_key !== undefined && !financialRecovery.keyValid(req.body.request_key)) {
+    res.status(400).json({error:'idempotency_key_required'});return true;
+  }
   if (!req.body.request_key) return false;
-  const { data, error } = await supabase.from('financial_write_requests').select('intent,result')
-    .eq('business_id', biz.business.id).eq('actor_user_id', req.user.userId)
-    .eq('operation', operation).eq('request_key', req.body.request_key).maybeSingle();
-  if (error) {
-    if (balanceFailure(res, error)) return true;
-    if (['42P01','PGRST205'].includes(error.code)) {
-      res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Financial create receipts require the writer migration.' });
-      return true;
-    }
-    throw error;
-  }
-  if (!data) return false;
-  if (!require('node:util').isDeepStrictEqual(data.intent, intent)) {
-    res.status(409).json({ error: 'idempotency_key_mismatch' }); return true;
-  }
-  if (operation === 'wallet_create') {
-    const { data: wallet, error: walletError } = await supabase.from('wallets').select('*')
-      .eq('id', data.result.wallet.id).eq('business_id', biz.business.id).maybeSingle();
-    if (walletError) throw walletError;
-    if (!wallet) {
-      res.status(409).json({ error: 'financial_intent_invalidated', message: 'The original wallet was created and later removed. Refresh before starting another create.' });
-      return true;
-    }
-    res.json({ wallet, is_replay: true }); return true;
-  }
-  res.json({ ...data.result, is_replay: true }); return true;
+  const canonical = await financialRecovery.intent(operation, rawIntent, req.params.id);
+  return financialRecovery.replay(supabase,req,res,biz,operation,req.body.request_key,canonical);
 }
+financialRecovery.install(app,{auth,requireBusiness,supabase});
+
 function canUseAiCfo(role)                     { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
 // Category structure: who may create/edit/archive business categories.
 // Accountant may PROPOSE (create) but not restructure (edit/archive).
@@ -8792,7 +8774,7 @@ app.post('/api/parse', auth, async (req, res) => {
 app.post('/api/transactions/batch', auth, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { transactions } = req.body;
+    let { transactions } = req.body;
 
     const biz = await requireBusiness(req, res);
     if (!biz) return;
@@ -8820,6 +8802,17 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       if (t.scope && !['business', 'personal'].includes(t.scope)) {
         return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
       }
+    }
+
+    // A child transfer identity must not collide between actors/operation types.
+    // Existing pre-recovery transfer IDs require review, not a second booking.
+    const rawTransferIds=transactions.map(t=>t.transfer_id).filter(Boolean);
+    if(rawTransferIds.length) {
+      const {data:legacy,error:legacyError}=await supabase.from('transactions').select('id')
+        .eq('business_id',biz.business.id).in('transfer_id',rawTransferIds).limit(1);
+      if(legacyError)throw legacyError;
+      if(legacy?.length)return res.status(409).json({error:'legacy_transfer_requires_review',automatic_retry:false});
+      transactions=transactions.map(t=>t.transfer_id?{...t,transfer_id:financialRecovery.transferLedgerId(userId,t.transfer_id,'transaction_batch')}:t);
     }
 
     // ── Plan limit: max_transactions_per_month ───────────────────────────────
@@ -8897,24 +8890,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
         .or(bizOrFilter(biz))
         .in('transfer_id', transferIdsInBatch);
       if (existingTransferTxs && existingTransferTxs.length > 0) {
-        existingTransferIds = new Set(existingTransferTxs.map(x => x.transfer_id));
-        for (const t of transactions.filter(t => t.transfer_id && existingTransferIds.has(t.transfer_id))) {
-          const legs = existingTransferTxs.filter(x => x.transfer_id === t.transfer_id);
-          const debit = legs.find(x => x.type === 'expense');
-          const credit = legs.find(x => x.type === 'income');
-          if (legs.length !== 2 || t.type !== 'transfer' || !debit || !credit
-            || debit.wallet_id !== t.wallet_id || credit.wallet_id !== t.to_wallet_id
-            || String(debit.currency_original).toUpperCase() !== String(walletMap[t.wallet_id]?.currency).toUpperCase()
-            || String(credit.currency_original).toUpperCase() !== String(walletMap[t.to_wallet_id]?.currency).toUpperCase()
-            || TX.cmpDec(debit.amount_original, t.amount) !== 0
-            || (t.target_amount != null && TX.cmpDec(credit.amount_original, t.target_amount) !== 0)
-            || debit.transaction_date !== (t.transaction_date || new Date().toISOString().slice(0, 10))) {
-            return res.status(409).json({ error: 'idempotency_key_mismatch', message: 'Transfer id already used with different parameters' });
-          }
-        }
-        if (transactions.every(t => t.transfer_id && existingTransferIds.has(t.transfer_id))) {
-          return res.status(200).json({ saved: existingTransferTxs.length, is_replay: true });
-        }
+        return res.status(409).json({error:'transfer_already_recorded',message:'Recover the original batch result before creating another transfer.'});
       }
     }
 
@@ -9080,7 +9056,7 @@ app.post('/api/transactions/batch', auth, async (req, res) => {
       return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic batch recording requires migration 070' });
     const { data, error } = await supabase.rpc('rpc_insert_business_transactions_once', {
       p_business_id: biz.business.id, p_user_id: userId, p_rows: rows,
-      p_request_key: req.body.request_key || null, p_intent: req.body.transactions,
+      p_request_key: req.body.request_key || null, p_intent: await financialRecovery.intent('transaction_batch',req.body.transactions),
     });
     if (error) {
       if (error.code === 'PGRST202' || /function.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
@@ -10680,7 +10656,7 @@ app.post('/api/wallets', auth, async (req, res) => {
     } : null;
     const { request_key, ...intent } = req.body;
     const { data, error } = await supabase.rpc('rpc_create_business_wallet', {
-      p_business_id: biz.business.id, p_user_id: userId, p_request_key: request_key || null, p_intent: intent,
+      p_business_id: biz.business.id, p_user_id: userId, p_request_key: request_key || null, p_intent: await financialRecovery.intent('wallet_create',intent),
       p_wallet: { name, currency: cur, type: type || null, entity_name: entity_name || null,
         color: color || null, sort_order: sort_order || 0, scope: walletScope }, p_opening: opening,
     });
@@ -10919,7 +10895,7 @@ app.post('/api/wallets/:id/adjust-balance', auth, async (req, res) => {
 
     const { data, error } = await supabase.rpc('rpc_adjust_business_wallet', {
       p_business_id: biz.business.id, p_user_id: userId, p_wallet_id: walletId,
-      p_request_key: request_key || null, p_intent: intent,
+      p_request_key: request_key || null, p_intent: await financialRecovery.intent('wallet_adjust',intent,req.params.id),
       p_expected_balance: expectedBalance, p_target: targetNum,
       p_correction: { amount_original: delta, currency_original: cur, amount_idr: fxRes.amount_idr,
         booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source,
@@ -10976,6 +10952,14 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
       return res.status(400).json({ error: 'invalid_transfer_wallets', message: 'Source and destination wallets must be different' });
     }
 
+    const transferRequestKey = req.body.transfer_id;
+    if (!financialRecovery.keyValid(transferRequestKey)) return res.status(400).json({error:'idempotency_key_required'});
+    const recoveryIntent = await financialRecovery.intent('wallet_transfer',req.body);
+    if (await financialRecovery.replay(supabase,req,res,biz,'wallet_transfer',transferRequestKey,recoveryIntent)) return;
+    const {data:legacyTransfer,error:legacyTransferError}=await supabase.from('transactions').select('id')
+      .eq('business_id',biz.business.id).eq('transfer_id',transferRequestKey).limit(1);
+    if(legacyTransferError)throw legacyTransferError;
+    if(legacyTransfer?.length)return res.status(409).json({error:'legacy_transfer_requires_review',automatic_retry:false});
     const bizOr = bizOrFilter(biz);
     const { data: wallets, error: wErr } = await supabase
       .from('wallets')
@@ -10997,43 +10981,9 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
     const txDate  = date ? new Date(date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
     if (!req.body.transfer_id)
       return res.status(400).json({ error: 'idempotency_key_required', message: 'Keep a stable transfer_id for this transfer.' });
-    const transferId = req.body.transfer_id;
+    const transferId = financialRecovery.transferLedgerId(userId,transferRequestKey);
     const transferRef = `xfer:${transferId}`;
     const desc = (description && description.trim()) || `Transfer: ${fromWallet.name} → ${toWallet.name}`;
-
-    // Replay / idempotency check for existing transfer_id
-    if (req.body.transfer_id) {
-      const { data: existingTxs } = await supabase
-        .from('transactions')
-        .select('*')
-        .or(bizOr)
-        .eq('transfer_id', req.body.transfer_id);
-
-      if (existingTxs && existingTxs.length > 0) {
-        const debit = existingTxs.find(t => t.type === 'expense');
-        const credit = existingTxs.find(t => t.type === 'income');
-        if (!debit || !credit || debit.wallet_id !== fromWallet.id || credit.wallet_id !== toWallet.id
-          || TX.cmpDec(debit.amount_original, sourceAmount) !== 0
-          || (target_amount != null && TX.cmpDec(credit.amount_original, target_amount) !== 0)
-          || String(debit.currency_original).toUpperCase() !== fromCur
-          || String(credit.currency_original).toUpperCase() !== toCur
-          || debit.transaction_date !== txDate) {
-          return res.status(409).json({ error: 'idempotency_key_mismatch', message: 'Transfer id already used with different parameters' });
-        }
-        return res.status(200).json({
-          ok: true,
-          is_replay: true,
-          transfer_id: req.body.transfer_id,
-          transactions: existingTxs,
-          from_wallet_id: fromWallet.id,
-          to_wallet_id: toWallet.id,
-          source_amount: sourceAmount,
-          source_currency: fromCur,
-          target_amount: Number(credit.amount_original),
-          target_currency: toCur,
-        });
-      }
-    }
 
     // A replay of an already-recorded transfer was answered above; every new one is checked
     // (the app always sends a transfer_id, so the check may not depend on its absence).
@@ -11088,7 +11038,7 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
     }
 
     try {
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer_guarded', {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_execute_wallet_transfer_recovery', {
         p_business_id: biz.business.id,
         p_user_id: userId,
         p_from_wallet_id: fromWallet.id,
@@ -11106,6 +11056,8 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
         p_transaction_date: txDate,
         p_transfer_id: transferId,
         p_scope: 'business',
+        p_request_key: transferRequestKey,
+        p_intent: recoveryIntent,
       });
 
       if (!rpcErr && rpcRes && rpcRes.ok) {
@@ -12211,6 +12163,15 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   if (!canCreateConfirmedFinancialRecord(biz.role))
     return res.status(403).json({ error: 'Your role does not allow recording payments' });
 
+  const idempotencyKey = (req.headers['idempotency-key'] || req.body?.idempotency_key || '').toString().trim();
+  if (!financialRecovery.keyValid(idempotencyKey)) return res.status(400).json({error:'idempotency_key_required'});
+  let recoveryIntent;
+  try {
+    recoveryIntent = await financialRecovery.intent('debt_payment',req.body,req.params.id);
+    if (await financialRecovery.replay(supabase,req,res,biz,'debt_payment',idempotencyKey,recoveryIntent)) return;
+  }
+  catch(e) { if(balanceFailure(res,e))return;return res.status(503).json({error:'financial_recovery_unavailable',outcome:'unknown'}); }
+
   const { data: debtRows } = await supabase.from('debts')
     .select('*').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
   const debt = debtRows?.[0];
@@ -12296,44 +12257,8 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
     });
   }
 
-  // Idempotency key handling
-  const idempotencyKey = (req.headers['idempotency-key'] || req.body?.idempotency_key || '').toString().trim();
-  if (!idempotencyKey || idempotencyKey.length > 128)
-    return res.status(400).json({ error: 'idempotency_key_required', message: 'Keep a stable payment request key before retrying.' });
-  const requestHash = crypto.createHash('sha256').update(JSON.stringify({
-    debt_id: String(debt.id),
-    amount: paymentAmount,
-    wallet_id: payWallet ? String(payWallet.id) : (wallet_id ? String(wallet_id) : null),
-    currency: cur,
-    date: txDate,
-  })).digest('hex');
-
-  if (idempotencyKey) {
-    try {
-      const { data: idempRow } = await supabase.from('debt_payment_idempotency')
-        .select('*')
-        .eq('business_id', biz.business.id)
-        .eq('key', idempotencyKey)
-        .maybeSingle();
-
-      if (idempRow) {
-        if (idempRow.request_hash === requestHash) {
-          return res.status(idempRow.response_status || 200).json({
-            ...idempRow.response_body,
-            is_replay: true,
-          });
-        } else {
-          return res.status(409).json({
-            error: 'idempotency_key_mismatch',
-            message: 'Idempotency key already used with different payment parameters',
-          });
-        }
-      }
-    } catch (idempErr) {
-      if (balanceFailure(res, idempErr)) return;
-      console.warn('[debts:pay] Idempotency lookup skipped:', idempErr.message);
-    }
-  }
+  // Hash the canonical request, not a refreshed FX quote or credential.
+  const requestHash = crypto.createHash('sha256').update(JSON.stringify(recoveryIntent)).digest('hex');
 
   if (paymentAmount > remaining + 0.01) {
     return res.status(400).json({ error: `Payment amount exceeds remaining balance (${remaining})` });
@@ -12358,7 +12283,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
   }
 
   try {
-    const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment_guarded', {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('rpc_record_debt_payment_recovery', {
       p_business_id: biz.business.id,
       p_user_id: req.user.userId,
       p_debt_id: debt.id,
@@ -12371,6 +12296,7 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
       p_payment_date: txDate,
       p_idempotency_key: idempotencyKey || null,
       p_request_hash: requestHash,
+      p_intent: recoveryIntent,
       p_account_name: payWallet.name,
       p_created_at: date ? new Date(date).toISOString() : new Date().toISOString(),
     });
@@ -12402,19 +12328,9 @@ app.post('/api/debts/:id/pay', auth, async (req, res) => {
       return res.status(500).json({ error: msg });
     }
 
-    if (rpcRes) {
-      if (rpcRes.is_replay) {
-        return res.status(rpcRes.status || 200).json({
-          ...rpcRes.data,
-          is_replay: true,
-        });
-      }
-      return res.json({
-        ok: true,
-        isFullyPaid: rpcRes.data.isFullyPaid ?? rpcRes.data.is_fully_paid,
-        remaining: Math.max(0, Number(rpcRes.data.remaining)),
-        debt: computeDebtStatus({ ...rpcRes.data.debt, withholding_allocated: withheld }),
-      });
+    if (rpcRes?.ok && rpcRes.data) {
+      return res.status(rpcRes.status || 200).json({...rpcRes.data,is_replay:rpcRes.is_replay===true,
+        result_is_historical:rpcRes.is_replay===true});
     }
 
     return res.status(500).json({ error: 'atomic_payment_failed', message: 'No response from payment RPC' });
