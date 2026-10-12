@@ -16,6 +16,7 @@ const WL = require('./lib/walletLedger');
 const { balanceFailure, databaseFailureBody, nativeInputIsExact } = require('./lib/balanceFailure');
 const financialRecovery = require('./lib/financialRecovery');
 const walletHistory = require('./lib/walletHistory');
+const profileValidation = require('./lib/profileValidation');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
 const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration 061)
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
@@ -384,7 +385,8 @@ app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
 // Personal Account shell — read/update the signed-in user's profile (identity only).
 app.get('/api/me/profile', emailAuthGate, auth, async (req, res) => {
   try {
-    const { data } = await supabase.from('user_profiles').select('*').eq('user_id', req.user.userId).limit(1);
+    const { data, error } = await supabase.from('user_profiles').select('*').eq('user_id', req.user.userId).limit(1);
+    if (error) throw error;
     res.json({ profile: data?.[0] || null });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -405,19 +407,30 @@ app.patch('/api/me/profile', emailAuthGate, auth, async (req, res) => {
     }
     if ('timezone' in patch) {
       patch.timezone = String(patch.timezone ?? '').trim().slice(0, 64);
-      if (patch.timezone && !/^[A-Za-z0-9_+\-/]+$/.test(patch.timezone)) {
+      if (!profileValidation.validTimezone(patch.timezone)) {
         return res.status(400).json({ error: 'invalid_timezone' });
       }
     }
     if ('avatar_url' in patch && patch.avatar_url !== '' && patch.avatar_url != null) {
-      const ok = typeof patch.avatar_url === 'string'
-        && patch.avatar_url.length <= 500
-        && patch.avatar_url.includes(`/storage/v1/object/public/${AVATAR_BUCKET}/`);
+      const ok = profileValidation.ownAvatarPath(patch.avatar_url, req.user.userId, process.env.SUPABASE_URL, AVATAR_BUCKET);
       if (!ok) return res.status(400).json({ error: 'invalid_avatar_url', message: 'Use the photo upload — external image URLs are not accepted.' });
     }
-    const { data } = await supabase.from('user_profiles')
+    let previousAvatar = null;
+    if ('avatar_url' in patch) {
+      const { data: previous, error: previousError } = await supabase.from('user_profiles').select('avatar_url').eq('user_id', req.user.userId).maybeSingle();
+      if (previousError) throw previousError;
+      previousAvatar = previous?.avatar_url;
+    }
+    const { data, error } = await supabase.from('user_profiles')
       .upsert({ user_id: req.user.userId, ...patch }, { onConflict: 'user_id' }).select().single();
-    res.json({ profile: data });
+    if (error || !data) throw error || new Error('Profile save was not confirmed');
+    let cleanupPending = false;
+    const previousPath = profileValidation.ownAvatarPath(previousAvatar, req.user.userId, process.env.SUPABASE_URL, AVATAR_BUCKET);
+    if ('avatar_url' in patch && previousPath && previousAvatar !== patch.avatar_url) {
+      try { const removed = await supabase.storage.from(AVATAR_BUCKET).remove([previousPath.path]); cleanupPending = !!removed.error; }
+      catch { cleanupPending = true; }
+    }
+    res.json({ profile: data, ...(cleanupPending ? { avatar_cleanup_pending: true } : {}) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -429,6 +442,23 @@ app.patch('/api/me/profile', emailAuthGate, auth, async (req, res) => {
 const AVATAR_BUCKET = process.env.AVATARS_BUCKET || 'avatars';
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const AVATAR_MIME_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+// Serve only the current actor's stored image through the application's origin.
+// The browser never needs a public/internal Supabase hostname or a storage secret.
+app.get('/api/me/avatar', emailAuthGate, auth, async (req, res) => {
+  res.set({ 'Cache-Control': 'private, no-store', 'Vary': 'Authorization', 'X-Content-Type-Options': 'nosniff' });
+  try {
+    const { data: rows, error } = await supabase.from('user_profiles').select('avatar_url').eq('user_id', req.user.userId).limit(1);
+    if (error) throw error;
+    const image = profileValidation.ownAvatarPath(rows?.[0]?.avatar_url, req.user.userId, process.env.SUPABASE_URL, AVATAR_BUCKET);
+    if (!image) return res.status(404).json({ error: 'avatar_not_available' });
+    const { data, error: downloadError } = await supabase.storage.from(AVATAR_BUCKET).download(image.path);
+    if (downloadError || !data) return res.status(502).json({ error: 'avatar_storage_unavailable' });
+    const bytes = Buffer.from(await data.arrayBuffer());
+    if (!bytes.length || bytes.length > AVATAR_MAX_BYTES) return res.status(502).json({ error: 'avatar_storage_unavailable' });
+    res.set({ 'Content-Type': image.mime, 'Cache-Control': 'private, no-store', 'Vary': 'Authorization', 'X-Content-Type-Options': 'nosniff' });
+    res.send(bytes);
+  } catch { res.status(500).json({ error: 'avatar_read_failed' }); }
+});
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },

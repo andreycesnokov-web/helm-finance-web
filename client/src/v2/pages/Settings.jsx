@@ -17,6 +17,7 @@ import { useT } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import TargetsCard from '../components/TargetsCard'
 import ReferenceLists from '../components/ReferenceLists'
+import ProfileAvatar from '../components/ProfileAvatar'
 import Modal from '../components/Modal'
 import {
   updateMyProfile, updateCompanyBasics, createCategory, updateCategory, archiveCategory,
@@ -104,6 +105,7 @@ function MeTab() {
         {flash}
         {prof.error ? <ErrorBox error={prof.error} onRetry={prof.reload} /> : prof.loading || !f ? <Skeleton rows={3} /> : (
           <form onSubmit={save} className="v2-set-form">
+            <ProfileAvatar profile={prof.data?.profile} onUpdated={prof.reload} disabled={busy||changingLang} />
             <div className="v2-field-row">
               <label className="v2-field"><span className="v2-field-label">{t('set.me.name')}</span>
                 <input className="v2-input" value={f.display_name} maxLength={80} onChange={(e) => setF({ ...f, display_name: e.target.value })} /></label>

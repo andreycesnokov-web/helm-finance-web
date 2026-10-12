@@ -97,18 +97,28 @@ async function performApiFetch(path, token, options = {}, journal = null, assert
   assertCurrent()
   const businessId = scoped ? identity.businessId : (options.headers?.['x-business-id'] || getActiveBusinessId())
   assertCurrent()
+  const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData
   const res = await fetch(BASE + path, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(multipart ? {} : { 'Content-Type': 'application/json' }),
       Authorization: `Bearer ${scoped ? identity.token : token}`,
       ...(businessId ? { 'x-business-id': businessId } : {}),
       ...options.headers,
       ...(journal || recoveryRead ? { Authorization: 'Bearer ' + (scoped ? identity.token : token) } : {}),
       ...(scoped ? { 'x-business-id': businessId } : {})
     },
-    body: options.body ? JSON.stringify(options.body) : undefined
+    body: options.body ? multipart ? options.body : JSON.stringify(options.body) : undefined
   }).catch((e) => { assertCurrent(); return unconfirmed(e) })
+  // Only this authenticated, non-financial GET may return an image body. Money
+  // paths still require their usual JSON acknowledgement and durable receipt.
+  if (path === '/me/avatar' && String(options.method || 'GET').toUpperCase() === 'GET' && options.responseType === 'avatar' && res.ok) {
+    assertCurrent()
+    if (!/^image\/(png|jpeg|webp|gif)(;|$)/i.test(res.headers.get('content-type') || '')) throw new Error('avatar_response_invalid')
+    const image = await res.blob()
+    assertCurrent()
+    return image
+  }
   let data = null
   const text = await res.text().catch((e) => { assertCurrent(); return unconfirmed(e) })
   assertCurrent()

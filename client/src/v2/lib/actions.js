@@ -152,6 +152,11 @@ export const verifyEmailSignIn = (body) =>
 
 export const updateMyProfile = (token, patch) =>
   apiFetch('/me/profile', token, { method: 'PATCH', body: patch })
+export const readMyAvatar = (token, signal) => apiFetch('/me/avatar', token, { responseType: 'avatar', signal })
+export const uploadMyAvatar = (token, file) => {
+  const body = new FormData(); body.append('avatar', file)
+  return apiFetch('/me/avatar', token, { method: 'POST', body })
+}
 
 // Business reference structure; server resolves membership and forbids system-row edits.
 export const createDirection = (token, body) => apiFetch('/business-directions', token, { method: 'POST', body })
