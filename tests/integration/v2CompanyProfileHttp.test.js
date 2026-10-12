@@ -52,7 +52,7 @@ test.before(async () => {
   // Reserve a local port before starting the real app (no production connection).
   const reserve = http.createServer(); await new Promise((r) => reserve.listen(0, '127.0.0.1', r));
   const port = reserve.address().port; await new Promise((r) => reserve.close(r)); base = `http://127.0.0.1:${port}`;
-  app = spawn(process.execPath, [path.resolve(__dirname, '../../server/index.js')], { env: { PATH: process.env.PATH, NODE_ENV: 'test', PORT: String(port), SUPABASE_URL: `http://127.0.0.1:${db.address().port}`, SUPABASE_SECRET_KEY: 'synthetic', BOT_TOKEN: 'synthetic', TELEGRAM_WEBHOOK_SECRET: 'synthetic', JWT_SECRET: SECRET }, stdio: ['ignore','pipe','pipe'] });
+  app = spawn(process.execPath, [path.resolve(__dirname, '../../server/index.js')], { env: { PATH: process.env.PATH, NODE_PATH: process.env.NODE_PATH, NODE_ENV: 'test', PORT: String(port), SUPABASE_URL: `http://127.0.0.1:${db.address().port}`, SUPABASE_SECRET_KEY: 'synthetic', BOT_TOKEN: 'synthetic', TELEGRAM_WEBHOOK_SECRET: 'synthetic', JWT_SECRET: SECRET }, stdio: ['ignore','pipe','pipe'] });
   let startup='';const capture=chunk=>{startup=(startup+String(chunk)).slice(-8000)};
   app.stdout.on('data',capture);app.stderr.on('data',capture);app.on('error',capture);
   const deadline = Date.now() + 15000;
