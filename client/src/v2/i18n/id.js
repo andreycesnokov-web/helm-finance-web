@@ -604,13 +604,14 @@ export default {
     },
     docs: {
       title: 'Unggah dokumen perusahaan',
-      p: 'PDF atau foto. AI membaca nomor, KBLI, dan bentuk perusahaan — Anda cek di langkah berikutnya. Disimpan terpisah di “Dokumen perusahaan”.',
+      p: 'PDF atau foto. Jika pembacaan otomatis tersedia, periksa sarannya di langkah berikutnya. Jika tidak, konfirmasikan jenis dokumen dan isi detailnya sendiri.',
+      uploaded:'File tersimpan — konfirmasi jenisnya',classified:'Jenis terkonfirmasi',confirming:'Mengonfirmasi jenis…',chooseType:'Jenis dokumen perusahaan',confirmType:'Konfirmasi jenis ini',confirmFailed:'Jenis belum terkonfirmasi. File tetap tersimpan; coba konfirmasi lagi.',aiUnavailable:'Pembacaan otomatis tidak tersedia. Konfirmasikan jenis dan isi profil secara manual.',restored:'File tersimpan dari perusahaan ini dipulihkan. Tidak perlu unggah ulang.',
       drop: 'Seret file ke sini',
       dropHint: 'atau klik untuk memilih · bisa beberapa sekaligus',
       st: {
         queued: 'Menunggu…',
         uploading: 'Mengunggah…',
-        reading: 'AI membaca dokumen…',
+        reading: 'Memeriksa dokumen…',
         other: 'Ini tampak seperti {what}, bukan dokumen perusahaan. Tetap di dokumen biasa.',
         unreadable: 'File tidak terbaca — foto buram atau terlalu gelap. Unggah yang lain atau isi manual.',
         duplicate: 'File ini sudah diunggah.',

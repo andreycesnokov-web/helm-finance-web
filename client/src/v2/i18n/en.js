@@ -604,13 +604,14 @@ export default {
     },
     docs: {
       title: 'Upload the company documents',
-      p: 'PDF or photo. The AI reads the numbers, KBLI and the company form — you check them in the next step. They are kept apart, in “Company documents”.',
+      p: 'PDF or photo. When automatic reading is available, review its suggestions in the next step. Otherwise confirm the document type and enter the details yourself.',
+      uploaded:'File saved — confirm its type', classified:'Type confirmed', confirming:'Confirming type…', chooseType:'Company document type',confirmType:'Confirm this type',confirmFailed:'The type could not be confirmed. The file is kept; retry confirmation.',aiUnavailable:'Automatic reading is unavailable. Confirm the type and enter the profile details manually.',restored:'Saved file restored from this company. No duplicate upload.',
       drop: 'Drop files here',
       dropHint: 'or click to choose · several at once',
       st: {
         queued: 'Waiting…',
         uploading: 'Uploading…',
-        reading: 'The AI is reading the document…',
+        reading: 'Checking the document…',
         other: 'This looks like {what}, not a company document. It stays in the ordinary documents.',
         unreadable: 'Could not read the file — the photo may be blurred or too dark. Upload another one or fill in by hand.',
         duplicate: 'This file is already uploaded.',

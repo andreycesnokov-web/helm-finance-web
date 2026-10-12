@@ -83,6 +83,7 @@ export const markRepaymentPaid = (token, id, body) =>
   apiFetch(`/business-funding/repayments/${encodeURIComponent(id)}/paid`, token, { method: 'POST', body })
 
 const docUrl = (id) => `/documents/${encodeURIComponent(id)}`
+export const readDocumentMetadata = (token,id) => apiFetch(docUrl(id),token)
 
 export const documentFileUrl = (token, id, mode = 'view', signal) =>
   apiFetch(`${docUrl(id)}/signed-url`, token, { method: 'POST', body: mode === 'download' ? { mode: 'download' } : {}, signal })

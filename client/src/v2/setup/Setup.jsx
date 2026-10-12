@@ -16,6 +16,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { unsavedFields } from '../lib/savedFields'
+import { COMPANY_DOCUMENT_TYPES, confirmedCompanyType, confirmCompanyDocument } from '../lib/companyDocuments'
 import { companyDraft, saveCompanyDraft, pendingCompanyCreation, submitCompanyCreation, checkCompanyCreation, finishCompanyCreation } from '../../lib/companyCreation'
 import I from '../icons'
 import { Pill, Skeleton, ErrorBox } from '../ui'
@@ -26,12 +27,12 @@ import { TaxList, ruleTitle } from '../pages/Accountant'
 import { optLabel } from '../pages/CompanyProfileEdit'
 import { shortDate } from '../lib/format'
 import {
-  saveTaxProfile, uploadCompanyDocument, identifyDocument, confirmDocumentKind, readProfileFromDocuments,
+  saveTaxProfile, uploadCompanyDocument, identifyDocument, confirmDocumentKind, readDocumentMetadata, readProfileFromDocuments,
 } from '../lib/actions'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
 const STEPS = ['about', 'docs', 'review', 'taxes']
-const COMPANY_TYPES = ['nib', 'npwp', 'akta', 'sk_kemenkumham', 'oss_license', 'pkp_certificate', 'kpp_registration', 'bpjs_document']
+const COMPANY_TYPES = COMPANY_DOCUMENT_TYPES
 // Slots shown on R5 — a slot is ticked when a document of one of its types is in the company.
 const SLOTS = [
   { key: 'nib', types: ['nib', 'oss_license'], must: true },
@@ -197,12 +198,22 @@ function SetupDocs() {
   const [drag, setDrag] = useState(false)
   const input = useRef(null)
   const patch = (key, p) => setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...p } : x)))
+  useEffect(()=>{
+    if(!docs.data?.documents||!request.isCurrent())return
+    setItems(existing=>{
+      const seen=new Set(existing.map(x=>x.docId).filter(Boolean))
+      const restored=docs.data.documents.filter(d=>!d.archived_at&&!seen.has(d.id)&&(COMPANY_TYPES.includes(typeOf(d))||d.extracted_json?.upload_intent?.source==='accountant_upload')).map(d=>{
+        const type=confirmedCompanyType(d),proposed=typeOf(d)
+        return {key:'saved-'+d.id,docId:d.id,name:d.file?.file_name||d.title||t('docs.type.other'),state:type?'classified':'uploaded',type,proposed:COMPANY_TYPES.includes(proposed)?proposed:'',restored:true}
+      })
+      return [...existing,...restored]
+    })
+  },[docs.data,request,t])
 
   const have = useMemo(() => {
-    const s = new Set((docs.data?.documents || []).filter((d) => !d.archived_at).map(typeOf).filter(Boolean))
-    for (const x of items) if (x.state === 'read' && x.type) s.add(x.type)
+    const s = new Set((docs.data?.documents || []).map(confirmedCompanyType).filter(Boolean))
     return s
-  }, [docs.data, items])
+  }, [docs.data])
 
   const handle = async (file, key) => {
     patch(key, { state: 'uploading' })
@@ -211,22 +222,30 @@ function SetupDocs() {
       const r = await uploadCompanyDocument(request, file)
       doc = r.document
     } catch (x) {
+      if(!request.isCurrent())return
       if (x?.status === 409 && x?.data?.duplicate) { patch(key, { state: 'duplicate' }); return }
       patch(key, { state: 'failed', note: x?.status === 403 ? t('setup.docs.noAccess') : (x?.data?.error || x?.message) }); return
     }
+    if(!request.isCurrent())return
     patch(key, { state: 'reading', docId: doc.id })
     const det = typeOf(doc)
     let ident = null
     try { ident = (await identifyDocument(request, doc.id, { lang }))?.identify || null } catch { /* AI unavailable → classifier only */ }
     if (!request.isCurrent()) return
-    const ai = ident?.suggested_type || null
-    const type = COMPANY_TYPES.includes(det) ? det : COMPANY_TYPES.includes(ai) ? ai : null
-    if (type && type !== det) { try { await confirmDocumentKind(request, doc.id, type) } catch { /* shown as read; the profile step reads confirmed types only */ } }
-    if (!request.isCurrent()) return
+    const ai = ident?.suggested_type || null,type=confirmedCompanyType(doc)
     invalidate()
-    if (type) patch(key, { state: 'read', type, title: ident?.title || '', note: ident?.summary || '' })
-    else if (ai || (det && det !== 'unknown')) patch(key, { state: 'other', type: ai || det, label: ident?.suggested_label || '', title: ident?.title || '' })
-    else patch(key, { state: 'unreadable' })
+    // Proposed AI types require an explicit user action and persisted readback.
+    // An unavailable AI never becomes a fake "Read" badge.
+    patch(key,{state:type?'classified':'uploaded',type:type||null,proposed:COMPANY_TYPES.includes(ai)?ai:COMPANY_TYPES.includes(det)?det:'',title:ident?.title||'',note:ident?.summary||'',aiUnavailable:!ident})
+  }
+  const confirmType = async (item) => {
+    if(!item.proposed||!request.isCurrent())return
+    patch(item.key,{state:'confirming',note:''})
+    try{
+      const actual=await confirmCompanyDocument(request,item.docId,item.proposed,{confirm:confirmDocumentKind,read:readDocumentMetadata})
+      if(!request.isCurrent())return
+      patch(item.key,{state:'classified',type:confirmedCompanyType(actual)});invalidate()
+    }catch(x){if(request.isCurrent())patch(item.key,{state:'uploaded',note:t('setup.docs.confirmFailed')})}
   }
   const add = (files) => {
     const list = [...files].slice(0, 12)
@@ -235,12 +254,14 @@ function SetupDocs() {
     // One at a time: each upload is identified before the next, so the list fills in order.
     ;(async () => { for (let i = 0; i < list.length && request.isCurrent(); i++) await handle(list[i], fresh[i].key) })()
   }
-  const busy = items.some((x) => ['queued', 'uploading', 'reading'].includes(x.state))
+  const busy = items.some((x) => ['queued', 'uploading', 'reading','confirming'].includes(x.state))
 
   return (
     <div className="v2-setup-card">
       <h1 className="v2-auth-h1">{t('setup.docs.title')}</h1>
       <p className="v2-auth-p">{t('setup.docs.p')}</p>
+      {docs.loading&&<Skeleton rows={2}/>}
+      {docs.error&&<ErrorBox error={docs.error} onRetry={docs.reload}/>}
       <div className={`v2-setup-drop${drag ? ' is-over' : ''}`} role="button" tabIndex={0}
         onClick={() => input.current?.click()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.current?.click() } }}
         onDragOver={(e) => { e.preventDefault(); setDrag(true) }} onDragLeave={() => setDrag(false)}
@@ -253,11 +274,11 @@ function SetupDocs() {
         <ul className="v2-setup-files" aria-live="polite">
           {items.map((x) => (
             <li key={x.key} className={`is-${x.state}`} data-setup-item={x.state}>
-              <span className="v2-setup-fic" aria-hidden="true">{x.state === 'read' ? <I.check size={16} /> : x.state === 'unreadable' || x.state === 'failed' ? <I.close size={16} /> : x.state === 'other' || x.state === 'duplicate' ? <I.warn size={16} /> : <I.clock size={16} />}</span>
+              <span className="v2-setup-fic" aria-hidden="true">{x.state === 'classified' ? <I.check size={16} /> : x.state === 'failed' ? <I.close size={16} /> : x.state === 'uploaded' || x.state === 'duplicate' ? <I.warn size={16} /> : <I.clock size={16} />}</span>
               <span className="v2-setup-ftext">
-                <strong>{x.state === 'read' ? t(`docs.vault.${x.type}`) : x.name}</strong>
+                <strong>{x.state === 'classified' ? t(`docs.vault.${x.type}`) : x.name}</strong>
                 <span className="v2-muted v2-small">
-                  {x.state === 'read' && <>{x.name}{x.title ? ` · ${x.title}` : ''}</>}
+                  {x.state === 'classified' && <>{x.name}{x.title ? ` · ${x.title}` : ''}</>}
                   {x.state === 'queued' && t('setup.docs.st.queued')}
                   {x.state === 'uploading' && t('setup.docs.st.uploading')}
                   {x.state === 'reading' && t('setup.docs.st.reading')}
@@ -265,10 +286,16 @@ function SetupDocs() {
                   {x.state === 'unreadable' && t('setup.docs.st.unreadable')}
                   {x.state === 'duplicate' && t('setup.docs.st.duplicate')}
                   {x.state === 'failed' && t('setup.docs.st.failed', { msg: x.note || '' })}
+                  {x.state === 'uploaded' && t('setup.docs.uploaded')}
+                  {x.state === 'classified' && t('setup.docs.classified')}
+                  {x.state === 'confirming' && t('setup.docs.confirming')}
                 </span>
-                {x.state === 'read' && x.note && <span className="v2-small">{x.note}</span>}
+                {x.aiUnavailable&&<span className="v2-small">{t('setup.docs.aiUnavailable')}</span>}
+                {x.restored&&<span className="v2-small">{t('setup.docs.restored')}</span>}
+                {x.note && <span className="v2-small" role={x.state==='uploaded'?'alert':undefined}>{x.note}</span>}
+                {x.state==='uploaded'&&<label className="v2-field"><span className="v2-field-label">{t('setup.docs.chooseType')}</span><select className="v2-select" value={x.proposed||''} onChange={e=>patch(x.key,{proposed:e.target.value})}><option value="">{t('pe.choose')}</option>{COMPANY_TYPES.map(type=><option key={type} value={type}>{t(`docs.vault.${type}`)}</option>)}</select><button type="button" className="v2-btn v2-btn-secondary" disabled={!x.proposed} onClick={()=>confirmType(x)}>{t('setup.docs.confirmType')}</button></label>}
               </span>
-              <Pill tone={x.state === 'read' ? 'good' : ['unreadable', 'failed'].includes(x.state) ? 'crit' : ['other', 'duplicate'].includes(x.state) ? 'warn' : 'info'}>{t(`setup.docs.pill.${x.state}`)}</Pill>
+              <Pill tone={x.state === 'classified' ? 'good' : x.state==='failed' ? 'crit' : ['uploaded', 'duplicate'].includes(x.state) ? 'warn' : 'info'}>{x.state==='classified'?t('setup.docs.classified'):x.state==='uploaded'?t('setup.docs.uploaded'):x.state==='confirming'?t('setup.docs.confirming'):t(`setup.docs.pill.${x.state}`)}</Pill>
             </li>
           ))}
         </ul>
