@@ -1,5 +1,6 @@
 // Design v2 — English (final wording from _specs/design-v2/designs).
 export default {
+  refs: { directions: 'Business directions', activities: 'Activity types', empty: 'No entries in this list.', history: 'Archiving hides an entry from new selections. Existing transaction references and amounts are retained.', rename: 'Rename “{name}”', unconfirmed: 'The saved values could not be confirmed.', new: { directions: 'New business direction', activities: 'New activity type' } },
   history: { title: 'Account history', note: 'Native amounts. Transfers and financing are cash movements, not revenue.', period: { all: 'All time', month: 'This month', '3m': 'Last 3 months', week: 'Last 7 days' }, page: '{start}–{end} of {total}', previous: 'Previous', next: 'Next' },
   route: { companyUnavailable: 'This company link is invalid or you no longer have access. Choose an accessible company from your account.', transactionUnavailable: 'This transaction was not found in the selected company or is no longer available.', taxSplit: 'Invoice tax review', settlement: 'Payment and document closeout', chooseInvoice: 'Choose an invoice to review its tax treatment, payments and evidence separately.' },
   nav: {

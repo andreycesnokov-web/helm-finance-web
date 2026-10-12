@@ -1,5 +1,6 @@
 // Design v2 — Bahasa Indonesia.
 export default {
+  refs: { directions: 'Bidang usaha', activities: 'Jenis kegiatan', empty: 'Belum ada entri dalam daftar ini.', history: 'Pengarsipan menyembunyikan entri dari pilihan baru. Referensi dan nilai transaksi yang ada tetap tersimpan.', rename: 'Ganti nama “{name}”', unconfirmed: 'Nilai yang disimpan belum dapat dikonfirmasi.', new: { directions: 'Bidang usaha baru', activities: 'Jenis kegiatan baru' } },
   history: { title: 'Riwayat rekening', note: 'Nilai dalam mata uang transaksi. Transfer dan pendanaan adalah arus kas, bukan pendapatan.', period: { all: 'Semua waktu', month: 'Bulan ini', '3m': '3 bulan terakhir', week: '7 hari terakhir' }, page: '{start}–{end} dari {total}', previous: 'Sebelumnya', next: 'Berikutnya' },
   route: { companyUnavailable: 'Tautan perusahaan tidak valid atau akses telah dicabut. Pilih perusahaan yang dapat diakses dari akun Anda.', transactionUnavailable: 'Transaksi tidak ditemukan di perusahaan yang dipilih atau tidak lagi tersedia.', taxSplit: 'Tinjauan pajak faktur', settlement: 'Pembayaran dan kelengkapan dokumen', chooseInvoice: 'Pilih faktur untuk meninjau perlakuan pajak, pembayaran, dan bukti secara terpisah.' },
   nav: {

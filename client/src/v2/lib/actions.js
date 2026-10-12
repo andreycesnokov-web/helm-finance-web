@@ -153,6 +153,14 @@ export const verifyEmailSignIn = (body) =>
 export const updateMyProfile = (token, patch) =>
   apiFetch('/me/profile', token, { method: 'PATCH', body: patch })
 
+// Business reference structure; server resolves membership and forbids system-row edits.
+export const createDirection = (token, body) => apiFetch('/business-directions', token, { method: 'POST', body })
+export const updateDirection = (token, id, body) => apiFetch(`/business-directions/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
+export const archiveDirection = (token, id) => apiFetch(`/business-directions/${encodeURIComponent(id)}`, token, { method: 'DELETE' })
+export const createActivityType = (token, body) => apiFetch('/activity-types', token, { method: 'POST', body })
+export const updateActivityType = (token, id, body) => apiFetch(`/activity-types/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
+export const archiveActivityType = (token, id) => apiFetch(`/activity-types/${encodeURIComponent(id)}`, token, { method: 'DELETE' })
+
 export const acceptInvite = (token, code) =>
   apiFetch(`/invite/${encodeURIComponent(code)}/accept`, token, { method: 'POST', body: {} })
 

@@ -16,6 +16,7 @@ import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox } from '../ui'
 import { useT } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import TargetsCard from '../components/TargetsCard'
+import ReferenceLists from '../components/ReferenceLists'
 import Modal from '../components/Modal'
 import {
   updateMyProfile, updateCompanyBasics, createCategory, updateCategory, archiveCategory,
@@ -55,7 +56,7 @@ export default function Settings() {
       </nav>
       {tab === 'me' && <MeTab />}
       {tab === 'company' && <CompanyTab />}
-      {tab === 'books' && <BooksTab />}
+      {tab === 'books' && <><BooksTab /><ReferenceLists kind="directions" /><ReferenceLists kind="activities" /></>}
       {tab === 'connections' && <ConnectionsTab />}
       {tab === 'team' && <TeamTab />}
       <SignOut />
@@ -68,15 +69,33 @@ function MeTab() {
   const t = useT()
   const request = useBusinessRequest()
   const { lang, changeLang } = useTranslation()
+  const { active } = useWorkspace()
   const prof = useApi('/me/profile')
   const [f, setF] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [changingLang, setChangingLang] = useState(false)
   const [flash, setFlash] = useFlash()
   useEffect(() => { if (prof.data && !f) { const p = prof.data.profile || {}; setF({ display_name: p.display_name || '', timezone: p.timezone || '' }) } }, [prof.data]) // eslint-disable-line react-hooks/exhaustive-deps
-  const pickLang = async (l) => { changeLang(l); try { await updateMyProfile(request, { locale: l }) } catch { /* the switch already applied on this device */ } }
+  const pickLang = async (l) => {
+    if (changingLang) return
+    setChangingLang(true)
+    changeLang(l)
+    try {
+      const result = await updateMyProfile(request, { locale: l })
+      if (result?.profile?.locale !== l) throw new Error(t('refs.unconfirmed'))
+      prof.reload()
+    } catch (x) { setFlash({ tone: 'warn', text: t('set.notSaved', { msg: errMsg(t, x) }) }) }
+    finally { setChangingLang(false) }
+  }
   const save = async (e) => {
     e.preventDefault(); setBusy(true)
-    try { await updateMyProfile(request, f); setFlash({ tone: 'good', text: t('set.saved') }) }
+    try {
+      const body = { display_name: f.display_name.trim(), timezone: f.timezone.trim() }
+      const result = await updateMyProfile(request, body)
+      const pending = unsavedFields(body, result?.profile, result)
+      if (pending.length) { setFlash({ tone: 'warn', text: t('set.savedPartly', { f: pending.join(', ') }) }); return }
+      setF(body); prof.reload(); setFlash({ tone: 'good', text: t('set.saved') })
+    }
     catch (x) { setFlash({ tone: 'warn', text: t('set.notSaved', { msg: errMsg(t, x) }) }) } finally { setBusy(false) }
   }
   return (
@@ -93,7 +112,7 @@ function MeTab() {
             </div>
             <div className="v2-field"><span className="v2-field-label">{t('set.me.lang')}</span>
               <div className="v2-seg" role="group" aria-label={t('set.me.lang')}>
-                {['ru', 'en', 'id'].map((l) => <button key={l} type="button" className="v2-seg-btn" aria-pressed={lang === l} onClick={() => pickLang(l)}>{l.toUpperCase()}</button>)}
+                {['ru', 'en', 'id'].map((l) => <button key={l} type="button" className="v2-seg-btn" aria-pressed={lang === l} disabled={changingLang} onClick={() => pickLang(l)}>{l.toUpperCase()}</button>)}
               </div>
               <span className="v2-muted v2-small">{t('set.me.langHint')}</span>
             </div>
@@ -101,7 +120,7 @@ function MeTab() {
           </form>
         )}
       </Card>
-      <TargetsCard />
+      {!['manager', 'employee'].includes(active?.role) && <TargetsCard />}
     </>
   )
 }

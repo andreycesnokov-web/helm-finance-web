@@ -26,6 +26,12 @@ const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } cat
 // existing server-side role check; it is listed in the batch report. All of them live in
 // client/src/v2/lib/actions.js — no other v2 file may write.
 export const WRITE_ALLOW = [
+  { method: 'POST', path: "'/business-directions'" },
+  { method: 'PATCH', path: '`/business-directions/' },
+  { method: 'DELETE', path: '`/business-directions/' },
+  { method: 'POST', path: "'/activity-types'" },
+  { method: 'PATCH', path: '`/activity-types/' },
+  { method: 'DELETE', path: '`/activity-types/' },
   { method: 'PATCH', path: '/approve' },        // PATCH /api/debts/:id/approve
   { method: 'PATCH', path: '/reject' },         // PATCH /api/debts/:id/reject
   { method: 'POST', path: '/request-info' },    // POST  /api/debts/:id/request-info
