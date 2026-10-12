@@ -553,6 +553,7 @@ export default {
     },
   },
   setup: {
+    creation: { completed:'Company “{name}” is saved.',unknown:'Creation result is not confirmed. Check the saved result or safely resend the same request. Do not create another company.',check:'Check creation result',retry:'Retry the same creation',continue:'Continue with this company',storage:'Allow local browser storage to preserve your draft and creation request before continuing.',browser:'Use a browser that supports safe coordination between tabs.',invalid:'Check the company name, currency and time zone.',partial:'Some optional fields are unavailable in this schema. Confirm the legal form separately in the company profile.' },
     saveExit: 'Save and exit',
     stepsLabel: 'Setup steps',
     step: {

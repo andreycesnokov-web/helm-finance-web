@@ -169,8 +169,6 @@ export const archiveActivityType = (token, id) => apiFetch(`/activity-types/${en
 export const acceptInvite = (token, code) =>
   apiFetch(`/invite/${encodeURIComponent(code)}/accept`, token, { method: 'POST', body: {} })
 
-export const createCompany = (token, body) =>
-  apiFetch('/businesses', token, { method: 'POST', body })
 
 export const lookupInvite = (code) => apiFetch(`/invite/${encodeURIComponent(code)}`, null)
 export const readMyProfile = (token) => apiFetch('/me/profile', token)

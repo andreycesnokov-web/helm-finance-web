@@ -72,7 +72,6 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: "'/auth/email/verify'" },    // POST  /api/auth/email/verify (public, one-time)
   { method: 'PATCH', path: "'/me/profile'" },          // PATCH /api/me/profile
   { method: 'POST', path: '/accept`' },                // POST  /api/invite/:code/accept
-  { method: 'POST', path: "'/businesses'" },           // POST  /api/businesses (creator = owner)
   // Settings (2026-10-10, Settings + w2/S2): existing routes, role-checked on the server.
   { method: 'PATCH', path: "'/business/current'" },                        // PATCH  /api/business/current
   { method: 'POST', path: "'/cashflow-categories'" },                      // POST   /api/cashflow-categories
@@ -188,7 +187,7 @@ t('v2 makes no mutating request outside the reviewed allow-list', () => {
 })
 
 t('every allowed write exists on the server (batch 8 routes are the approved ones only)', () => {
-  const server = read(path.join(ROOT, 'server/index.js'))
+  const server = read(path.join(ROOT, 'server/index.js')) + read(path.join(ROOT, 'server/lib/companyCreation.js'))
   for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,

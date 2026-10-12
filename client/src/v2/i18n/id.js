@@ -553,6 +553,7 @@ export default {
     },
   },
   setup: {
+    creation: { completed:'Perusahaan “{name}” tersimpan.',unknown:'Hasil pembuatan belum terkonfirmasi. Periksa hasil tersimpan atau kirim ulang permintaan yang sama dengan aman. Jangan membuat perusahaan lain.',check:'Periksa hasil pembuatan',retry:'Ulangi permintaan yang sama',continue:'Lanjutkan dengan perusahaan ini',storage:'Izinkan penyimpanan lokal browser untuk menyimpan draf dan permintaan pembuatan.',browser:'Gunakan browser yang mendukung koordinasi aman antar tab.',invalid:'Periksa nama, mata uang dan zona waktu perusahaan.',partial:'Sebagian bidang opsional belum tersedia dalam skema ini. Konfirmasikan bentuk badan hukum di profil perusahaan.' },
     saveExit: 'Simpan dan keluar',
     stepsLabel: 'Langkah penyiapan',
     step: {

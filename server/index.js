@@ -13941,45 +13941,8 @@ app.delete('/api/businesses/:id', auth, async (req, res) => {
   }
 });
 
-// POST /api/businesses — create an additional business (caller becomes owner).
-// Does not touch existing businesses. Graceful for optional columns (country/timezone/
-// business_type) that may be absent in the live schema — no raw schema error.
-app.post('/api/businesses', auth, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { name, base_currency, country, timezone, business_type } = req.body || {};
-    if (!name?.trim()) return res.status(400).json({ error: 'Business name is required.' });
-    if (base_currency && !BUSINESS_ALLOWED_CURRENCIES.includes(base_currency))
-      return res.status(400).json({ error: `Invalid currency. Allowed: ${BUSINESS_ALLOWED_CURRENCIES.join(', ')}` });
-
-    const row = { owner_user_id: userId, name: name.trim(), base_currency: base_currency || 'IDR', plan: 'free', type: 'business' };
-    if (country !== undefined) row.country = country || null;
-    if (timezone !== undefined) row.timezone = timezone || null;
-    if (business_type !== undefined) row.business_type = business_type || null;
-
-    let business, bErr, dropped = [];
-    for (let i = 0; i < 5; i++) {
-      ({ data: business, error: bErr } = await supabase.from('businesses').insert(row).select().single());
-      if (!bErr) break;
-      // PostgREST: "Could not find the 'x' column"; Postgres itself: 'column "x" of relation … does not exist'.
-      const m = /find the '([a-z_]+)' column|column "([a-z_]+)" of relation/i.exec(bErr.message || '');
-      const col = m?.[1] || m?.[2];
-      if (col && col in row && !['name', 'base_currency', 'owner_user_id', 'type', 'plan'].includes(col)) { delete row[col]; dropped.push(col); continue; }
-      break;
-    }
-    if (bErr) return res.status(400).json({ error: 'Could not create the business. Please try again.' });
-
-    const { error: mErr } = await supabase.from('business_members').insert({ business_id: business.id, user_id: userId, role: 'owner', status: 'active' });
-    if (mErr) return res.status(500).json({ error: 'Business created but membership failed. Please contact support.' });
-
-    // Standard cash-flow categories (a company used to start with none). Best effort, idempotent.
-    const seeded = await defaultCategories.seedBusinessCategories(supabase, business.id, userId);
-
-    res.status(201).json({ business, categories_seeded: seeded.inserted, ...(dropped.length ? { unsupported_fields: dropped } : {}) });
-  } catch (e) {
-    res.status(500).json({ error: 'Could not create the business.' });
-  }
-});
+// Actor-only registration; company + owner + defaults + replay receipt are atomic.
+require('./lib/companyCreation').registerCompanyCreation(app, { auth, supabase, currencies: BUSINESS_ALLOWED_CURRENCIES });
 
 // ── PAYROLL V1 ───────────────────────────────────────────────────────────────
 

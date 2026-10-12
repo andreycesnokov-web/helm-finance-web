@@ -16,6 +16,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { unsavedFields } from '../lib/savedFields'
+import { companyDraft, saveCompanyDraft, pendingCompanyCreation, submitCompanyCreation, checkCompanyCreation, finishCompanyCreation } from '../../lib/companyCreation'
 import I from '../icons'
 import { Pill, Skeleton, ErrorBox } from '../ui'
 import { useT, useLang } from '../i18n'
@@ -25,7 +26,7 @@ import { TaxList, ruleTitle } from '../pages/Accountant'
 import { optLabel } from '../pages/CompanyProfileEdit'
 import { shortDate } from '../lib/format'
 import {
-  createCompany, saveTaxProfile, uploadCompanyDocument, identifyDocument, confirmDocumentKind, readProfileFromDocuments,
+  saveTaxProfile, uploadCompanyDocument, identifyDocument, confirmDocumentKind, readProfileFromDocuments,
 } from '../lib/actions'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
@@ -84,38 +85,65 @@ export function SetupAbout() {
   const t = useT()
   const nav = useNavigate()
   const { token } = useAuth()
-  const { applyActive, refresh, selectionRef } = useWorkspace()
+  const { applyActive, refresh, selectionRef, loading } = useWorkspace()
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
-  const [f, setF] = useState({ name: '', form: '', base_currency: 'IDR', country: 'Indonesia', timezone: detectTimezone(), activity: '' })
+  const [f, setF] = useState(() => {
+    const draft={ name: '', form: '', base_currency: 'IDR', country: 'Indonesia', timezone: detectTimezone(), activity: '', ...companyDraft(token) }
+    const original=pendingCompanyCreation(token)?.body
+    return original?{...draft,name:original.name,base_currency:original.base_currency,country:original.country||draft.country,timezone:original.timezone||draft.timezone,form:original.business_type||draft.form}:draft
+  })
+  const [pending, setPending] = useState(() => pendingCompanyCreation(token))
+  const [checked, setChecked] = useState(false)
   const [err, setErr] = useState({})
   const [busy, setBusy] = useState(false)
-  const set = (k, v) => { setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: null, form_: null })) }
+  const set = (k, v) => { if(pending)return;setF((x) => ({ ...x, [k]: v })); setErr((e) => ({ ...e, [k]: null, form_: null })) }
+  useEffect(() => { try { saveCompanyDraft(token,f) } catch { setErr({form_:t('setup.creation.storage')}) } }, [token,f,t])
+  const check = async () => {
+    if(busy)return
+    setBusy(true);setChecked(false);const selection=selectionRef.current
+    const isCurrent=()=>mounted.current&&selectionRef.current===selection
+    try { await checkCompanyCreation(token,{isCurrent});if(isCurrent()){setPending(pendingCompanyCreation(token));setChecked(true);setErr({})} }
+    catch(x){if(isCurrent())setErr({form_:t('setup.creation.unknown')})}
+    finally{if(mounted.current)setBusy(false)}
+  }
+  useEffect(() => { if(!loading&&pendingCompanyCreation(token))check() }, [token,loading])
+  const continueCreated = () => {
+    const result=pending?.result,business=result?.business
+    if(!checked||!business)return
+    try { sessionStorage.setItem(ACTIVITY_KEY(business.id), f.activity || 'unknown') } catch { /* private mode */ }
+    finishCompanyCreation(token)
+    applyActive({ id: business.id, name: business.name, type: 'business', role: 'owner', business_code: business.business_code })
+    refresh()
+    nav('/business/setup/docs?business_id='+encodeURIComponent(business.id))
+  }
   const submit = async (e) => {
     e.preventDefault()
+    if(busy)return
     if (!f.name.trim()) { setErr({ name: t('setup.about.nameErr') }); return }
     setBusy(true)
     const selection = selectionRef.current
     const isCurrent = () => mounted.current && selectionRef.current === selection
     try {
-      const { business } = await createCompany(token, { name: f.name.trim(), base_currency: f.base_currency, country: f.country, timezone: f.timezone, business_type: f.form || 'other' })
+      const body=pending?.body||{ name: f.name.trim(), base_currency: f.base_currency, country: f.country, timezone: f.timezone, business_type: f.form || 'other' }
+      await submitCompanyCreation(token,body,{isCurrent})
       if (!isCurrent()) return
-      try { sessionStorage.setItem(ACTIVITY_KEY(business.id), f.activity || 'unknown') } catch { /* private mode */ }
-      const legal = FORMS.find((x) => x.v === f.form)?.legal
-      // The first profile rows: country and, when the owner knows it, the legal form. The rest is read from the documents.
-      try { await saveTaxProfile({ token, businessId: business.id, isCurrent }, { jurisdiction: 'ID', country: f.country, ...(legal ? { legal_entity_type: legal } : {}) }) } catch { /* the profile step asks again */ }
-      if (!isCurrent()) return
-      applyActive({ id: business.id, name: business.name, type: 'business', role: 'owner', business_code: business.business_code })
-      refresh()
-      nav('/business/setup/docs')
+      setPending(pendingCompanyCreation(token));setChecked(true);setErr({})
     } catch (x) {
-      setErr({ form_: x?.status === 403 || x?.status === 402 ? t('setup.about.limit') : t('setup.err', { msg: x?.data?.error || x?.message }) })
-    } finally { setBusy(false) }
+      if(isCurrent()){
+        setPending(pendingCompanyCreation(token))
+        const message=x?.code==='company_recovery_storage_required'?t('setup.creation.storage'):x?.code==='company_serialization_required'?t('setup.creation.browser'):x?.status===400?t('setup.creation.invalid'):t('setup.creation.unknown')
+        setErr({form_:message})
+      }
+    } finally { if(mounted.current)setBusy(false) }
   }
   return (
     <form className="v2-setup-card" onSubmit={submit} noValidate>
       <h1 className="v2-auth-h1">{t('setup.about.title')}</h1>
       <p className="v2-auth-p">{t('setup.about.p')}</p>
+      {pending && <div className="v2-banner v2-tone-info" role="status"><span>{pending.state==='completed'&&checked?t('setup.creation.completed',{name:pending.result.business.name}):t('setup.creation.unknown')}</span></div>}
+      {pending?.state==='completed'&&pending.result?.unsupported_fields?.length>0&&<p className="v2-inline-err" role="alert">{t('setup.creation.partial')}</p>}
+      <fieldset className="v2-fieldset" disabled={!!pending||busy}>
       <label className="v2-field"><span className="v2-field-label">{t('setup.about.name')} *</span>
         <input className="v2-input" value={f.name} autoFocus maxLength={120} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
         {err.name ? <span className="v2-inline-err" role="alert">{err.name}</span> : <span className="v2-muted v2-small">{t('setup.about.nameHint')}</span>}
@@ -144,11 +172,13 @@ export function SetupAbout() {
         </div>
         <span className="v2-muted v2-small">{t('setup.about.activityHint')}</span>
       </fieldset>
+      </fieldset>
       <div className="v2-banner v2-tone-info"><I.info size={18} /><span className="v2-banner-text">{t('setup.about.separate')}</span></div>
       {err.form_ && <p className="v2-inline-err" role="alert">{err.form_}</p>}
       <div className="v2-setup-actions">
         <Link to="/account" className="v2-btn v2-btn-secondary">{t('setup.back')}</Link>
-        <button type="submit" className="v2-btn v2-btn-primary" disabled={busy}>{busy ? t('setup.creating') : t('setup.about.create')}</button>
+        {pending?.state==='completed'?<button type="button" className="v2-btn v2-btn-primary" disabled={busy||!checked} onClick={continueCreated}>{t('setup.creation.continue')}</button>:<button type="submit" className="v2-btn v2-btn-primary" disabled={busy}>{busy?t('setup.creating'):pending?t('setup.creation.retry'):t('setup.about.create')}</button>}
+        {pending&&<button type="button" className="v2-btn v2-btn-secondary" disabled={busy} onClick={check}>{t('setup.creation.check')}</button>}
       </div>
       <p className="v2-muted v2-small">{t('setup.about.owner')}</p>
     </form>
