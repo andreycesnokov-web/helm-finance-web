@@ -649,6 +649,10 @@ export default {
       wait: 'Membaca file…',
     },
     review: {
+      manualTitle:'Periksa informasi perusahaan', manualP:'Isi informasi secara manual. Mode ini tidak membaca dokumen secara otomatis; data disimpan setelah Anda mengonfirmasi.',
+      draftUnavailable:'Browser tidak dapat menyimpan draf. Simpan informasi sebelum meninggalkan halaman ini.',
+      countryRequired:'Periksa negara perusahaan dan yurisdiksi profil. Buka profil perusahaan; aturan Indonesia tidak akan diterapkan secara otomatis.',
+      employeeRequired:'Konfirmasikan apakah perusahaan memiliki karyawan.',
       regime: 'Rezim PPh',
       reg: { normal: 'Umum (tarif normal)', pph_final_umkm: 'Final 0,5% UMKM (PP 55)', unknown: 'Belum tahu' },
       regimeHint: 'PP 55: 0,5% dari omzet bulanan, untuk jangka waktu terbatas dan hingga 4,8 miliar setahun. Dikonfirmasi akuntan.',
@@ -683,6 +687,7 @@ export default {
       next: 'Semua benar — tampilkan pajak saya',
     },
     taxes: {
+      notConfigured:'Kalender pendaftaran ini hanya mencakup Indonesia. Aturan untuk negara perusahaan ini belum dikonfigurasi; periksa bersama akuntan dalam profil perusahaan.',
       title: 'Yang harus dilaporkan {co}',
       p: 'Dari profil: {facts}. Tenggat mengikuti aturan umum (PMK 81/2024); akuntan mengonfirmasi.',
       formUnknown: 'bentuk belum diisi',

@@ -649,6 +649,10 @@ export default {
       wait: 'Reading the files…',
     },
     review: {
+      manualTitle:'Check the company details', manualP:'Enter the details yourself. Nothing is read automatically in manual mode; values are saved only after confirmation.',
+      draftUnavailable:'This browser could not keep your draft. Save the details before leaving this page.',
+      countryRequired:'The company country and profile jurisdiction need review. Open the company profile; Indonesian rules will not be substituted.',
+      employeeRequired:'Confirm whether the company has employees.',
       regime: 'Income tax regime',
       reg: { normal: 'General (standard rates)', pph_final_umkm: 'Final 0.5% for small business (PP 55)', unknown: 'Not sure' },
       regimeHint: 'PP 55: 0.5% of monthly revenue, for a limited number of years and up to 4.8 billion a year. The accountant confirms.',
@@ -683,6 +687,7 @@ export default {
       next: 'All correct — show my taxes',
     },
     taxes: {
+      notConfigured:'This setup calendar covers Indonesia only. Tax rules for this company’s country have not been configured; review them with your accountant in the company profile.',
       title: 'What {co} has to file',
       p: 'From the profile: {facts}. Deadlines follow the general rules (PMK 81/2024); the accountant confirms them.',
       formUnknown: 'form not set',

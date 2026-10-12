@@ -18,6 +18,7 @@ import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { unsavedFields } from '../lib/savedFields'
 import { COMPANY_DOCUMENT_TYPES, confirmedCompanyType, confirmCompanyDocument, documentReadingUnavailable } from '../lib/companyDocuments'
+import { REVIEW_FIELDS, readReviewDraft, saveReviewDraft, clearReviewDraft, reviewCountry, reviewBody } from '../lib/setupReview'
 import { companyDraft, saveCompanyDraft, pendingCompanyCreation, submitCompanyCreation, checkCompanyCreation, finishCompanyCreation } from '../../lib/companyCreation'
 import I from '../icons'
 import { Pill, Skeleton, ErrorBox } from '../ui'
@@ -344,7 +345,6 @@ function SetupDocs() {
 }
 
 /* ── R6: check what the AI read ──────────────────────────────────────────── */
-const REVIEW_FIELDS = ['company_legal_name', 'legal_entity_type', 'npwp', 'kpp', 'nib', 'primary_kbli', 'additional_kbli']
 const LEGAL = ['PT Local', 'PT PMA', 'CV', 'Yayasan', 'Individual / Freelancer', 'Other']
 const asText = (v) => (Array.isArray(v) ? v.join(', ') : v == null ? '' : String(v))
 
@@ -354,63 +354,63 @@ function SetupReview() {
   const request = useBusinessRequest()
   const invalidate = useInvalidate()
   const prof = useApi('/accountant/profile')
+  const company = useApi('/business/current')
+  const country = reviewCountry(company.data?.business,prof.data?.profile)
+  const [draft] = useState(()=>readReviewDraft(request))
   const [ai, setAi] = useState({ state: 'loading' })
-  const [vals, setVals] = useState({})
+  const [vals, setVals] = useState(()=>Object.fromEntries(Object.entries(draft.fields).map(([k,value])=>[k,{value,user:true}])))
   const [edit, setEdit] = useState({})
-  const [ans, setAns] = useState({ pkp_status: '', employee_status: '', fy: 'jan', tax_regime: '' })
+  const [ans, setAns] = useState({ pkp_status: '', employee_status: '', fy: 'jan', tax_regime: '',...draft.answers })
+  const [touched,setTouched]=useState(()=>Object.fromEntries(Object.keys(draft.answers).map(k=>[k,true])))
+  const [draftError,setDraftError]=useState(false)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
   const manual = new URLSearchParams(window.location.search).get('manual') === '1'
+  const answer=(k,value)=>{setAns(a=>({...a,[k]:value}));setTouched(a=>({...a,[k]:true}))}
+  useEffect(()=>{
+    try{saveReviewDraft(request,{fields:Object.fromEntries(Object.entries(vals).filter(([,v])=>v.user).map(([k,v])=>[k,v.value])),answers:Object.fromEntries(Object.entries(ans).filter(([k])=>touched[k]))});setDraftError(false)}catch{if(request.isCurrent())setDraftError(true)}
+  },[request,vals,ans,touched])
 
   useEffect(() => {
+    if(prof.loading||company.loading||prof.error||company.error)return
+    if(manual||!country.isID||country.conflict){setAi({state:'manual'});return}
     let off = false
     readProfileFromDocuments(request, {}).then((r) => {
-      if (off) return
+      if (off||!request.isCurrent()) return
       const v = {}
       for (const s of r.suggestions || []) v[s.field] = { value: s.value, sources: s.sources || [], conflict: s.conflict, values: s.values }
-      setVals(v)
+      setVals(existing=>({...existing,...v,...Object.fromEntries(Object.entries(existing).filter(([,x])=>x.user))}))
       // No reading because the model could not be reached is "AI unavailable" (R10), not "no documents".
       const aiDown = !(r.documents || []).length && (r.skipped || []).some((s) => /^ai_/.test(s.reason || ''))
       setAi({ state: (r.documents || []).length ? 'ready' : aiDown ? 'error' : 'none', data: r })
-      if (v.pkp_status?.value) setAns((a) => ({ ...a, pkp_status: v.pkp_status.value }))
-    }).catch((x) => { if (!off) setAi({ state: 'error', status: x?.status }) })
+      if (v.pkp_status?.value) setAns((a) => ({ ...a, pkp_status: a.pkp_status||v.pkp_status.value }))
+    }).catch((x) => { if (!off&&request.isCurrent()) setAi({ state: 'error', status: x?.status }) })
     return () => { off = true }
-  }, [request])
+  }, [request,manual,prof.loading,company.loading,prof.error,company.error,country.isID,country.conflict])
   useEffect(() => {
     const p = prof.data?.profile
     if (!p) return
-    setAns((a) => ({ ...a, pkp_status: a.pkp_status || p.pkp_status || '', employee_status: a.employee_status || p.employee_status || '', tax_regime: a.tax_regime || p.tax_regime || '' }))
+    setAns((a) => ({ ...a, pkp_status: a.pkp_status || p.pkp_status || '', employee_status: a.employee_status || p.employee_status || '', tax_regime: a.tax_regime || p.tax_regime || '',fy:touched.fy?a.fy:p.financial_year_start&&String(p.financial_year_start).slice(5,10)!=='01-01'?'other':a.fy }))
     setVals((v) => { const n = { ...v }; for (const k of REVIEW_FIELDS) if (!n[k] && p[k]) n[k] = { value: p[k], sources: [], saved: true }; return n })
   }, [prof.data])
 
   const setVal = (k, value) => setVals((v) => ({ ...v, [k]: { ...(v[k] || {}), value, user: true } }))
   const save = async () => {
-    if (!ans.pkp_status || !ans.employee_status) { setMsg({ tone: 'warn', text: t('setup.review.answer') }); return }
+    if(busy||!request.isCurrent()||prof.loading||company.loading||prof.error||company.error)return
+    if(!country.jurisdiction||country.conflict){setMsg({tone:'warn',text:t('setup.review.countryRequired')});return}
+    if (country.isID&&!ans.pkp_status || !ans.employee_status) { setMsg({ tone: 'warn', text: t(country.isID?'setup.review.answer':'setup.review.employeeRequired') }); return }
     setBusy(true); setMsg(null)
-    const body = { jurisdiction: 'ID', pkp_status: ans.pkp_status, vat_status: ans.pkp_status === 'pkp_registered' ? 'pkp' : null, employee_status: ans.employee_status }
-    if (ans.tax_regime && ans.tax_regime !== 'unknown') body.tax_regime = ans.tax_regime
-    const yr = new Date().getFullYear()
-    if (ans.fy === 'jan') { body.financial_year_start = `${yr}-01-01`; body.financial_year_end = `${yr}-12-31` }
-    const verification = {}
-    for (const k of REVIEW_FIELDS) {
-      const v = vals[k]
-      if (!v || v.value == null || v.value === '') continue
-      body[k] = k === 'additional_kbli' ? (Array.isArray(v.value) ? v.value : String(v.value).split(/[,;\s]+/).filter(Boolean)) : v.value
-      verification[k] = v.user ? 'user_declared' : v.sources?.[0]?.document_id ? { state: 'extracted', document_id: v.sources[0].document_id } : 'user_declared'
-    }
-    if (Object.keys(verification).length) body.field_verification = verification
-    // KBLI also into business_activity_codes — a column that exists before migration 040, so the
-    // codes are kept even while primary_kbli / additional_kbli wait for it.
-    const kbli = [body.primary_kbli, ...(body.additional_kbli || [])].filter(Boolean)
-    if (kbli.length) body.business_activity_codes = kbli.join(', ')
+    const body=reviewBody({country,vals,answers:ans,touched,profile:prof.data?.profile||{}})
     try {
       const r = await saveTaxProfile(request, body)
+      if(!request.isCurrent())return
       invalidate()
       const notSaved = unsavedFields(body, r?.profile, r)
       if (notSaved.length) { setMsg({ tone: 'warn', text: t('pe.savedPartly', { f: notSaved.map((k) => t(`pe.f.${k}`)).join(', ') }) }); return }
+      clearReviewDraft(request)
       nav('/business/setup/taxes')
-    } catch (x) { setMsg({ tone: 'warn', text: x?.status === 403 ? t('pe.forbidden') : t('setup.err', { msg: x?.data?.error || x?.message }) }) }
-    finally { setBusy(false) }
+    } catch (x) { if(request.isCurrent())setMsg({ tone: 'warn', text: x?.status === 403 ? t('pe.forbidden') : t('setup.err', { msg: x?.data?.error || x?.message }) }) }
+    finally { if(request.isCurrent())setBusy(false) }
   }
   const src = (v) => {
     if (v?.user) return t('setup.review.byYou')
@@ -421,11 +421,15 @@ function SetupReview() {
   }
   const titles = ai.data?.kbli_titles || []
   const titleOf = (code) => titles.find((k) => k.code === code)?.title
+  if(prof.loading||company.loading)return <div className="v2-setup-card"><Skeleton rows={6}/></div>
+  if(prof.error||company.error)return <div className="v2-setup-card"><ErrorBox error={prof.error||company.error} onRetry={()=>{prof.reload();company.reload()}}/></div>
 
   return (
     <div className="v2-setup-card">
-      <h1 className="v2-auth-h1">{t('setup.review.title')}</h1>
-      <p className="v2-auth-p">{t('setup.review.p')}</p>
+      <h1 className="v2-auth-h1">{t(manual||!country.isID?'setup.review.manualTitle':'setup.review.title')}</h1>
+      <p className="v2-auth-p">{t(manual||!country.isID?'setup.review.manualP':'setup.review.p')}</p>
+      {draftError&&<div className="v2-banner v2-tone-warn" role="status">{t('setup.review.draftUnavailable')}</div>}
+      {(!country.jurisdiction||country.conflict)&&<div className="v2-banner v2-tone-warn" role="status"><span>{t('setup.review.countryRequired')}</span><Link to="/business/accountant/tax-profile/edit">{t('screen.companyProfile')}</Link></div>}
       {ai.state === 'loading' && <><Skeleton rows={6} /><span className="v2-muted v2-small">{t('pe.ai.reading')}</span></>}
       {ai.state === 'error' && (
         <div className="v2-banner v2-tone-warn" role="status"><I.warn size={18} /><span className="v2-banner-text"><strong>{t('setup.review.aiDown')}</strong> {t('setup.review.aiDownP')}</span></div>
@@ -435,7 +439,7 @@ function SetupReview() {
       )}
       {ai.state !== 'loading' && (
         <ul className="v2-setup-review" data-setup-review>
-          {REVIEW_FIELDS.map((k) => {
+          {REVIEW_FIELDS.filter(k=>country.isID||['company_legal_name','legal_entity_type'].includes(k)).map((k) => {
             const v = vals[k]
             const editing = edit[k]
             return (
@@ -463,32 +467,32 @@ function SetupReview() {
       )}
       <section className="v2-setup-q">
         <h2 className="v2-h2">{t('setup.review.qTitle')}</h2>
-        <fieldset className="v2-fieldset"><legend className="v2-field-label">{t('setup.review.pkp')}</legend>
+        {country.isID&&<fieldset className="v2-fieldset"><legend className="v2-field-label">{t('setup.review.pkp')}</legend>
           <div className="v2-setup-chips">
-            {[['non_pkp', 'no'], ['pkp_registered', 'yes'], ['unknown', 'dk']].map(([v, l]) => <button key={v} type="button" className="v2-chip" aria-pressed={ans.pkp_status === v} onClick={() => setAns((a) => ({ ...a, pkp_status: v }))}>{t(`setup.review.${l}`)}</button>)}
+            {[['non_pkp', 'no'], ['pkp_registered', 'yes'], ['unknown', 'dk']].map(([v, l]) => <button key={v} type="button" className="v2-chip" aria-pressed={ans.pkp_status === v} onClick={() => answer('pkp_status',v)}>{t(`setup.review.${l}`)}</button>)}
           </div>
           <span className="v2-muted v2-small">{vals.pkp_status?.sources?.length ? t('setup.review.pkpFromDoc') : t('setup.review.pkpHint')}</span>
-        </fieldset>
+        </fieldset>}
         <fieldset className="v2-fieldset"><legend className="v2-field-label">{t('setup.review.emp')}</legend>
           <div className="v2-setup-chips">
-            {[['no_employees', 'no'], ['has_employees', 'yes']].map(([v, l]) => <button key={v} type="button" className="v2-chip" aria-pressed={ans.employee_status === v} onClick={() => setAns((a) => ({ ...a, employee_status: v }))}>{t(`setup.review.${l}`)}</button>)}
+            {[['no_employees', 'no'], ['has_employees', 'yes']].map(([v, l]) => <button key={v} type="button" className="v2-chip" aria-pressed={ans.employee_status === v} onClick={() => answer('employee_status',v)}>{t(`setup.review.${l}`)}</button>)}
           </div>
         </fieldset>
-        <fieldset className="v2-fieldset"><legend className="v2-field-label">{t('setup.review.regime')}</legend>
+        {country.isID&&<fieldset className="v2-fieldset"><legend className="v2-field-label">{t('setup.review.regime')}</legend>
           <div className="v2-setup-chips">
-            {['normal', 'pph_final_umkm', 'unknown'].map((v) => <button key={v} type="button" className="v2-chip" aria-pressed={ans.tax_regime === v} onClick={() => setAns((a) => ({ ...a, tax_regime: v }))}>{t(`setup.review.reg.${v}`)}</button>)}
+            {['normal', 'pph_final_umkm', 'unknown'].map((v) => <button key={v} type="button" className="v2-chip" aria-pressed={ans.tax_regime === v} onClick={() => answer('tax_regime',v)}>{t(`setup.review.reg.${v}`)}</button>)}
           </div>
           <span className="v2-muted v2-small">{t('setup.review.regimeHint')}</span>
-        </fieldset>
+        </fieldset>}
         <label className="v2-field"><span className="v2-field-label">{t('setup.review.fy')}</span>
-          <select className="v2-select" value={ans.fy} onChange={(e) => setAns((a) => ({ ...a, fy: e.target.value }))}>
+          <select className="v2-select" value={ans.fy} onChange={(e) => answer('fy',e.target.value)}>
             <option value="jan">{t('setup.review.fyJan')}</option><option value="other">{t('setup.review.fyOther')}</option>
           </select></label>
       </section>
       {msg && <div className={`v2-banner v2-tone-${msg.tone}`} role="status"><span className="v2-banner-text">{msg.text}</span></div>}
       <div className="v2-setup-actions">
         <Link to="/business/setup/docs" className="v2-btn v2-btn-ghost">{t('setup.review.back')}</Link>
-        <button type="button" className="v2-btn v2-btn-primary" disabled={busy || ai.state === 'loading'} onClick={save}>{busy ? t('pe.saving') : t('setup.review.next')}</button>
+        <button type="button" className="v2-btn v2-btn-primary" disabled={busy || ai.state === 'loading'||!country.jurisdiction||country.conflict} onClick={save}>{busy ? t('pe.saving') : t('setup.review.next')}</button>
       </div>
     </div>
   )
@@ -499,11 +503,16 @@ function SetupTaxes() {
   const t = useT()
   const lang = useLang()
   const { active } = useWorkspace()
-  const cal = useApi('/accountant/tax-calendar')
   const prof = useApi('/accountant/profile')
+  const company = useApi('/business/current')
+  const country=reviewCountry(company.data?.business,prof.data?.profile)
+  const cal = useApi(!prof.loading&&!company.loading&&country.isID&&!country.conflict?'/accountant/tax-calendar':null)
   const pending = (new URLSearchParams(window.location.search).get('pending') || '').split(',').filter(Boolean)
-  if (cal.loading || prof.loading) return <div className="v2-setup-card"><Skeleton rows={8} /></div>
+  if (cal.loading || prof.loading||company.loading) return <div className="v2-setup-card"><Skeleton rows={8} /></div>
+  if(prof.error||company.error)return <div className="v2-setup-card"><ErrorBox error={prof.error||company.error} onRetry={()=>{prof.reload();company.reload()}}/></div>
+  if(!country.isID||country.conflict)return <div className="v2-setup-card"><h1 className="v2-auth-h1">{t('setup.taxes.title',{co:active?.name||''})}</h1><p className="v2-auth-p" role="status">{t('setup.taxes.notConfigured')}</p><div className="v2-setup-actions"><Link to="/business/accountant/tax-profile/edit" className="v2-btn v2-btn-secondary">{t('screen.companyProfile')}</Link><Link to="/business/onboarding" className="v2-btn v2-btn-primary">{t('setup.taxes.open')}</Link></div></div>
   if (cal.error) return <div className="v2-setup-card"><ErrorBox error={cal.error} onRetry={cal.reload} /></div>
+  if(!cal.data)return <div className="v2-setup-card"><Skeleton rows={8}/></div>
   const p = prof.data?.profile || {}
   const events = cal.data?.events || []
   const overdue = events.filter((e) => e.stage === 'overdue')
