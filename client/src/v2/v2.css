@@ -1548,6 +1548,17 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 .v2-setup-files li.is-unreadable .v2-setup-fic, .v2-setup-files li.is-failed .v2-setup-fic { background: var(--danger-soft); color: var(--danger); }
 .v2-setup-files li.is-other .v2-setup-fic { background: var(--warning-soft); color: var(--warning-ink); }
 .v2-setup-ftext { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2-setup-files .v2-setup-ftext { overflow-wrap: anywhere; }
+.v2-setup-files li.is-classified .v2-setup-fic { background: var(--success-soft); color: var(--success); }
+.v2-setup-root .v2-auth-brand { min-width: 0; }
+.v2-setup-root .v2-auth-brand img { flex-shrink: 0; }
+.v2-setup-root .v2-brand-name { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .v2-setup-root .v2-auth-top { flex-wrap: wrap; }
+  .v2-setup-root .v2-auth-top-right { width: 100%; justify-content: space-between; }
+  .v2-setup-files li { grid-template-columns: 28px minmax(0, 1fr); }
+  .v2-setup-files li > .v2-pill { grid-column: 2; justify-self: start; }
+}
 .v2-setup-review li { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: var(--space-3); align-items: start; padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
 .v2-setup-review li:first-child { border-top: 0; }
 @media (max-width: 700px) { .v2-setup-review li { grid-template-columns: 1fr auto; } .v2-setup-rlabel { grid-column: 1 / -1; } }
