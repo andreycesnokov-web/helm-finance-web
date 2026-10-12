@@ -12,6 +12,7 @@ before(async()=>{
  canonical=(await import('../../server/lib/financialIntent.mjs')).canonicalFinancialIntent;
  await sql.query('INSERT INTO users(id) VALUES($1),($2),($3)',[U,A,R]);
  await sql.query("INSERT INTO businesses(id,name,owner_user_id,type) VALUES($1,'Recovery A',$4,'business'),($2,'Recovery B',$5,'business'),($3,'Recovery Personal',$4,'personal')",[B,C,P,U,A]);
+  await sql.query("INSERT INTO business_members(business_id,user_id,role,status) VALUES($1,$4,'owner','active'),($2,$5,'owner','active'),($3,$4,'owner','active')",[B,C,P,U,A]);
  await sql.query("INSERT INTO business_members(business_id,user_id,role,status) VALUES($1,$2,'admin','active'),($1,$3,'admin','active')",[B,A,R]);
  await sql.query("INSERT INTO wallets(id,business_id,user_id,name,currency,scope) VALUES($1,$3,$4,'Native source','IDR','business'),($2,$3,$4,'Native target','IDR','business')",[W,V,B,U]);
  await sql.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date) VALUES($1,$2,'income',1000,1000,'IDR',$3,'business','2026-10-01'),($1,$2,'income',1000,1000,'IDR',$4,'business','2026-10-01')",[B,U,W,V]);
