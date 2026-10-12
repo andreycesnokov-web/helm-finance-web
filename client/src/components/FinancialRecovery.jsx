@@ -53,7 +53,7 @@ export default function FinancialRecovery() {
     }catch(e){if(current())setState(s=>({...s,busy:false,error:e.message}))}
   }
   if(!scope)return null
-  return <aside data-financial-recovery style={{position:'fixed',right:12,bottom:12,zIndex:1300,maxWidth:480,fontFamily:'inherit'}}>
+  return <aside data-financial-recovery style={{position:'fixed',right:12,bottom:12,zIndex:100010,maxWidth:480,fontFamily:'inherit'}}>
     <button type="button" onClick={()=>{setOpen(true);refresh()}} style={{padding:'9px 14px',border:'1px solid #ccd3df',borderRadius:10,background:'white',color:'#14223b'}}>{t.button}{visible&&state.pending.length?' · '+state.pending.length:''}</button>
     {open&&<section role="dialog" aria-modal="false" aria-label={t.title} data-recovery-dialog style={{background:'white',color:'#14223b',border:'1px solid #ccd3df',borderRadius:12,padding:16,maxHeight:'75vh',overflowY:'auto',boxShadow:'0 8px 36px #0002'}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:12}}><strong>{t.title}</strong><button type="button" onClick={()=>setOpen(false)}>{t.closed}</button></div>

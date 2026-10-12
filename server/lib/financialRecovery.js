@@ -71,10 +71,15 @@ async function replay(supabase,req,res,biz,operation,key,canonical) {
   res.json({...row.result,is_replay:true,result_is_historical:true,recovery:receipt});return true;
 }
 function install(app,{auth,requireBusiness,supabase}) {
+  const privateRead=(req,res,next)=>{
+    res.set('Cache-Control','private, no-store');
+    res.set('Pragma','no-cache');
+    res.vary('Authorization');res.vary('x-business-id');next();
+  };
   const error=(res,e)=>String(e?.message||'').startsWith('business_write_forbidden:')
     ?res.status(403).json({error:'financial_recovery_forbidden',automatic_retry:false})
     :res.status(503).json({error:'financial_recovery_unavailable',outcome:'unknown',automatic_retry:false});
-  app.get('/api/financial-operations/recent',auth,async(req,res)=>{
+  app.get('/api/financial-operations/recent',privateRead,auth,async(req,res)=>{
     try {
       const biz=await requireBusiness(req,res);if(!biz)return;
       const requested=req.query.operation;
@@ -103,7 +108,7 @@ function install(app,{auth,requireBusiness,supabase}) {
         has_more:data.has_more,next_cursor:next,window_days:7,actor_only:true,automatic_retry:false});
     }catch(e){error(res,e);}
   });
-  app.get('/api/financial-operations/:operation/:key',auth,async(req,res)=>{
+  app.get('/api/financial-operations/:operation/:key',privateRead,auth,async(req,res)=>{
     try {
       const biz=await requireBusiness(req,res);if(!biz)return;
       const {operation,key}=req.params;
