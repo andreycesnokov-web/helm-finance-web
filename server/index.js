@@ -2679,51 +2679,23 @@ app.get('/api/accountant/profile', auth, async (req, res) => {
     const { data, error } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
     if (error) throw error;
     const columns = await profileColumns(supabase, TAX_PROFILE_EXTENDED);
-    res.json({ profile: data?.[0] || null, extended_fields: columns.unsupported.length === 0,
+    res.set({ 'Cache-Control': 'private, no-store', Vary: 'Authorization' });
+    res.json({ profile: data?.[0] || null, completeness: profileCompleteness(data?.[0] || null), extended_fields: columns.unsupported.length === 0,
       supported_extended_fields: columns.supported, unsupported_fields: columns.unsupported,
       can_edit: canApproveFinancialRecord(biz.role) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // PUT /api/accountant/profile — owner/admin/cfo edits the tax profile
-const TAX_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_residency','tax_regime','tax_identifier','npwp','nib','financial_year_start','financial_year_end','vat_status','pkp_status','employee_status','payroll_tax_status','withholding_tax_status','industry','business_activity_codes','accounting_method','reporting_currency','filing_frequency'];
-// Columns added by migration 040 (company name, KPP, KBLI, NIB date, employees, BPJS, per-field
-// verification). Until 040 is applied they are NOT saved, and the response says which ones.
+// Extended fields use the additive atomic profile migration, not historical040.
 const TAX_PROFILE_EXTENDED = ['foreign_owned','company_legal_name','brand_name','kpp','pkp_effective_date','nib_issue_date','primary_kbli','additional_kbli','actual_business_activities','employee_count','local_employee_count','foreign_employee_count','payroll_frequency','bpjs_registered','transaction_types','field_verification'];
-const PROFILE_VERIFY_STATES = ['missing', 'user_declared', 'document_uploaded', 'extracted', 'accountant_verified', 'conflict'];
 const { profileColumns } = require('./lib/profileColumns');
 async function profileExtendedReady() {
   return (await profileColumns(supabase, TAX_PROFILE_EXTENDED)).unsupported.length === 0;
 }
-// One 040 field from a request body → the stored value (types per migration 040).
-function extendedProfileValue(f, v, role, before) {
-  if (v === '' || v == null) return null;
-  if (['employee_count', 'local_employee_count', 'foreign_employee_count'].includes(f)) { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 ? n : null; }
-  if (f === 'bpjs_registered') return v === true || v === 'true' ? true : v === false || v === 'false' ? false : null;
-  if (['pkp_effective_date', 'nib_issue_date'].includes(f)) return /^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? String(v) : null;
-  if (['additional_kbli', 'transaction_types'].includes(f)) {
-    const arr = Array.isArray(v) ? v : String(v).split(/[,;\s]+/);
-    return arr.map((x) => String(x).trim()).filter(Boolean).slice(0, 40);
-  }
-  if (f === 'field_verification') {
-    // Per-field source. "accountant_verified" only from an accountant; the rest are sanitised.
-    const out = { ...((before && before.field_verification) || {}) };
-    for (const [k, st] of Object.entries(v || {})) {
-      if (![...TAX_PROFILE_FIELDS, ...TAX_PROFILE_EXTENDED].includes(k)) continue;
-      const state = typeof st === 'string' ? st : st?.state;
-      if (!PROFILE_VERIFY_STATES.includes(state)) continue;
-      if (state === 'accountant_verified' && role !== 'accountant') continue;
-      out[k] = typeof st === 'object' && st?.document_id ? { state, document_id: String(st.document_id).slice(0, 64) } : state;
-    }
-    return out;
-  }
-  return String(v).slice(0, 500);
-}
 // Minimum fields needed before any obligation can be generated.
 const { applicableProfileFields } = require('./lib/pkpStatus');
 const REQUIRED_PROFILE_FIELDS = ['country','jurisdiction','legal_entity_type','tax_regime','financial_year_start','financial_year_end','vat_status'];
-// Changing these re-opens verification and is always audited.
-const CRITICAL_PROFILE_FIELDS = ['country','legal_entity_type','tax_regime','tax_identifier','npwp','pkp_status','vat_status','financial_year_start','financial_year_end'];
 
 // Completeness is measured against the fields that APPLY to this profile. A company that
 // states it is NOT PKP is not missing `vat_status` — the question does not apply to it — so
@@ -2773,46 +2745,7 @@ function evaluateApplicableTaxRules({ taxProfile, activeRules, asOfDate = new Da
   return { applicable_rules: applicable, excluded_rules: excluded, missing_profile_fields: [...missing], warnings };
 }
 
-app.put('/api/accountant/profile', auth, async (req, res) => {
-  try {
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can edit the tax profile' });
-    const { data: beforeRows, error: beforeError } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
-    if (beforeError) throw beforeError;
-    const before = beforeRows?.[0] || null;
-
-    const updates = { business_id: biz.business.id, updated_at: new Date().toISOString() };
-    for (const f of TAX_PROFILE_FIELDS) if (req.body[f] !== undefined) updates[f] = req.body[f] || null;
-    if (!before) updates.created_by_user_id = req.user.userId;
-    // 040 fields: saved only when the columns exist; otherwise reported back as not saved.
-    const extendedAsked = TAX_PROFILE_EXTENDED.filter((f) => req.body[f] !== undefined);
-    const columns = extendedAsked.length ? await profileColumns(supabase, TAX_PROFILE_EXTENDED) : { supported: [], unsupported: [] };
-    for (const f of extendedAsked) if (columns.supported.includes(f)) updates[f] = extendedProfileValue(f, req.body[f], biz.role, before);
-    const notSaved = extendedAsked.filter((f) => !columns.supported.includes(f));
-
-    // Recompute status from completeness. A critical change on a verified profile
-    // re-opens review (verification must be redone).
-    const merged = { ...(before || {}), ...updates };
-    const { missing } = profileCompleteness(merged);
-    const criticalChanged = CRITICAL_PROFILE_FIELDS.some(f => f in updates && (before?.[f] || null) !== (updates[f] || null));
-    if (missing.length) updates.profile_status = 'incomplete';
-    else if (before?.profile_status === 'verified' && criticalChanged) { updates.profile_status = 'needs_review'; updates.verified_at = null; updates.verified_by_user_id = null; }
-    else if (!before?.profile_status || before.profile_status === 'incomplete') updates.profile_status = 'active';
-
-    const { data, error } = await supabase.from('tax_profiles')
-      .upsert(updates, { onConflict: 'business_id' }).select().single();
-    if (error) return res.status(500).json({ error: error.message });
-
-    if (!before || criticalChanged) {
-      const beforeCrit = {}, afterCrit = {};
-      for (const f of CRITICAL_PROFILE_FIELDS) { beforeCrit[f] = before?.[f] ?? null; afterCrit[f] = data[f] ?? null; }
-      await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role, entityType: 'tax_profile', entityId: data.id, action: before ? 'critical_fields_changed' : 'created', before: before ? beforeCrit : null, after: afterCrit });
-    }
-    res.json({ profile: data, completeness: profileCompleteness(data), warnings: profileWarnings(data),
-      not_saved: notSaved, unsupported_fields: notSaved, migration: notSaved.length ? '040_not_applied' : null });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+require('./lib/businessProfile').registerBusinessProfileOperations(app, { auth, supabase, requireBusiness, canApprove: canApproveFinancialRecord, completeness: profileCompleteness, warnings: profileWarnings });
 
 // POST /api/accountant/profile/from-documents — what the company's own documents say.
 //
@@ -2865,26 +2798,6 @@ app.post('/api/accountant/profile/from-documents', auth, async (req, res) => {
 });
 
 // POST /api/accountant/profile/verify — owner/admin/cfo confirms the profile.
-app.post('/api/accountant/profile/verify', auth, async (req, res) => {
-  try {
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canApproveFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
-    const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
-    const p = rows?.[0];
-    if (!p) return res.status(404).json({ error: 'No tax profile' });
-    const { missing } = profileCompleteness(p);
-    if (missing.length) return res.status(422).json({ error: 'Profile incomplete', missing });
-    const now = new Date().toISOString();
-    const { data, error } = await supabase.from('tax_profiles')
-      .update({ profile_status: 'verified', verified_by_user_id: req.user.userId, verified_at: now, updated_at: now })
-      .eq('business_id', biz.business.id).select().single();
-    if (error) return res.status(500).json({ error: error.message });
-    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role, entityType: 'tax_profile', entityId: data.id, action: 'verified' });
-    res.json({ profile: data });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // GET /api/accountant/applicability — deterministic applicable-rule evaluation.
 // ── GET /api/audit/events — business-scoped audit trail (P3, premium module) ──
 // Read-only view over audit_events (023). Strictly scoped to the ACTIVE business;
@@ -2899,8 +2812,9 @@ app.get('/api/audit/events', auth, async (req, res) => {
 
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Number(req.query.offset) || 0;
+    const profileHistory = req.query.entity_type === 'tax_profile';
     let q = supabase.from('audit_events')
-      .select('id, created_at, actor_user_id, actor_role, channel, entity_type, entity_id, action, request_id', { count: 'exact' })
+      .select('id, created_at, actor_user_id, actor_role, channel, entity_type, entity_id, action, request_id' + (profileHistory ? ', after_json' : ''), { count: 'exact' })
       .eq('business_id', biz.business.id);
     if (req.query.entity_type) q = q.eq('entity_type', String(req.query.entity_type));
     if (req.query.action) q = q.eq('action', String(req.query.action));
@@ -2915,7 +2829,7 @@ app.get('/api/audit/events', auth, async (req, res) => {
       names = Object.fromEntries((users || []).map(u => [u.id, u.first_name || u.username || String(u.id)]));
     }
     res.json({
-      events: (data || []).map(e => ({ ...e, actor_name: e.actor_user_id != null ? (names[e.actor_user_id] || String(e.actor_user_id)) : 'System' })),
+      events: (data || []).map(({ after_json, ...e }) => ({ ...e, actor_name: e.actor_user_id != null ? (names[e.actor_user_id] || String(e.actor_user_id)) : 'System', ...(profileHistory ? { profile_version: after_json?.profile?.profile_version ?? null, verified_profile_version: after_json?.profile?.verified_profile_version ?? null } : {}) })),
       total: count || 0,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -2991,10 +2905,15 @@ app.get('/api/accountant/applicability', auth, async (req, res) => {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
-    const { data: rows } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    const { data: rows, error: profileError } = await supabase.from('tax_profiles').select('*').eq('business_id', biz.business.id).limit(1);
+    if (profileError) throw profileError;
     const profile = rows?.[0] || null;
-    const jur = profile?.jurisdiction || 'ID';
-    const { data: rules } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+    const countryJurisdiction = { Indonesia: 'ID', Singapore: 'SG', Malaysia: 'MY', Thailand: 'TH' }[biz.business.country];
+    const jur = countryJurisdiction || profile?.jurisdiction;
+    if (!jur || countryJurisdiction && profile?.jurisdiction && profile.jurisdiction !== countryJurisdiction)
+      return res.json({ available: false, reason: 'profile_country_review_required', applicable_rules: [], excluded_rules: [], missing_profile_fields: ['country','jurisdiction'], completeness: profileCompleteness(profile) });
+    const { data: rules, error: rulesError } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('jurisdiction', jur).eq('status', 'active');
+    if (rulesError) throw rulesError;
     // Only rules with a verified source actually drive obligations.
     const effective = (rules || []).filter(r => effectiveRuleActive(r, r.official_sources));
     const result = evaluateApplicableTaxRules({ taxProfile: profile, activeRules: effective });

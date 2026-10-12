@@ -76,20 +76,20 @@ test('GET accurately reports partial schema beyond primary_kbli/field_verificati
   assert.equal(r.data.extended_fields, false); assert.deepEqual(r.data.unsupported_fields, ['employee_count']);
   assert.ok(r.data.supported_extended_fields.includes('field_verification'));
 });
-test('PUT A preserves unedited fields, saves supported ones, reports precise omissions; GET confirms', async () => {
+test('legacy PUT without reviewed version/key is refused with no direct table fallback', async () => {
   const r = await call('PUT', '/accountant/profile', A, { npwp: '000999', jurisdiction: 'ID', primary_kbli: '00001', employee_count: '2' });
-  assert.equal(r.status, 200); assert.deepEqual(r.data.not_saved, ['employee_count']);
+  assert.equal(r.status, 400);
   assert.equal(profiles[B].npwp, '000222'); assert.equal(profiles[A].accounting_method, 'unchanged');
-  const read = await call('GET', '/accountant/profile'); assert.equal(read.data.profile.npwp, '000999'); assert.equal(read.data.profile.primary_kbli, '00001');
-  assert.ok(!Object.hasOwn(writes.find((w) => w.table === 'tax_profiles').body, 'employee_count'));
+  const read = await call('GET', '/accountant/profile'); assert.equal(read.data.profile.npwp, '000111'); assert.equal(read.data.profile.primary_kbli, '00111');
+  assert.equal(writes.length,0);
 });
-test('absent profile creates a row with explicit jurisdiction; B remains unchanged', async () => {
-  delete profiles[A]; const r = await call('PUT', '/accountant/profile', A, { jurisdiction: 'ID', country: 'Indonesia' });
-  assert.equal(r.status, 200); assert.equal(r.data.profile.jurisdiction, 'ID'); assert.equal(profiles[B].npwp, '000222');
+test('unavailable atomic RPC never creates an absent profile via a direct write', async () => {
+  delete profiles[A]; const r = await call('PUT', '/accountant/profile', A, { jurisdiction: 'ID', country: 'Indonesia',expected_version:'0',request_key:A });
+  assert.equal(r.status, 503); assert.equal(r.data.outcome,'unknown'); assert.equal(profiles[A],undefined);assert.equal(profiles[B].npwp, '000222');assert.equal(writes.length,0);
 });
-test('initial profile read failure returns 500; failed before-read prevents PUT', async () => {
+test('profile read failure remains visible and a malformed legacy save cannot mutate', async () => {
   failRead = true; assert.equal((await call('GET', '/accountant/profile')).status, 500);
-  assert.equal((await call('PUT', '/accountant/profile', A, { npwp: 'bad' })).status, 500); assert.equal(writes.length, 0);
+  assert.equal((await call('PUT', '/accountant/profile', A, { npwp: 'bad' })).status, 400); assert.equal(writes.length, 0);
 });
 test('auditor is read-only; inaccessible explicit company cannot fall back to A', async () => {
   assert.equal((await call('GET', '/accountant/profile', A, null, 502)).data.can_edit, false);

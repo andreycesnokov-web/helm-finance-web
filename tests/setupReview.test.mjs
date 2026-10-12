@@ -14,6 +14,10 @@ test('stale workspace or changed signed-in actor cannot write another draft',()=
  assert.throws(()=>saveReviewDraft({...A,isCurrent:()=>false},{fields:{}}),/workspace_changed/)
  memory.set('hf_token',token(-10));assert.throws(()=>saveReviewDraft(A,{fields:{}}),/workspace_changed/);memory.delete('hf_token')
 })
+test('review reload retains the original version and bounded baseline, not a newer server version',()=>{
+ saveReviewDraft(A,{fields:{brand_name:'ignored',company_legal_name:'draft'},answers:{fy:'other'},expected_version:'7',before:{company_legal_name:'old',financial_year_start:'2025-07-01',token:'secret',profile_version:99}})
+ const d=readReviewDraft(A);assert.equal(d.expected_version,'7');assert.equal(d.before.financial_year_start,'2025-07-01');assert.equal(d.before.company_legal_name,'old');assert(!Object.hasOwn(d.before,'token'));assert(!Object.hasOwn(d.before,'profile_version'));assert(!Object.hasOwn(d.fields,'brand_name'));clearReviewDraft(A)
+})
 test('Singapore and unspecified countries never inherit Indonesian identifiers, PKP or tax regime',()=>{
  const country=reviewCountry({country:'Singapore'},null);assert.equal(country.jurisdiction,'SG');assert.equal(country.isID,false)
  const body=reviewBody({country,vals:{npwp:{value:'TEST',user:true},company_legal_name:{value:'Fictional',user:true}},answers:{employee_status:'no_employees',pkp_status:'non_pkp',tax_regime:'pph_final_umkm',fy:'jan'},year:2026})

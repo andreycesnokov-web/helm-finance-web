@@ -130,8 +130,9 @@ export function actionError(e) {
 export const saveTaxProfile = (token, body) =>
   apiFetch('/accountant/profile', token, { method: 'PUT', body })
 
-export const verifyTaxProfile = (token) =>
-  apiFetch('/accountant/profile/verify', token, { method: 'POST', body: {} })
+export const verifyTaxProfile = (token, body) =>
+  apiFetch('/accountant/profile/verify', token, { method: 'POST', body })
+export const readProfileRequest = (token, key) => apiFetch(`/accountant/profile/requests/${encodeURIComponent(key)}`, token)
 
 export const readProfileFromDocuments = (token, { force = false } = {}) =>
   apiFetch('/accountant/profile/from-documents', token, { method: 'POST', body: { force } })

@@ -27,9 +27,11 @@ import { V2DataProvider, useApi, useInvalidate } from '../data'
 import { LangSwitch } from '../auth/AuthApp'
 import { TaxList, ruleTitle } from '../pages/Accountant'
 import { optLabel } from '../pages/CompanyProfileEdit'
+import {performProfileOperation,recoverProfileOperation,profileCurrent,unconfirmedProfileFields} from '../lib/profileOperation'
+import {financialActor} from '../../lib/financialRecovery'
 import { shortDate } from '../lib/format'
 import {
-  saveTaxProfile, uploadCompanyDocument, identifyDocument, confirmDocumentKind, readDocumentMetadata, readProfileFromDocuments,
+  saveTaxProfile, readProfileRequest, uploadCompanyDocument, identifyDocument, confirmDocumentKind, readDocumentMetadata, readProfileFromDocuments,
 } from '../lib/actions'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
@@ -348,6 +350,10 @@ const LEGAL = ['PT Local', 'PT PMA', 'CV', 'Yayasan', 'Individual / Freelancer',
 const asText = (v) => (Array.isArray(v) ? v.join(', ') : v == null ? '' : String(v))
 
 function SetupReview() {
+  const request=useBusinessRequest()
+  return <SetupReviewScoped key={`${financialActor(request.token)}/${request.businessId}`}/>
+}
+function SetupReviewScoped() {
   const t = useT()
   const nav = useNavigate()
   const request = useBusinessRequest()
@@ -356,6 +362,8 @@ function SetupReview() {
   const company = useApi('/business/current')
   const country = reviewCountry(company.data?.business,prof.data?.profile)
   const [draft] = useState(()=>readReviewDraft(request))
+  const [baseline,setBaseline]=useState(()=>draft.expected_version!==undefined?{expected_version:draft.expected_version,before:draft.before}:Object.keys(draft.fields).length||Object.keys(draft.answers).length?{expected_version:null,before:null}:null)
+  const savingRef=useRef(false)
   const [ai, setAi] = useState({ state: 'loading' })
   const [vals, setVals] = useState(()=>Object.fromEntries(Object.entries(draft.fields).map(([k,value])=>[k,{value,user:true}])))
   const [edit, setEdit] = useState({})
@@ -366,9 +374,11 @@ function SetupReview() {
   const [msg, setMsg] = useState(null)
   const manual = new URLSearchParams(window.location.search).get('manual') === '1'
   const answer=(k,value)=>{setAns(a=>({...a,[k]:value}));setTouched(a=>({...a,[k]:true}))}
+  useEffect(()=>{if(!baseline&&!prof.loading&&!company.loading&&!prof.error&&!company.error&&company.data?.business?.id===request.businessId&&profileCurrent(request))setBaseline({expected_version:String(prof.data?.profile?.profile_version??0),before:prof.data?.profile||null})},[baseline,prof.data,prof.loading,prof.error,company.data,company.loading,company.error,request])
   useEffect(()=>{
-    try{saveReviewDraft(request,{fields:Object.fromEntries(Object.entries(vals).filter(([,v])=>v.user).map(([k,v])=>[k,v.value])),answers:Object.fromEntries(Object.entries(ans).filter(([k])=>touched[k]))});setDraftError(false)}catch{if(request.isCurrent())setDraftError(true)}
-  },[request,vals,ans,touched])
+    if(!baseline||baseline.expected_version===null)return
+    try{saveReviewDraft(request,{...baseline,fields:Object.fromEntries(Object.entries(vals).filter(([,v])=>v.user).map(([k,v])=>[k,v.value])),answers:Object.fromEntries(Object.entries(ans).filter(([k])=>touched[k]))});setDraftError(false)}catch{if(profileCurrent(request))setDraftError(true)}
+  },[request,vals,ans,touched,baseline])
 
   useEffect(() => {
     if(prof.loading||company.loading||prof.error||company.error)return
@@ -387,29 +397,34 @@ function SetupReview() {
     return () => { off = true }
   }, [request,manual,prof.loading,company.loading,prof.error,company.error,country.isID,country.conflict])
   useEffect(() => {
-    const p = prof.data?.profile
+    const p = baseline?.before
     if (!p) return
     setAns((a) => ({ ...a, pkp_status: a.pkp_status || p.pkp_status || '', employee_status: a.employee_status || p.employee_status || '', tax_regime: a.tax_regime || p.tax_regime || '',fy:touched.fy?a.fy:p.financial_year_start&&String(p.financial_year_start).slice(5,10)!=='01-01'?'other':a.fy }))
     setVals((v) => { const n = { ...v }; for (const k of REVIEW_FIELDS) if (!n[k] && p[k]) n[k] = { value: p[k], sources: [], saved: true }; return n })
-  }, [prof.data])
+  }, [baseline])
 
   const setVal = (k, value) => setVals((v) => ({ ...v, [k]: { ...(v[k] || {}), value, user: true } }))
   const save = async () => {
-    if(busy||!request.isCurrent()||prof.loading||company.loading||prof.error||company.error)return
+    if(savingRef.current||draftError||!profileCurrent(request)||prof.loading||company.loading||prof.error||company.error)return
+    if(!baseline||baseline.expected_version===null){setMsg({tone:'warn',text:t('pe.historical')});return}
     if(!country.jurisdiction||country.conflict){setMsg({tone:'warn',text:t('setup.review.countryRequired')});return}
     if (country.isID&&!ans.pkp_status || !ans.employee_status) { setMsg({ tone: 'warn', text: t(country.isID?'setup.review.answer':'setup.review.employeeRequired') }); return }
-    setBusy(true); setMsg(null)
-    const body=reviewBody({country,vals,answers:ans,touched,profile:prof.data?.profile||{}})
+    savingRef.current=true;setBusy(true); setMsg(null)
     try {
-      const r = await saveTaxProfile(request, body)
-      if(!request.isCurrent())return
+      const body=reviewBody({country,vals,answers:ans,touched,profile:baseline.before||{}})
+      const prior=await recoverProfileOperation(request,'save',{read:readProfileRequest})
+      if(!profileCurrent(request))return
+      if(prior?.historical){setMsg({tone:'warn',text:t('pe.historical')});return}
+      const r=prior?.ok&&unconfirmedProfileFields(body,prior.profile,prior).length===0?prior:await performProfileOperation(request,'save',body,baseline.expected_version,{send:saveTaxProfile,read:readProfileRequest})
+      if(!profileCurrent(request))return
+      if(r.historical){setMsg({tone:'warn',text:t('pe.historical')});return}
       invalidate()
-      const notSaved = unsavedFields(body, r?.profile, r)
+      const notSaved = unconfirmedProfileFields(body, r?.profile, r)
       if (notSaved.length) { setMsg({ tone: 'warn', text: t('pe.savedPartly', { f: notSaved.map((k) => t(`pe.f.${k}`)).join(', ') }) }); return }
       clearReviewDraft(request)
       nav('/business/setup/taxes')
-    } catch (x) { if(request.isCurrent())setMsg({ tone: 'warn', text: x?.status === 403 ? t('pe.forbidden') : t('setup.err', { msg: x?.data?.error || x?.message }) }) }
-    finally { if(request.isCurrent())setBusy(false) }
+    } catch (x) { if(profileCurrent(request))setMsg({ tone: 'warn', text: x?.status === 403 ? t('pe.forbidden') : t('setup.err', { msg: x?.data?.error || x?.message }) }) }
+    finally {if(profileCurrent(request)){setBusy(false);savingRef.current=false}}
   }
   const src = (v) => {
     if (v?.user) return t('setup.review.byYou')
@@ -428,6 +443,7 @@ function SetupReview() {
       <h1 className="v2-auth-h1">{t(manual||!country.isID?'setup.review.manualTitle':'setup.review.title')}</h1>
       <p className="v2-auth-p">{t(manual||!country.isID?'setup.review.manualP':'setup.review.p')}</p>
       {draftError&&<div className="v2-banner v2-tone-warn" role="status">{t('setup.review.draftUnavailable')}</div>}
+      {baseline?.expected_version===null&&<div className="v2-banner v2-tone-warn" role="alert">{t('pe.historical')} <button type="button" className="v2-btn-link" onClick={()=>{clearReviewDraft(request);window.location.reload()}}>{t('pe.loadLatest')}</button></div>}
       {(!country.jurisdiction||country.conflict)&&<div className="v2-banner v2-tone-warn" role="status"><span>{t('setup.review.countryRequired')}</span><Link to="/business/accountant/tax-profile/edit">{t('screen.companyProfile')}</Link></div>}
       {ai.state === 'loading' && <><Skeleton rows={6} /><span className="v2-muted v2-small">{t('pe.ai.reading')}</span></>}
       {ai.state === 'error' && (

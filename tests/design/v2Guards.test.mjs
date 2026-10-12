@@ -187,7 +187,9 @@ t('v2 makes no mutating request outside the reviewed allow-list', () => {
 })
 
 t('every allowed write exists on the server (batch 8 routes are the approved ones only)', () => {
-  const server = read(path.join(ROOT, 'server/index.js')) + read(path.join(ROOT, 'server/lib/companyCreation.js')) + read(path.join(ROOT, 'server/lib/teamOperations.js'))
+  const entry=read(path.join(ROOT,'server/index.js'))
+  assert.ok(/registerBusinessProfileOperations\(app,/.test(entry),'profile module must be registered on the real app')
+  const server = entry + read(path.join(ROOT, 'server/lib/companyCreation.js')) + read(path.join(ROOT, 'server/lib/teamOperations.js')) + read(path.join(ROOT,'server/lib/businessProfile.js'))
   for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,
