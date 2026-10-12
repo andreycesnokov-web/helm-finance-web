@@ -78,11 +78,14 @@ async function locked(name, fn) {
 }
 async function recoveryRead(path, context) {
   context.assertCurrent()
-  const r = await fetch('/api/financial-operations/' + path, { headers: {
-    Authorization: 'Bearer ' + context.token, 'x-business-id': context.business
-  } })
+  let r
+  try {
+    r = await fetch('/api/financial-operations/' + path, { headers: {
+      Authorization: 'Bearer ' + context.token, 'x-business-id': context.business
+    } })
+  } catch (e) { context.assertCurrent(); throw e }
   let data
-  try { data = await r.json() } catch { throw failure('financial_recovery_unavailable', 'The operation result could not be checked.', 503) }
+  try { data = await r.json() } catch { context.assertCurrent(); throw failure('financial_recovery_unavailable', 'The operation result could not be checked.', 503) }
   context.assertCurrent()
   if (!r.ok) {
     const e = failure(data.error || 'financial_recovery_unavailable', data.message || 'The operation result could not be checked.', r.status)
