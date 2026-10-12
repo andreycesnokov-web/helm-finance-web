@@ -526,6 +526,7 @@ export default {
       tg: 'Telegram bisa dihubungkan nanti di Pengaturan.',
     },
     r9: {
+      openJoined:'Buka perusahaan', unconfirmed:'Hasil belum dikonfirmasi. Simpan kode ini dan periksa kembali; keanggotaan saat ini akan diverifikasi sebelum mencoba lagi.',
       back: '← Ke halaman masuk',
       backAcc: '← Ke akun saya',
       title: 'Bergabung dengan undangan',

@@ -28,6 +28,7 @@ import { unsavedFields } from '../lib/savedFields'
 
 const TABS = ['me', 'company', 'books', 'connections', 'team']
 const ROLES = ['admin', 'ceo', 'cfo', 'accountant', 'manager', 'employee', 'auditor']
+const ROLE_RANK={owner:6,ceo:5,admin:4,cfo:3,accountant:3,manager:2,employee:1,auditor:1}
 const PROVIDERS = ['xendit', 'midtrans', 'doku', 'hitpay', 'duitku', 'ipaymu']
 const initial = (s) => (String(s || '?').trim()[0] || '?').toUpperCase()
 const errMsg = (t, x) => (x?.status === 403 ? t('set.err.role') : x?.data?.message || x?.data?.error || x?.message || t('set.err.generic'))
@@ -397,35 +398,39 @@ function TeamTab() {
   const [flash, setFlash] = useFlash()
   const run = async (fn, ok) => {
     setBusy(true)
-    try { const r = await fn(); invalidate(); if (ok) setFlash({ tone: 'good', text: ok }); return r }
-    catch (x) { setFlash({ tone: 'warn', text: t('set.notSaved', { msg: errMsg(t, x) }) }); return null } finally { setBusy(false) }
+    try { const r = await fn();if(!request.isCurrent())return null;if(!r||typeof r!=='object')throw Error(t('refs.unconfirmed'));invalidate(); if (ok) setFlash({ tone: 'good', text: ok }); return r }
+    catch (x) { if(request.isCurrent())setFlash({ tone: 'warn', text: t('set.notSaved', { msg: errMsg(t, x) }) }); return null } finally { if(request.isCurrent())setBusy(false) }
   }
   if (team.loading) return <Card><Skeleton rows={4} /></Card>
   if (team.error) return <Card title={t('set.tab.team')}><p className="v2-muted">{t('set.teamHidden')}</p></Card>
   const members = team.data?.members || []
   const invites = team.data?.invites || []
   const myRole = team.data?.my_role
-  const canManage = ['owner', 'admin', 'ceo'].includes(myRole)
+  const canInvite = ['owner', 'admin', 'ceo'].includes(myRole),canManage=['owner','admin'].includes(myRole)
+  const inviteRoles=ROLES.filter(r=>ROLE_RANK[r]<ROLE_RANK[myRole])
+  const changeRoles=ROLES.filter(r=>myRole==='owner'||ROLE_RANK[r]<ROLE_RANK[myRole])
+  const editable=m=>canManage&&m.role!=='owner'&&String(m.user_id)!==String(user?.id)&&(myRole==='owner'||ROLE_RANK[m.role]<ROLE_RANK[myRole])
   const sendInvite = async () => {
     const r = await run(() => inviteMember(request, { role: inv.role, email: inv.email.trim() || undefined, expires_days: 7 }), null)
-    if (r) setDlg({ kind: 'link', link: `${window.location.origin}${r.invite_url}`, code: r.invite?.code, email: inv.email.trim() })
+    if (r&&r.invite?.id&&r.invite?.role===inv.role&&r.invite_url===`/invite/${r.invite.code}`) setDlg({ kind: 'link', link: `${window.location.origin}${r.invite_url}`, code: r.invite.code, email: inv.email.trim() })
+    else if(r)setFlash({tone:'warn',text:t('refs.unconfirmed')})
   }
   return (
-    <Card title={t('set.tab.team')} aside={canManage ? <button type="button" className="v2-btn v2-btn-primary" onClick={() => setDlg({ kind: 'invite' })}>{t('set.team.invite')}</button> : null}>
+    <Card title={t('set.tab.team')} aside={canInvite ? <button type="button" className="v2-btn v2-btn-primary" onClick={() => setDlg({ kind: 'invite' })}>{t('set.team.invite')}</button> : null}>
       {flash}
       <ul className="v2-team">
         {members.map((m) => (
           <li key={m.id} data-member={m.role}>
             <span className="v2-ava">{initial(m.name)}</span>
             <span className="v2-team-name">{m.name}{String(m.user_id) === String(user?.id) && <span className="v2-muted v2-small"> · {t('set.team.you')}</span>}</span>
-            {canManage && m.role !== 'owner' && String(m.user_id) !== String(user?.id) ? (
+            {editable(m) ? (
               <select className="v2-select v2-set-role" value={m.role} aria-label={t('set.team.role')} disabled={busy}
                 onChange={(e) => run(() => updateMember(request, m.id, { role: e.target.value }), t('set.saved'))}>
-                {ROLES.map((r) => <option key={r} value={r}>{t(`set.role.${r}`)}</option>)}
+                {changeRoles.map((r) => <option key={r} value={r}>{t(`set.role.${r}`)}</option>)}
               </select>
             ) : <Pill tone="neutral">{t(`set.role.${m.role}`)}</Pill>}
             <span className="v2-muted v2-small v2-team-what">{t(`set.roleWhat.${m.role}`)}</span>
-            {canManage && m.role !== 'owner' && String(m.user_id) !== String(user?.id) && <button type="button" className="v2-btn-link v2-small" onClick={() => setDlg({ kind: 'remove', member: m })}>{t('set.team.remove')}</button>}
+            {editable(m) && <button type="button" className="v2-btn-link v2-small" onClick={() => setDlg({ kind: 'remove', member: m })}>{t('set.team.remove')}</button>}
           </li>
         ))}
         {invites.map((i) => (
@@ -445,7 +450,7 @@ function TeamTab() {
           <label className="v2-field"><span className="v2-field-label">Email</span><input className="v2-input" type="email" value={inv.email} placeholder="name@company.com" onChange={(e) => setInv({ ...inv, email: e.target.value })} /></label>
           <label className="v2-field"><span className="v2-field-label">{t('set.team.role')}</span>
             <select className="v2-select" value={inv.role} onChange={(e) => setInv({ ...inv, role: e.target.value })}>
-              {ROLES.map((r) => <option key={r} value={r}>{t(`set.role.${r}`)} — {t(`set.roleWhat.${r}`)}</option>)}
+              {inviteRoles.map((r) => <option key={r} value={r}>{t(`set.role.${r}`)} — {t(`set.roleWhat.${r}`)}</option>)}
             </select></label>
           <p className="v2-muted v2-small">{t('set.team.inviteNote')}</p>
         </Modal>
@@ -462,7 +467,7 @@ function TeamTab() {
       {dlg?.kind === 'remove' && (
         <Modal title={t('set.team.removeTitle', { name: dlg.member.name })} onClose={() => setDlg(null)}
           footer={<><button type="button" className="v2-btn v2-btn-secondary" onClick={() => setDlg(null)}>{t('set.cancel')}</button>
-            <button type="button" className="v2-btn v2-btn-danger" disabled={busy} onClick={async () => { await run(() => removeMember(request, dlg.member.id), t('set.team.removed')); setDlg(null) }}>{t('set.team.removeOk')}</button></>}>
+            <button type="button" className="v2-btn v2-btn-danger" disabled={busy} onClick={async () => { const r=await run(() => removeMember(request, dlg.member.id), t('set.team.removed'));if(r?.ok&&request.isCurrent())setDlg(null) }}>{t('set.team.removeOk')}</button></>}>
           <p className="v2-sec">{t('set.team.removeP')}</p>
         </Modal>
       )}

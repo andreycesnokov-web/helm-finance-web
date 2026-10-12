@@ -172,6 +172,7 @@ export const acceptInvite = (token, code) =>
 
 
 export const lookupInvite = (code) => apiFetch(`/invite/${encodeURIComponent(code)}`, null)
+export const readInviteMembership = (token,code) => apiFetch(`/invite/${encodeURIComponent(code)}/membership`,token)
 export const readMyProfile = (token) => apiFetch('/me/profile', token)
 export const readWorkspaces = (token) => apiFetch('/workspaces', token)
 

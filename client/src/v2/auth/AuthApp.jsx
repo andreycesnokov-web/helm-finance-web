@@ -11,11 +11,13 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useTranslation } from '../../hooks/useTranslation'
 import { consumePostLoginRedirect, setActiveBusinessId } from '../../lib/api'
+import { financialActor } from '../../lib/financialRecovery'
+import { confirmedInvitation } from '../lib/invitation'
 import I from '../icons'
 import { useT } from '../i18n'
 import {
   startEmailSignIn, verifyEmailSignIn, updateMyProfile, acceptInvite,
-  lookupInvite, readMyProfile, readWorkspaces,
+  lookupInvite, readInviteMembership, readMyProfile, readWorkspaces,
 } from '../lib/actions'
 import '../v2.css'
 
@@ -291,23 +293,39 @@ export function Join() {
   const [inv, setInv] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const lookupRevision=useRef(0),currentToken=useRef(token),mounted=useRef(true)
+  currentToken.current=token
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;lookupRevision.current++}},[])
+  const actorRequest=()=>{const actor=financialActor(token);return{token,isCurrent:()=>{try{return mounted.current&&!!actor&&financialActor(currentToken.current)===actor&&financialActor(localStorage.getItem('hf_token'))===actor}catch{return false}}}}
   const check = async (e, c = code) => {
     e?.preventDefault?.()
     const v = String(c || '').trim()
     if (!v) { setErr(t('auth.r9.empty')); return }
+    const revision=++lookupRevision.current,identity=actorRequest(),isCurrent=()=>mounted.current&&lookupRevision.current===revision&&(!token||identity.isCurrent())
     setBusy(true); setErr(''); setInv(null)
-    try { setInv(await lookupInvite(v)) } catch (x) { setErr(x?.status === 429 ? t('auth.err.rate') : t('auth.r9.bad')) } finally { setBusy(false) }
+    try {
+      const preview=await lookupInvite(v);if(!isCurrent())return
+      const membership=token?await readInviteMembership(token,v):null;if(!isCurrent())return
+      setInv(membership?.state==='joined'?{...preview,role:membership.role,already_member:true}:preview)
+    } catch (x) {
+      if(!isCurrent())return
+      if(x?.status===410&&token){try{const membership=await readInviteMembership(token,v);if(!isCurrent())return;if(membership?.state==='joined'){setInv({...membership,code:v.toUpperCase(),already_member:true});return}}catch{if(!isCurrent())return}}
+      setErr(x?.status === 429 ? t('auth.err.rate') : t('auth.r9.bad'))
+    } finally { if(isCurrent())setBusy(false) }
   }
-  useEffect(() => { if (params.code) check(null, params.code) }, [params.code]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { lookupRevision.current++;setInv(null);setBusy(false);if (params.code){setCode(params.code);check(null, params.code)} }, [params.code,token]) // eslint-disable-line react-hooks/exhaustive-deps
   const accept = async () => {
     if (!token) { try { localStorage.setItem(INVITE_KEY, `/invite/${inv.code}`) } catch { /* private mode */ } nav('/login'); return }
+    const identity=actorRequest();if(busy||!identity.isCurrent())return
     setBusy(true); setErr('')
     try {
-      const r = await acceptInvite(token, inv.code)
+      const r=inv.already_member?await readInviteMembership(token,inv.code):await confirmedInvitation(identity,inv.code,{accept:acceptInvite,read:readInviteMembership})
+      if(!identity.isCurrent())return
+      if(r?.state!=='joined'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r.business_id||''))throw Error('invitation_not_confirmed')
       setActiveBusinessId(r.business_id)
       try { localStorage.setItem('activeWorkspaceId', r.business_id); localStorage.setItem('last_active_workspace_id', r.business_id) } catch { /* private mode */ }
       window.location.assign('/business/pulse')
-    } catch (x) { setErr(x?.status === 410 ? t('auth.r9.bad') : t('auth.err.generic')) } finally { setBusy(false) }
+    } catch (x) { if(identity.isCurrent())setErr(x?.status === 410 ? t('auth.r9.bad') : t('auth.r9.unconfirmed')) } finally { if(identity.isCurrent())setBusy(false) }
   }
   const roleKey = inv?.role ? `set.role.${inv.role}` : ''
   return (
@@ -317,7 +335,7 @@ export function Join() {
         <p className="v2-auth-p">{t('auth.r9.p')}</p>
         <form onSubmit={check} noValidate>
           <label className="v2-field"><span className="v2-field-label">{t('auth.r9.code')}</span>
-            <input className="v2-input" value={code} autoFocus={!params.code} aria-invalid={!!err} onChange={(e) => { setCode(e.target.value); setErr('') }} /></label>
+            <input className="v2-input" value={code} autoFocus={!params.code} aria-invalid={!!err} onChange={(e) => { lookupRevision.current++;setCode(e.target.value);setInv(null);setBusy(false);setErr('') }} /></label>
           {err && <p className="v2-inline-err" role="alert">{err}</p>}
           {!inv && <button type="submit" className="v2-btn v2-btn-primary v2-btn-block" disabled={busy}>{t('auth.r9.check')}</button>}
         </form>
@@ -329,7 +347,7 @@ export function Join() {
             <span>{t('auth.r9.role', { role: t(roleKey) !== roleKey ? t(roleKey) : inv.role })}</span>
             {t(`auth.r9.can.${inv.role}`) !== `auth.r9.can.${inv.role}` && <span className="v2-muted v2-small">{t(`auth.r9.can.${inv.role}`)}</span>}
             <div className="v2-row-gap">
-              <button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={accept}>{token ? t('auth.r9.accept') : t('auth.r9.signInToAccept')}</button>
+              <button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={accept}>{token ? t(inv.already_member?'auth.r9.openJoined':'auth.r9.accept') : t('auth.r9.signInToAccept')}</button>
               <button type="button" className="v2-btn v2-btn-ghost" onClick={() => { setInv(null); setCode('') }}>{t('auth.r9.decline')}</button>
             </div>
           </div>

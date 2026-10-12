@@ -7586,7 +7586,7 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function generateInviteCode() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase(); // e.g. "A3K9PZ"
+  return crypto.randomBytes(8).toString('hex').toUpperCase();
 }
 
 // ── GET /api/team ─────────────────────────────────────────────────────────────
@@ -7834,67 +7834,8 @@ app.delete('/api/team/invites/:code', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── PATCH /api/team/members/:memberId ────────────────────────────────────────
-// Update role or status.
-app.patch('/api/team/members/:memberId', auth, async (req, res) => {
-  const userId = req.user.userId;
-  const { role, status } = req.body;
-  try {
-    const biz = await requireBusiness(req, res); if (!biz) return;
-    if (!['owner', 'admin'].includes(biz.role))
-      return res.status(403).json({ error: 'Only owner/admin can change roles' });
-
-    const update = {};
-    if (role)   update.role   = role;
-    if (status) update.status = status;
-
-    // The target member MUST belong to the active business — never mutate a member of another
-    // workspace via its id. Stale-grant cleanup is NOT done here: it is enforced in the database
-    // by a trigger on business_members (migration 046), so it happens in the SAME transaction as
-    // this update — atomic, race-free, and covering every route that changes a role or status,
-    // not just this one. If the trigger's audit write fails, this update rolls back and throws.
-    const { data, error } = await supabase.from('business_members')
-      .update(update)
-      .eq('id', req.params.memberId)
-      .eq('business_id', biz.business.id)
-      .select();
-    if (error) throw error;
-    if (!data?.length) return res.status(404).json({ error: 'Member not found in this business' });
-    res.json(data[0]);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── DELETE /api/team/members/:memberId ───────────────────────────────────────
-// Remove a member (soft: status = removed).
-app.delete('/api/team/members/:memberId', auth, async (req, res) => {
-  const userId = req.user.userId;
-  try {
-    const biz = await requireBusiness(req, res); if (!biz) return;
-    if (!['owner', 'admin'].includes(biz.role))
-      return res.status(403).json({ error: 'Only owner/admin can remove members' });
-
-    // Target must belong to the ACTIVE business — never remove a member of another
-    // workspace via its id.
-    const { data: targetRows } = await supabase.from('business_members')
-      .select('user_id, role').eq('id', req.params.memberId).eq('business_id', biz.business.id).limit(1);
-    const target = targetRows?.[0];
-    if (!target) return res.status(404).json({ error: 'Member not found in this business' });
-    if (target.user_id === userId)
-      return res.status(400).json({ error: 'Cannot remove yourself' });
-    if (target.role === 'owner')
-      return res.status(403).json({ error: 'Cannot remove business owner' });
-
-    // Removal ends eligibility. Grant cleanup is enforced by the database trigger on
-    // business_members (migration 046) in the same transaction as this status change — so a
-    // re-invite later starts from all-off, with no separate cleanup step to race or forget.
-    await supabase.from('business_members')
-      .update({ status: 'removed' })
-      .eq('id', req.params.memberId)
-      .eq('business_id', biz.business.id);
-
-    res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// Atomic, current-role-checked Business membership operations. No legacy fallback.
+require('./lib/teamOperations').registerTeamOperations(app,{auth,supabase,requireBusiness});
 
 // ── GET /api/invite/:code  (PUBLIC — no auth) ─────────────────────────────────
 // Returns invite info so the join page can show company name + role.
@@ -7926,60 +7867,6 @@ app.get('/api/invite/:code', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── POST /api/invite/:code/accept  (auth required) ───────────────────────────
-// Accept invite → create/update business_members row.
-// Called after user authenticates with Telegram on the invite page.
-app.post('/api/invite/:code/accept', auth, async (req, res) => {
-  const userId = req.user.userId;
-  try {
-    const code = req.params.code.toUpperCase();
-    const { data: invite, error: iErr } = await supabase.from('business_invites')
-      .select('*').eq('code', code).single();
-    if (iErr || !invite) return res.status(404).json({ error: 'Invite not found' });
-    if (invite.status !== 'active') return res.status(410).json({ error: 'Invite is no longer active' });
-    if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'Invite has expired' });
-    if (invite.uses_count >= invite.max_uses) return res.status(410).json({ error: 'Invite limit reached' });
-
-    // Check if user already a member
-    const { data: existing } = await supabase.from('business_members')
-      .select('id, role, status').eq('user_id', userId).eq('business_id', invite.business_id).single();
-
-    if (existing) {
-      if (existing.status === 'active')
-        return res.json({ ok: true, already_member: true, role: existing.role, message: 'Already a member of this business' });
-      // Reactivate if removed
-      await supabase.from('business_members')
-        .update({ status: 'active', role: invite.role, invite_code: code })
-        .eq('id', existing.id);
-    } else {
-      // Get user display name
-      const { data: u } = await supabase.from('users').select('first_name, username').eq('id', userId).single();
-      const displayName = u?.first_name || u?.username || null;
-
-      await supabase.from('business_members').insert({
-        business_id:  invite.business_id,
-        user_id:      userId,
-        role:         invite.role,
-        status:       'active',
-        display_name: displayName,
-        joined_at:    new Date().toISOString(),
-        invited_by:   invite.invited_by,
-        invite_code:  code,
-      });
-    }
-
-    // Increment uses_count; mark exhausted if max reached
-    const newCount = invite.uses_count + 1;
-    await supabase.from('business_invites').update({
-      uses_count: newCount,
-      status: newCount >= invite.max_uses ? 'exhausted' : 'active',
-    }).eq('id', invite.id);
-
-    res.json({ ok: true, role: invite.role, business_id: invite.business_id });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // TEAM ONBOARDING & TELEGRAM ACTIVATION (training mode)
 // ─────────────────────────────────────────────────────────────────────────────
 // Training records (debts.is_training = true) NEVER affect cash, Pulse totals

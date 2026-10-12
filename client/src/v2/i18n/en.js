@@ -526,6 +526,7 @@ export default {
       tg: 'Telegram can be linked later in Settings.',
     },
     r9: {
+      openJoined:'Open the company', unconfirmed:'The result is not confirmed. Keep this code and check it again; your current membership will be verified before retrying.',
       back: '← To sign in',
       backAcc: '← To my account',
       title: 'Join a company by invitation',
