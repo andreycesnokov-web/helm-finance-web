@@ -386,13 +386,21 @@ app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
 
 // Personal Account shell — read/update the signed-in user's profile (identity only).
 app.get('/api/me/profile', emailAuthGate, auth, async (req, res) => {
+  res.set({ 'Cache-Control': 'private, no-store', 'Vary': 'Authorization' });
   try {
     const { data, error } = await supabase.from('user_profiles').select('*').eq('user_id', req.user.userId).limit(1);
     if (error) throw error;
-    res.json({ profile: data?.[0] || null });
+    // Read-only identity metadata, scoped to the authenticated BIGINT actor.
+    // Never accept email or an actor id from the submitted profile fields.
+    const { data: identities, error: identityError } = await supabase.from('user_email_identities')
+      .select('email, email_verified_at').eq('user_id', req.user.userId).not('email_verified_at', 'is', null)
+      .order('email_verified_at', { ascending: true }).limit(1);
+    if (identityError) throw identityError;
+    res.json({ profile: data?.[0] || null, identity: { email: identities?.[0]?.email || null, email_verified: !!identities?.[0]?.email_verified_at } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.patch('/api/me/profile', emailAuthGate, auth, async (req, res) => {
+  res.set({ 'Cache-Control': 'private, no-store', 'Vary': 'Authorization' });
   try {
     const allowed = ['display_name', 'locale', 'timezone', 'avatar_url'];
     const patch = {}; for (const k of allowed) if (k in (req.body || {})) patch[k] = req.body[k];

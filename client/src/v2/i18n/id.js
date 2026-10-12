@@ -504,6 +504,11 @@ export default {
       again: 'Minta tautan baru',
     },
     r3: {
+      loading: "Memuat akun Anda…",
+      loadError: "Akun Anda tidak dapat dimuat. Profil atau daftar perusahaan tidak diganti dengan data kosong. Coba lagi.",
+      retry: "Periksa lagi",
+      draftError: "Perangkat ini tidak dapat menyimpan draf. Penyimpanan diblokir sampai draf dapat disimpan.",
+      unconfirmed: "Hasil penyimpanan belum dikonfirmasi. Draf Anda disimpan. Periksa profil tersimpan sebelum mencoba lagi.",
       logout: 'Keluar',
       hello: 'Halo!',
       p: 'Anda masuk sebagai {email}. Untuk mulai, buat perusahaan atau bergabung dengan undangan.',

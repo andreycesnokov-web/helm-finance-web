@@ -504,6 +504,11 @@ export default {
       again: 'Get a new link',
     },
     r3: {
+      loading: "Loading your account…",
+      loadError: "Your account could not be loaded. No empty profile or company list has been substituted. Try again.",
+      retry: "Check again",
+      draftError: "This device could not keep your draft. Saving is blocked until it can be preserved.",
+      unconfirmed: "The save result is not confirmed. Your draft is kept. Check the saved profile before trying again.",
       logout: 'Sign out',
       hello: 'Hello!',
       p: 'You are signed in as {email}. To start, create a company or join one by invitation.',

@@ -13,6 +13,7 @@ import { useTranslation } from '../../hooks/useTranslation'
 import { consumePostLoginRedirect, setActiveBusinessId } from '../../lib/api'
 import { financialActor } from '../../lib/financialRecovery'
 import { confirmedInvitation } from '../lib/invitation'
+import { accountBody, ownProfile, profileMatches, readAccountDraft, writeAccountDraft, clearAccountDraft, confirmedAccountProfile } from '../lib/accountProfile'
 import I from '../icons'
 import { useT } from '../i18n'
 import {
@@ -214,30 +215,55 @@ export function SignInCallback() {
 export function Account() {
   const t = useT()
   const nav = useNavigate()
-  const { token, user, logout } = useAuth()
+  const { token, logout } = useAuth()
   const [prof, setProf] = useState(null)
   const [ws, setWs] = useState(null)
   const [name, setName] = useState('')
   const [tz, setTz] = useState(detectTimezone())
   const [msg, setMsg] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [profileState,setProfileState]=useState('loading'),[workspaceState,setWorkspaceState]=useState('loading')
+  const [reload,setReload]=useState(0),[pending,setPending]=useState(false)
+  const mounted=useRef(true),currentToken=useRef(token),saving=useRef(false)
+  currentToken.current=token
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[])
+  const actorRequest=()=>{const actor=financialActor(token);return{token,isCurrent:()=>{try{return mounted.current&&!!actor&&financialActor(currentToken.current)===actor&&financialActor(localStorage.getItem('hf_token'))===actor}catch{return false}}}}
   useEffect(() => {
     if (!token) { nav('/login', { replace: true }); return }
-    readMyProfile(token).then((r) => { const p = r?.profile || {}; setProf(p); setName(p.display_name || user?.firstName || ''); if (p.timezone) setTz(p.timezone) }).catch(() => setProf({}))
-    readWorkspaces(token).then(setWs).catch(() => setWs({ business: [] }))
-  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
+    let live=true;const request=actorRequest(),valid=()=>live&&request.isCurrent()
+    setProf(null);setWs(null);setProfileState('loading');setWorkspaceState('loading');setMsg(null);setBusy(false);saving.current=false
+    readMyProfile(token).then(r=>{
+      if(!valid())return;const p=ownProfile(request,r),draft=readAccountDraft(request)
+      setProf({...p,email:r.identity?.email_verified?r.identity.email:null});setProfileState('ready')
+      if(draft?.pending&&profileMatches(p,accountBody(draft.display_name,draft.timezone))){clearAccountDraft(request);setPending(false);setName(p.display_name||'');setTz(p.timezone||detectTimezone());setMsg({tone:'good',text:t('auth.r3.saved')})}
+      else {setName(draft?.display_name??p?.display_name??'');setTz(draft?.timezone??p?.timezone??detectTimezone());setPending(!!draft?.pending);if(draft?.pending)setMsg({tone:'warn',text:t('auth.r3.unconfirmed')})}
+    }).catch(()=>{if(valid())setProfileState('error')})
+    readWorkspaces(token).then(r=>{if(!valid())return;if(!Array.isArray(r?.business))throw Error('account_workspaces_invalid');setWs(r);setWorkspaceState('ready')}).catch(()=>{if(valid())setWorkspaceState('error')})
+    return()=>{live=false}
+  }, [token,reload]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!token) return null
   const companies = ws?.business || []
   const open = (b) => { setActiveBusinessId(b.id); try { localStorage.setItem('activeWorkspaceId', b.id); localStorage.setItem('last_active_workspace_id', b.id) } catch { /* private mode */ } window.location.assign('/business/pulse') }
-  const save = async (e) => {
-    e.preventDefault(); setBusy(true); setMsg(null)
-    try { await updateMyProfile(token, { display_name: name, timezone: tz }); setMsg({ tone: 'good', text: t('auth.r3.saved') }) }
-    catch { setMsg({ tone: 'warn', text: t('auth.err.generic') }) } finally { setBusy(false) }
+  const edit=(field,value)=>{const request=actorRequest();if(!request.isCurrent()||profileState!=='ready'||busy)return
+    const draft={display_name:field==='name'?value:name,timezone:field==='tz'?value:tz,pending:false}
+    try{writeAccountDraft(request,draft);setMsg(null)}catch{setMsg({tone:'warn',text:t('auth.r3.draftError')})}
+    setPending(false);if(field==='name')setName(value);else setTz(value)
+  }
+  const save=async e=>{
+    e.preventDefault();const request=actorRequest();if(saving.current||pending||profileState!=='ready'||!request.isCurrent())return
+    const body=accountBody(name,tz)
+    try{writeAccountDraft(request,{...body,pending:true})}catch{setMsg({tone:'warn',text:t('auth.r3.draftError')});return}
+    saving.current=true;setBusy(true);setPending(true);setMsg(null)
+    try{const p=await confirmedAccountProfile(request,body,{write:updateMyProfile,read:readMyProfile});if(!request.isCurrent())return;clearAccountDraft(request);setProf(old=>({...p,email:old?.email}));setName(p.display_name);setTz(p.timezone);setPending(false);setMsg({tone:'good',text:t('auth.r3.saved')})}
+    catch(x){if(request.isCurrent()){if(x?.status>=400&&x?.status<500){try{writeAccountDraft(request,{...body,pending:false});setPending(false);setMsg({tone:'warn',text:t('auth.err.generic')})}catch{setMsg({tone:'warn',text:t('auth.r3.draftError')})}}else setMsg({tone:'warn',text:t('auth.r3.unconfirmed')})}}
+    finally{if(request.isCurrent()){saving.current=false;setBusy(false)}}
   }
   return (
     <AuthFrame wide right={<button type="button" className="v2-btn v2-btn-ghost" onClick={() => { logout(); nav('/login') }}>{t('auth.r3.logout')}</button>}>
       <h1 className="v2-auth-h1 v2-auth-h1-page">{t('auth.r3.hello')}</h1>
-      <p className="v2-auth-p">{companies.length ? t('auth.r3.pickP', { email: prof?.email || '' }) : t('auth.r3.p', { email: prof?.email || '' })}</p>
+      {profileState==='ready'&&workspaceState==='ready'&&<p className="v2-auth-p">{companies.length ? t('auth.r3.pickP', { email: prof?.email || '' }) : t('auth.r3.p', { email: prof?.email || '' })}</p>}
+      {(profileState==='loading'||workspaceState==='loading')&&<p role="status">{t('auth.r3.loading')}</p>}
+      {(profileState==='error'||workspaceState==='error')&&<div className="v2-banner v2-tone-warn" role="alert"><span className="v2-banner-text">{t('auth.r3.loadError')}</span><button type="button" className="v2-btn v2-btn-secondary" onClick={()=>setReload(n=>n+1)}>{t('auth.r3.retry')}</button></div>}
       {companies.length > 0 && (
         <section className="v2-card v2-auth-list" aria-label={t('auth.r3.yours')}>
           <h2 className="v2-h2">{t('auth.r3.yours')}</h2>
@@ -251,7 +277,7 @@ export function Account() {
           </ul>
         </section>
       )}
-      <div className="v2-auth-choices">
+      {workspaceState==='ready'&&<div className="v2-auth-choices">
         <Link to="/business/new" className="v2-auth-choice">
           <span className="v2-auth-choice-ic" aria-hidden="true"><I.plus size={22} /></span>
           <strong>{companies.length ? t('auth.r3.createAnother') : t('auth.r3.create')}</strong>
@@ -264,18 +290,19 @@ export function Account() {
           <span className="v2-muted">{t('auth.r3.inviteP')}</span>
           <span className="v2-btn v2-btn-secondary">{t('auth.r3.enterCode')}</span>
         </Link>
-      </div>
+      </div>}
       <form className="v2-card v2-auth-profile" onSubmit={save}>
         <h2 className="v2-h2">{t('auth.r3.profile')}</h2>
         <div className="v2-field-row">
           <label className="v2-field"><span className="v2-field-label">{t('auth.r3.name')}</span>
-            <input className="v2-input" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} /></label>
+            <input className="v2-input" value={profileState==='ready'?name:''} disabled={profileState!=='ready'||busy} maxLength={80} onChange={(e) => edit('name',e.target.value)} /></label>
           <label className="v2-field"><span className="v2-field-label">{t('auth.r3.tz')}</span>
-            <input className="v2-input" value={tz} onChange={(e) => setTz(e.target.value)} />
+            <input className="v2-input" value={profileState==='ready'?tz:''} disabled={profileState!=='ready'||busy} maxLength={64} onChange={(e) => edit('tz',e.target.value)} />
             <span className="v2-muted v2-small">{t('auth.r3.tzAuto', { tz: detectTimezone() })}</span></label>
         </div>
         {msg && <div className={`v2-banner v2-tone-${msg.tone}`} role="status"><span className="v2-banner-text">{msg.text}</span></div>}
-        <div className="v2-row-gap"><button type="submit" className="v2-btn v2-btn-primary" disabled={busy}>{t('auth.r3.save')}</button>
+        {pending&&!busy&&<button type="button" className="v2-btn v2-btn-secondary" onClick={()=>setReload(n=>n+1)}>{t('auth.r3.retry')}</button>}
+        <div className="v2-row-gap"><button type="submit" className="v2-btn v2-btn-primary" disabled={busy||pending||profileState!=='ready'}>{t('auth.r3.save')}</button>
           <span className="v2-muted v2-small">{t('auth.r3.tg')}</span></div>
       </form>
     </AuthFrame>
