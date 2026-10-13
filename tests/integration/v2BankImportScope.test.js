@@ -93,7 +93,7 @@ test.after(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 
 // Defer one real pipeline boundary. Everything goes through the app's API client;
 // the signed storage URL is synthetic and no real documents or cash are written.
-function importServer({ hold, duplicate = false, failFirst = false, dropConfirm = false, partial = false, canConfirm = true, knownOpening = false } = {}) {
+function importServer({ hold, duplicate = false, failFirst = false, dropConfirm = false, partial = false, canConfirm = true, knownOpening = false, unlinkedConfirmed = false } = {}) {
   const normalFetch = global.fetch;
   const calls = [];
   const gate = { release: null };
@@ -102,7 +102,7 @@ function importServer({ hold, duplicate = false, failFirst = false, dropConfirm 
   const hash=()=>((partial&&confirms===1)?'b':'a').repeat(64);
   const review = () => ({
     batch: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', status: imported ? 'imported' : partial&&confirms===1 ? 'partially_imported' : 'review_required', currency: 'IDR', opening_balance: 100, closing_balance: partial?110:90, statement_start:'2026-05-01', statement_end: '2026-05-31' },
-    rows: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', row_index: 0, tx_date: '2026-05-10', description: 'Bank admin fee', amount: 10, direction: 'out', review_status: partial&&confirms>0?'imported':'needs_review',linked_transaction_id:partial&&confirms>0?700:null },...(partial?[{id:row2,row_index:1,tx_date:'2026-05-11',description:'STAGE receipt',amount:20,direction:'in',review_status:imported?'imported':'needs_review',linked_transaction_id:imported?701:null}]:[])],
+    rows: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', row_index: 0, tx_date: '2026-05-10', description: 'Bank admin fee', amount: 10, direction: 'out', review_status: unlinkedConfirmed?'confirmed':imported||partial&&confirms>0?'imported':'needs_review',linked_transaction_id:!unlinkedConfirmed&&(imported||partial&&confirms>0)?700:null },...(partial?[{id:row2,row_index:1,tx_date:'2026-05-11',description:'STAGE receipt',amount:20,direction:'in',review_status:imported?'imported':'needs_review',linked_transaction_id:imported?701:null}]:[])],
     categories: [{ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', name: 'Bank fee and admin', group_type: 'outflow' }],
     reviewed:{review_hash:hash(),can_confirm:canConfirm,can_correct_opening:knownOpening,opening_state:knownOpening?'known':'unknown',historical_opening:knownOpening?'80':null,current_balance:'60'},
   });
@@ -279,6 +279,10 @@ test('same-company confirm saves rule and displays completed import', async () =
   assert.equal(server.calls.filter(x => x.stage === 'rule').length, 1);
   assert.equal(server.calls.filter(x => x.stage === 'confirm').length, 1);
   assert.ok(server.calls.every(x => x.id === A));
+});
+
+test('bookmarked done shows pending review and zero bookings for unlinked confirmed hints',async()=>{
+ const server=importServer({unlinkedConfirmed:true});await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&done=1');await until(()=>has('data-imp-unsettled'),'pending review warning must open');assert.equal(root.root.findByProps({'data-imp-new':true}).children.join(''),'0');assert(!has('data-imp-done'));assert.equal(server.calls.filter(x=>x.stage==='confirm').length,0);
 });
 
 test('partial selection stays in review and confirms only remaining row with a fresh identity',async()=>{

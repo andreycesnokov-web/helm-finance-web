@@ -408,17 +408,19 @@ function DoneStep({ batchId }) {
   if (rev.error) return <div className="v2-page"><ErrorBox error={rev.error} onRetry={rev.reload} /></div>
   const { batch, rows = [], reconciliation } = rev.data
   const n = (f) => rows.filter(f).length
+  const unsettled = rows.some((r) => !r.linked_transaction_id && r.review_status !== 'excluded')
   const wallet = (w.data?.wallets || []).find((x) => String(x.id) === String(batch.wallet_id))
   return (
     <div className="v2-page">
       <PageHead title={t('imp.title')} />
-      <Steps cur="done" />
+      <Steps cur={unsettled ? 'rows' : 'done'} />
       <ImportReceiptHistory batchId={batchId}/>
       <Card>
-        <h2 className="v2-h2" data-imp-done>{t('imp.doneTitle', { p: batch.statement_end ? shortDate(batch.statement_end, lang) : '' })}</h2>
+        <h2 className="v2-h2" data-imp-done={unsettled ? undefined : ''}>{unsettled ? t('imp.rowsTitle', { n: rows.length }) : t('imp.doneTitle', { p: batch.statement_end ? shortDate(batch.statement_end, lang) : '' })}</h2>
+        {unsettled && <div className="v2-banner v2-tone-warn" role="status" data-imp-unsettled><span>{t('imp.safe.partial')}</span> <Btn to={`/business/bank-import?batch=${batchId}`}>{t('imp.continue')}</Btn></div>}
         <ul className="v2-set-cats">
-          <li><span>{t('imp.d.new')}</span><strong className="v2-num" data-imp-new>{n((r) => ['imported', 'confirmed'].includes(r.review_status) && r.suggested_match_type !== 'existing_tx')}</strong></li>
-          <li><span>{t('imp.d.linked')}</span><strong className="v2-num">{n((r) => r.review_status === 'matched_existing' || (r.review_status === 'imported' && r.suggested_match_type === 'existing_tx'))}</strong></li>
+          <li><span>{t('imp.d.new')}</span><strong className="v2-num" data-imp-new>{n((r) => r.linked_transaction_id && ['imported', 'confirmed'].includes(r.review_status) && r.suggested_match_type !== 'existing_tx')}</strong></li>
+          <li><span>{t('imp.d.linked')}</span><strong className="v2-num">{n((r) => r.linked_transaction_id && (r.review_status === 'matched_existing' || (r.review_status === 'imported' && r.suggested_match_type === 'existing_tx')))}</strong></li>
           <li><span>{t('imp.d.dup')}</span><strong className="v2-num">{n((r) => r.match_status === 'duplicate')}</strong></li>
           <li><span>{t('imp.d.excluded')}</span><strong className="v2-num">{n((r) => r.review_status === 'excluded')}</strong></li>
         </ul>
