@@ -61,7 +61,7 @@ export default function CompanyProfile() {
   const docState = (key) => items.find((i) => (i.type || i.doc_type) === key)?.status || null
   const rules = appl.data?.applicable_rules || []
   const excluded = appl.data?.excluded_rules || []
-  const employees = payroll.data?.employees?.length ?? p.employee_count ?? null
+  const employees = p.employee_count ?? payroll.data?.employees?.length ?? null
 
   return (
     <div className="v2-page">
@@ -118,7 +118,7 @@ export default function CompanyProfile() {
 
           <Card title={t('prof.people')}>
             <dl className="v2-dl">
-              <Row t={t} label={t('prof.employees')} value={employees != null ? String(employees) : null} source={payroll.data ? t('prof.fromPayroll') : null} />
+              <Row t={t} label={t('prof.employees')} value={employees != null ? String(employees) : null} source={p.employee_count!=null?src('employee_count'):payroll.data ? t('prof.fromPayroll') : null} />
               {['local_employee_count','foreign_employee_count','payroll_frequency','transaction_types'].map(k=><Row key={k} t={t} label={t(`pe.f.${k}`)} value={show(p[k])} source={src(k)}/>)}
               {isID&&<Row t={t} label="BPJS" value={p.bpjs_registered === true ? t('prof.yes') : p.bpjs_registered === false ? t('prof.no') : null} />}
               <Row t={t} label={t('prof.directors')} value={null} />
