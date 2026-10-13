@@ -10,12 +10,16 @@ import { txSource, txDate } from '../lib/obligations'
 import Modal from './Modal'
 import { updateTransaction } from '../lib/actions'
 import { catLabel } from '../lib/categoryLabel'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
+import { canRecordCompanyMoney } from '../lib/financePermissions'
 
 const DIR_IN = ['income']
 export default function TransactionDialog({ tx, wallets = [], categories = [], onClose, onSaved }) {
   const t = useT()
   const lang = useLang()
   const request = useBusinessRequest()
+  const { active } = useWorkspace()
+  const canWrite = canRecordCompanyMoney(active?.role)
   const src = txSource(tx)
   const locked = src === 'bank' || src === 'opening'
   const isIn = DIR_IN.includes(tx.type)
@@ -29,6 +33,7 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], o
   const sameCcy = wallets.filter((w) => String(w.currency || 'IDR') === cur)
   const cats = categories.filter((c) => c.group_type === (isIn ? 'inflow' : 'outflow'))
   const save = async () => {
+    if (!canWrite || !request.isCurrent() || busy) return
     setBusy(true); setErr('')
     const body = {}
     if (f.description !== (tx.description || '')) body.description = f.description || null
@@ -51,30 +56,31 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], o
   return (
     <Modal title={`${t(`tx.type.${tx.type}`) !== `tx.type.${tx.type}` ? t(`tx.type.${tx.type}`) : tx.type} · ${t(`tx.src.${src}`)} · ${shortDate(txDate(tx), lang)}`} onClose={onClose}
       footer={<><button type="button" className="v2-btn v2-btn-secondary" onClick={onClose}>{t('set.cancel')}</button>
-        <button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={save}>{t('set.save')}</button></>}>
+        <button type="button" className="v2-btn v2-btn-primary" disabled={busy || !canWrite} onClick={save}>{t('set.save')}</button></>}>
       <p className={`v2-stat-mid v2-num ${isIn ? 'v2-pos' : ''}`}>{isIn ? '+' : '−'} {money(tx.amount_original, { currency: cur, full: true })}</p>
       <label className="v2-field"><span className="v2-field-label">{t('txd.desc')}</span>
-        <input className="v2-input" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
+        <input className="v2-input" value={f.description} disabled={!canWrite} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
       <label className="v2-field"><span className="v2-field-label">{t('tx.col.category')}</span>
-        <select className="v2-select" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>
+        <select className="v2-select" value={f.category} disabled={!canWrite} onChange={(e) => setF({ ...f, category: e.target.value })}>
           <option value="">{t('imp.choose')}</option>
           {cats.map((c) => <option key={c.id} value={c.name}>{catLabel(t, c.name)}</option>)}
           {f.category && !cats.some((c) => c.name === f.category) && <option value={f.category}>{catLabel(t, f.category)}</option>}
         </select></label>
       <div className="v2-field-row">
         <label className="v2-field"><span className="v2-field-label">{t('tx.col.account')}</span>
-          <select className="v2-select" value={f.wallet_id} disabled={locked} onChange={(e) => setF({ ...f, wallet_id: e.target.value })}>
+          <select className="v2-select" value={f.wallet_id} disabled={locked || !canWrite} onChange={(e) => setF({ ...f, wallet_id: e.target.value })}>
             {!f.wallet_id && <option value="">—</option>}
             {sameCcy.map((w) => <option key={w.id} value={String(w.id)}>{w.name} · {w.currency || 'IDR'}</option>)}
           </select>
           <span className="v2-muted v2-small">{t('txd.sameCcy')}</span></label>
         <label className="v2-field"><span className="v2-field-label">{t('txd.date')}</span>
-          <input className="v2-input" type="date" value={f.date} disabled={locked} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
+          <input className="v2-input" type="date" value={f.date} disabled={locked || !canWrite} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
         <label className="v2-field"><span className="v2-field-label">{t('radar.col.amount')}</span>
-          <input className="v2-input v2-num" inputMode="decimal" value={f.amount} disabled={locked} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
+          <input className="v2-input v2-num" inputMode="decimal" value={f.amount} disabled={locked || !canWrite} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
       </div>
       <p className="v2-small">{t('txd.docs')} <Link to="/business/documents?tab=look">{t('txd.attach')}</Link></p>
       {locked && <p className="v2-muted v2-small">{t(src === 'opening' ? 'txd.openingNote' : 'txd.bankNote')}</p>}
+      {!canWrite && <p className="v2-muted v2-small">{t('accd.noRights')}</p>}
       {err && <p className="v2-inline-err" role="alert">{err}</p>}
     </Modal>
   )
