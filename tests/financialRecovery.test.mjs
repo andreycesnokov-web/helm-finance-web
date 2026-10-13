@@ -29,6 +29,22 @@ test.beforeEach(async()=>{
   }
 })
 const body={name:'Wallet',type:'bank',currency:'IDR',opening_balance:10,scope:'business'}
+
+test('bill response loss and independent equivalent callers recover the original audited create without another POST',async()=>{
+ const bill={type:'payable',counterparty:'Supplier',amount:'30.00',currency:'IDR',scope:'business'};
+ let committed;
+ globalThis.fetch=async(url,options={})=>{
+  if(url.endsWith('/financial-operations/recent'))return json({operations:[]});
+  if(url.includes('/financial-operations/bill_create/')){reads.push(url);return json({state:'confirmed',result:committed});}
+  posts.push(JSON.parse(options.body));committed={id:123,debt:{id:123},audit_id:'audit',request_id:posts[0].request_key};throw Error('simulated commit response loss');
+ };
+ await assert.rejects(api.apiFetch('/debts',jwt(-1,'first'),{method:'POST',body:bill}),e=>e.code==='financial_outcome_unknown');
+ const result=await api.apiFetch('/debts',jwt(-1,'second'),{method:'POST',body:{...bill,amount:30,description:null,due_date:null,invoice_date:null,invoice_number:null}});
+ assert.equal(result.id,123);assert.equal(posts.length,1);assert.equal(reads.length,1);
+ const key=posts[0].request_key;
+ await assert.rejects(api.apiFetch('/debts',jwt(-1,'first'),{method:'POST',body:{...bill,amount:31,request_key:key}}),e=>e.code==='idempotency_key_mismatch');
+ assert.equal(posts.length,1);
+});
 test('canonical wallet meaning is equal across Classic/V2 ordering, decimals and omitted defaults; other target/money stays distinct',()=>{
   assert.equal(stableJson(canonicalFinancialIntent('wallet_create',body)),stableJson(canonicalFinancialIntent('wallet_create',{scope:'business',opening_balance:'10.00',entity_name:null,currency:'IDR',name:'Wallet',type:'bank'})))
   assert.notDeepEqual(canonicalFinancialIntent('wallet_create',body),canonicalFinancialIntent('wallet_create',{...body,opening_balance:11}))

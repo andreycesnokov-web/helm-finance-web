@@ -1,11 +1,11 @@
 'use strict';
 const crypto = require('node:crypto');
 const shared = import('./financialIntent.mjs');
-const operations = new Set(['wallet_create','transaction_batch','wallet_adjust','debt_payment','wallet_transfer']);
+const operations = new Set(['wallet_create','transaction_batch','wallet_adjust','debt_payment','wallet_transfer','bill_create']);
 const managers = new Set(['owner','ceo','admin','cfo']);
 const writers = new Set([...managers,'accountant']);
 const keyValid = key => typeof key === 'string' && key.length >= 1 && key.length <= 128 && key === key.trim() && !/[\u0000-\u001f]/.test(key);
-const permitted = (role, operation) => (['wallet_create','wallet_adjust'].includes(operation) ? managers : writers).has(role);
+const permitted = (role, operation) => operation==='bill_create' ? [...writers,'manager','employee'].includes(role) : (['wallet_create','wallet_adjust'].includes(operation) ? managers : writers).has(role);
 async function intent(operation, body, target) { return (await shared).canonicalFinancialIntent(operation, body, target); }
 async function storedIntent(operation, value, target) {
   return value?.version === 1 && value?.operation === operation && value?.scope === 'business' ? value : intent(operation, value, target);
@@ -15,6 +15,10 @@ function transferLedgerId(actor, key, operation = 'wallet_transfer') {
   return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-');
 }
 async function findReceipt(supabase, business, actor, operation, key) {
+  if(operation==='bill_create'){
+    const {data,error}=await supabase.rpc('rpc_read_own_bill_creation',{p_actor:actor,p_business:business,p_request_key:key});
+    if(error)throw error;return data?{operation,request_key:key,intent:{version:1,operation,scope:'business',payload:data.payload},result:{...data.result.debt,...data.result},created_at:data.created_at}:null;
+  }
   const table = operation === 'debt_payment' ? 'debt_payment_idempotency' : 'financial_write_requests';
   const fields = operation === 'debt_payment' ? 'key,intent,response_body,created_at,debt_id,transaction_id' : 'request_key,intent,result,created_at';
   let query=supabase.from(table).select(fields).eq('business_id',business)
@@ -26,7 +30,7 @@ async function findReceipt(supabase, business, actor, operation, key) {
   return data ? {operation,request_key:key,intent:data.intent,result:data.result ?? data.response_body,created_at:data.created_at} : null;
 }
 async function publicReceipt(supabase,business,actor,row,detail=true) {
-  const result=row.result;
+  const result=row.operation==='bill_create'?{...row.result.debt,...row.result}:row.result;
   const ref=crypto.createHash('sha256').update(JSON.stringify([business,String(actor),row.operation,row.request_key])).digest('hex').slice(0,12).toUpperCase();
   const objectIds = [];
   if(row.operation==='wallet_create' && result?.wallet?.id) objectIds.push(result.wallet.id);

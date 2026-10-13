@@ -46,7 +46,7 @@ export default function BillChecklist({ d, slipNeeded, onUpload = null }) {
     submitting.current = true
     setBusy(true); setErr(null)
     try {
-      await updateBillChecklist(request, d.id, body)
+      await updateBillChecklist(request, d.id, {...body,expected_version:d.bill_version})
       if (request.isCurrent()) invalidate()
     } catch (x) {
       const code = actionError(x)

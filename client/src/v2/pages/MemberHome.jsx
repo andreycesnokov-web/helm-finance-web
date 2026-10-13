@@ -39,10 +39,12 @@ function ExpenseDialog({ me, onClose, onSaved }) {
   const [err, setErr] = useState('')
   const input = useRef(null)
   const amount = num(f.amount)
+  const submitting=useRef(false)
   const save = async () => {
+    if(submitting.current||!request.isCurrent())return
     if (!(amount > 0)) { setErr(t('mh.exp.errAmount')); return }
     if (!f.what.trim()) { setErr(t('mh.exp.errWhat')); return }
-    setBusy(true); setErr('')
+    submitting.current=true;setBusy(true); setErr('')
     try {
       const debt = await createBill(request, { type: 'payable', counterparty: me || t('mh.exp.me'), amount, currency: 'IDR', due_date: null,
         description: `${t('mh.exp.prefix')}: ${f.what.trim()} · ${f.date}`, scope: 'business' })
@@ -50,7 +52,7 @@ function ExpenseDialog({ me, onClose, onSaved }) {
         try { const doc = await uploadReceiptFile(request, file); if (doc?.document?.id) await linkDocument(request, doc.document.id, 'debt', debt.id) } catch { /* the request exists; the receipt can be sent again */ }
       }
       onSaved?.(); onClose()
-    } catch (x) { setErr(x?.status === 403 ? t('dec.forbidden') : x?.data?.message || x?.data?.error || x?.message) } finally { setBusy(false) }
+    } catch (x) { setErr(x?.status === 403 ? t('dec.forbidden') : x?.data?.message || x?.data?.error || x?.message) } finally { submitting.current=false;if(request.isCurrent())setBusy(false) }
   }
   return (
     <Modal title={t('mh.exp.title')} onClose={onClose}

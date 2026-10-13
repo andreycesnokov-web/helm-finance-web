@@ -15,6 +15,7 @@ const TX = require('./lib/transactionClass');
 const WL = require('./lib/walletLedger');
 const { balanceFailure, databaseFailureBody, nativeInputIsExact } = require('./lib/balanceFailure');
 const financialRecovery = require('./lib/financialRecovery');
+const billCreation = require('./lib/billCreation');
 const bankImportReview = require('./lib/bankImportReview');
 const walletHistory = require('./lib/walletHistory');
 const profileValidation = require('./lib/profileValidation');
@@ -1433,106 +1434,37 @@ app.get('/api/debts', auth, async (req, res) => {
   res.json(await enrichDebtsFor(biz.business.id, data));
 });
 
-app.post('/api/debts', auth, async (req, res) => {
-  const userId = req.user.userId;
-  // ── Plan limit: max_invoices_per_month (debts are the MVP invoice proxy) ──
-  try {
-    const access = await getCurrentAccess(userId);
-    if (access) {
-      const maxInvoices = access.limits.max_invoices_per_month;
-      if (maxInvoices !== null && maxInvoices !== undefined) {
-        const monthStart = new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
-        const { count: usedCount } = await supabase
-          .from('debts')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .gte('created_at', monthStart.toISOString());
-        const used = usedCount || 0;
-        if (isLimitReached(maxInvoices, used)) {
-          return sendUpgradeRequired(res, 'invoices',
-            `Monthly invoice/debt limit reached (${maxInvoices}/month on ${access.accessState.effectivePlan} plan)`,
-            { limit: maxInvoices, usage: used, current_plan: access.accessState.effectivePlan }
-          );
-        }
-      }
-    }
-  } catch (limitErr) {
-    if (balanceFailure(res, limitErr)) return;
-    console.warn('[debts] limit check failed:', limitErr.message);
-  }
-  const biz = await requireBusiness(req, res);
-  if (!biz) return;
-  // Privileged roles create confirmed records; manager/employee → pending_approval
-  const confirmed = canCreateConfirmedFinancialRecord(biz.role);
-  const amount = Number(req.body.amount || 0);
-  const insertRow = {
-    // The bill checklist marks (migration 061) are set only through
-    // PATCH /api/debts/:id/checklist, which checks the role and writes an audit row.
-    ...CHECKLIST.withoutChecklistFields(req.body),
-    ...bizWriteFields(biz, userId),
-    original_amount: amount,  // lock original amount; never mutate this
-    paid_amount:     0,
-    is_settled:      false,
-    settled_at:      null,
-    status:          'open',
-    source_channel:   req.body.source_channel  || 'web',
-    approval_status:  confirmed ? (req.body.approval_status || 'approved') : 'pending_approval',
-    created_by_role:  biz.role,
-  };
-  const { data, error } = await supabase.from('debts')
-    .insert(insertRow).select().single();
-  if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
-  res.json(computeDebtStatus(data));
+// Existing access policy, with its native count serialized by the common gate.
+async function billQuota(actor,business,scope='actor') {
+ const access=await getCurrentAccess(actor,scope==='business'?business:undefined);
+ const limit=access?.limits?.max_invoices_per_month;
+ const monthStart=new Date();monthStart.setDate(1);monthStart.setHours(0,0,0,0);
+ if(limit!=null&&(!Number.isSafeInteger(limit)||limit<0))throw Error('bill_invalid_quota');
+ return {limit:limit??null,since:monthStart.toISOString(),scope};
+}
+app.post('/api/debts', auth, async (req,res)=>{
+ try {
+  const biz=await requireBusiness(req,res);if(!biz)return;
+  if(!canCreateFinancialRequest(biz.role))return res.status(403).json({error:'bill_forbidden',outcome:'rolled_back'});
+  const request=billCreation.creationRequest(req.body);
+  const data=await billCreation.create(supabase,req.user.userId,biz.business.id,request,await billQuota(req.user.userId,biz.business.id));
+  res.json({...data,...computeDebtStatus(data.debt)});
+ }catch(e){billCreation.sendFailure(res,e);}
 });
 
 // ── PATCH /api/debts/:id — edit a debt's editable fields ─────────────────────
 // Used to fix details (counterparty / amount / due date / description / type)
 // before or after approval. Business-scoped; privileged roles only.
 // original_amount tracks the editable total so status/remaining recompute.
-app.patch('/api/debts/:id', auth, async (req, res) => {
-  try {
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canCreateConfirmedFinancialRecord(biz.role))
-      return res.status(403).json({ error: 'Your role does not allow editing records' });
-
-    const { data: rows } = await supabase.from('debts')
-      .select('id, paid_amount').eq('id', req.params.id).or(bizOrFilter(biz)).limit(1);
-    const debt = rows?.[0];
-    if (!debt) return res.status(404).json({ error: 'Debt not found' });
-
-    const updates = {};
-    // null / empty clears the field. String(null) used to store the literal text "null".
-    const textOrNull = (v) => (v === null || v === undefined ? null : String(v).trim() || null);
-    if (req.body.counterparty !== undefined) updates.counterparty = textOrNull(req.body.counterparty);
-    if (req.body.description  !== undefined) updates.description  = textOrNull(req.body.description);
-    if (req.body.due_date     !== undefined) updates.due_date     = req.body.due_date || null;
-    if (req.body.scope        !== undefined) updates.scope        = req.body.scope;
-    if (req.body.type         !== undefined && ['receivable', 'payable'].includes(req.body.type))
-      updates.type = req.body.type;
-    if (req.body.amount !== undefined) {
-      const amt = Number(req.body.amount);
-      if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'amount must be a positive number' });
-      if (amt < Number(debt.paid_amount || 0))
-        return res.status(400).json({ error: 'amount cannot be less than already paid' });
-      // A recorded withholding also settles part of the bill (batch 10).
-      const withheld = Number((await loadWithholdings(biz.business.id))[String(debt.id)]?.amount || 0);
-      if (withheld > 0 && amt < Number(debt.paid_amount || 0) + withheld)
-        return res.status(400).json({ error: 'amount cannot be less than already paid plus tax withheld' });
-      updates.amount = amt;
-      updates.original_amount = amt;
-    }
-    if (Object.keys(updates).length === 0)
-      return res.status(400).json({ error: 'No editable fields provided' });
-
-    const { data, error } = await supabase.from('debts')
-      .update(updates).eq('id', debt.id).select().single();
-    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
-    res.json(computeDebtStatus(data));
-  } catch (e) {
-    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
+app.patch('/api/debts/:id',auth,async(req,res)=>{
+ try {
+  const biz=await requireBusiness(req,res);if(!biz)return;
+  if(!canCreateConfirmedFinancialRecord(biz.role))return res.status(403).json({error:'bill_forbidden',outcome:'rolled_back'});
+  const {version,patch}=billCreation.metadataRequest(req.body);
+  const {data,error}=await supabase.rpc('rpc_update_business_bill',{p_actor:req.user.userId,p_business:biz.business.id,p_debt:req.params.id,p_expected_version:version,p_patch:patch,p_action:'metadata'});
+  if(error)throw error;if(!data?.debt?.id)throw Error('bill_result_unconfirmed');
+  res.json(computeDebtStatus(data.debt));
+ }catch(e){billCreation.sendFailure(res,e);}
 });
 
 app.patch('/api/debts/:id/settle', auth, async (req, res) => {
@@ -1912,41 +1844,15 @@ app.post('/api/debts/:id/request-info', auth, async (req, res) => {
 // and is read with GET /api/withholding-slips. Accountant role and above; audited.
 // Nothing closes on its own: this never pays, settles, approves or files anything.
 // Before migration 061 is applied the columns do not exist → 409, nothing written.
-app.patch('/api/debts/:id/checklist', auth, async (req, res) => {
-  try {
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (biz.business?.type === 'personal')
-      return res.status(403).json({ error: 'business_workspace_required' });
-    if (!CHECKLIST.canEditChecklist(biz.role))
-      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can update the bill checklist' });
-
-    const { patch, error: vErr } = CHECKLIST.checklistPatchFromBody(req.body || {}, { userId: req.user.userId });
-    if (vErr) return res.status(400).json({ error: vErr });
-
-    const { data: rows, error: rErr } = await supabase.from('debts')
-      .select('id, business_id, accountant_checked_at, accountant_checked_by')
-      .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
-    if (rErr && TARGETS.isMissingColumn(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
-    if (rErr) return res.status(500).json({ error: rErr.message });
-    const before = rows?.[0];
-    if (!before) return res.status(404).json({ error: 'Debt not found' });
-
-    const { data, error } = await supabase.from('debts').update(patch)
-      .eq('id', before.id).eq('business_id', biz.business.id)
-      .select('id, accountant_checked_at, accountant_checked_by').single();
-    if (error && TARGETS.isMissingColumn(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '061' });
-    if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
-
-    const pick = (r) => ({ accountant_checked_at: r.accountant_checked_at ?? null, accountant_checked_by: r.accountant_checked_by ?? null });
-    await recordAudit({
-      businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
-      entityType: 'debt', entityId: before.id, action: 'debt_checklist_updated',
-      before: pick(before), after: pick(data),
-    });
-    res.json({ id: data.id, checklist: pick(data) });
-  } catch (e) {
-    if (balanceFailure(res, e)) return; res.status(500).json({ error: e.message }); }
+app.patch('/api/debts/:id/checklist',auth,async(req,res)=>{
+ try {
+  const biz=await requireBusiness(req,res);if(!biz)return;
+  if(!CHECKLIST.canEditChecklist(biz.role))return res.status(403).json({error:'bill_forbidden',outcome:'rolled_back'});
+  const {version,patch}=billCreation.metadataRequest(req.body,true);
+  const {data,error}=await supabase.rpc('rpc_update_business_bill',{p_actor:req.user.userId,p_business:biz.business.id,p_debt:req.params.id,p_expected_version:version,p_patch:patch,p_action:'checklist'});
+  if(error)throw error;if(!data?.debt?.id)throw Error('bill_result_unconfirmed');
+  res.json({id:data.debt.id,bill_version:data.debt.bill_version,checklist:{accountant_checked_at:data.debt.accountant_checked_at,accountant_checked_by:data.debt.accountant_checked_by}});
+ }catch(e){billCreation.sendFailure(res,e);}
 });
 
 // ── POST /api/debts/:id/withholding — record a withholding on a bill or invoice ─────
@@ -2560,7 +2466,8 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
       last_action_channel: 'telegram',
       attachments: [item], attachment_url: `tg:${file_id}`,
     };
-    const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+    const created=await billCreation.create(supabase,m.submitterUser.id,m.businessId,billCreation.fromTrustedRow(req.body.request_key,insertRow),await billQuota(m.submitterUser.id,m.businessId));
+    const data=created.debt,error=null;
     if (error) return res.status(500).json({ error: error.message });
 
     const ccy = data.currency || 'IDR';
@@ -7264,7 +7171,8 @@ app.post('/api/debts/from-telegram', async (req, res) => {
       last_action_channel:       'telegram',
     };
 
-    const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+    const created=await billCreation.create(supabase,submitterUser.id,targetBusinessId,billCreation.fromTrustedRow(req.body.request_key,insertRow),await billQuota(submitterUser.id,targetBusinessId));
+    const data=created.debt,error=null;
     if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
 
     // Notify admin+ members about a pending submission (fire-and-forget)
@@ -7325,45 +7233,6 @@ app.post('/api/debts/from-telegram', async (req, res) => {
 async function createPendingPayableDraft(biz, actingUserId, draft) {
   const businessId = biz.business.id;
 
-  // Plan limit — same rule as POST /api/debts (debts are the MVP invoice proxy).
-  try {
-    const access = await getCurrentAccess(actingUserId, businessId);
-    const maxInvoices = access && access.limits ? access.limits.max_invoices_per_month : null;
-    if (maxInvoices !== null && maxInvoices !== undefined) {
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      monthStart.setHours(0, 0, 0, 0);
-      const { count } = await supabase.from('debts')
-        .select('id', { count: 'exact', head: true })
-        .eq('business_id', businessId)
-        .gte('created_at', monthStart.toISOString());
-      if (isLimitReached(maxInvoices, count || 0)) {
-        return { error: 'plan_limit_reached', limit: maxInvoices, usage: count || 0 };
-      }
-    }
-  } catch (limitErr) {
-    console.warn('[mcp-draft] limit check failed:', limitErr.message);
-  }
-
-  // Duplicate guard: an open (non-rejected, unpaid) payable for the same supplier and
-  // amount in this company. Re-sending the same invoice must not create a second draft.
-  const { data: similar } = await supabase.from('debts')
-    .select('id, counterparty, amount, due_date, approval_status, status')
-    .eq('business_id', businessId)
-    .eq('type', 'payable')
-    .eq('amount', draft.amount)
-    .ilike('counterparty', String(draft.counterparty).replace(/[\\%_]/g, (c) => `\\${c}`))
-    .not('status', 'in', '("paid","cancelled")')
-    .neq('approval_status', 'rejected')
-    .limit(1);
-  if (similar && similar.length) {
-    const d = similar[0];
-    return { error: 'duplicate_payable', existing: {
-      id: d.id, counterparty: d.counterparty, amount: Number(d.amount),
-      due_date: d.due_date || null, approval_status: d.approval_status,
-    } };
-  }
-
   const { data: userRows } = await supabase.from('users')
     .select('id, username, first_name').eq('id', actingUserId).limit(1);
   const u = userRows && userRows[0];
@@ -7379,6 +7248,7 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
     currency:             draft.currency,
     due_date:             draft.due_date || null,
     description:          draft.description || null,
+    invoice_number:       draft.invoice_number || null,
     notes:                'Submitted via AI assistant (CFO AI connector). Awaiting approval.',
     status:               'open',
     source_channel:       'mcp',
@@ -7392,23 +7262,16 @@ async function createPendingPayableDraft(biz, actingUserId, draft) {
     approved_via_channel: null,
     last_action_channel:  'mcp',
   };
-  const { data, error } = await supabase.from('debts').insert(insertRow).select().single();
+  let created;
+  try {created=await billCreation.create(supabase,actingUserId,businessId,billCreation.fromTrustedRow(draft.request_key,insertRow),await billQuota(actingUserId,businessId,'business'));}
+  catch(e){return {error: /bill_[a-z_]+/.exec(e.message)?.[0]||'bill_create_unavailable'};}
+  const data=created.debt,error=null;
   if (error) {
     console.error('[mcp-draft] insert failed:', error.message);
     return { error: 'insert_failed' };
   }
 
-  await recordAudit({
-    businessId, actorUserId: actingUserId, actorRole: biz.role, channel: 'mcp',
-    entityType: 'debt', entityId: data.id, action: 'mcp_payable_draft_created',
-    after: {
-      type: 'payable', counterparty: data.counterparty, amount: Number(data.amount),
-      currency: data.currency, due_date: data.due_date || null,
-      approval_status: 'pending_approval', invoice_number: draft.invoice_number || null,
-      amount_source: draft.amount_source || null,
-    },
-  });
-
+  if(created.replayed)return {debt:computeDebtStatus(data),replayed:true,telegram_notified:0};
   // Approval request to the people who may approve (owner included — this is how the
   // founder gets the one-tap Approve for a draft they asked their AI assistant to file).
   let notified = { sent: 0 };
@@ -8177,7 +8040,7 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
       .select('owner_user_id').eq('id', member.business_id).single();
 
     // ── Create the training record (never cash-impacting) ───────────────────
-    const { data: debt, error } = await supabase.from('debts').insert({
+    const trainingRow={
       user_id:                business?.owner_user_id || actingUserId,
       business_id:            member.business_id,
       type:                   training_type === 'receivable' ? 'receivable' : 'payable',
@@ -8199,7 +8062,9 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
       created_by_role:        member.role,
       approval_status:        'pending_approval',
       last_action_channel:    'telegram',
-    }).select().single();
+    };
+    const created=await billCreation.create(supabase,actingUserId,member.business_id,billCreation.fromTrustedRow(req.body.request_key,trainingRow),await billQuota(actingUserId,member.business_id));
+    const debt=created.debt,error=null;
     if (error) return res.status(500).json({ error: error.message });
 
     // ── Progress update; completed when all 3 test types exist ──────────────

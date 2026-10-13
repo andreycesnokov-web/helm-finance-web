@@ -4,12 +4,13 @@
 // The user checks every field. Saving: POST /api/debts (the server sets approval by role) and the
 // invoice is linked to the bill (POST /api/documents/:id/links). Money moves only when a payment
 // is marked.
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money } from '../lib/format'
 import Modal from './Modal'
+import { financialActor } from '../../lib/financialRecovery'
 import { uploadInvoiceFile, readInvoice, identifyDocument, createBill, updateBill, linkDocument } from '../lib/actions'
 
 const CURRENCIES = ['IDR', 'USD', 'SGD', 'EUR', 'MYR', 'AUD', 'CNY', 'JPY']
@@ -22,12 +23,17 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
   const lang = useLang()
   const request = useBusinessRequest()
   const cps = useApi('/counterparties')
-  const [kind, setKind] = useState(editing?.type || mode)
+  const actor=financialActor(request.token)
+  const draftKey=!editing&&actor&&request.businessId?'cfoBillDraft:v1:'+actor+':'+request.businessId:null
+  const [stored]=useState(()=>{try{return draftKey?JSON.parse(localStorage.getItem(draftKey)):null}catch{return null}})
+  const submitting=useRef(false)
+  const [kind, setKind] = useState(editing?.type || stored?.kind || mode)
   const [f, setF] = useState(editing
-    ? { counterparty: editing.counterparty || '', number: '', amount: String(editing.original_amount ?? editing.amount ?? ''), currency: editing.currency || 'IDR', date: '', due: editing.due_date ? String(editing.due_date).slice(0, 10) : '', description: editing.description || '' }
-    : { counterparty: '', number: '', amount: '', currency: 'IDR', date: '', due: isoDays(14), description: '' })
+    ? { counterparty: editing.counterparty || '', number: editing.invoice_number || '', amount: String(editing.original_amount ?? editing.amount ?? ''), currency: editing.currency || 'IDR', date: editing.invoice_date || '', due: editing.due_date ? String(editing.due_date).slice(0, 10) : '', description: editing.description || '' }
+    : stored?.f || { counterparty: '', number: '', amount: '', currency: 'IDR', date: '', due: isoDays(14), description: '' })
   const [from, setFrom] = useState({})          // field → 'doc' when it came from the invoice
-  const [doc, setDoc] = useState(null)          // { id, name, state, dup?, taxNote? }
+  const [doc, setDoc] = useState(stored?.doc || null)          // { id, name, state, dup?, taxNote? }
+  useEffect(()=>{if(draftKey&&request.isCurrent()){try{localStorage.setItem(draftKey,JSON.stringify({kind,f,doc:doc?.id?doc:null}))}catch{setErr('The draft could not be saved on this device. Keep this window open.')}}},[draftKey,kind,f,doc])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const input = useRef(null)
@@ -87,17 +93,20 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
 
   const amount = num(f.amount)
   const save = async () => {
+    if(submitting.current||!request.isCurrent())return
     if (!f.counterparty.trim()) { setErr(t('billd.err.who')); return }
     if (!(amount > 0)) { setErr(t('billd.err.amount')); return }
-    setBusy(true); setErr('')
+    submitting.current=true;setBusy(true); setErr('')
     try {
-      const desc = [f.number ? `№ ${f.number}` : '', f.description.trim()].filter(Boolean).join(' · ') || null
+      const desc = f.description.trim() || null
       const debt = editing
-        ? await updateBill(request, editing.id, { counterparty: f.counterparty.trim(), amount, currency: f.currency, due_date: f.due || null, description: desc })
-        : await createBill(request, { type: kind, counterparty: f.counterparty.trim(), amount, currency: f.currency, due_date: f.due || null, description: desc, scope: 'business' })
-      if (doc?.id && debt?.id) { try { await linkDocument(request, doc.id, 'debt', debt.id) } catch { /* the bill exists; the invoice stays in Documents */ } }
+        ? await updateBill(request, editing.id, {expected_version:editing.bill_version, counterparty: f.counterparty.trim(), amount, currency: f.currency, invoice_number:f.number.trim()||null, invoice_date:f.date||null, due_date: f.due || null, description: desc })
+        : await createBill(request, { type: kind, counterparty: f.counterparty.trim(), amount, currency: f.currency, invoice_number:f.number.trim()||null, invoice_date:f.date||null, due_date: f.due || null, description: desc, scope: 'business' })
+      if(!request.isCurrent())return
+      if (doc?.id && debt?.id) { try { await linkDocument(request, doc.id, 'debt', debt.id) } catch { setErr('The bill is saved. Its document was not linked. Retry to link the document; the original bill will be recovered.');return } }
+      if(draftKey)localStorage.removeItem(draftKey)
       onSaved?.(debt); onClose()
-    } catch (x) { setErr(x?.status === 403 ? t('dec.forbidden') : (x?.data?.message || x?.data?.error || x?.message)) } finally { setBusy(false) }
+    } catch (x) { setErr(x?.status === 403 ? t('dec.forbidden') : (x?.data?.message || x?.data?.error || x?.message)) } finally { submitting.current=false;if(request.isCurrent())setBusy(false) }
   }
   const mark = (k) => (from[k] ? <span className={`v2-pill v2-tone-${from[k] === 'image' ? 'warn' : 'info'} v2-billd-from`}>{t(from[k] === 'image' ? 'billd.fromImage' : 'billd.fromDoc')}</span> : null)
   return (

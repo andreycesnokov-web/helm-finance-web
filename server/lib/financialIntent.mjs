@@ -1,6 +1,6 @@
 // Pure shared identity contract. Credentials, generated FX output and UI field
 // order are not operation identity. It never rewrites the body sent to a writer.
-export const RECOVERY_OPERATIONS = Object.freeze(['wallet_create', 'transaction_batch', 'wallet_adjust', 'debt_payment', 'wallet_transfer'])
+export const RECOVERY_OPERATIONS = Object.freeze(['wallet_create', 'transaction_batch', 'wallet_adjust', 'debt_payment', 'wallet_transfer', 'bill_create'])
 const numeric = new Set(['amount','opening_balance','target_balance','expected_balance','target_amount','rate','booked_rate','amount_idr','sort_order'])
 export function decimalIdentity(value) {
   const s = String(value).trim()
@@ -19,6 +19,7 @@ export function canonicalJson(value) {
   return value
 }
 export function requestDescription(path) {
+  if (path === '/debts') return { operation: 'bill_create', field: 'request_key' }
   if (path === '/wallets') return { operation: 'wallet_create', field: 'request_key' }
   if (path === '/transactions/batch') return { operation: 'transaction_batch', field: 'request_key' }
   let m = path.match(/^\/wallets\/([^/]+)\/adjust-balance$/)
@@ -49,6 +50,9 @@ export function canonicalFinancialIntent(operation, body, target = null) {
     // Preserve sequence and every transaction field. Key/order differences are
     // harmless; changing any native money, target, date or provenance is not.
     return canonicalJson({ version: 1, operation, scope: 'business', payload: Array.isArray(body) ? body : body.transactions })
+  }
+  if (operation === 'bill_create') {
+    Object.assign(p,{type:body.type,counterparty:String(body.counterparty||'').trim(),amount:body.amount,currency:String(body.currency||'IDR').trim().toUpperCase(),due_date:body.due_date||null,description:body.description?.trim()||null,scope:body.scope||'business',invoice_number:body.invoice_number?.trim()||null,invoice_date:body.invoice_date||null})
   }
   if (operation === 'wallet_create') {
     Object.assign(p, { name: body.name, currency: String(body.currency || 'IDR').toUpperCase(), type: body.type || null,
