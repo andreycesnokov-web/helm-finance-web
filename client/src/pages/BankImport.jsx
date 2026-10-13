@@ -433,15 +433,17 @@ export default function BankImport() {
 
   useEffect(()=>{confirming.current=false;setBusy(false);setSuggesting(false);setBatch(null);setRows([]);setReviewed(null);setRecon(null);setRecoveryMsg('');setApplyOpening(false);setOpeningReason('');setWalletId('');setWallets([]);setHistory([]);setCats([]);setCps([]);setSummary(null);setFileObj(null);setFileName('');setHeaders([]);setRawRows([]);setOpening('');setClosing('')},[request.businessId,financialActor(request.token)])
   const importIO={send:(identity,id,body)=>apiFetch(`/bank-imports/${encodeURIComponent(id)}/confirm`,identity,{method:'POST',body}),read:(identity,id,key)=>apiFetch(`/bank-imports/${encodeURIComponent(id)}/requests/${encodeURIComponent(key)}`,identity)}
+  const eligibleDecision=r=>!r.linked_transaction_id&&!['imported','excluded'].includes(r.review_status)&&(r._action==='exclude'||r._include&&r.match_status!=='duplicate')
   const recover=async retry=>{if(!batch||!importCurrent(request)||confirming.current)return;confirming.current=true;setBusy(true);try{const r=retry?await resumeImportConfirm(request,batch.id,importIO):await recoverImportConfirm(request,batch.id,importIO);if(!importCurrent(request))return;setRecoveryMsg(r?.ok?l.recovered:l.pending);if(r?.ok){setRecon(r.reconciliation||null);await loadReview(batch.id);loadHistory()}}catch{if(importCurrent(request))setRecoveryMsg(l.pending)}finally{if(importCurrent(request)){confirming.current=false;setBusy(false)}}}
   const confirm = async (onlyRows) => {
     if(confirming.current||!importCurrent(request)||!reviewed?.review_hash||!reviewed.can_confirm)return
-    const target = (onlyRows || rows).filter(r => r._include && r.match_status !== 'duplicate' && r.review_status !== 'imported')
+    const target = (onlyRows || rows).filter(eligibleDecision)
     if (!target.length) return
     confirming.current=true
     setBusy(true)
     try {
       const payload = target.map(r => {
+        if(r._action==='exclude')return{row_id:r.id,match_action:'exclude'}
         const isLink = r._action === 'link' || (r.suggested_match_type && r._action === 'link') || (!r._action && !!r.matched_transaction_id)
         const matchTxId = r.matched_transaction_id || (r.suggested_match_type === 'existing_tx' ? Number(r.suggested_match_id) : null)
         return {
@@ -479,9 +481,11 @@ export default function BankImport() {
     } catch { /* non-blocking */ }
   }
 
-  const excludeRow = async (r) => {
-    try { await apiFetch(`/bank-imports/${batch.id}/rows/${r.id}/exclude`, request, { method: 'POST' }) } catch { /* */ }
-    setRows(rows.map(x => x.id === r.id ? { ...x, review_status: 'excluded', _include: false } : x))
+  const excludeRow = (r) => {
+    if(busy||importPending(request,batch.id)||!reviewed?.can_confirm||!importCurrent(request)||r.linked_transaction_id)return
+    // An explicit decision is committed with confirm. A standalone exclude POST
+    // invalidates the reviewed hash and splits the user's final decisions.
+    setRows(current=>current.map(x => x.id === r.id ? { ...x, _action:'exclude', _include:true } : x))
   }
 
   const createCategory = async () => {
@@ -516,7 +520,7 @@ export default function BankImport() {
   }
   const visibleRows = rows.filter(matchFilter)
 
-  const includeCount = rows.filter(r => r._include && r.match_status !== 'duplicate' && r.review_status !== 'imported').length
+  const includeCount = rows.filter(eligibleDecision).length
   const highRows = rows.filter(r => r.review_status === 'high_confidence' && r._include)
   const dupCount = rows.filter(r => r.match_status === 'duplicate').length
 
@@ -662,7 +666,7 @@ export default function BankImport() {
               <tbody>
                 {visibleRows.map((r) => {
                   const isDup = r.match_status === 'duplicate'
-                  const isExcluded = r.review_status === 'excluded'
+                  const isExcluded = r.review_status === 'excluded'||r._action==='exclude'
                   const badge = confBadge(r)
                   const setRow = (patch) => setRows(rows.map(x => x.id === r.id ? { ...x, ...patch } : x))
                   return (
@@ -707,7 +711,7 @@ export default function BankImport() {
                         )}
                       </td>
                       <td style={{ padding: 6, textAlign: 'center' }}>
-                        {!isExcluded && !isDup && <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => excludeRow(r)}>✕</button>}
+                        {!isExcluded && !r.linked_transaction_id && <button className="btn btn-ghost btn-sm" disabled={busy||!reviewed?.can_confirm||importPending(request,batch.id)} style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => excludeRow(r)}>✕</button>}
                       </td>
                     </tr>
                   )
