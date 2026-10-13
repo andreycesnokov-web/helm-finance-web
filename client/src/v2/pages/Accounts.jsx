@@ -149,7 +149,7 @@ export default function Accounts() {
 
   if (!wallets.length) {
     return <>{head}<Card><Empty icon={<I.accounts size={28} />} title={t('acc.emptyTitle')} text={t('acc.emptyText')}
-      action={canManage ? <Btn variant="primary" onClick={() => setDlg({ kind: 'new' })}>{t('acc.add')}</Btn> : null} /></Card>{dialogs}</>
+      action={canManage ? <Btn variant="primary" onClick={() => setDlg({ kind: 'new' })}>{t('acc.add')}</Btn> : null} />{canManage && <button type="button" className="v2-btn-link v2-small" onClick={() => setDlg({ kind: 'archived' })}>{t('acc.archivedShow')}</button>}</Card>{dialogs}</>
   }
 
   return (
