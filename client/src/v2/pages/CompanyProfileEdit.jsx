@@ -128,6 +128,7 @@ export default function CompanyProfileEdit() {
     setBusy(true); setMsg(null)
     try {
       const body = profileBody(form, verification, savedProfile)
+      if(Object.keys(body).length===0){setMsg({tone:'info',text:t('pe.noChanges')});return}
       const r = await performProfileOperation(request,'save',body,savedProfile?.profile_version??0,{send:saveTaxProfile,read:readProfileRequest})
       if(!profileCurrent(request))return
       if (!r?.profile) throw new Error(t('pe.notConfirmed'))
@@ -141,7 +142,7 @@ export default function CompanyProfileEdit() {
         : { tone: 'good', text: t('pe.saved', { n: r?.completeness?.percent ?? '—' }) })
     } catch (e) {
       if(!profileCurrent(request))return
-      setMsg({ tone: 'warn', text: e?.status === 422 ? t('pe.incomplete', { f: (e?.data?.missing || e?.data?.fields || []).map((k) => t(`pe.f.${k}`)).join(', ') || e?.data?.message || e?.data?.error }) : e?.status === 403 ? t('pe.forbidden') : t('pe.failed', { msg: e?.data?.message || e?.data?.error || e?.message }) })
+      setMsg({ tone: 'warn', text: e?.data?.error==='profile_version_conflict'?t('pe.historical'):e?.status === 422 ? t('pe.incomplete', { f: (e?.data?.missing || e?.data?.fields || []).map((k) => t(`pe.f.${k}`)).join(', ') || e?.data?.message || e?.data?.error }) : e?.status === 403 ? t('pe.forbidden') : t('pe.failed', { msg: e?.data?.message || e?.data?.error || e?.message }) })
     } finally { if(profileCurrent(request)){setBusy(false);saving.current=false} }
   }
   const verify = async () => {

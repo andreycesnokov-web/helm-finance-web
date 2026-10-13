@@ -54,3 +54,7 @@ test('legacy forms send changed supported values only and retain an absent-profi
  saveProfileDraft(request,{form:{brand_name:'draft from empty profile'},before:null,verification:{}});assert.equal(readProfileDraft(request).before,null)
  const changed=profileDelta({...before,field_verification:{...before.field_verification,nib:{state:'user_declared'}}},before);assert.deepEqual(changed.field_verification.nib,{state:'user_declared'})
 })
+test('a queued clean form after acknowledged save cannot create an extra version/audit',async()=>{
+ reset();let saved,writes=0;const send=async(r,b)=>{writes++;return saved=ack(b)},read=async()=>saved
+ await performProfileOperation(request,'save',{brand_name:'x'},1,{send,read});await assert.rejects(performProfileOperation(request,'save',{},2,{send,read}),{code:'profile_no_changes'});assert.equal(writes,1)
+})

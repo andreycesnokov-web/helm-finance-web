@@ -54,6 +54,7 @@ export async function performProfileOperation(request,operation,body,expectedVer
  current(request);const rawVersion=String(expectedVersion??'');if(!/^\d+$/.test(rawVersion)||typeof expectedVersion==='number'&&!Number.isSafeInteger(expectedVersion)||BigInt(rawVersion)>9223372036854775807n)throw fail('profile_version_required',400)
  const expected=BigInt(rawVersion).toString()
  const payload=operation==='save'?normalizeProfilePatch(body):{},existing=readEntry(request,operation)
+ if(operation==='save'&&Object.keys(payload).length===0)throw fail('profile_no_changes',400)
  if(existing&&['prepared','in_flight'].includes(existing.state)){
   const recovered=await recoverProfileOperation(request,operation,{read});current(request)
   if(recovered?.ok===true&&stableJson(existing.payload)===stableJson(payload))return recovered

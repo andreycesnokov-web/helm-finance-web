@@ -427,6 +427,7 @@ export default {
     taxLoading: 'Memuat kartu pajak terverifikasi...',
   },
   pe: {
+    noChanges:'Tidak ada perubahan profil yang belum disimpan.',
     countryMismatch: 'Negara profil berbeda dari negara perusahaan. Periksa dan koreksi secara eksplisit sebelum menyimpan atau mengonfirmasi.',useCompanyCountry:'Gunakan negara dan yurisdiksi perusahaan',
     loadLatest: "Muat profil terbaru dan buang draf",
     checkResult: "Periksa hasil",
