@@ -54,7 +54,9 @@ export default function CompanyProfile() {
   const fv = p.field_verification || {}
   const src = (k) => {const state=typeof fv[k]==='string'?fv[k]:fv[k]?.state;return state?t(`prof.source.${state}`):null}
   const isID=(company.data?.business?.country||p.country)==='Indonesia'
-  const confirmed=p.profile_version!=null&&String(p.profile_version)===String(p.verified_profile_version)
+  const currentCountry=company.data?.business?.country,currentJurisdiction={Indonesia:'ID',Singapore:'SG',Malaysia:'MY',Thailand:'TH'}[currentCountry]
+  const countryMismatch=!!currentCountry&&(p.country!==currentCountry||!!currentJurisdiction&&p.jurisdiction!==currentJurisdiction)
+  const confirmed=!company.loading&&!company.error&&!countryMismatch&&p.profile_version!=null&&String(p.profile_version)===String(p.verified_profile_version)
   const items = req.data?.items || []
   const docState = (key) => items.find((i) => (i.type || i.doc_type) === key)?.status || null
   const rules = appl.data?.applicable_rules || []
@@ -65,6 +67,7 @@ export default function CompanyProfile() {
     <div className="v2-page">
       {head}
       <AccountantTabs active="profile" />
+      {countryMismatch&&<div className="v2-banner v2-tone-warn" role="alert">{t('pe.countryMismatch')} <Link to="/business/accountant/tax-profile/edit">{t('prof.edit')}</Link></div>}
       <div className="v2-grid-detail">
         <div className="v2-col">
           <Card>
