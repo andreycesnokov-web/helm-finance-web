@@ -217,6 +217,9 @@ export default function BankImport() {
     loadHistory()
   }, [token, loadHistory, qWalletId])
 
+  // History loading must not reread an explicitly opened batch and overwrite
+  // decisions made while that independent list request was still in flight.
+  const periodHistory = qBatchId ? null : history
   useEffect(() => {
     if (qBatchId && token) {
       apiFetch(`/bank-imports/${qBatchId}/review`, request)
@@ -257,7 +260,7 @@ export default function BankImport() {
         openHistoryBatch(matchBatch)
       }
     }
-  }, [qBatchId, qMonth, qWalletId, history, token, request])
+  }, [qBatchId, qMonth, qWalletId, periodHistory, token, request])
 
   const openHistoryBatch = async (b) => {
     if (!b?.id) return
