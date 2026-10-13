@@ -6396,94 +6396,9 @@ app.patch('/api/bank-import/rows/:id', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/bank-import/batches/:id/confirm — import confirmed rows + reconcile
-app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
-  try {
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canCreateConfirmedFinancialRecord(biz.role)) return res.status(403).json({ error: 'Forbidden' });
-
-    const { data: batch } = await supabase.from('bank_import_batches').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).single();
-    if (!batch) return res.status(404).json({ error: 'Batch not found' });
-    const reviewed=bankImportReview.importRequest(req.body,req.params.id);
-    res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
-    if(await bankImportReview.replay(supabase,req,res,biz,batch.id,reviewed))return;
-    const openingState=await bankImportReview.reviewedState(supabase,biz.business.id,batch.id,req.user.userId);
-    const opening=await bankImportReview.pricedOpening(reviewed,openingState,fx);
-    if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
-    const periodProblem = statementPeriodProblem(batch);
-    if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
-
-    const { data: rows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
-    // Import rows the user confirmed (not duplicates, not rejected). review_status
-    // 'confirmed' (new review queue) OR legacy match_status 'confirmed'.
-    const isConfirmed = (r) => (r.review_status === 'confirmed' || r.match_status === 'confirmed') && r.review_status !== 'excluded';
-    const toImport = (rows || []).filter(isConfirmed);
-
-    // Bridge (PR2, migration 049): confirmed CREDIT lines also become incoming-payment
-    // evidence. Entirely inside the flag — with INCOMING_PAYMENTS_ENABLED off this call is
-    // not made, nothing is read. Failures here never fail the import: the ledger write already
-    // committed and is the user's actual outcome. It is idempotent, so a repeated confirm
-    // (nothing left to import) still re-runs it — that is how missing evidence is recovered.
-    const respond = async (out) => {
-      const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
-      const incoming_payments = await bridgeBankBatchToIncomingPayments({ batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
-      res.json({ ...out, ok: true, imported: out.imported, status: out.status, reconciliation: out.reconciliation,
-                 ...(incoming_payments ? { incoming_payments } : {}) });
-    };
-    // Repeat confirm: nothing to write. Unlike before, no empty reconciliation snapshot is stored.
-    if (!toImport.length) return res.status(400).json({error:'rows required',code:'invalid_plan',automatic_retry:false});
-
-    // Resolve category ids → names (ledger is TEXT). Prefer the user's FINAL choice.
-    const catMap = await loadBusinessCategoryMap(biz);
-    let walletCurrency = null;
-    if (batch.wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('currency').eq('id', batch.wallet_id).limit(1);
-      walletCurrency = w?.[0]?.currency || null;
-    }
-    const txCurrency = (batch.currency || walletCurrency || 'IDR').toUpperCase();
-
-    // 1) Validate every row before anything is written.
-    const problems = [];
-    const prepared = [];
-    for (const r of toImport) {
-      let txType = r.final_transaction_type || r.suggested_type || 'expense';
-      if (!VALID_SYSTEM_TX_TYPES.includes(txType)) txType = r.suggested_type || 'expense';
-      const problem = !VALID_SYSTEM_TX_TYPES.includes(txType) ? `Invalid transaction type: ${txType}` : statementRowProblem(r, 'create');
-      if (problem) { problems.push({ row_id: r.id, row_index: r.row_index, error: problem }); continue; }
-      prepared.push({ r, txType });
-    }
-    if (problems.length) return res.status(400).json(invalidRowsBody(problems));
-
-    // 2) FX outside the database transaction.
-    const plan = [];
-    try {
-      for (const { r, txType } of prepared) {
-        const fxRes = await fx.toIdr(r.amount, txCurrency, String(r.tx_date).slice(0, 10));
-        plan.push({
-          row_id: r.id, action: 'create', type: txType,
-          category_id: r.final_category_id || null,
-          category_name: r.final_category_id ? null
-            : (r.suggested_category_id ? (catMap.get(r.suggested_category_id) || null) : (r.suggested_category || null)),
-          counterparty_name: r.suggested_counterparty || null,
-          scope: r.final_scope || null,
-          // What the FX valuation was computed from — the database refuses if any of it changed.
-          expected_amount: Number(r.amount), expected_date: String(r.tx_date).slice(0, 10), currency: txCurrency,
-          amount_idr: fxRes.amount_idr, booked_rate: fxRes.booked_rate, rate_source: fxRes.rate_source,
-          normalized_desc: normalizeDesc(r.description),
-        });
-      }
-    } catch (e) {
-      console.error(`[bank-import] FX valuation failed: ${e.message}`);
-      return res.status(502).json({ error: 'Could not value the statement in IDR. Nothing was imported.', code: 'fx_unavailable' });
-    }
-
-    // 3) One transaction.
-    const result = await runAtomicBankConfirm({ biz, batch, plan, actorUserId: req.user.userId, flow: 'legacy', reviewed, opening });
-    if (result.status !== 200) return res.status(result.status).json(result.body);
-    return respond(result.body);
-  } catch (e) {const r=bankImportReview.errorBody(e);res.status(e.status||r.status).json(r.body);}
-});
+// Retained Classic address uses the same persisted decisions/review/receipt
+// contract. It cannot select extra confirmed rows or override them with hints.
+app.post('/api/bank-import/batches/:id/confirm', auth, (req,res) => confirmReviewedBankImport(req,res,req.params.id));
 
 // ═════════════════════════════════════════════════════════════════════════════
 //  AI CATEGORIZATION — Phase 2: deterministic suggestion cascade (no AI, no
@@ -6893,7 +6808,8 @@ app.get('/api/bank-imports/:batchId/review', auth, async (req, res) => {
 // POST /api/bank-imports/:batchId/confirm — confirm rows with FINAL decisions,
 // then create transactions. The user's choice always overrides the suggestion.
 // Records classification_feedback (suggestion vs final) for audit + rule promotion.
-app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
+app.post('/api/bank-imports/:batchId/confirm', auth, (req,res) => confirmReviewedBankImport(req,res,req.params.batchId));
+async function confirmReviewedBankImport(req,res,batchId) {
   try {
     const biz = await requireBusiness(req, res);
     if (!biz) return;
@@ -6901,9 +6817,9 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       return res.status(403).json({ error: 'Your role cannot confirm bank imports' });
 
     const { data: batch } = await supabase.from('bank_import_batches')
-      .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
+      .select('*').eq('id', batchId).eq('business_id', biz.business.id).single();
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
-    const reviewed=bankImportReview.importRequest(req.body,req.params.batchId);
+    const reviewed=bankImportReview.importRequest(req.body,batchId);
     res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
     if(await bankImportReview.replay(supabase,req,res,biz,batch.id,reviewed))return;
     const openingState=await bankImportReview.reviewedState(supabase,biz.business.id,batch.id,req.user.userId);
@@ -7027,7 +6943,7 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
     if (result.status !== 200) return res.status(result.status).json(result.body);
     return respond(result.body);
   } catch (e) {const r=bankImportReview.errorBody(e);res.status(e.status||r.status).json(r.body);}
-});
+}
 
 // POST /api/bank-imports/:batchId/rows/:rowId/exclude — drop a row from import.
 app.post('/api/bank-imports/:batchId/rows/:rowId/exclude', auth, async (req, res) => {
