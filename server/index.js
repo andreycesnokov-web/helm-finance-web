@@ -15,6 +15,7 @@ const TX = require('./lib/transactionClass');
 const WL = require('./lib/walletLedger');
 const { balanceFailure, databaseFailureBody, nativeInputIsExact } = require('./lib/balanceFailure');
 const financialRecovery = require('./lib/financialRecovery');
+const bankImportReview = require('./lib/bankImportReview');
 const walletHistory = require('./lib/walletHistory');
 const profileValidation = require('./lib/profileValidation');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
@@ -894,6 +895,7 @@ async function replayFinancialCreate(req, res, biz, operation, rawIntent) {
   return financialRecovery.replay(supabase,req,res,biz,operation,req.body.request_key,canonical);
 }
 financialRecovery.install(app,{auth,requireBusiness,supabase});
+bankImportReview.install(app,{auth,requireBusiness,supabase});
 
 function canUseAiCfo(role)                     { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
 // Category structure: who may create/edit/archive business categories.
@@ -4207,26 +4209,23 @@ const BANK_CONFIRM_ERROR_STATUS = [
 ];
 
 // Calls the atomic RPC and maps its outcome to { status, body }.
-async function runAtomicBankConfirm({ biz, batch, plan, actorUserId, flow }) {
-  const { data, error } = await supabase.rpc('rpc_confirm_bank_import', {
-    p_business_id: biz.business.id, p_batch_id: batch.id,
-    p_owner_user_id: biz.ownerUserId, p_actor_user_id: actorUserId,
-    p_plan: plan, p_flow: flow,
-  });
+async function runAtomicBankConfirm({ biz, batch, plan, actorUserId, flow, reviewed, opening }) {
+  const {data,error}=await bankImportReview.confirm(supabase,{biz,batch,actorUserId,plan,flow,reviewed,opening});
   if (error) {
+    const controlled=bankImportReview.errorBody(error);if(controlled.status!==503)return controlled;
     const conflict = databaseFailureBody(error);
-    if (conflict) return conflict;
+    if (conflict) return {...conflict,body:{...conflict.body,outcome:error.code==='P0001'?'rolled_back':'unknown',automatic_retry:false}};
     const msg = String(error.message || '');
     if (error.code === 'PGRST202' || error.code === '42883' || /rpc_confirm_bank_import/.test(msg) && /(does not exist|Could not find)/i.test(msg)) {
-      console.error('[bank-import] rpc_confirm_bank_import missing — migration 069 not applied');
-      return { status: 503, body: { error: 'Bank import is temporarily unavailable (database update 069 missing). Nothing was imported.', code: 'database_schema_mismatch' } };
+      console.error('[bank-import] reviewed import RPC is unavailable');
+      return { status: 503, body: { error: 'import_schema_unavailable', code: 'database_schema_mismatch',outcome:'unknown',automatic_retry:false } };
     }
     const m = /^([a-z_]+):\s*(.*)$/.exec(msg);
     const hit = BANK_CONFIRM_ERROR_STATUS.find(([re]) => re.test(msg));
     if (!hit) console.error(`[bank-import] atomic confirm failed: ${msg}`);
     return hit
-      ? { status: hit[1], body: { error: `${m ? m[2] : msg}. Nothing was imported.`, code: m ? m[1] : 'bank_import_confirm_failed' } }
-      : { status: 500, body: { error: 'Bank import confirm failed. Nothing was imported.', code: 'bank_import_confirm_failed' } };
+      ? { status: hit[1], body: { error: m ? m[2] : msg, code: m ? m[1] : 'bank_import_confirm_failed',outcome:error.code==='P0001'?'rolled_back':'unknown',automatic_retry:false } }
+      : { status: 503, body: { error: 'import_outcome_unknown', code: 'bank_import_confirm_failed',outcome:'unknown',automatic_retry:false } };
   }
   // data.already_processed = every requested row was already in the ledger: nothing written.
   return { status: 200, body: data };
@@ -6406,7 +6405,11 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
 
     const { data: batch } = await supabase.from('bank_import_batches').select('*').eq('id', req.params.id).eq('business_id', biz.business.id).single();
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
-    if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
+    const reviewed=bankImportReview.importRequest(req.body,req.params.id);
+    res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
+    if(await bankImportReview.replay(supabase,req,res,biz,batch.id,reviewed))return;
+    const openingState=await bankImportReview.reviewedState(supabase,biz.business.id,batch.id,req.user.userId);
+    const opening=await bankImportReview.pricedOpening(reviewed,openingState,fx);
     if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
     const periodProblem = statementPeriodProblem(batch);
     if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
@@ -6415,7 +6418,7 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
     // Import rows the user confirmed (not duplicates, not rejected). review_status
     // 'confirmed' (new review queue) OR legacy match_status 'confirmed'.
     const isConfirmed = (r) => (r.review_status === 'confirmed' || r.match_status === 'confirmed') && r.review_status !== 'excluded';
-    const toImport = (rows || []).filter(r => isConfirmed(r) && !r.linked_transaction_id);
+    const toImport = (rows || []).filter(isConfirmed);
 
     // Bridge (PR2, migration 049): confirmed CREDIT lines also become incoming-payment
     // evidence. Entirely inside the flag — with INCOMING_PAYMENTS_ENABLED off this call is
@@ -6425,11 +6428,11 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
     const respond = async (out) => {
       const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
       const incoming_payments = await bridgeBankBatchToIncomingPayments({ batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
-      res.json({ ok: true, imported: out.imported, status: out.status, reconciliation: out.reconciliation,
+      res.json({ ...out, ok: true, imported: out.imported, status: out.status, reconciliation: out.reconciliation,
                  ...(incoming_payments ? { incoming_payments } : {}) });
     };
     // Repeat confirm: nothing to write. Unlike before, no empty reconciliation snapshot is stored.
-    if (!toImport.length) return respond({ imported: 0, status: batch.status, reconciliation: null });
+    if (!toImport.length) return res.status(400).json({error:'rows required',code:'invalid_plan',automatic_retry:false});
 
     // Resolve category ids → names (ledger is TEXT). Prefer the user's FINAL choice.
     const catMap = await loadBusinessCategoryMap(biz);
@@ -6476,10 +6479,10 @@ app.post('/api/bank-import/batches/:id/confirm', auth, async (req, res) => {
     }
 
     // 3) One transaction.
-    const result = await runAtomicBankConfirm({ biz, batch, plan, actorUserId: req.user.userId, flow: 'legacy' });
+    const result = await runAtomicBankConfirm({ biz, batch, plan, actorUserId: req.user.userId, flow: 'legacy', reviewed, opening });
     if (result.status !== 200) return res.status(result.status).json(result.body);
     return respond(result.body);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {const r=bankImportReview.errorBody(e);res.status(e.status||r.status).json(r.body);}
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -6876,13 +6879,15 @@ app.get('/api/bank-imports/:batchId/review', auth, async (req, res) => {
       excluded: count(r => r.review_status === 'excluded'),
     };
 
+    const reviewed=await bankImportReview.reviewedState(supabase,biz.business.id,batch.id,req.user.userId);
+    res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
     res.json({
-      batch, rows: all,
+      reviewed:{...reviewed,can_confirm:canCreateConfirmedFinancialRecord(biz.role)}, batch, rows: all,
       categories: cats || [], counterparties: cps || [],
       reconciliation: recon?.[0] || null, summary,
       canManageCategories: canManageCategories(biz.role),
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch(e){const r=bankImportReview.errorBody(e);res.status(e.status||r.status).json(r.body);}
 });
 
 // POST /api/bank-imports/:batchId/confirm — confirm rows with FINAL decisions,
@@ -6898,7 +6903,11 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
     const { data: batch } = await supabase.from('bank_import_batches')
       .select('*').eq('id', req.params.batchId).eq('business_id', biz.business.id).single();
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
-    if (batch.status === 'imported') return res.status(400).json({ error: 'Batch already imported' });
+    const reviewed=bankImportReview.importRequest(req.body,req.params.batchId);
+    res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
+    if(await bankImportReview.replay(supabase,req,res,biz,batch.id,reviewed))return;
+    const openingState=await bankImportReview.reviewedState(supabase,biz.business.id,batch.id,req.user.userId);
+    const opening=await bankImportReview.pricedOpening(reviewed,openingState,fx);
     if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
     const periodProblem = statementPeriodProblem(batch);
     if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
@@ -6933,7 +6942,7 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       const row = rowById.get(p.row_id);
       const bad = (error) => problems.push({ row_id: p.row_id, row_index: row?.row_index ?? null, error });
       if (!row) { bad('Row does not belong to this batch'); continue; }
-      if (row.linked_transaction_id) continue;   // already in the ledger — repeat confirm
+      if (row.linked_transaction_id) {prepared.push({row,action:'processed',item:{row_id:row.id,action:'create'}});continue;} // durable no-op or original-key replay, never duplicate cash
 
       const action = p.match_action === 'link' ? 'link' : p.match_action === 'exclude' ? 'exclude' : 'create';
       const type = p.transaction_type || row.suggested_transaction_type || row.suggested_type || (row.direction === 'in' ? 'income' : 'expense');
@@ -6994,12 +7003,12 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
       const { data: bridgeRows } = await supabase.from('bank_import_rows').select('*').eq('batch_id', batch.id);
       const incoming_payments = await bridgeBankBatchToIncomingPayments({
         batch, rows: bridgeRows, biz, actingUserId: req.user.userId });
-      res.json({ ok: true, imported: out.imported, linked: out.linked, status: out.status, reconciliation: out.reconciliation,
+      res.json({ ...out, ok: true, imported: out.imported, linked: out.linked, status: out.status, reconciliation: out.reconciliation,
                  ...(incoming_payments ? { incoming_payments } : {}) });
     };
     // Every requested row is already in the ledger (repeat / double click): nothing is written —
     // unlike before, not even an empty reconciliation snapshot.
-    if (!prepared.length) return respond({ imported: 0, linked: 0, status: batch.status, reconciliation: null });
+    if (!prepared.length) return res.status(400).json({error:'rows required',code:'invalid_plan',automatic_retry:false});
 
     // 2) FX outside the database transaction (may call a rate provider).
     try {
@@ -7014,10 +7023,10 @@ app.post('/api/bank-imports/:batchId/confirm', auth, async (req, res) => {
     }
 
     // 3) One transaction: transactions, row links, feedback, reconciliation, batch status.
-    const result = await runAtomicBankConfirm({ biz, batch, plan: prepared.map(pr => pr.item), actorUserId: req.user.userId, flow: 'review' });
+    const result = await runAtomicBankConfirm({ biz, batch, plan: prepared.map(pr => pr.item), actorUserId: req.user.userId, flow: 'review', reviewed, opening });
     if (result.status !== 200) return res.status(result.status).json(result.body);
     return respond(result.body);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {const r=bankImportReview.errorBody(e);res.status(e.status||r.status).json(r.body);}
 });
 
 // POST /api/bank-imports/:batchId/rows/:rowId/exclude — drop a row from import.

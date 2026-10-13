@@ -265,8 +265,13 @@ export const createImportBatch = (token, body) =>
 export const suggestImport = (token, batchId) =>
   apiFetch(`/bank-imports/${encodeURIComponent(batchId)}/suggest`, token, { method: 'POST', body: {} })
 
-export const confirmImport = (token, batchId, rows) =>
-  apiFetch(`/bank-imports/${encodeURIComponent(batchId)}/confirm`, token, { method: 'POST', body: { rows } })
+// importConfirmOperation supplies the persisted request key, reviewed hash and
+// exact original decisions. Never make a fresh-key retry after an unknown result.
+export const confirmImport = (token, batchId, body) =>
+  apiFetch(`/bank-imports/${encodeURIComponent(batchId)}/confirm`, token, { method: 'POST', body })
+
+export const readImportConfirmReceipt = (token, batchId, requestKey) =>
+  apiFetch(`/bank-imports/${encodeURIComponent(batchId)}/requests/${encodeURIComponent(requestKey)}`, token)
 
 export const createClassificationRule = (token, body) =>
   apiFetch('/classification-rules', token, { method: 'POST', body })

@@ -11,7 +11,7 @@ const rendererPath = process.env.REACT_TEST_RENDERER_PATH || 'react-test-rendere
 const renderer = require(rendererPath);
 const React = require(require.resolve('react', { paths: [path.dirname(require.resolve(rendererPath))] }));
 const { act } = renderer;
-const ROOT = process.env.V2_SCOPE_TEST_ROOT || path.resolve(__dirname, '../..');
+const ROOT = (process.env.V2_SCOPE_TEST_ROOT || path.resolve(__dirname, '../..')).replace(/\\/g, '/');
 const A = '11111111-1111-1111-1111-111111111111';
 const B = '22222222-2222-2222-2222-222222222222';
 const companies = [A, B].map((id, i) => ({ id, name: i ? 'Company B' : 'Company A', type: 'business', role: 'owner', country: 'Indonesia', timezone: 'Asia/Jakarta', base_currency: 'IDR' }));
@@ -93,15 +93,18 @@ test.after(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 
 // Defer one real pipeline boundary. Everything goes through the app's API client;
 // the signed storage URL is synthetic and no real documents or cash are written.
-function importServer({ hold, duplicate = false, failFirst = false } = {}) {
+function importServer({ hold, duplicate = false, failFirst = false, dropConfirm = false, partial = false, canConfirm = true, knownOpening = false } = {}) {
   const normalFetch = global.fetch;
   const calls = [];
   const gate = { release: null };
-  let imported = false;
+  let imported = false, receipt=null, confirms=0;
+  const row2='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const hash=()=>((partial&&confirms===1)?'b':'a').repeat(64);
   const review = () => ({
-    batch: { id: 'batch-A', status: imported ? 'imported' : 'review_required', currency: 'IDR', opening_balance: 100, closing_balance: 90, statement_end: '2026-05-31' },
-    rows: [{ id: 'row-A', row_index: 0, tx_date: '2026-05-10', description: 'Bank admin fee', amount: 10, direction: 'out', review_status: 'needs_review' }],
-    categories: [{ id: 401, name: 'Bank fee and admin', group_type: 'outflow' }],
+    batch: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', status: imported ? 'imported' : partial&&confirms===1 ? 'partially_imported' : 'review_required', currency: 'IDR', opening_balance: 100, closing_balance: partial?110:90, statement_start:'2026-05-01', statement_end: '2026-05-31' },
+    rows: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', row_index: 0, tx_date: '2026-05-10', description: 'Bank admin fee', amount: 10, direction: 'out', review_status: partial&&confirms>0?'imported':'needs_review',linked_transaction_id:partial&&confirms>0?700:null },...(partial?[{id:row2,row_index:1,tx_date:'2026-05-11',description:'STAGE receipt',amount:20,direction:'in',review_status:imported?'imported':'needs_review',linked_transaction_id:imported?701:null}]:[])],
+    categories: [{ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', name: 'Bank fee and admin', group_type: 'outflow' }],
+    reviewed:{review_hash:hash(),can_confirm:canConfirm,can_correct_opening:knownOpening,opening_state:knownOpening?'known':'unknown',historical_opening:knownOpening?'80':null,current_balance:'60'},
   });
   global.fetch = async (url, opts = {}) => {
     const p = String(url), method = opts.method || 'GET';
@@ -121,14 +124,17 @@ function importServer({ hold, duplicate = false, failFirst = false } = {}) {
     else if (p === '/api/bank-import/read') {
       stage = 'read';
       result = { ok: true, method: 'csv', suggested_wallet_id: `wallet-${A}`, statement: { currency: 'IDR', period_start: '2026-05-01', period_end: '2026-05-31', opening: 100, closing: 90, checks: { balances: true }, rows: review().rows } };
-    } else if (p === '/api/bank-import/batches' && method === 'POST') { stage = 'batch'; result = { batch: { id: 'batch-A' } }; }
+    } else if (p === '/api/bank-import/batches' && method === 'POST') { stage = 'batch'; result = { batch: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } }; }
     else if (p.endsWith('/filing')) { stage = 'filing'; result = {}; }
     else if (p.endsWith('/suggest')) { stage = 'suggest'; result = {}; }
     else if (p === '/api/classification-rules') { stage = 'rule'; result = {}; }
-    else if (p.endsWith('/confirm')) { stage = 'confirm'; imported = true; result = {}; }
-    else if (p === '/api/bank-imports/batch-A/review') return id === A ? respond(review()) : respond({ error: 'not_found' }, 404);
+    else if (p.endsWith('/confirm')) { stage='confirm';confirms++;imported=!partial||confirms>1;const {request_key,...payload}=body;result={ok:true,request_id:request_key,batch_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',review_hash:payload.review_hash,imported:1,linked:0,status:imported?'imported':'partially_imported'};receipt={state:'confirmed',request_id:request_key,batch_id:result.batch_id,intent:{version:1,operation:'bank_import_confirm',batch_id:result.batch_id,...payload},result}; }
+    else if(p.includes('/requests/')){stage='receipt';result=receipt||{state:'not_found'};}
+    else if(p.endsWith('/receipts')){stage='history';result={rows:[]};}
+    else if (p === '/api/bank-imports/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/review') return id === A ? respond(review()) : respond({ error: 'not_found' }, 404);
     else return normalFetch(url, opts);
     calls.push({ p, method, id, file, body, stage });
+    if(stage==='confirm'&&dropConfirm&&confirms===1)throw Error('Synthetic response lost after commit');
     if (stage === hold && !gate.release && (stage !== 'init' && stage !== 'storage' && stage !== 'complete' || first)) {
       return new Promise(resolve => { gate.release = () => resolve(respond(result, status)); });
     }
@@ -245,14 +251,14 @@ test('same-company start creates batch, files both documents and opens review', 
 async function enableRule() {
   const row = root.root.findAll(x => x.props['data-imp-row'] === 'bank_fee')[0];
   assert.ok(row, 'bank fee must offer classification rule');
-  await act(async () => row.findByType('select').props.onChange({ target: { value: '401' } }));
-  const checkbox = root.root.findAllByType('input').find(x => x.props.type === 'checkbox');
+  await act(async () => row.findByType('select').props.onChange({ target: { value: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' } }));
+  const checkbox = root.root.findAllByType('input').find(x => x.props['data-imp-rule-save']!==undefined);
   assert.ok(checkbox);
   await act(async () => checkbox.props.onChange({ target: { checked: true } }));
 }
 for (const stage of ['rule', 'confirm']) {
   test(`confirm stops after company switch during ${stage}`, async () => {
-    const server = importServer({ hold: stage }); await mount('/business/bank-import?batch=batch-A');
+    const server = importServer({ hold: stage }); await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     await until(() => has('data-imp-confirm'), 'review must open');
     await enableRule();
     await click(root.root.findByProps({ 'data-imp-confirm': true }));
@@ -266,11 +272,34 @@ for (const stage of ['rule', 'confirm']) {
 }
 
 test('same-company confirm saves rule and displays completed import', async () => {
-  const server = importServer(); await mount('/business/bank-import?batch=batch-A');
+  const server = importServer(); await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   await until(() => has('data-imp-confirm'), 'review must open'); await enableRule();
   await click(root.root.findByProps({ 'data-imp-confirm': true }));
   await until(() => has('data-imp-done'), 'done must open');
   assert.equal(server.calls.filter(x => x.stage === 'rule').length, 1);
   assert.equal(server.calls.filter(x => x.stage === 'confirm').length, 1);
   assert.ok(server.calls.every(x => x.id === A));
+});
+
+test('partial selection stays in review and confirms only remaining row with a fresh identity',async()=>{
+ const server=importServer({partial:true});await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');await until(()=>has('data-imp-confirm'),'review opens');
+ await act(async()=>root.root.findByProps({'data-imp-select':'dddddddd-dddd-4ddd-8ddd-dddddddddddd'}).props.onChange({target:{checked:false}}));
+ await click(root.root.findByProps({'data-imp-confirm':true}));await until(()=>root.root.findByProps({'data-imp-select':'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'}).props.disabled,'confirmed row becomes immutable');
+ assert(!has('data-imp-done'));await act(async()=>root.root.findByProps({'data-imp-select':'dddddddd-dddd-4ddd-8ddd-dddddddddddd'}).props.onChange({target:{checked:true}}));
+ await click(root.root.findByProps({'data-imp-confirm':true}));await until(()=>has('data-imp-done'),'done after remaining row');
+ const posts=server.calls.filter(x=>x.stage==='confirm');assert.equal(posts.length,2);assert.deepEqual(posts[0].body.rows.map(r=>r.row_id),['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']);assert.deepEqual(posts[1].body.rows.map(r=>r.row_id),['dddddddd-dddd-4ddd-8ddd-dddddddddddd']);assert.notEqual(posts[0].body.request_key,posts[1].body.request_key);assert.notEqual(posts[0].body.review_hash,posts[1].body.review_hash);
+});
+
+test('committed response loss survives page remount; recovery checks own original receipt without another POST',async()=>{
+ const server=importServer({dropConfirm:true});await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');await until(()=>has('data-imp-confirm'),'review opens');await click(root.root.findByProps({'data-imp-confirm':true}));await settle();assert(!has('data-imp-done'));
+ await act(async()=>root.unmount());root=null;await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');await until(()=>has('data-imp-recover'),'pending recovery retained after reload');await click(root.root.findByProps({'data-imp-recover':true}));await until(()=>has('data-imp-done'),'own committed result accepted');assert.equal(server.calls.filter(x=>x.stage==='confirm').length,1);const posts=server.calls.filter(x=>x.stage==='confirm');assert(server.calls.filter(x=>x.stage==='receipt').every(x=>x.p.endsWith(posts[0].body.request_key)));
+});
+
+test('readonly reviewed membership disables confirmation and refuses programmatic submission',async()=>{
+ const server=importServer({canConfirm:false});await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');await until(()=>has('data-imp-confirm'),'review opens');const button=root.root.findByProps({'data-imp-confirm':true});assert(button.props.disabled);await click(button);await settle();assert.equal(server.calls.filter(x=>x.stage==='confirm').length,0);
+});
+
+test('opening correction is only an explicit part of confirm and uses historical80 instead of current60',async()=>{
+ const server=importServer({knownOpening:true});await mount('/business/bank-import?batch=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');await until(()=>has('data-imp-opening'),'dated opening control opens');assert.equal(root.root.findByProps({'data-imp-opening':true}).props.checked,false);
+ await act(async()=>root.root.findByProps({'data-imp-opening':true}).props.onChange({target:{checked:true}}));assert(root.root.findByProps({'data-imp-confirm':true}).props.disabled);await act(async()=>root.root.findByProps({'data-imp-opening-reason':true}).props.onChange({target:{value:'STAGE explicit opening reason'}}));await click(root.root.findByProps({'data-imp-confirm':true}));await until(()=>has('data-imp-done'),'done');const posts=server.calls.filter(x=>x.stage==='confirm');assert.equal(posts.length,1);assert.deepEqual(posts[0].body.opening,{expected_historical_opening:'80',target_opening:'100',reason:'STAGE explicit opening reason'});assert(!server.calls.some(x=>x.p.includes('adjust-balance')));
 });

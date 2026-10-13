@@ -13,6 +13,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../../hooks/useAuth'
+import {performImportConfirm,recoverImportConfirm,resumeImportConfirm,importPending,importCurrent} from '../../lib/importConfirmOperation'
+import {financialActor} from '../../lib/financialRecovery'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import I from '../icons'
@@ -23,7 +25,7 @@ import { money, shortDate } from '../lib/format'
 import { insightOf } from '../lib/statementInsights'
 import { catLabel } from '../lib/categoryLabel'
 import {
-  uploadStatementFile, readStatement, createImportBatch, suggestImport, confirmImport, createClassificationRule, fileDocument, adjustWalletBalance,
+  uploadStatementFile, readStatement, createImportBatch, suggestImport, createClassificationRule, fileDocument, confirmImport, readImportConfirmReceipt,
 } from '../lib/actions'
 
 const STEPS = ['file', 'rows', 'done']
@@ -146,21 +148,6 @@ function FileStep() {
   const ccy = (wallet?.currency || st?.currency || 'IDR')
   const pending = targetMonth && walletId ? (batches.data?.batches || []).find((b) => String(b.wallet_id) === String(walletId)
     && b.statement_start && b.statement_end && String(b.statement_start).slice(0, 7) <= targetMonth && String(b.statement_end).slice(0, 7) >= targetMonth) : null
-  // The account should hold the statement's opening balance before its rows are added.
-  const openGap = wallet && st && st.opening != null && Math.abs(Number(wallet.balance || 0) - Number(st.opening)) >= 1
-    && !(main?.read?.overlapping_batches || []).some((b) => String(b.wallet_id) === String(wallet.id))
-  const setOpening = async () => {
-    if (!request.isCurrent()) return
-    setBusy(true); setErr('')
-    try {
-      const d = new Date(`${st.period_start}T00:00:00Z`); d.setUTCDate(d.getUTCDate() - 1)
-      await adjustWalletBalance(request, wallet.id, { target_balance: Number(st.opening), transaction_date: d.toISOString().slice(0, 10), reason: t('imp.openingReason') })
-      if (!request.isCurrent()) return
-      invalidate(); wallets.reload()
-    } catch (x) {
-      if (request.isCurrent()) setErr(x?.status === 403 ? t('accd.noRights') : (x?.data?.error || x?.message))
-    } finally { if (request.isCurrent()) setBusy(false) }
-  }
   const wrongCurrency = wallet && st && st.currency && String(wallet.currency || 'IDR') !== String(st.currency)
   const overlap = (main?.read?.overlapping_batches || []).filter((b) => wallet && String(b.wallet_id) === String(wallet.id))
   return (
@@ -221,12 +208,7 @@ function FileStep() {
             </span>
           </div>
         )}
-        {openGap && !wrongCurrency && (
-          <div className="v2-banner v2-tone-warn" role="status" data-imp-opengap><I.warn size={18} />
-            <span className="v2-banner-text">{t('imp.openGap', { name: wallet.name, now: money(wallet.balance, { currency: ccy, full: true }), open: money(st.opening, { currency: ccy, full: true }) })}</span>
-            <button type="button" className="v2-btn v2-btn-secondary" disabled={busy} onClick={setOpening}>{t('imp.setOpening')}</button>
-          </div>
-        )}
+        {st?.opening!=null&&<p className="v2-muted v2-small">{t('imp.safe.openingLater')}</p>}
         {wrongCurrency && <p className="v2-inline-err" role="alert">{t('imp.err.currency', { a: wallet.currency || 'IDR', f: st.currency })}</p>}
         {overlap.length > 0 && <div className="v2-banner v2-tone-warn" role="status"><I.warn size={18} /><span className="v2-banner-text">{t('imp.overlap', { d: shortDate(overlap[0].created_at, lang) })}</span></div>}
         {err && <p className="v2-inline-err" role="alert">{err}</p>}
@@ -273,6 +255,9 @@ function RowsStep({ batchId }) {
   const invalidate = useInvalidate()
   const rev = useApi(`/bank-imports/${batchId}/review`)
   const me = useApi('/me/profile')
+  const confirming=useRef(false)
+  const [recoveryMsg,setRecoveryMsg]=useState(''),[recovering,setRecovering]=useState(false),[applyOpening,setApplyOpening]=useState(false),[openingReason,setOpeningReason]=useState('')
+  useEffect(()=>{confirming.current=false;setDec({});setErr('');setRecoveryMsg('');setApplyOpening(false);setOpeningReason('')},[batchId,request.businessId,financialActor(request.token)])
   const [dec, setDec] = useState({})          // row id → { category_id, exclude, ok }
   const [tab, setTab] = useState('all')
   const [busy, setBusy] = useState(false)
@@ -286,10 +271,12 @@ function RowsStep({ batchId }) {
     otherCompanies: (workspaces?.business || []).filter((b) => String(b.id) !== String(active?.id)).map((b) => b.name),
     ownerNames: [me.data?.profile?.display_name, user?.firstName].filter(Boolean),
   }), [active, workspaces, me.data, user])
+  const completed=data?.batch?.status==='imported'&&!importPending(request,batchId)
+  useEffect(()=>{if(completed&&importCurrent(request))nav(`/business/bank-import?batch=${batchId}&done=1`,{replace:true})},[completed,request,batchId,nav])
   if (rev.loading) return <div className="v2-page"><PageHead title={t('imp.title')} /><Steps cur="rows" /><Card><Skeleton rows={8} /></Card></div>
   if (rev.error) return <div className="v2-page"><PageHead title={t('imp.title')} /><ErrorBox error={rev.error} onRetry={rev.reload} /></div>
   const batch = data.batch
-  if (batch.status === 'imported') { nav(`/business/bank-import?batch=${batchId}&done=1`, { replace: true }); return null }
+  if (completed) return null
   const rows = (data.rows || []).slice().sort((a, b) => (a.row_index ?? 0) - (b.row_index ?? 0))
   const bucketOf = (r) => (dec[r.id]?.exclude ? 'excluded' : r.match_status === 'duplicate' ? 'duplicate'
     : r.review_status === 'matched_existing' && r.suggested_match_type === 'transfer' ? 'suggested'   // a same-amount pair in this statement
@@ -302,11 +289,15 @@ function RowsStep({ batchId }) {
   const balances = batch.opening_balance != null && batch.closing_balance != null ? Math.abs(Number(batch.opening_balance) + signed - Number(batch.closing_balance)) < 1 : null
   const set = (id, p) => setDec((d) => ({ ...d, [id]: { ...(d[id] || {}), ...p } }))
 
+  const io={send:confirmImport,read:readImportConfirmReceipt}
+  const recovered=async retry=>{if(recovering||!importCurrent(request))return;setRecovering(true);try{const r=retry?await resumeImportConfirm(request,batchId,io):await recoverImportConfirm(request,batchId,io);if(!importCurrent(request))return;setRecoveryMsg(t(r?.ok?'imp.safe.recovered':'imp.safe.pending'));if(r?.ok){invalidate();rev.reload()}}catch{if(importCurrent(request))setRecoveryMsg(t('imp.safe.pending'))}finally{if(importCurrent(request))setRecovering(false)}}
+  const reviewed=data.reviewed,selected=rows.filter(r=>!r.linked_transaction_id&&dec[r.id]?.selected!==false),pending=importPending(request,batchId)
   const confirm = async () => {
-    if (!request.isCurrent()) return
+    if (confirming.current||!importCurrent(request)||!reviewed?.review_hash||!reviewed.can_confirm||!selected.length) return
+    confirming.current=true
     setBusy(true); setErr('')
     try {
-      const payload = rows.filter((r) => !r.linked_transaction_id).map((r) => {
+      const payload = selected.map((r) => {
         const b = bucketOf(r)
         if (b === 'excluded' || b === 'duplicate') return { row_id: r.id, match_action: 'exclude' }
         if (b === 'matched_existing' && (r.suggested_match_type === 'existing_tx' || r.matched_transaction_id)) return { row_id: r.id, match_action: 'link' }
@@ -315,24 +306,35 @@ function RowsStep({ batchId }) {
         // Direction from the statement: in = income, out = expense — the category says what it is.
         return { row_id: r.id, transaction_type: r.direction === 'in' ? 'income' : 'expense', category_id: cid || null, scope: 'business' }
       })
+      if (!request.isCurrent()) return
+      if(applyOpening&&!openingReason.trim())throw Error(t('imp.safe.reasonRequired'))
+      const body={rows:payload,review_hash:reviewed.review_hash,opening:applyOpening?{expected_historical_opening:reviewed.historical_opening,target_opening:String(batch.opening_balance),reason:openingReason}:null}
+      const result=await performImportConfirm(request,batchId,body,io)
+      if (!importCurrent(request)) return
       if (rule?.save && rule.text && rule.category_id) {
         try { await createClassificationRule(request, { rule_name: rule.text, match_type: 'contains', match_value: rule.text, category_id: rule.category_id, created_from: 'bank_import' }) } catch { /* the import does not depend on the rule */ }
       }
-      if (!request.isCurrent()) return
-      await confirmImport(request, batchId, payload)
-      if (!request.isCurrent()) return
+      if(!importCurrent(request))return
       invalidate()
-      nav(`/business/bank-import?batch=${batchId}&done=1`)
+      if(result.status==='imported')nav(`/business/bank-import?batch=${batchId}&done=1`);else {setApplyOpening(false);setRecoveryMsg(t('imp.safe.partial'));rev.reload()}
     } catch (x) {
-      if (request.isCurrent()) setErr(x?.status === 409 ? t('imp.err.changed') : t('imp.err.confirm', { msg: x?.data?.message || x?.data?.error || x?.message }))
-    } finally { if (request.isCurrent()) setBusy(false) }
+      if (importCurrent(request)) setErr(x?.data?.outcome==='rolled_back'&&x?.status===409?t('imp.err.changed'):t('imp.safe.pending'))
+    } finally { if (importCurrent(request)){setBusy(false);confirming.current=false} }
   }
 
   return (
     <div className="v2-page">
       <PageHead title={t('imp.rowsTitle', { n: rows.length })} sub={t('imp.rowsSub')} back={{ to: '/business/bank-import', label: t('imp.step.file') }}
-        actions={<button type="button" className="v2-btn v2-btn-primary" disabled={busy} onClick={confirm} data-imp-confirm>{busy ? t('imp.confirming') : t('imp.confirm')}</button>} />
+        actions={<button type="button" className="v2-btn v2-btn-primary" disabled={busy||!reviewed?.can_confirm||!selected.length||!reviewed?.review_hash||applyOpening&&!openingReason.trim()} onClick={confirm} data-imp-confirm>{busy ? t('imp.confirming') : t('imp.confirm')}</button>} />
       <Steps cur="rows" />
+      <Card title={t('imp.safe.reviewTitle')}>
+        <p data-imp-historical>{reviewed?.opening_state==='known'?t('imp.safe.historical',{v:money(reviewed.historical_opening,{currency:ccy,full:true}),d:shortDate(batch.statement_start,lang)}):t('imp.safe.unknown')}</p>
+        <p className="v2-muted">{t('imp.safe.current',{v:money(reviewed?.current_balance,{currency:ccy,full:true})})}</p>
+        {reviewed?.opening_state==='known'&&reviewed.can_correct_opening&&batch.opening_balance!=null&&<label className="v2-field"><span><input type="checkbox" checked={applyOpening} disabled={busy||pending} onChange={e=>setApplyOpening(e.target.checked)} data-imp-opening/>{t('imp.safe.applyOpening',{v:money(batch.opening_balance,{currency:ccy,full:true})})}</span></label>}
+        {applyOpening&&<label className="v2-field"><span>{t('imp.safe.reason')}</span><input value={openingReason} maxLength={500} onChange={e=>setOpeningReason(e.target.value)} data-imp-opening-reason/></label>}
+        <div className="v2-row-gap"><button className="v2-btn v2-btn-secondary" disabled={busy||recovering} onClick={()=>recovered(false)} data-imp-recover>{t('imp.safe.check')}</button>{pending&&<button className="v2-btn v2-btn-ghost" disabled={busy||recovering} onClick={()=>recovered(true)} data-imp-resume>{t('imp.safe.retry')}</button>}<button className="v2-btn v2-btn-ghost" disabled={busy||recovering||pending} onClick={()=>{setDec({});setApplyOpening(false);rev.reload()}}>{t('imp.safe.reload')}</button></div>
+        {recoveryMsg&&<p role="status">{recoveryMsg}</p>}
+      </Card>
       <nav className="v2-seg v2-set-tabs" aria-label={t('imp.filter')}>
         <button type="button" className="v2-seg-btn" aria-pressed={tab === 'all'} onClick={() => setTab('all')}>{t('imp.all')} · {rows.length}</button>
         {BUCKETS.filter((b) => counts[b] > 0).map((b) => <button key={b} type="button" className="v2-seg-btn" aria-pressed={tab === b} onClick={() => setTab(b)}>{t(`imp.b.${b}`)} · {counts[b]}</button>)}
@@ -346,7 +348,7 @@ function RowsStep({ batchId }) {
             const taxAmt = TAX_RATE[ins.tax] ? Math.round(Number(r.amount) * TAX_RATE[ins.tax]) : null
             return (
               <li key={r.id} className={`is-${b}`} data-imp-row={ins.kind} data-bucket={b}>
-                <span className="v2-num v2-imp-date">{shortDate(r.tx_date, lang)}</span>
+                <label><input type="checkbox" checked={!r.linked_transaction_id&&dec[r.id]?.selected!==false} disabled={busy||!!r.linked_transaction_id||pending} onChange={e=>set(r.id,{selected:e.target.checked})} aria-label={t('imp.safe.select')} data-imp-select={r.id}/></label><span className="v2-num v2-imp-date">{shortDate(r.tx_date, lang)}</span>
                 <span className="v2-imp-text"><strong>{ins.counterparty || r.description}</strong>
                   <span className="v2-muted v2-small v2-block">{ins.counterparty ? r.description : ''}</span>
                   <span className="v2-small v2-block">{t(`imp.k.${ins.kind}`, { other: ins.other || '' })}{r.suggestion_source && r.suggestion_source !== 'none' && <span className="v2-muted"> · {t(`imp.src.${r.suggestion_source}`) !== `imp.src.${r.suggestion_source}` ? t(`imp.src.${r.suggestion_source}`) : r.suggestion_source}</span>}</span>
@@ -380,7 +382,7 @@ function RowsStep({ batchId }) {
       </Card>
       {rule && (
         <Card title={t('imp.ruleTitle')}>
-          <label className="v2-pe-sug-row"><input type="checkbox" checked={!!rule.save} onChange={(e) => setRule({ ...rule, save: e.target.checked })} />
+          <label className="v2-pe-sug-row"><input type="checkbox" checked={!!rule.save} data-imp-rule-save onChange={(e) => setRule({ ...rule, save: e.target.checked })} />
             <span>{t('imp.rule', { text: rule.text, cat: cats.find((c) => String(c.id) === String(rule.category_id))?.name || '' })}</span></label>
           <p className="v2-muted v2-small">{t('imp.ruleNote')}</p>
         </Card>
@@ -411,6 +413,7 @@ function DoneStep({ batchId }) {
     <div className="v2-page">
       <PageHead title={t('imp.title')} />
       <Steps cur="done" />
+      <ImportReceiptHistory batchId={batchId}/>
       <Card>
         <h2 className="v2-h2" data-imp-done>{t('imp.doneTitle', { p: batch.statement_end ? shortDate(batch.statement_end, lang) : '' })}</h2>
         <ul className="v2-set-cats">
@@ -419,14 +422,7 @@ function DoneStep({ batchId }) {
           <li><span>{t('imp.d.dup')}</span><strong className="v2-num">{n((r) => r.match_status === 'duplicate')}</strong></li>
           <li><span>{t('imp.d.excluded')}</span><strong className="v2-num">{n((r) => r.review_status === 'excluded')}</strong></li>
         </ul>
-        {wallet && batch.closing_balance != null && (
-          <div className={`v2-banner v2-tone-${Math.abs(Number(wallet.balance) - Number(batch.closing_balance)) < 1 ? 'good' : 'warn'}`} role="status" data-imp-acc={Math.abs(Number(wallet.balance) - Number(batch.closing_balance)) < 1 ? 'ok' : 'off'}>
-            <span className="v2-banner-text">{Math.abs(Number(wallet.balance) - Number(batch.closing_balance)) < 1
-              ? t('imp.acc.ok', { name: wallet.name, v: money(wallet.balance, { currency: batch.currency || 'IDR', full: true }) })
-              : t('imp.acc.off', { name: wallet.name, v: money(wallet.balance, { currency: batch.currency || 'IDR', full: true }), bank: money(batch.closing_balance, { currency: batch.currency || 'IDR', full: true }) })}</span>
-            {Math.abs(Number(wallet.balance) - Number(batch.closing_balance)) >= 1 && <Btn to="/business/accounts">{t('acc.balance')}</Btn>}
-          </div>
-        )}
+        {wallet&&<p className="v2-muted" data-imp-current>{t('imp.safe.current',{v:money(wallet.balance,{currency:batch.currency||wallet.currency,full:true})})}</p>}
         {reconciliation && (
           <div className={`v2-banner v2-tone-${reconciliation.status === 'balanced' ? 'good' : 'warn'}`} role="status" data-imp-recon={reconciliation.status}>
             <span className="v2-banner-text">{reconciliation.status === 'balanced'
@@ -442,4 +438,11 @@ function DoneStep({ batchId }) {
       </Card>
     </div>
   )
+}
+
+function ImportReceiptHistory({batchId}){
+ const t=useT(),request=useBusinessRequest(),list=useApi(`/bank-imports/${batchId}/receipts`),[result,setResult]=useState(null),[busy,setBusy]=useState(false)
+ useEffect(()=>{setResult(null);setBusy(false)},[batchId,request.businessId,financialActor(request.token)])
+ const check=async key=>{setBusy(true);try{const r=await readImportConfirmReceipt(request,batchId,key);if(!importCurrent(request))return;if(r.state!=='confirmed'||r.request_id!==key||r.batch_id!==batchId||r.result?.ok!==true)throw Error('unconfirmed');setResult(r.result)}catch{if(importCurrent(request))setResult({unknown:true})}finally{if(importCurrent(request))setBusy(false)}}
+ return <Card title={t('imp.safe.check')}><p className="v2-muted">{t('imp.safe.receiptNote')}</p>{list.loading?<Skeleton rows={2}/>:list.error?<ErrorBox error={list.error} onRetry={list.reload}/>:<ul data-imp-receipts>{(list.data?.rows||[]).map(r=><li key={r.request_key}><span>{r.created_at?.slice(0,10)} · {r.imported} / {r.linked}</span> <button className="v2-btn-link" disabled={busy} onClick={()=>check(r.request_key)}>{t('imp.safe.check')}</button></li>)}</ul>}{result&&<p role="status" data-imp-receipt-result>{t(result.unknown?'imp.safe.pending':'imp.safe.recovered')}{!result.unknown&&` ${result.imported} / ${result.linked}`}</p>}</Card>
 }
