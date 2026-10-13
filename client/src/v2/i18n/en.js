@@ -1435,6 +1435,7 @@ export default {
     amount: 'Amount', date: 'Date', walletOut: 'Paid from', walletIn: 'Received into', pickWallet: 'Choose an account',
     noWallets: 'Add a company account first.', descOut: 'What was it for', descIn: 'Who paid, for what', category: 'Category (optional)', categoryPh: 'e.g. Office rent',
     businessNote: 'Saved as a company record in this business. Personal money is kept in your Personal workspace.',
+    draftNote: 'Unsaved fields stay in this browser for this user and company. A draft does not record money.', draftUnavailable: 'This browser could not keep the draft. Copy the fields before reloading.',
     saveOut: 'Save expense', saveIn: 'Save income', doneOut: 'Expense of {v} saved.', doneIn: 'Income of {v} saved.',
     forbidden: 'Your role can submit requests but not record money directly. Ask an owner, admin or CFO.',
     err: { type: 'Choose expense or income.', amount: 'Enter an amount in whole rupiah, e.g. 1.500.000.', wallet: 'Choose the account.', date: 'Enter a date.', description: 'Say what it was for.', insufficient_balance: '{name} has {bal}. This expense would take it below zero — {short} is missing. Choose another account or record the incoming money first.', wallet_balance_negative: '{name} already shows {bal} in the books. A bank account cannot be below zero — import its bank statement or record the missing income first.' },

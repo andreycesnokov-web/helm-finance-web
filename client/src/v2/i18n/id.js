@@ -1435,6 +1435,7 @@ export default {
     amount: 'Jumlah', date: 'Tanggal', walletOut: 'Dibayar dari', walletIn: 'Diterima di', pickWallet: 'Pilih rekening',
     noWallets: 'Tambahkan rekening perusahaan dulu.', descOut: 'Untuk apa', descIn: 'Siapa yang membayar, untuk apa', category: 'Kategori (opsional)', categoryPh: 'mis. Sewa kantor',
     businessNote: 'Disimpan sebagai catatan perusahaan ini. Uang pribadi ada di ruang kerja Pribadi.',
+    draftNote: 'Kolom yang belum disimpan tetap di browser ini, terpisah per pengguna dan perusahaan. Draf tidak mencatat uang.', draftUnavailable: 'Browser tidak dapat menyimpan draf. Salin kolom sebelum memuat ulang.',
     saveOut: 'Simpan pengeluaran', saveIn: 'Simpan pemasukan', doneOut: 'Pengeluaran {v} tersimpan.', doneIn: 'Pemasukan {v} tersimpan.',
     forbidden: 'Peran Anda dapat mengajukan permintaan, tetapi tidak mencatat uang langsung. Hubungi pemilik, admin atau CFO.',
     err: { type: 'Pilih pengeluaran atau pemasukan.', amount: 'Masukkan jumlah dalam rupiah, mis. 1.500.000.', wallet: 'Pilih rekening.', date: 'Isi tanggal.', description: 'Tulis untuk apa.', insufficient_balance: 'Saldo {name} {bal}. Pengeluaran ini membuat saldo minus — kurang {short}. Pilih rekening lain atau catat uang masuk dulu.', wallet_balance_negative: 'Saldo {name} di pembukuan sudah {bal}. Rekening bank tidak bisa minus — impor mutasinya atau catat pemasukan yang belum tercatat.' },
