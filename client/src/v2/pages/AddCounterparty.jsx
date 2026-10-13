@@ -45,6 +45,7 @@ export default function AddCounterparty() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const [dup, setDup] = useState(null)
+  const duplicateId = dup?.possible_matches?.[0]?.counterparty_id || dup?.possible_matches?.[0]?.id || dup?.matched_counterparty_id
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
   const npwp = npwpFormat(f.npwp)
   const holder = holderMatches(f.account_name, f.legal_name)
@@ -119,7 +120,7 @@ export default function AddCounterparty() {
         <div className="v2-banner v2-tone-warn" role="alert">
           <I.warn size={18} />
           <span className="v2-banner-text"><strong>{t('cp.form.dupQ', { name: dup.possible_matches?.[0]?.legal_name || dup.possible_matches?.[0]?.name || '' })}</strong> {dup.message}</span>
-          {dup.possible_matches?.[0]?.id && <Btn to={`/business/counterparties/${dup.possible_matches[0].id}/edit`}>{t('cp.form.openExisting')}</Btn>}
+          {duplicateId && <Btn to={`/business/counterparties/${encodeURIComponent(duplicateId)}/edit`}>{t('cp.form.openExisting')}</Btn>}
           <Btn variant="primary" onClick={() => save(true)} disabled={busy}>{t('cp.form.different')}</Btn>
         </div>
       )}
