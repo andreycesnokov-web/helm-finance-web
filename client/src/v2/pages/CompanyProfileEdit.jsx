@@ -106,6 +106,8 @@ export default function CompanyProfileEdit() {
   const supported = prof.data?.supported_extended_fields
   const canEdit = prof.data?.can_edit !== false
   const isID=(company.data?.business?.country||form?.country)==='Indonesia'
+  const actualCountry=company.data?.business?.country,actualJurisdiction={Indonesia:'ID',Singapore:'SG',Malaysia:'MY',Thailand:'TH'}[actualCountry]
+  const countryConflict=!!actualCountry&&(form?.country!==actualCountry||!!actualJurisdiction&&form?.jurisdiction!==actualJurisdiction)
   const set = (k, v) => {if(formContext.current!==namespace||!profileCurrent(request))return; setForm((f) => ({ ...f, [k]: v })); setVerification((m) => ({ ...m, [k]: v===''?'missing':'user_declared' })) }
   const applyPicked = () => {
     if(formContext.current!==namespace||!profileCurrent(request))return
@@ -167,6 +169,7 @@ export default function CompanyProfileEdit() {
         <div className="v2-col">
           {!ext && <div className="v2-banner v2-tone-warn"><I.info size={18} /><span className="v2-banner-text">{t('pe.no040')}</span></div>}
           {draftError&&<div className="v2-banner v2-tone-warn" role="alert">{t('pe.draftUnavailable')}</div>}
+          {countryConflict&&<div className="v2-banner v2-tone-warn" role="alert">{t('pe.countryMismatch')} <button type="button" className="v2-btn-link" disabled={busy||!canEdit||!actualJurisdiction} onClick={()=>{set('country',actualCountry);set('jurisdiction',actualJurisdiction)}}>{t('pe.useCompanyCountry')}</button></div>}
           {msg && <div className={`v2-banner v2-tone-${msg.tone}`} role="status"><span className="v2-banner-text">{msg.text}</span></div>}
           {SECTIONS.map((s) => (
             <Card key={s.key} title={t(`pe.s.${s.key}`)}>
@@ -195,8 +198,8 @@ export default function CompanyProfileEdit() {
             </Card>
           ))}
           <div className="v2-row-gap v2-pe-actions">
-            <button type="button" className="v2-btn v2-btn-primary" disabled={busy || !canEdit||!ext||draftError} onClick={save}>{busy ? t('pe.saving') : t('pe.save')}</button>
-            <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !canEdit||!ext||draftError} onClick={verify}>{t('pe.verify')}</button>
+            <button type="button" className="v2-btn v2-btn-primary" disabled={busy || !canEdit||!ext||draftError||countryConflict} onClick={save}>{busy ? t('pe.saving') : t('pe.save')}</button>
+            <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !canEdit||!ext||draftError||countryConflict} onClick={verify}>{t('pe.verify')}</button>
             <button type="button" className="v2-btn v2-btn-secondary" disabled={busy||recovering} onClick={recover}>{t('pe.checkResult')}</button>
             <button type="button" className="v2-btn v2-btn-ghost" disabled={busy} onClick={reloadCurrent}>{t('pe.loadLatest')}</button>
             <button type="button" className="v2-btn v2-btn-ghost" onClick={() => nav('/business/accountant/tax-profile')}>{t('pe.back')}</button>

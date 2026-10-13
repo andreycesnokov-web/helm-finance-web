@@ -100,6 +100,8 @@ BEGIN
  previous:=CASE WHEN t.id IS NULL THEN NULL ELSE to_jsonb(t) END;
  IF p_operation='verify' THEN
   IF t.id IS NULL THEN RAISE EXCEPTION 'profile_not_found'; END IF;
+  IF b.country IS NOT NULL AND t.country IS DISTINCT FROM b.country THEN RAISE EXCEPTION 'profile_country_mismatch'; END IF;
+  IF b.country IN('Indonesia','Singapore','Malaysia','Thailand') AND t.jurisdiction IS DISTINCT FROM (CASE b.country WHEN 'Indonesia' THEN 'ID' WHEN 'Singapore' THEN 'SG' WHEN 'Malaysia' THEN 'MY' WHEN 'Thailand' THEN 'TH' END) THEN RAISE EXCEPTION 'profile_country_mismatch'; END IF;
   missing:=public.cfo_profile_missing(previous);IF cardinality(missing)>0 THEN RAISE EXCEPTION 'profile_incomplete' USING DETAIL=to_jsonb(missing)::text; END IF;
   FOR field,source IN SELECT e.key,e.value FROM jsonb_each(t.field_verification) e ORDER BY e.key LOOP
    IF coalesce(source->>'state',source#>>'{}')='conflict' THEN RAISE EXCEPTION 'profile_source_conflict'; END IF;
