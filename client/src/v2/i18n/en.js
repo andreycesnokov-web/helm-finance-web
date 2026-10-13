@@ -169,6 +169,7 @@ export default {
       check: 'Accountant check', have: 'in place', missing: 'missing', notTracked: 'not tracked here yet' },
     closeNote: 'Nothing closes on its own.',
     ck: {
+      docsUnknown: 'The linked documents could not be confirmed. Payment does not establish a proof file.', retryDocs: 'Check documents again',
       slipFrom: 'recorded with the withholding by your accountant', slipOnFile: 'attached', checkedOn: 'checked {d}', notChecked: 'not checked yet', undo: 'Undo', mark: 'Mark checked',
       pending: 'Accountant check tracking starts when the owner applies migration 061.',
       forbidden: 'Only an accountant, owner, admin or CFO can update this checklist.', notApplied: 'Not available until the owner applies migration 061.',

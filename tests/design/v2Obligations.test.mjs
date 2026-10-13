@@ -154,7 +154,8 @@ t('bill checklist: slip read from withholding_records, check from 061, never cla
   assert.deepStrictEqual(before.map((c) => [c.key, c.done, !!c.unknown]), [['invoice', true, false], ['proof', false, false], ['slip', false, true], ['check', false, true]])
   const slips = { available: true, by_debt: { 1: { slip_document_id: 'd' } } }
   const after = billChecklistItems({ id: 1, status: 'paid', last_payment_at: 'x', accountant_checked_at: null }, { paid: true, slipNeeded: true, slips })
-  assert.deepStrictEqual(after.map((c) => [c.key, c.done, !!c.editable]), [['invoice', false, false], ['proof', true, false], ['slip', true, false], ['check', false, true]])
+  assert.deepStrictEqual(after.map((c) => [c.key, c.done, !!c.editable]), [['invoice', false, false], ['proof', false, false], ['slip', true, false], ['check', false, true]])
+  assert.ok(billChecklistItems({ id: 1 }, { hasProof: true }).find(c => c.key === 'proof').done, 'a linked proof file satisfies the proof row without fabricating payment')
   assert.strictEqual(after.find((c) => c.key === 'slip').documentId, 'd')
   assert.ok(!billChecklistItems({ accountant_checked_at: null }, { slipNeeded: false }).some((c) => c.key === 'slip'), 'no slip without an engine withholding')
 })

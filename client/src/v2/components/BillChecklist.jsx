@@ -1,6 +1,6 @@
 // Bill detail → Documents: the 4-item checklist (designs/BillDetail.dc.html).
-//   invoice  attached to the bill (existing attachments)
-//   proof    the bill is paid and the payment is linked (existing fields)
+//   invoice/proof: active typed Document Center files linked to this bill.
+//   A payment ledger row never stands in for an uploaded proof file.
 //   slip     the bukti potong — only when the verified engine computed a withholding.
 //            READ-ONLY here: it lives in withholding_records.bukti_potong_document_id
 //            (migration 031, P-05 option B) and is read with GET /api/withholding-slips.
@@ -8,37 +8,50 @@
 //            PATCH /api/debts/:id/checklist (accountant role and above, audited).
 // "Nothing closes on its own": the mark never pays, settles or approves anything.
 // Before 061 the check row says "not tracked here yet", exactly as in batch 3.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { useApi, useInvalidate } from '../data'
 import { updateBillChecklist, actionError } from '../lib/actions'
-import { billChecklistItems } from '../lib/obligations'
+import { billChecklistItems, docPath } from '../lib/obligations'
+import { billDocumentEvidence } from '../lib/billEvidence'
+import { canRecordCompanyMoney } from '../lib/financePermissions'
 import { shortDate } from '../lib/format'
 import { useT, useLang } from '../i18n'
 import { Card } from '../ui'
 import I from '../icons'
 
-export default function BillChecklist({ d, hasInvoice, paid, slipNeeded, invoiceDocPath = null, onUpload = null }) {
+export default function BillChecklist({ d, slipNeeded, onUpload = null }) {
   const t = useT()
   const lang = useLang()
-  const { token } = useAuth()
+  const request = useBusinessRequest()
+  const { active } = useWorkspace()
+  const canCheck = canRecordCompanyMoney(active?.role)
   const invalidate = useInvalidate()
   const slips = useApi(slipNeeded ? '/withholding-slips' : null)
-  const items = billChecklistItems(d, { hasInvoice, paid, slipNeeded, slips: slips.data, invoiceDocPath })
+  const documents = useApi(d?.id ? '/documents?debt_id=' + encodeURIComponent(d.id) + '&limit=200' : null)
+  const evidence = billDocumentEvidence(d, documents.error || documents.loading ? null : documents.data)
+  const items = billChecklistItems(d, { hasInvoice: !!evidence.invoice, hasProof: !!evidence.proof,
+    documentsKnown: evidence.known, slipNeeded, slips: slips.data,
+    invoiceDocPath: evidence.invoice ? docPath(evidence.invoice) : null,
+    proofDocPath: evidence.proof ? docPath(evidence.proof) : null })
   const checkTracked = !!items.find((c) => c.key === 'check')?.editable
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
+  const submitting = useRef(false)
 
   const run = async (body) => {
+    if (!canCheck || !request.isCurrent() || submitting.current) return
+    submitting.current = true
     setBusy(true); setErr(null)
     try {
-      await updateBillChecklist(token, d.id, body)
-      invalidate()
+      await updateBillChecklist(request, d.id, body)
+      if (request.isCurrent()) invalidate()
     } catch (x) {
       const code = actionError(x)
-      setErr(code === 'forbidden' ? t('bill.ck.forbidden') : code === 'notApplied' ? t('bill.ck.notApplied') : code)
-    } finally { setBusy(false) }
+      if (request.isCurrent()) setErr(code === 'forbidden' ? t('bill.ck.forbidden') : code === 'notApplied' ? t('bill.ck.notApplied') : code)
+    } finally { submitting.current = false; if (request.isCurrent()) setBusy(false) }
   }
 
   const sub = (c) => {
@@ -54,6 +67,7 @@ export default function BillChecklist({ d, hasInvoice, paid, slipNeeded, invoice
     if (c.unknown) return null
     if (c.key === 'slip') return c.done ? <Link to="/business/documents">{t('bill.view')}</Link> : <Link to="/business/accountant?tab=packages">{t('acct.seePackages')}</Link>
     if (c.key === 'check') {
+      if (!canCheck) return null
       return <button type="button" className="v2-linkbtn" disabled={busy} onClick={() => run({ accountant_checked: !c.done })}>{c.done ? t('bill.ck.undo') : t('bill.ck.mark')}</button>
     }
     // Upload FOR this bill: the new document is linked to it in the same call.
@@ -78,6 +92,7 @@ export default function BillChecklist({ d, hasInvoice, paid, slipNeeded, invoice
         ))}
       </ul>
       {err && <p className="v2-inline-err" role="alert">{err}</p>}
+      {!evidence.known && <p role="status" className="v2-muted v2-small">{t('bill.ck.docsUnknown')} <button type="button" className="v2-linkbtn" onClick={documents.reload}>{t('bill.ck.retryDocs')}</button></p>}
       <p className="v2-muted v2-small">{t('bill.closeNote')}{!checkTracked && ` ${t('bill.ck.pending')}`}</p>
     </Card>
   )

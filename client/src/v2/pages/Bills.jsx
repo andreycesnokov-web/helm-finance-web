@@ -5,7 +5,7 @@
 // Writes reuse the existing components unchanged: DebtFormModal (Add a bill / New
 // invoice, business scope locked) and PayBillDialog (Mark paid / Mark received, components/MoneyDialogs).
 // The previous pages stay one click away under "Classic view".
-import { useMemo, useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { PayBillDialog } from '../components/MoneyDialogs'
 import BillDialog from '../components/BillDialog'
@@ -129,14 +129,14 @@ export default function Bills() {
       </>} />
   )
   const modals = (
-    <>
+    <Fragment key="bill-modals">
       {create && <BillDialog mode={create} onClose={() => setCreate(null)} onSaved={invalidate} />}
       {pay && <PayBillDialog debt={pay} accounts={bizWallets} onClose={() => setPay(null)} onSaved={invalidate} />}
       {editDebt && <BillDialog debt={editDebt} onClose={clearEditParam} onSaved={invalidate} />}
-    </>
+    </Fragment>
   )
-  if (debts.loading) return <>{head}<Card><Skeleton rows={6} /></Card>{modals}</>
-  if (debts.error) return <>{head}<ErrorBox error={debts.error} onRetry={debts.reload} />{modals}</>
+  if (debts.loading) return <div className="v2-page">{head}<Card><Skeleton rows={6} /></Card>{modals}</div>
+  if (debts.error) return <div className="v2-page">{head}<ErrorBox error={debts.error} onRetry={debts.reload} />{modals}</div>
 
   const collect = billRows(list, { tab: 'collect', view })
   const payRows = billRows(list, { tab: 'pay', view })

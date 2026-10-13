@@ -270,13 +270,13 @@ export const docNeedsLook = (d) => !((Array.isArray(d?.links) && d.links.length 
 // The v2 Documents page opens this document's review panel in place from ?doc=<id>.
 export const docPath = (doc) => `/business/documents?doc=${encodeURIComponent(doc.id)}`
 
-export function billChecklistItems(d, { hasInvoice = false, paid = false, slipNeeded = false, slips = null, invoiceDocPath = null } = {}) {
+export function billChecklistItems(d, { hasInvoice = false, hasProof = false, documentsKnown = true, slipNeeded = false, slips = null, invoiceDocPath = null, proofDocPath = null } = {}) {
   const checkTracked = !!d && Object.prototype.hasOwnProperty.call(d, 'accountant_checked_at')
   const slipTracked = slips?.available === true
   const slipDoc = slipTracked ? slips.by_debt?.[String(d?.id)]?.slip_document_id || null : null
   return [
-    { key: 'invoice', done: !!hasInvoice, link: hasInvoice ? (invoiceDocPath || '/business/documents') : null },
-    { key: 'proof', done: !!paid && !!(d?.linked_transaction_id || d?.last_payment_at) },
+    { key: 'invoice', done: !!hasInvoice, unknown: !hasInvoice && !documentsKnown, link: hasInvoice ? (invoiceDocPath || '/business/documents') : null },
+    { key: 'proof', done: !!hasProof, unknown: !hasProof && !documentsKnown, link: hasProof ? (proofDocPath || '/business/documents') : null },
     ...(slipNeeded ? [{ key: 'slip', done: !!slipDoc, unknown: !slipTracked, documentId: slipDoc }] : []),
     { key: 'check', done: checkTracked && !!d.accountant_checked_at, unknown: !checkTracked, editable: checkTracked },
   ]

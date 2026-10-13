@@ -169,6 +169,7 @@ export default {
       check: 'Pemeriksaan akuntan', have: 'ada', missing: 'belum ada', notTracked: 'belum dilacak di sini' },
     closeNote: 'Tidak ada yang tertutup dengan sendirinya.',
     ck: {
+      docsUnknown: 'Dokumen terkait belum terkonfirmasi. Catatan pembayaran bukan file bukti bayar.', retryDocs: 'Periksa dokumen lagi',
       slipFrom: 'dicatat akuntan bersama pemotongannya', slipOnFile: 'terlampir', checkedOn: 'diperiksa {d}', notChecked: 'belum diperiksa', undo: 'Batalkan', mark: 'Tandai diperiksa',
       pending: 'Penandaan pemeriksaan akuntan dimulai setelah pemilik menerapkan migrasi 061.',
       forbidden: 'Hanya akuntan, pemilik, admin atau CFO yang bisa mengubah daftar ini.', notApplied: 'Belum tersedia sampai pemilik menerapkan migrasi 061.',
