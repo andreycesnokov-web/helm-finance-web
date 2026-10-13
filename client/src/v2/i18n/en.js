@@ -931,8 +931,8 @@ export default {
       accounts: 'To accounts',
     },
     recon: {
-      ok: '{name} reconciled to {d}: the balance matches the bank.',
-      off: '{name}: the difference with the bank is {v} — some rows were excluded or are missing.',
+      ok: '{name}: confirmed statement rows match its closing calculation at {d}.',
+      off: '{name}: confirmed statement rows differ from its closing calculation by {v}.',
     },
   },
   txd: {

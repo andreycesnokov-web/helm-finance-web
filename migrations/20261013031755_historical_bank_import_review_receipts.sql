@@ -61,7 +61,7 @@ END $$;
 CREATE FUNCTION public.rpc_confirm_bank_import_reviewed(
  p_business uuid,p_batch uuid,p_actor bigint,p_request_key uuid,p_review_hash text,p_intent jsonb,p_plan jsonb,p_opening jsonb DEFAULT NULL,p_flow text DEFAULT 'review')
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $$
-DECLARE company public.businesses; member public.business_members; batch public.bank_import_batches; wallet public.wallets; role_name text; prior public.bank_import_confirm_requests; state jsonb; answer jsonb; raw_opening jsonb; delta numeric; expected numeric; target numeric; rate numeric; idr numeric; correction_id bigint;
+DECLARE company public.businesses; member public.business_members; batch public.bank_import_batches; wallet public.wallets; role_name text; prior public.bank_import_confirm_requests; state jsonb; answer jsonb; raw_opening jsonb; delta numeric; expected numeric; target numeric; rate numeric; idr numeric; correction_id bigint; has_pending boolean; final_status text;
 BEGIN
  PERFORM public.fn_ledger_writer_lock();
  SELECT * INTO company FROM public.businesses WHERE id=p_business AND coalesce(type,'business')<>'personal' AND coalesce(status,'active')<>'archived' FOR KEY SHARE;
@@ -102,12 +102,18 @@ BEGIN
     VALUES(p_business,company.owner_user_id,p_actor,'correction',delta,upper(wallet.currency),idr,rate,p_opening->>'rate_source',p_opening->>'reason','bank_import_opening',wallet.id,'business',batch.statement_start-1,'Balance adjustment') RETURNING id INTO correction_id;
   END IF;
  END IF;
- -- Unselected raw rows must remain pending even before suggest/classification.
- -- Otherwise the existing review flow can mark a raw two-row batch complete
- -- after the first selected row, leaving the second permanently unprocessed.
+ -- Raw rows need the existing provenance-eligible review state before creating
+ -- their ledger link. This does not confirm or book any unselected row.
  UPDATE public.bank_import_rows SET review_status='needs_review' WHERE batch_id=p_batch AND business_id=p_business AND linked_transaction_id IS NULL AND review_status IS NULL;
  -- Preserve canonical compat provenance, validation, feedback and cumulative math.
  answer:=public.rpc_confirm_bank_import(p_business,p_batch,company.owner_user_id,p_actor,p_plan,p_flow);
+ -- A suggestion or a saved decision is not a completed ledger operation.
+ -- Raw, confirmed and matched-but-unlinked rows remain pending until explicitly
+ -- imported/linked or excluded. Preserve their original hints/decisions.
+ SELECT EXISTS(SELECT 1 FROM public.bank_import_rows WHERE batch_id=p_batch AND business_id=p_business AND linked_transaction_id IS NULL AND review_status IS DISTINCT FROM 'excluded') INTO has_pending;
+ final_status:=CASE WHEN has_pending THEN 'partially_imported' ELSE 'imported' END;
+ UPDATE public.bank_import_batches SET status=final_status WHERE id=p_batch AND business_id=p_business;
+ answer:=answer||jsonb_build_object('status',final_status);
  answer:=answer||jsonb_build_object('request_id',p_request_key,'batch_id',p_batch,'review_hash',p_review_hash,'opening',jsonb_build_object('state',state->>'opening_state','historical_before',state->'historical_opening','correction_id',correction_id,'delta',coalesce(delta,0)::text,'date',batch.statement_start-1),'result_is_historical',true);
  INSERT INTO public.bank_import_confirm_requests(business_id,actor_user_id,request_key,batch_id,intent,result) VALUES(p_business,p_actor,p_request_key,p_batch,p_intent,answer);
  INSERT INTO public.audit_events(business_id,actor_user_id,actor_role,entity_type,entity_id,action,request_id,after_json)

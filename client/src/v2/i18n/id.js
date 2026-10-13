@@ -931,8 +931,8 @@ export default {
       accounts: 'Ke rekening',
     },
     recon: {
-      ok: '{name} direkonsiliasi s.d. {d}: saldo cocok dengan bank.',
-      off: '{name}: selisih dengan bank {v} — sebagian baris dikecualikan atau hilang.',
+      ok: '{name}: baris terkonfirmasi cocok dengan perhitungan laporan pada {d}.',
+      off: '{name}: selisih baris terkonfirmasi dengan perhitungan laporan adalah {v}.',
     },
   },
   txd: {

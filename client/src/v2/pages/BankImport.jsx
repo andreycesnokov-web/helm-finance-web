@@ -423,6 +423,7 @@ function DoneStep({ batchId }) {
           <li><span>{t('imp.d.excluded')}</span><strong className="v2-num">{n((r) => r.review_status === 'excluded')}</strong></li>
         </ul>
         {wallet&&<p className="v2-muted" data-imp-current>{t('imp.safe.current',{v:money(wallet.balance,{currency:batch.currency||wallet.currency,full:true})})}</p>}
+        <p className="v2-muted" data-imp-historical>{rev.data.reviewed?.opening_state==='known'?t('imp.safe.historical',{v:money(rev.data.reviewed.historical_opening,{currency:batch.currency||wallet?.currency||'IDR',full:true}),d:shortDate(batch.statement_start,lang)}):t('imp.safe.unknown')}</p>
         {reconciliation && (
           <div className={`v2-banner v2-tone-${reconciliation.status === 'balanced' ? 'good' : 'warn'}`} role="status" data-imp-recon={reconciliation.status}>
             <span className="v2-banner-text">{reconciliation.status === 'balanced'

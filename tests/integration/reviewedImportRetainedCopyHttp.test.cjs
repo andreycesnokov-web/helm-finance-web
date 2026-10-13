@@ -7,7 +7,7 @@ const {Client}=require('pg'),{createRealPgSupabase}=require('./_realPgSupabase')
 const connectionString=process.env.CFO_IMPORT_COPY_URL;
 assert(connectionString,'CFO_IMPORT_COPY_URL must explicitly select the retained owned copy');
 const target=new URL(connectionString);
-assert(['127.0.0.1','localhost'].includes(target.hostname)&&/^\/cfo_import_review_native_20261013_031755_r3$/.test(target.pathname),'Refuse any other target');
+assert(['127.0.0.1','localhost'].includes(target.hostname)&&/^\/cfo_import_review_native_20261013_031755_r5$/.test(target.pathname),'Refuse any other target');
 const OWNER=-9,SECRET='owned-native-import-http-synthetic-20261013';let admin,supa,server,base,token,loseNext=false;
 async function query(s,args=[]){return(await admin.query(s,args)).rows}
 async function request(path,{method='GET',body,business}={}){const r=await fetch(base+path,{method,headers:{authorization:'Bearer '+token,'x-business-id':business,'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});return{status:r.status,body:await r.json(),headers:r.headers}}

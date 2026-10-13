@@ -17,7 +17,7 @@ const L = {
     debit: 'Debit column (optional)', credit: 'Credit column (optional)', dcHint: 'If the statement has separate Debit/Credit columns, map both — Amount is then ignored.',
     opening: 'Opening balance (optional)', closing: 'Closing balance (optional)', parse: 'Parse file', back: 'Back',
     rows: 'rows', duplicates: 'duplicates', toImport: 'to import', confirmImport: 'Confirm import', imported: 'Imported',
-    category: 'Category', type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Reconciliation',
+    category: 'Category', type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Statement rows',
     balanced: 'Balanced', unbalanced: 'Unbalanced', difference: 'Difference', noWallet: 'Select a target account first.',
     history: 'Recent imports', createTx: 'Will create transactions for included rows only.',
     suggesting: 'Analyzing with rules + AI…', confidence: 'Confidence', match: 'Match', suggestion: 'AI suggestion',
@@ -38,7 +38,7 @@ const L = {
     debit: 'Колонка Debit (необязательно)', credit: 'Колонка Credit (необязательно)', dcHint: 'Если в выписке отдельные колонки Debit/Credit — укажи обе, тогда «Сумма» игнорируется.',
     opening: 'Входящий остаток (необязательно)', closing: 'Исходящий остаток (необязательно)', parse: 'Разобрать файл', back: 'Назад',
     rows: 'строк', duplicates: 'дубликатов', toImport: 'к импорту', confirmImport: 'Подтвердить импорт', imported: 'Импортировано',
-    category: 'Категория', type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Сверка',
+    category: 'Категория', type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Строки выписки',
     balanced: 'Сходится', unbalanced: 'Не сходится', difference: 'Разница', noWallet: 'Сначала выбери счёт назначения.',
     history: 'Последние импорты', createTx: 'Транзакции создаются только для включённых строк.',
     suggesting: 'Анализ правилами + AI…', confidence: 'Уверенность', match: 'Совпадение', suggestion: 'Подсказка AI',
@@ -59,7 +59,7 @@ const L = {
     debit: 'Kolom Debit (opsional)', credit: 'Kolom Credit (opsional)', dcHint: 'Jika rekening punya kolom Debit/Credit terpisah, petakan keduanya — Jumlah diabaikan.',
     opening: 'Saldo awal (opsional)', closing: 'Saldo akhir (opsional)', parse: 'Urai file', back: 'Kembali',
     rows: 'baris', duplicates: 'duplikat', toImport: 'akan diimpor', confirmImport: 'Konfirmasi impor', imported: 'Terimpor',
-    category: 'Kategori', type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Rekonsiliasi',
+    category: 'Kategori', type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Baris laporan',
     balanced: 'Seimbang', unbalanced: 'Tidak seimbang', difference: 'Selisih', noWallet: 'Pilih akun tujuan dulu.',
     history: 'Impor terbaru', createTx: 'Transaksi hanya dibuat untuk baris yang disertakan.',
     suggesting: 'Menganalisis dengan aturan + AI…', confidence: 'Keyakinan', match: 'Kecocokan', suggestion: 'Saran AI',
@@ -431,7 +431,7 @@ export default function BankImport() {
     catch (e) { alert(e.message) } finally { setSuggesting(false) }
   }
 
-  useEffect(()=>{confirming.current=false;setBatch(null);setRows([]);setReviewed(null);setRecoveryMsg('');setApplyOpening(false);setOpeningReason('')},[request.businessId,financialActor(request.token)])
+  useEffect(()=>{confirming.current=false;setBusy(false);setSuggesting(false);setBatch(null);setRows([]);setReviewed(null);setRecon(null);setRecoveryMsg('');setApplyOpening(false);setOpeningReason('');setWalletId('');setWallets([]);setHistory([]);setCats([]);setCps([]);setSummary(null);setFileObj(null);setFileName('');setHeaders([]);setRawRows([]);setOpening('');setClosing('')},[request.businessId,financialActor(request.token)])
   const importIO={send:(identity,id,body)=>apiFetch(`/bank-imports/${encodeURIComponent(id)}/confirm`,identity,{method:'POST',body}),read:(identity,id,key)=>apiFetch(`/bank-imports/${encodeURIComponent(id)}/requests/${encodeURIComponent(key)}`,identity)}
   const recover=async retry=>{if(!batch||!importCurrent(request)||confirming.current)return;confirming.current=true;setBusy(true);try{const r=retry?await resumeImportConfirm(request,batch.id,importIO):await recoverImportConfirm(request,batch.id,importIO);if(!importCurrent(request))return;setRecoveryMsg(r?.ok?l.recovered:l.pending);if(r?.ok){setRecon(r.reconciliation||null);await loadReview(batch.id);loadHistory()}}catch{if(importCurrent(request))setRecoveryMsg(l.pending)}finally{if(importCurrent(request)){confirming.current=false;setBusy(false)}}}
   const confirm = async (onlyRows) => {
@@ -723,7 +723,7 @@ export default function BankImport() {
 
       {recon && (
         <div style={{ background: recon.status === 'balanced' ? 'var(--green-light,#E1F5EE)' : '#FEF3F2', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16, fontSize: 13 }}>
-          <b>{l.reconciled}: {recon.status === 'balanced' ? '✓ ' + l.balanced : '⚠ ' + l.unbalanced}</b> · {l.difference}: {fmt(recon.difference)} IDR
+          <b>{l.reconciled}: {recon.status === 'balanced' ? '✓ ' + l.balanced : '⚠ ' + l.unbalanced}</b> · {l.difference}: {fmt(recon.difference)} {batch?.currency || wallets.find(w=>String(w.id)===String(walletId))?.currency || ''}
         </div>
       )}
 
