@@ -38,6 +38,7 @@ function writeEntry(request,operation,entry){const k=key(request,operation),raw=
 export function readProfileDraft(request){return readEntry(request,'draft')}
 export function saveProfileDraft(request,draft){writeEntry(request,'draft',{form:normalizeProfilePatch(draft.form),before:draft.before?{...normalizeProfilePatch(draft.before),profile_version:draft.before.profile_version}:null,verification:draft.verification||{}})}
 export function clearProfileDraft(request){localStorage.removeItem(key(request,'draft'))}
+export function profilePending(request,operation){try{const entry=readEntry(request,operation);return !!entry&&['prepared','in_flight'].includes(entry.state)}catch{return false}}
 function confirms(entry,result,request){
  current(request)
  const expected=String(BigInt(entry.expected_version)+(entry.operation==='save'?1n:0n))
@@ -69,4 +70,18 @@ export async function performProfileOperation(request,operation,body,expectedVer
  // A successful write followed by a read failure remains an unknown result.
  confirms(entry,response,request)
  const fresh=confirms(entry,await read(request,entry.request_key),request);writeEntry(request,operation,{...entry,state:'confirmed'});return fresh
+}
+// Explicit user action only. Missing receipts never trigger a hidden retry.
+// The identical key/version/payload lets the RPC arbitrate a still-committing
+// original request, an existing commit, or a real rollback without duplication.
+export async function resumeProfileOperation(request,operation,{send,read}){
+ current(request);const entry=readEntry(request,operation)
+ if(!entry||entry.operation!==operation||!UUID.test(entry.request_key||''))throw fail('profile_no_pending_request')
+ const recovered=await recoverProfileOperation(request,operation,{read});current(request)
+ if(recovered?.ok)return recovered
+ if(recovered?.state!=='unknown')throw fail('profile_pending_review')
+ writeEntry(request,operation,{...entry,state:'in_flight'})
+ try{const result=await send(request,{...entry.payload,expected_version:entry.expected_version,request_key:entry.request_key});current(request);confirms(entry,result,request)}
+ catch(e){current(request);if(e?.data?.outcome==='rolled_back')writeEntry(request,operation,{...entry,state:'rejected'});throw e}
+ const result=confirms(entry,await read(request,entry.request_key),request);writeEntry(request,operation,{...entry,state:'confirmed'});return result
 }

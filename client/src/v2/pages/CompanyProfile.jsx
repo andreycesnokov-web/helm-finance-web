@@ -55,7 +55,7 @@ export default function CompanyProfile() {
   const src = (k) => {const state=typeof fv[k]==='string'?fv[k]:fv[k]?.state;return state?t(`prof.source.${state}`):null}
   const isID=(company.data?.business?.country||p.country)==='Indonesia'
   const currentCountry=company.data?.business?.country,currentJurisdiction={Indonesia:'ID',Singapore:'SG',Malaysia:'MY',Thailand:'TH'}[currentCountry]
-  const countryMismatch=!!currentCountry&&(p.country!==currentCountry||!!currentJurisdiction&&p.jurisdiction!==currentJurisdiction)
+  const countryMismatch=!!prof.data?.profile&&!!currentCountry&&(p.country!==currentCountry||!!currentJurisdiction&&p.jurisdiction!==currentJurisdiction)
   const confirmed=!company.loading&&!company.error&&!countryMismatch&&p.profile_version!=null&&String(p.profile_version)===String(p.verified_profile_version)
   const items = req.data?.items || []
   const docState = (key) => items.find((i) => (i.type || i.doc_type) === key)?.status || null

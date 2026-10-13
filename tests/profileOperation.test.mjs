@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {webcrypto} from 'node:crypto'
-import {performProfileOperation,recoverProfileOperation,normalizeProfilePatch,saveProfileDraft,readProfileDraft,unconfirmedProfileFields,profileDelta} from '../client/src/v2/lib/profileOperation.js'
+import {performProfileOperation,recoverProfileOperation,resumeProfileOperation,normalizeProfilePatch,saveProfileDraft,readProfileDraft,unconfirmedProfileFields,profileDelta} from '../client/src/v2/lib/profileOperation.js'
 if(!globalThis.crypto)Object.defineProperty(globalThis,'crypto',{value:webcrypto,configurable:true})
 const storage=new Map(),token=id=>'x.'+Buffer.from(JSON.stringify({userId:id})).toString('base64url')+'.x',A='00000000-0000-4000-8000-000000000001',B='00000000-0000-4000-8000-000000000002'
 globalThis.localStorage={getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)}
@@ -57,4 +57,15 @@ test('legacy forms send changed supported values only and retain an absent-profi
 test('a queued clean form after acknowledged save cannot create an extra version/audit',async()=>{
  reset();let saved,writes=0;const send=async(r,b)=>{writes++;return saved=ack(b)},read=async()=>saved
  await performProfileOperation(request,'save',{brand_name:'x'},1,{send,read});await assert.rejects(performProfileOperation(request,'save',{},2,{send,read}),{code:'profile_no_changes'});assert.equal(writes,1)
+})
+test('only explicit retry can resend an unknown absent receipt, preserving identical key/version/payload',async()=>{
+ reset();let first,saved,writes=0,seen=[];const send=async(r,b)=>{writes++;seen.push(b);if(writes===1){first=b;throw Error('lost before upstream')}return saved=ack(b)},read=async()=>saved||{state:'not_found'}
+ await assert.rejects(performProfileOperation(request,'save',{brand_name:'x'},1,{send,read}),/lost before upstream/);assert.equal(writes,1)
+ await assert.rejects(performProfileOperation(request,'save',{brand_name:'x'},1,{send,read}),{code:'profile_pending_review'});assert.equal(writes,1)
+ const result=await resumeProfileOperation(request,'save',{send,read});assert(result.ok);assert.deepEqual(seen[1],first);assert.equal(writes,2)
+ await resumeProfileOperation(request,'save',{send,read});assert.equal(writes,2)
+})
+test('explicit retry still refuses changed actor before read or send',async()=>{
+ reset();await assert.rejects(performProfileOperation(request,'save',{brand_name:'x'},1,{send:async()=>{throw Error('lost')},read:async()=>({state:'not_found'})}));localStorage.setItem('hf_token',token(-10));let calls=0
+ await assert.rejects(resumeProfileOperation(request,'save',{send:async()=>{calls++},read:async()=>{calls++}}),{code:'profile_actor_changed'});assert.equal(calls,0)
 })

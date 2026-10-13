@@ -9,7 +9,7 @@ import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox } from '../ui'
 import { useT } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { saveTaxProfile, verifyTaxProfile, readProfileFromDocuments,readProfileRequest } from '../lib/actions'
-import {performProfileOperation,recoverProfileOperation,profileCurrent,readProfileDraft,saveProfileDraft,clearProfileDraft,unconfirmedProfileFields} from '../lib/profileOperation'
+import {performProfileOperation,recoverProfileOperation,resumeProfileOperation,profilePending,profileCurrent,readProfileDraft,saveProfileDraft,clearProfileDraft,unconfirmedProfileFields} from '../lib/profileOperation'
 import {financialActor} from '../../lib/financialRecovery'
 import AccountantTabs from '../components/AccountantTabs'
 
@@ -156,6 +156,7 @@ export default function CompanyProfileEdit() {
   }
   const recover=async()=>{if(recovering||!profileCurrent(request))return;setRecovering(true);try{let latest=null,unknown=false;for(const op of ['save','verify']){const r=await recoverProfileOperation(request,op,{read:readProfileRequest});if(!profileCurrent(request))return;if(r?.state==='unknown')unknown=true;if(r?.ok&&!r.historical)latest=r}if(latest){const p=latest.current_profile||latest.profile;setSavedProfile(p);setVerification({});setForm(Object.fromEntries(ALL_FIELDS.map(f=>[f.k,f.type==='date'?dateIn(p[f.k]):asInput(p[f.k])])));invalidate()}setMsg({tone:unknown||!latest?'warn':'good',text:t(unknown?'pe.pending':latest?'pe.recovered':'pe.historical')})}catch{if(profileCurrent(request))setMsg({tone:'warn',text:t('pe.pending')})}finally{if(profileCurrent(request))setRecovering(false)}}
   const reloadCurrent=()=>{if(busy||!profileCurrent(request))return;try{clearProfileDraft(request);draftUnreadable.current=false;setDraftError(false);setForm(null);setVerification({});setSavedProfile(null);prof.reload();setMsg({tone:'info',text:t('pe.reloaded')})}catch{setDraftError(true)}}
+  const resume=async operation=>{if(saving.current||!canEdit||!profileCurrent(request))return;saving.current=true;setBusy(true);try{const r=await resumeProfileOperation(request,operation,{send:operation==='save'?saveTaxProfile:verifyTaxProfile,read:readProfileRequest});if(!profileCurrent(request))return;setMsg({tone:r.historical?'warn':'good',text:t(r.historical?'pe.historical':'pe.recovered')});invalidate()}catch(e){if(profileCurrent(request))setMsg({tone:'warn',text:e?.data?.error==='profile_version_conflict'?t('pe.historical'):t('pe.failed',{msg:e?.data?.error||e.message})})}finally{if(profileCurrent(request)){setBusy(false);saving.current=false}}}
 
   const sug = useMemo(() => (ai.data?.suggestions || []).filter((s) => !s.same_as_current), [ai.data])
   const head = <PageHead title={t('pe.title')} sub={t('pe.sub')} back={{ to: '/business/accountant/tax-profile', label: t('screen.companyProfile') }} />
@@ -202,6 +203,8 @@ export default function CompanyProfileEdit() {
             <button type="button" className="v2-btn v2-btn-primary" disabled={busy || !canEdit||!ext||draftError||countryConflict} onClick={save}>{busy ? t('pe.saving') : t('pe.save')}</button>
             <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !canEdit||!ext||draftError||countryConflict} onClick={verify}>{t('pe.verify')}</button>
             <button type="button" className="v2-btn v2-btn-secondary" disabled={busy||recovering} onClick={recover}>{t('pe.checkResult')}</button>
+            {profilePending(request,'save')&&<button type="button" className="v2-btn v2-btn-ghost" disabled={busy||!canEdit} onClick={()=>resume('save')}>{t('pe.retryOriginalSave')}</button>}
+            {profilePending(request,'verify')&&<button type="button" className="v2-btn v2-btn-ghost" disabled={busy||!canEdit} onClick={()=>resume('verify')}>{t('pe.retryOriginalVerify')}</button>}
             <button type="button" className="v2-btn v2-btn-ghost" disabled={busy} onClick={reloadCurrent}>{t('pe.loadLatest')}</button>
             <button type="button" className="v2-btn v2-btn-ghost" onClick={() => nav('/business/accountant/tax-profile')}>{t('pe.back')}</button>
           </div>

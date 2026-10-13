@@ -427,6 +427,7 @@ export default {
     taxLoading: 'Loading verified tax cards...',
   },
   pe: {
+    retryOriginalSave:'Retry the original save with the same key',retryOriginalVerify:'Retry the original confirmation with the same key',
     noChanges:'There are no unsaved profile changes.',
     countryMismatch: 'This profile disagrees with the company country. Review and explicitly correct it before saving or confirming.',useCompanyCountry:'Use the company country and jurisdiction',
     loadLatest: "Load current profile and discard draft",
