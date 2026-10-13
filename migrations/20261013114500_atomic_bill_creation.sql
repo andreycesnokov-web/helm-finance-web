@@ -57,7 +57,9 @@ BEGIN
   IF to_char(due_value,'YYYY-MM-DD') IS DISTINCT FROM p_payload->>'due_date' THEN RAISE EXCEPTION 'bill_invalid_value'; END IF;
  END IF;
  INSERT INTO public.debts(user_id,business_id,type,counterparty,amount,original_amount,paid_amount,currency,due_date,description,scope,is_settled,status,source_channel,created_by_user_id,created_by_role,approval_status)
- VALUES(p_actor,b.id,p_payload->>'type',btrim(p_payload->>'counterparty'),amount_value,amount_value,0,p_payload->>'currency',due_value::timestamp AT TIME ZONE 'UTC',p_payload->>'description','business',false,'open','web',p_actor,role_name,
+ -- Same attribution as the existing bizWriteFields: user_id remains the owner
+ -- for retained queries; created_by_user_id and the receipt belong to the actor.
+ VALUES(b.owner_user_id,b.id,p_payload->>'type',btrim(p_payload->>'counterparty'),amount_value,amount_value,0,p_payload->>'currency',due_value::timestamp AT TIME ZONE 'UTC',p_payload->>'description','business',false,'open','web',p_actor,role_name,
    CASE WHEN role_name IN('owner','ceo','admin','cfo','accountant') THEN 'approved' ELSE 'pending_approval' END)
  RETURNING * INTO d;
  INSERT INTO public.audit_events(business_id,actor_user_id,actor_role,channel,entity_type,entity_id,action,before_json,after_json,request_id)
