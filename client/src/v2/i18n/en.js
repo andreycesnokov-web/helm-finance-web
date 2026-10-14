@@ -1601,7 +1601,7 @@ export default {
     history: 'Change history',
   "collected": "Documents by operation · collected {ok} of {n}",
   "empty": "No operations to check",
-  "gaps": "{missing} operations need documents · {clarification} need clarification",
+  "gaps": "{missing} operations need an item · {clarification} need clarification",
   "reviewSeparate": "Accountant review is a separate step; this month is not closed",
   "aiUnavailable": "AI check unavailable — rules and manual confirmation",
   "ownRecords": "Only your submitted records; not the company-wide readiness",
@@ -1610,13 +1610,13 @@ export default {
   "filter": {
     "all": "All",
     "incomplete": "Needs completing",
-    "missing": "Needs documents",
+    "missing": "Needs an item",
     "clarification": "Needs clarification",
     "complete": "Documents collected"
   },
   "status": {
     "complete": "Documents collected",
-    "missing": "Needs documents",
+    "missing": "Needs an item",
     "clarification": "Needs clarification"
   },
   "state": {
@@ -1685,7 +1685,7 @@ export default {
   "invoice": "Bill / invoice",
   "noInvoice": "No bill / invoice record",
   "have": "Available documents",
-  "missing": "Missing documents",
+  "missing": "Items to add",
   "document": "Document",
   "openFolder": "Open folder",
   "folder": "Operation folder",

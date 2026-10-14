@@ -1601,7 +1601,7 @@ export default {
     history: 'Riwayat perubahan',
   "collected": "Dokumen per transaksi · terkumpul {ok} dari {n}",
   "empty": "Tidak ada transaksi untuk diperiksa",
-  "gaps": "{missing} transaksi perlu dokumen · {clarification} perlu klarifikasi",
+  "gaps": "{missing} transaksi perlu dilengkapi · {clarification} perlu klarifikasi",
   "reviewSeparate": "Pemeriksaan akuntan adalah tahap terpisah; bulan belum ditutup",
   "aiUnavailable": "Pemeriksaan AI tidak tersedia — aturan dan konfirmasi manual",
   "ownRecords": "Hanya transaksi yang Anda ajukan; bukan kesiapan seluruh perusahaan",
@@ -1610,13 +1610,13 @@ export default {
   "filter": {
     "all": "Semua",
     "incomplete": "Perlu dilengkapi",
-    "missing": "Perlu dokumen",
+    "missing": "Perlu dilengkapi",
     "clarification": "Perlu klarifikasi",
     "complete": "Dokumen lengkap"
   },
   "status": {
     "complete": "Dokumen lengkap",
-    "missing": "Perlu dokumen",
+    "missing": "Perlu dilengkapi",
     "clarification": "Perlu klarifikasi"
   },
   "state": {
@@ -1685,7 +1685,7 @@ export default {
   "invoice": "Tagihan / faktur",
   "noInvoice": "Belum ada tagihan / faktur",
   "have": "Dokumen tersedia",
-  "missing": "Dokumen yang kurang",
+  "missing": "Yang perlu ditambahkan",
   "document": "Dokumen",
   "openFolder": "Buka folder",
   "folder": "Folder transaksi",
