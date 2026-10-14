@@ -13,7 +13,7 @@ import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
-import { money, shortDate, daysUntil } from '../lib/format'
+import { money, shortDate, shortCalendarDate, daysUntil } from '../lib/format'
 import { billStatus, billSummary, billRows, tabForPath, remaining } from '../lib/obligations'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { canRecordCompanyMoney, canSubmitBill } from '../lib/financePermissions'
@@ -50,7 +50,7 @@ function Row({ d, onPay, t, lang }) {
         <Link to={detailPath(d)} className="v2-brow-name">{clean(d.counterparty) || t('bills.noName')}</Link>
         <span className="v2-brow-note">{[clean(d.description), d.source_channel === 'mcp' ? t('bills.byAi') : null].filter(Boolean).join(' · ')}</span>
       </span>
-      <span role="cell" className="v2-brow-due v2-num">{d.due_date ? shortDate(d.due_date, lang) : '—'}</span>
+      <span role="cell" className="v2-brow-due v2-num">{d.due_date ? shortCalendarDate(d.due_date, lang) : '—'}</span>
       <span role="cell" className="v2-brow-status"><StatusPill d={d} /></span>
       <span role="cell" className="v2-brow-amt v2-num v2-r">{money(remaining(d), { currency: d.currency || 'IDR' })}</span>
       <span role="cell" className="v2-brow-act">{action}</span>

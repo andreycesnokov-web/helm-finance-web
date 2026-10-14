@@ -28,3 +28,11 @@ test('bill dates/number have dedicated identity and edits require a reviewed ver
  for(const value of [{currency:'USD'},{expected_version:1,paid_amount:0},{expected_version:1,due_date:'2026-02-30'}])assert.throws(()=>metadataRequest(value));
  assert.deepEqual(metadataRequest({expected_version:4,accountant_checked:true},true),{version:4,patch:{accountant_checked:true}});
 });
+
+test('metadata refusals are actionable and cannot report a false success',()=>{
+ const {sendFailure}=require('../server/lib/billCreation');
+ for(const code of ['bill_stale','bill_metadata_locked']){
+  const res={status(n){this.statusCode=n;return this},json(v){this.body=v}};
+  sendFailure(res,{message:code});assert.equal(res.statusCode,409);assert.equal(res.body.outcome,'rolled_back');assert.equal(res.body.automatic_retry,false);assert.notEqual(res.body.message,code);
+ }
+});

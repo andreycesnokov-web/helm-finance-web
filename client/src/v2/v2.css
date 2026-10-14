@@ -1598,10 +1598,17 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 
 /* Statement import rows (w2/H2) */
 .v2-imp-rows { list-style: none; margin: 0; padding: 0; }
-.v2-imp-rows li { display: grid; grid-template-columns: 64px minmax(0, 1.4fr) 150px minmax(0, 1.2fr) auto; gap: var(--space-3); align-items: start; padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
-.v2-imp-rows li:first-child { border-top: 0; }
-.v2-imp-rows li.is-excluded, .v2-imp-rows li.is-duplicate { opacity: 0.55; }
-@media (max-width: 1000px) { .v2-imp-rows li { grid-template-columns: 56px minmax(0, 1fr) auto; } .v2-imp-what { grid-column: 2 / -1; } .v2-imp-acts { grid-column: 2 / -1; } }
+.v2-imp-rows > li { display: grid; grid-template-columns: 24px 82px minmax(0, 1.4fr) max-content minmax(180px, 1fr); grid-template-areas: "select date text amount category" ". . actions actions actions"; gap: var(--space-3); align-items: start; padding: var(--space-3) 0; border-top: 1px solid var(--border-subtle); }
+.v2-imp-rows > li:first-child { border-top: 0; }
+.v2-imp-rows > li.is-excluded, .v2-imp-rows > li.is-duplicate { opacity: 0.55; }
+.v2-imp-rows > li > label { grid-area: select; }
+.v2-imp-date { grid-area: date; }
+.v2-imp-text { grid-area: text; }
+.v2-imp-amt { grid-area: amount; }
+.v2-imp-what { grid-area: category; overflow-wrap: anywhere; }
+.v2-imp-acts { grid-area: actions; }
+@media (max-width: 1200px) { .v2-imp-rows > li { grid-template-columns: 24px 82px minmax(0, 1fr) max-content; grid-template-areas: "select date text amount" ". . category category" ". . actions actions"; } }
+@media (max-width: 600px) { .v2-imp-rows > li { grid-template-columns: 24px minmax(0, 1fr) max-content; grid-template-areas: "select date amount" ". text text" ". category category" ". actions actions"; } }
 .v2-imp-date { font-size: 13px; color: var(--text-secondary); padding-top: 2px; }
 .v2-imp-text { min-width: 0; overflow-wrap: anywhere; display: flex; flex-direction: column; gap: 2px; }
 .v2-imp-amt { text-align: right; font-weight: 700; white-space: nowrap; }

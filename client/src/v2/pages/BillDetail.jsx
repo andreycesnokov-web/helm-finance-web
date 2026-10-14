@@ -14,7 +14,7 @@ import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
-import { money, shortDate } from '../lib/format'
+import { money, shortDate, shortCalendarDate } from '../lib/format'
 import { remaining, billStatus, withholdingTreatment } from '../lib/obligations'
 import { cashItems, forecast, applyScenario } from '../lib/radarSeries'
 import { findWithholdingRule, computeInvoicePlan } from '../../pages/business/InvoiceReviewDrawer'
@@ -120,7 +120,7 @@ export default function BillDetail({ kind = 'payable' }) {
           <StatusPill d={d} />
           <h1 className="v2-h1">{who}</h1>
           <p className="v2-sub"><strong className="v2-num">{money(d.original_amount ?? d.amount, { full: true, currency: d.currency || 'IDR' })}</strong>
-            {description && ` · ${description}`}{d.due_date && ` · ${t('pulse.dec.due', { d: shortDate(d.due_date, lang) })}`}</p>
+            {description && ` · ${description}`}{d.due_date && ` · ${t('pulse.dec.due', { d: shortCalendarDate(d.due_date, lang) })}`}</p>
         </div>
         {s === 'pending' && <div className="v2-pagehead-actions"><DecisionActions debt={d} /></div>}
       </header>
@@ -154,7 +154,7 @@ export default function BillDetail({ kind = 'payable' }) {
               <dd>{cp ? <Link to={`/business/counterparties/${encodeURIComponent(cp.id)}/edit`}>{who}</Link> : <Link to="/business/counterparties">{clean(d.counterparty) || '—'}</Link>}</dd>
               {d.invoice_number && <><dt>{t('bill.invoiceNo')}</dt><dd className="v2-num">{d.invoice_number}</dd></>}
               <dt>{t('bill.created')}</dt><dd>{shortDate(d.created_at, lang)}</dd>
-              <dt>{t('bill.dueDate')}</dt><dd>{d.due_date ? shortDate(d.due_date, lang) : t('bill.noDue')}</dd>
+              <dt>{t('bill.dueDate')}</dt><dd>{d.due_date ? shortCalendarDate(d.due_date, lang) : t('bill.noDue')}</dd>
               {Number(d.paid_amount) > 0 && <><dt>{t('bill.paidSoFar')}</dt><dd className="v2-num">{money(d.paid_amount)}</dd></>}
               {d.category && <><dt>{t('bill.category')}</dt><dd>{catLabel(t, d.category)}</dd></>}
             </dl>

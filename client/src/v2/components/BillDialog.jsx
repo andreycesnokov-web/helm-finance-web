@@ -16,7 +16,7 @@ import { canRecordCompanyMoney, canSubmitBill } from '../lib/financePermissions'
 import { uploadInvoiceFile, readInvoice, identifyDocument, createBill, updateBill, linkDocument } from '../lib/actions'
 
 const CURRENCIES = ['IDR', 'USD', 'SGD', 'EUR', 'MYR', 'AUD', 'CNY', 'JPY']
-const isoDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+const isoDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` }
 const num = (v) => { const n = Number(String(v ?? '').replace(/[\s.](?=\d{3}\b)/g, '').replace(',', '.')); return Number.isFinite(n) ? n : NaN }
 const dateOf = (d) => (d && /^\d{4}-\d{2}-\d{2}/.test(String(d.value || d)) ? String(d.value || d).slice(0, 10) : '')
 

@@ -1,6 +1,6 @@
 // Design v2 money/date formatting. Run: node tests/design/v2Format.test.mjs
 import assert from 'node:assert'
-import { money, compact, daysUntil, initial } from '../../client/src/v2/lib/format.js'
+import { shortCalendarDate, money, compact, daysUntil, initial } from '../../client/src/v2/lib/format.js'
 
 let pass = 0, fail = 0
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
@@ -40,6 +40,18 @@ t('daysUntil counts calendar days', () => {
 })
 
 t('initial', () => { assert.strictEqual(initial('demo co'), 'D'); assert.strictEqual(initial(''), '?') })
+
+t('bill calendar dates remain the same day across timezones', () => {
+  const previous = process.env.TZ
+  try {
+    for (const zone of ['America/Los_Angeles','Asia/Shanghai','Pacific/Kiritimati']) {
+      process.env.TZ = zone
+      assert.strictEqual(shortCalendarDate('2026-10-01T00:00:00+00:00'), '1 Oct')
+      assert.strictEqual(shortCalendarDate('2026-10-01'), '1 Oct')
+      assert.strictEqual(shortCalendarDate('2026-02-30'), '—')
+    }
+  } finally { if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous }
+})
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)
