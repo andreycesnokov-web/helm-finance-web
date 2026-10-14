@@ -125,7 +125,7 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
       {contractPending&&<p className="v2-muted v2-small">{t('od.contractRowHelp')}</p>}
       {r.state==='not_applicable'&&<p className="v2-muted v2-small">{r.na_reason==='recorded_fee_or_transfer'?t('od.ruleNoContract'):o.review?t('od.confirmedByPerson')+(r.na_reason?' · '+r.na_reason:''):t('od.contractUndecided')}</p>}
       {manage&&r.type==='contract'&&<Btn variant="ghost" data-od-decide-contract onClick={()=>setReviewOpen(v=>!v)}>{reviewOpen?t('od.hideDecision'):contractPending?t('od.decideContract'):t('od.changeDecision')}</Btn>}
-      {manage&&roles.includes(r.type)&&r.state!=='not_applicable'&&!contractPending&&<div className="v2-od-actions">
+      {manage&&roles.includes(r.type)&&r.state!=='not_applicable'&&!contractPending&&!((o.owner_financing_type||o.loan_repayment)&&r.state==='linked')&&<div className="v2-od-actions">
        <Btn variant="secondary" data-od-upload-for={r.type} disabled={busy||outcome?.unknown} onClick={()=>{chooseRole(r.type);uploadRole.current=r.type;fileInput.current?.click()}}>{t('od.upload')}</Btn>
        <Btn variant="ghost" data-od-existing-for={r.type} disabled={busy||outcome?.unknown} onClick={()=>chooseRole(r.type)}>{t('od.existing')}</Btn>
       </div>}
