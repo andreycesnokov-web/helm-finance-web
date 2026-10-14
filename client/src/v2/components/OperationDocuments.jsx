@@ -5,6 +5,7 @@ import {useApi,useInvalidate} from '../data'
 import {useT,useLang} from '../i18n'
 import {Card,Pill,Btn,Skeleton,ErrorBox,Empty} from '../ui'
 import {money,shortCalendarDate} from '../lib/format'
+import {catLabel} from '../lib/categoryLabel'
 import {useBusinessRequest} from '../lib/useBusinessRequest'
 import {documentFileUrl,operationDocumentAction,readOperationDocumentPackage,uploadOperationDocument} from '../lib/actions'
 import {canRecordCompanyMoney} from '../lib/financePermissions'
@@ -45,7 +46,7 @@ export default function OperationDocuments({month}){
    <Card>
     <div className="v2-chips" aria-label={t('od.filters')}>{['all','incomplete','missing','clarification','complete'].map(k=><button type="button" key={k} data-od-filter={k} className="v2-chip v2-chip-sel" aria-pressed={filter===k} onClick={()=>pick(k)}>{t(`od.filter.${k}`)}</button>)}</div>
     {!rows.length?<Empty title={t('od.emptyFilter')}/>:<ul className="v2-od-list" data-od-list>{rows.slice(page*50,(page+1)*50).map(o=><li key={o.key} data-operation={o.key}>
-     <div><span className="v2-muted">{shortCalendarDate(o.date,lang)}</span><strong>{bankRecipient(o)?t('od.paymentTo',{name:bankRecipient(o)}):o.description||t('od.unnamed')}</strong><span>{money(o.amount,{currency:o.currency,full:true})}</span><span className="v2-small">{o.category||t('od.noCategory')}</span></div>
+     <div><span className="v2-muted">{shortCalendarDate(o.date,lang)}</span><strong>{bankRecipient(o)?t('od.paymentTo',{name:bankRecipient(o)}):o.description||t('od.unnamed')}</strong><span>{money(o.amount,{currency:o.currency,full:true})}</span><span className="v2-small">{o.category?catLabel(t,o.category):t('od.noCategory')}</span></div>
      <div className="v2-small">{o.invoice?<Link to={'/business/'+(o.invoice.type==='receivable'?'receivables':'payables')+'/'+o.invoice.id}>{t('od.invoice')}{o.invoice.number?' · '+o.invoice.number:''}</Link>:['funding','loan'].includes(o.kind)?t('od.ownerFinancing.noInvoice'):t('od.noInvoice')}</div>
      <div className="v2-small">{t('od.have')}: {o.documents.map(d=>d.file?.file_name||t('od.document')).join(', ')||'—'}</div>
      <div className="v2-small">{t('od.missing')}: {o.requirements.filter(r=>r.mandatory&&r.state==='missing').map(r=>t(`od.requirement.${r.type}`)).join(', ')||'—'}</div>
@@ -92,16 +93,18 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
  return <Modal wide title={t('od.folder')} onClose={()=>{if(!busy)onClose()}}>
   <div data-od-folder>
    <section className="v2-od-summary" data-od-summary>
-    <p className="v2-muted">{shortCalendarDate(o.date,lang)} · {o.category||t('od.noCategory')}</p>
+    <p className="v2-muted">{shortCalendarDate(o.date,lang)} · {o.category?catLabel(t,o.category):t('od.noCategory')}</p>
     <h3>{recipient?t('od.paymentTo',{name:recipient}):t(`od.operationKind.${o.direction==='in'||o.direction==='out'?o.direction:'other'}`)}</h3>
     <p className="v2-od-amount">{money(o.amount,{currency:o.currency,full:true})}</p>
     {recipient&&<p className="v2-muted v2-small">{t('od.recipientFromBank')}</p>}
    </section>
-   {o.target_type==='transaction'&&o.owner_financing_type&&<section className="v2-note" data-od-owner-financing>
-    <strong>{t('od.ownerFinancing.title')}</strong>
-    <p>{t(`od.ownerFinancing.current.${o.owner_financing_type}`)}</p>
-    <p className="v2-muted v2-small">{t('od.ownerFinancing.explain')}</p>
-    {manage&&<div className="v2-row-gap">
+   {o.target_type==='transaction'&&o.owner_financing_type&&<section className="v2-od-owner-financing" data-od-owner-financing>
+    <div className="v2-od-owner-financing-copy">
+     <strong>{t('od.ownerFinancing.title')}</strong>
+     <p>{t(`od.ownerFinancing.current.${o.owner_financing_type}`)}</p>
+     <p className="v2-muted v2-small">{t('od.ownerFinancing.explain')}</p>
+    </div>
+    {manage&&<div className="v2-od-owner-financing-actions">
      <Link className="v2-btn v2-btn-secondary" to={'/business/transactions?tx='+encodeURIComponent(o.target_id)+'&category='+encodeURIComponent('Capital contribution')}>{t('od.ownerFinancing.equity')}</Link>
      <Link className="v2-btn v2-btn-secondary" to={'/business/transactions?tx='+encodeURIComponent(o.target_id)+'&category='+encodeURIComponent('Owner funding (loan)')}>{t('od.ownerFinancing.loan')}</Link>
     </div>}
