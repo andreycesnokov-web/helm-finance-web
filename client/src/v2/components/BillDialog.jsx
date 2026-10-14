@@ -11,6 +11,8 @@ import { useApi } from '../data'
 import { money } from '../lib/format'
 import Modal from './Modal'
 import { financialActor } from '../../lib/financialRecovery'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
+import { canRecordCompanyMoney, canSubmitBill } from '../lib/financePermissions'
 import { uploadInvoiceFile, readInvoice, identifyDocument, createBill, updateBill, linkDocument } from '../lib/actions'
 
 const CURRENCIES = ['IDR', 'USD', 'SGD', 'EUR', 'MYR', 'AUD', 'CNY', 'JPY']
@@ -22,6 +24,8 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
   const t = useT()
   const lang = useLang()
   const request = useBusinessRequest()
+  const {active}=useWorkspace()
+  const canWrite=editing?canRecordCompanyMoney(active?.role):canSubmitBill(active?.role)
   const cps = useApi('/counterparties')
   const actor=financialActor(request.token)
   const draftKey=!editing&&actor&&request.businessId?'cfoBillDraft:v1:'+actor+':'+request.businessId:null
@@ -93,7 +97,7 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
 
   const amount = num(f.amount)
   const save = async () => {
-    if(submitting.current||!request.isCurrent())return
+    if(submitting.current||!request.isCurrent()||!canWrite)return
     if (!f.counterparty.trim()) { setErr(t('billd.err.who')); return }
     if (!(amount > 0)) { setErr(t('billd.err.amount')); return }
     submitting.current=true;setBusy(true); setErr('')
@@ -112,7 +116,7 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
   return (
     <Modal wide title={editing ? t('billd.editTitle', { who: editing.counterparty || '' }) : t('billd.title')} onClose={onClose}
       footer={<><button type="button" className="v2-btn v2-btn-secondary" onClick={onClose}>{t('set.cancel')}</button>
-        <button type="button" className="v2-btn v2-btn-primary" disabled={busy || ['uploading', 'reading'].includes(doc?.state)} onClick={save} data-billd-save>{t('billd.save')}</button></>}>
+        <button type="button" className="v2-btn v2-btn-primary" disabled={!canWrite || busy || ['uploading', 'reading'].includes(doc?.state)} onClick={save} data-billd-save>{t('billd.save')}</button></>}>
       {!editing && <><div className="v2-seg" role="group" aria-label={t('billd.kind')}>
         <button type="button" className="v2-seg-btn" aria-pressed={kind === 'payable'} onClick={() => setKind('payable')}>{t('billd.payable')}</button>
         <button type="button" className="v2-seg-btn" aria-pressed={kind === 'receivable'} onClick={() => setKind('receivable')}>{t('billd.receivable')}</button>
@@ -150,6 +154,7 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
       {doc?.taxNote && <p className="v2-imp-tax v2-small">{doc.taxNote}</p>}
       <p className="v2-muted v2-small">{t('billd.note')}</p>
       {err && <p className="v2-inline-err" role="alert">{err}</p>}
+      {!canWrite && <p role="status" className="v2-inline-err">{t('dec.forbidden')}</p>}
     </Modal>
   )
 }

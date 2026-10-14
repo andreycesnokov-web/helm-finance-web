@@ -15,6 +15,8 @@ import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { money, shortDate, daysUntil } from '../lib/format'
 import { billStatus, billSummary, billRows, tabForPath, remaining } from '../lib/obligations'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
+import { canRecordCompanyMoney, canSubmitBill } from '../lib/financePermissions'
 
 const TONE = { pending: 'info', late: 'crit', partial: 'warn', open: 'neutral', paid: 'good', cancelled: 'neutral' }
 // Each tab is its own route, so a reload or a shared link keeps the tab.
@@ -90,6 +92,8 @@ export default function Bills() {
   const [create, setCreate] = useState(null)   // 'payable' | 'receivable'
   const [pay, setPay] = useState(null)
   const [editDebt, setEditDebt] = useState(null)
+  const {active}=useWorkspace()
+  const canCreate=canSubmitBill(active?.role),canEdit=canRecordCompanyMoney(active?.role)
   const debts = useApi('/debts')
   const wallets = useApi('/wallets')
   // GET /api/wallets returns only this company's wallets (by business_id). A wallet labelled
@@ -103,13 +107,13 @@ export default function Bills() {
   // Handle ?edit=<id> query parameter (e.g. from Radar "Set date")
   useEffect(() => {
     const editId = new URLSearchParams(loc.search).get('edit')
-    if (editId && list.length > 0) {
+    if (canEdit && editId && list.length > 0) {
       const target = list.find(d => String(d.id) === String(editId))
       if (target) {
         setEditDebt(target)
       }
     }
-  }, [loc.search, list])
+  }, [loc.search, list,canEdit])
 
   const clearEditParam = () => {
     const params = new URLSearchParams(loc.search)
@@ -123,7 +127,7 @@ export default function Bills() {
 
   const head = (
     <PageHead title={t('nav.bills')} sub={t('bills.sub')}
-      actions={<>
+      actions={canCreate&&<>
         <Btn icon={<I.plus size={16} />} onClick={() => setCreate('payable')}>{t('bills.addBill')}</Btn>
         <Btn variant="primary" icon={<I.plus size={16} />} onClick={() => setCreate('receivable')}>{t('bills.newInvoice')}</Btn>
       </>} />
@@ -132,7 +136,7 @@ export default function Bills() {
     <Fragment key="bill-modals">
       {create && <BillDialog mode={create} onClose={() => setCreate(null)} onSaved={invalidate} />}
       {pay && <PayBillDialog debt={pay} accounts={bizWallets} onClose={() => setPay(null)} onSaved={invalidate} />}
-      {editDebt && <BillDialog debt={editDebt} onClose={clearEditParam} onSaved={invalidate} />}
+      {canEdit&&editDebt && <BillDialog debt={editDebt} onClose={clearEditParam} onSaved={invalidate} />}
     </Fragment>
   )
   if (debts.loading) return <div className="v2-page">{head}<Card><Skeleton rows={6} /></Card>{modals}</div>
