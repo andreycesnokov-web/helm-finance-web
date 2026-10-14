@@ -24,8 +24,11 @@ import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
 import { insightOf } from '../lib/statementInsights'
 import { catLabel } from '../lib/categoryLabel'
+import Modal from '../components/Modal'
+import { canRecordCompanyMoney } from '../lib/financePermissions'
+import { apiFetch } from '../../lib/api'
 import {
-  uploadStatementFile, readStatement, createImportBatch, suggestImport, createClassificationRule, fileDocument, confirmImport, readImportConfirmReceipt,
+  uploadStatementFile, readStatement, createImportBatch, suggestImport, createClassificationRule, fileDocument, confirmImport, readImportConfirmReceipt, createCategory,
 } from '../lib/actions'
 
 const STEPS = ['file', 'rows', 'done']
@@ -272,14 +275,16 @@ function RowsStep({ batchId }) {
   const me = useApi('/me/profile')
   const confirming=useRef(false)
   const [recoveryMsg,setRecoveryMsg]=useState(''),[recovering,setRecovering]=useState(false),[applyOpening,setApplyOpening]=useState(false),[openingReason,setOpeningReason]=useState('')
-  useEffect(()=>{confirming.current=false;setDec({});setErr('');setRecoveryMsg('');setApplyOpening(false);setOpeningReason('')},[batchId,request.businessId,financialActor(request.token)])
+  useEffect(()=>{confirming.current=false;setDec({});setErr('');setRecoveryMsg('');setApplyOpening(false);setOpeningReason('');setNewCategory(null);setAddedCategories([])},[batchId,request.businessId,financialActor(request.token)])
   const [dec, setDec] = useState({})          // row id → { category_id, exclude, ok }
   const [tab, setTab] = useState('all')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [rule, setRule] = useState(null)      // { text, category_id }
+  const [newCategory, setNewCategory] = useState(null)
+  const [addedCategories, setAddedCategories] = useState([])
   const data = rev.data
-  const cats = data?.categories || []
+  const cats = useMemo(() => [...new Map([...(data?.categories || []), ...addedCategories].map(c => [String(c.id), c])).values()], [data?.categories, addedCategories])
   const catByName = useMemo(() => new Map(cats.map((c) => [String(c.name).toLowerCase(), c])), [cats])
   const ctx = useMemo(() => ({
     company: active?.name || '',
@@ -374,9 +379,10 @@ function RowsStep({ batchId }) {
                   {b === 'duplicate' ? <span className="v2-muted v2-small">{t('imp.dupNote')}</span>
                     : b === 'matched_existing' ? <span className="v2-small">{t('imp.existingNote')}</span>
                     : (
-                      <select className="v2-select" value={cid} aria-label={t('imp.category')} disabled={b === 'excluded'}
-                        onChange={(e) => { set(r.id, { category_id: e.target.value, ok: true }); if (ins.kind === 'bank_fee' || ins.kind === 'gateway') setRule({ text: (r.description || '').split(/\s{2,}| \d/)[0].trim().slice(0, 40), category_id: e.target.value, save: false }) }}>
+                      <select className="v2-select" value={cid} aria-label={t('imp.category')} disabled={b === 'excluded' || busy || pending || recovering}
+                        onChange={(e) => { if (e.target.value === '__new_category__') { setNewCategory({ rowId:r.id, direction:r.direction }); return } set(r.id, { category_id: e.target.value, ok: true }); if (ins.kind === 'bank_fee' || ins.kind === 'gateway') setRule({ text: (r.description || '').split(/\s{2,}| \d/)[0].trim().slice(0, 40), category_id: e.target.value, save: false }) }}>
                         <option value="">{t('imp.choose')}</option>
+                        {canRecordCompanyMoney(active?.role) && !r.linked_transaction_id && <option value="__new_category__">{t('imp.newCategory.add')}</option>}
                         {['inflow', 'outflow'].map((g) => (
                           <optgroup key={g} label={t(`set.books.${g}`)}>{cats.filter((c) => c.group_type === g && (g === 'inflow') === (r.direction === 'in')).map((c) => <option key={c.id} value={c.id}>{catLabel(t, c.name)}</option>)}</optgroup>
                         ))}
@@ -395,6 +401,13 @@ function RowsStep({ batchId }) {
           })}
         </ul>
       </Card>
+      {newCategory && <ImportCategoryDialog request={request} direction={newCategory.direction} categories={cats} onClose={() => setNewCategory(null)} onSaved={(category) => {
+        if (!request.isCurrent()) return
+        setAddedCategories(xs => [...xs.filter(c => String(c.id) !== String(category.id)), category])
+        set(newCategory.rowId, { category_id: category.id, ok: true })
+        setNewCategory(null)
+        invalidate()
+      }} />}
       {rule && (
         <Card title={t('imp.ruleTitle')}>
           <label className="v2-pe-sug-row"><input type="checkbox" checked={!!rule.save} data-imp-rule-save onChange={(e) => setRule({ ...rule, save: e.target.checked })} />
@@ -411,6 +424,48 @@ function RowsStep({ batchId }) {
       </Card>
     </div>
   )
+}
+
+function ImportCategoryDialog({ request, direction, categories, onClose, onSaved }) {
+  const t = useT(), group = direction === 'in' ? 'inflow' : 'outflow'
+  const [name, setName] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [unknown, setUnknown] = useState(false)
+  const submitting = useRef(false)
+  const currentName = name.trim()
+  const matching = list => list.find(c => c.group_type === group && String(c.name).trim().toLocaleLowerCase() === currentName.toLocaleLowerCase())
+  const save = async () => {
+    if (submitting.current || !currentName || unknown || !request.isCurrent()) return
+    submitting.current = true; setBusy(true); setError('')
+    try {
+      // Reuse an existing named category instead of submitting a duplicate.
+      const category = matching(categories) || (await createCategory(request, { name: currentName, group_type: group }))?.category
+      if (!request.isCurrent()) return
+      if (!category?.id || category.group_type !== group) throw Error('category_result_unconfirmed')
+      onSaved(category)
+    } catch (x) {
+      if (request.isCurrent()) { const uncertain = !x?.status || x.status >= 500; setUnknown(uncertain); setError(uncertain ? t('imp.newCategory.unknown') : x.status === 403 ? t('dec.forbidden') : t('set.notSaved', { msg:x?.data?.error || x?.message })) }
+    } finally { submitting.current = false; if (request.isCurrent()) setBusy(false) }
+  }
+  const check = async () => {
+    if (submitting.current || !request.isCurrent()) return
+    submitting.current = true; setBusy(true)
+    try {
+      const result = await apiFetch('/cashflow-categories', request)
+      if (!request.isCurrent()) return
+      const category = matching(result.categories || [])
+      if (category) onSaved(category)
+      else setError(t('imp.newCategory.notFound'))
+    } catch { if (request.isCurrent()) setError(t('imp.newCategory.unknown')) }
+    finally { submitting.current = false; if (request.isCurrent()) setBusy(false) }
+  }
+  return <Modal title={t('imp.newCategory.title')} onClose={() => { if (!busy) onClose() }} footer={<>
+    <button className="v2-btn v2-btn-secondary" disabled={busy} onClick={onClose}>{t('set.cancel')}</button>
+    {unknown ? <button className="v2-btn v2-btn-primary" disabled={busy} onClick={check} data-import-category-check>{t('imp.newCategory.check')}</button>
+      : <button className="v2-btn v2-btn-primary" disabled={busy || !currentName} onClick={save} data-import-category-save>{t('set.books.add')}</button>}
+  </>}>
+    <p className="v2-muted">{t(`set.books.${group}`)}</p>
+    <form onSubmit={e => { e.preventDefault(); save() }}><label className="v2-field"><span>{t('imp.newCategory.name')}</span><input className="v2-input" value={name} maxLength={100} disabled={busy || unknown} onChange={e => setName(e.target.value)} data-import-category-name /></label></form>
+    {error && <p className="v2-inline-err" role="alert">{error}</p>}
+  </Modal>
 }
 
 /* ── 3 · Done ────────────────────────────────────────────────────────────── */
