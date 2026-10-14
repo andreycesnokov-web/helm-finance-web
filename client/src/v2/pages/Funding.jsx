@@ -49,7 +49,7 @@ function IncomingPayments({ t, lang }) {
 
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const SOURCES = ['founder', 'investor', 'bank', 'other_lender']
-const EMPTY = { source_kind: 'founder', instrument: 'loan', lender_name: '', counterparty_id: '', amount: '', received_on: daysAgo(0), interest_rate_annual: '', due_on: '', terms_text: '' }
+const EMPTY = { source_kind: 'founder', instrument: '', lender_name: '', counterparty_id: '', amount: '', received_on: daysAgo(0), interest_rate_annual: '', due_on: '', terms_text: '' }
 
 function RecordForm({ onDone, t }) {
   const request = useBusinessRequest()
@@ -62,7 +62,7 @@ function RecordForm({ onDone, t }) {
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
   const loan = f.instrument === 'loan'
   const save = async (e) => {
-    e.preventDefault(); setBusy(true); setErr(null)
+    e.preventDefault(); if(!f.instrument){setErr(t('fund.chooseInstrument'));return} setBusy(true); setErr(null)
     try {
       await createFunding(request, { ...f, counterparty_id: f.counterparty_id || null,
         interest_rate_annual: loan ? f.interest_rate_annual : null, due_on: loan ? f.due_on : null,
@@ -81,6 +81,7 @@ function RecordForm({ onDone, t }) {
           <div className="v2-seg" role="radiogroup" aria-labelledby="f-inst">
             {['loan', 'equity'].map((k) => <button key={k} type="button" role="radio" aria-checked={f.instrument === k} aria-pressed={f.instrument === k} className="v2-seg-btn" onClick={() => setF((x) => ({ ...x, instrument: k }))}>{t(`fund.inst.${k}`)}</button>)}
           </div>
+          {!f.instrument&&<span className="v2-muted v2-small">{t('fund.chooseInstrument')}</span>}
         </div>
         <div className="v2-field-row">
           <label className="v2-field"><span className="v2-field-label">{t('fund.from')}</span>
@@ -123,6 +124,7 @@ function RecordForm({ onDone, t }) {
           </fieldset>
         )}
         <p className="v2-muted v2-small">{t('fund.never')}</p>
+        <p className="v2-muted v2-small">{t('fund.unlinkedRegister')}</p>
         <div className="v2-decide-row">
           <button type="button" className="v2-btn v2-btn-secondary" onClick={onDone} disabled={busy}>{t('dec.cancel')}</button>
           <button type="submit" className="v2-btn v2-btn-primary" disabled={busy}>{t('fund.save')}</button>

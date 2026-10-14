@@ -46,7 +46,7 @@ export default function OperationDocuments({month}){
     <div className="v2-chips" aria-label={t('od.filters')}>{['all','incomplete','missing','clarification','complete'].map(k=><button type="button" key={k} data-od-filter={k} className="v2-chip v2-chip-sel" aria-pressed={filter===k} onClick={()=>pick(k)}>{t(`od.filter.${k}`)}</button>)}</div>
     {!rows.length?<Empty title={t('od.emptyFilter')}/>:<ul className="v2-od-list" data-od-list>{rows.slice(page*50,(page+1)*50).map(o=><li key={o.key} data-operation={o.key}>
      <div><span className="v2-muted">{shortCalendarDate(o.date,lang)}</span><strong>{bankRecipient(o)?t('od.paymentTo',{name:bankRecipient(o)}):o.description||t('od.unnamed')}</strong><span>{money(o.amount,{currency:o.currency,full:true})}</span><span className="v2-small">{o.category||t('od.noCategory')}</span></div>
-     <div className="v2-small">{o.invoice?<Link to={'/business/'+(o.invoice.type==='receivable'?'receivables':'payables')+'/'+o.invoice.id}>{t('od.invoice')}{o.invoice.number?' · '+o.invoice.number:''}</Link>:t('od.noInvoice')}</div>
+     <div className="v2-small">{o.invoice?<Link to={'/business/'+(o.invoice.type==='receivable'?'receivables':'payables')+'/'+o.invoice.id}>{t('od.invoice')}{o.invoice.number?' · '+o.invoice.number:''}</Link>:['funding','loan'].includes(o.kind)?t('od.ownerFinancing.noInvoice'):t('od.noInvoice')}</div>
      <div className="v2-small">{t('od.have')}: {o.documents.map(d=>d.file?.file_name||t('od.document')).join(', ')||'—'}</div>
      <div className="v2-small">{t('od.missing')}: {o.requirements.filter(r=>r.mandatory&&r.state==='missing').map(r=>t(`od.requirement.${r.type}`)).join(', ')||'—'}</div>
      <div><Pill tone={o.status==='complete'?'good':'warn'}>{t(`od.status.${o.status}`)}</Pill><Btn variant="secondary" data-od-open={o.key} onClick={()=>setSelected(o.key)}>{t('od.openFolder')}</Btn></div>
@@ -97,14 +97,25 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
     <p className="v2-od-amount">{money(o.amount,{currency:o.currency,full:true})}</p>
     {recipient&&<p className="v2-muted v2-small">{t('od.recipientFromBank')}</p>}
    </section>
+   {o.target_type==='transaction'&&o.owner_financing_type&&<section className="v2-note" data-od-owner-financing>
+    <strong>{t('od.ownerFinancing.title')}</strong>
+    <p>{t(`od.ownerFinancing.current.${o.owner_financing_type}`)}</p>
+    <p className="v2-muted v2-small">{t('od.ownerFinancing.explain')}</p>
+    {manage&&<div className="v2-row-gap">
+     <Link className="v2-btn v2-btn-secondary" to={'/business/transactions?tx='+encodeURIComponent(o.target_id)+'&category='+encodeURIComponent('Capital contribution')}>{t('od.ownerFinancing.equity')}</Link>
+     <Link className="v2-btn v2-btn-secondary" to={'/business/transactions?tx='+encodeURIComponent(o.target_id)+'&category='+encodeURIComponent('Owner funding (loan)')}>{t('od.ownerFinancing.loan')}</Link>
+    </div>}
+   </section>}
    <h3>{t('od.nextDocuments')}</h3>
    <ul className="v2-od-evidence" data-od-evidence>
     {o.requirements.map(r=>{
      const linkedDocs=r.documents.map(id=>o.documents.find(d=>d.id===id)).filter(Boolean)
      const bankProof=r.type==='payment'&&r.state==='linked'&&r.explanation==='bank_row_or_transfer_pair'
+     const declaredCapital=r.type==='funding'&&r.explanation==='capital_classification_and_bank'
      const contractPending=r.type==='contract'&&r.explanation==='contract_decision_pending'
      return <li key={r.type} data-od-evidence-role={r.type} className={r.state==='linked'?'is-done':''}>
-      <div className="v2-od-evidence-head"><strong>{t(`od.requirement.${r.type}`)}</strong><span>{contractPending?t('od.contractUndecided'):bankProof?t('od.bankVerified'):t(`od.state.${r.state}`)}</span></div>
+      <div className="v2-od-evidence-head"><strong>{t(`od.requirement.${r.type}`)}</strong><span>{contractPending?t('od.contractUndecided'):bankProof?t('od.bankVerified'):declaredCapital?t('od.ownerFinancing.declared'):t(`od.state.${r.state}`)}</span></div>
+      {declaredCapital&&<p className="v2-muted v2-small">{t('od.ownerFinancing.declaredHelp')}</p>}
       {bankProof&&<div className="v2-od-evidence-files">{o.bank_rows.filter(row=>row.verified).map(row=><span key={row.id}><Link to={'/business/bank-import?batch='+row.batch_id}>{t('od.statement')}</Link>{row.document_id&&<button className="v2-btn-link" type="button" onClick={()=>open(row.document_id)}>{t('docs.open')}</button>}</span>)}</div>}
       {linkedDocs.length>0&&<div className="v2-od-evidence-files">{linkedDocs.map(d=><button type="button" className="v2-btn-link" key={d.id} onClick={()=>open(d.id)}>{d.file?.file_name||t('od.document')}</button>)}</div>}
       {contractPending&&<p className="v2-muted v2-small">{t('od.contractRowHelp')}</p>}

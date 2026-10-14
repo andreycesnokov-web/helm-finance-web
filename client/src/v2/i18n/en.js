@@ -277,6 +277,8 @@ export default {
     hiring: 'Thinking of hiring?', hiringText: 'Ask AI CFO what a new person would do to your runway before you decide.', askCfo: 'Ask AI CFO',
   },
   fund: {
+    chooseInstrument: 'Choose first: non-repayable capital or a repayable loan.',
+    unlinkedRegister: 'This register does not yet link automatically to an imported bank transaction. Its record does not create a payment; check for an existing record before adding the same amount.',
     ipTitle: 'Incoming payments from gateways',
     ipConnect: 'Connect a gateway',
     ipOff: 'Connect a gateway and receipts will appear here by themselves.',
@@ -791,6 +793,7 @@ export default {
     since: 'archived {d}',
   },
   imp: {
+    fundingChoiceRequired: 'Choose a category explicitly for {n} transfers involving an owner or incoming transfers from a person. They may be capital, a loan, loan repayment or something else; the statement cannot establish the terms.',
     newCategory: {"add": "+ New category", "title": "New category", "name": "Category name", "unknown": "The category save could not be confirmed. Check the category list before trying again.", "check": "Check saved categories", "notFound": "The category is not in the list yet. Check again; no new create was sent."},
     safe: {"receiptNote": "Saved confirmation results belong to your own requests. They are historical evidence, not the current account balance.", "openingLater": "Opening will be reviewed for the statement start date after parsing. It is not adjusted on this step.", "reviewTitle": "Review the statement and its starting balance", "historical": "Recorded opening before {d}: {v}.", "unknown": "Opening history is incomplete or undated. No starting balance is assumed and no opening correction is available. You can review the rows; account matching remains unverified.", "current": "Current recorded account balance: {v}. This may include movements after the statement period.", "applyOpening": "Include an atomic opening correction to {v} with this confirmation", "reason": "Reason for opening correction", "reasonRequired": "Enter the reason for the opening correction.", "check": "Check confirmation result", "retry": "Retry the original confirmation", "reload": "Reload the review", "select": "Include this row in the confirmation", "pending": "The result is not confirmed. Check the original request before another confirmation. Missing result is not proof of rollback.", "recovered": "Original confirmation found. No second write was sent.", "partial": "Selected rows confirmed. Review the remaining rows before continuing."},
     openingReason: 'Opening balance per bank statement',
@@ -885,7 +888,8 @@ export default {
       to_person: 'Salary, a service, or a loan repayment? Salary or services → PPh 21.',
       intercompany: 'A loan or a repayment? The same row should be in the other company’s statement.',
       foreign: 'Choose the bill it pays.',
-      owner: 'Reimbursement, a loan or dividends? Without a document the accountant will not accept it as a company cost.',
+      owner: 'Loan repayment, withdrawal, reimbursement or another owner payment? Choose the category explicitly.',
+      ownerIncoming: 'Is this non-repayable capital, a repayable loan, or another receipt? Choose the category explicitly.',
     },
     tax: {
       pph26: 'Abroad: PPh 26 20% ≈ {v} (or the treaty rate with a DGT form) — the accountant confirms.',
@@ -1577,6 +1581,15 @@ export default {
     aiCost: 'AI cost · 30 days', log: 'Admin log', logSub: 'Plan and access changes · append-only', logNa: 'The admin log is not available.',
   },
   od: {
+    ownerFinancing: {
+      title: 'Owner receipt: choose the terms',
+      current: { equity: 'Currently: non-repayable capital contribution', loan: 'Currently: repayable owner loan' },
+      explain: 'Changing the category corrects the existing bank transaction without creating another payment. No supplier invoice is needed here; the funding basis and contract decision are reviewed separately.',
+      noInvoice: 'Funding receipt — no supplier invoice requested',
+      equity: 'Capital contribution — no repayment', loan: 'Owner loan — repayable',
+      declared: 'Capital classification confirmed; bank credit verified',
+      declaredHelp: 'This provisionally confirms the nature of the receipt, not its legal form. Accountant review remains a separate step.',
+    },
     paymentLink: 'Payment',
     invoiceDuplicate: 'Possible reference match: {ref}. Check the existing document; this does not by itself mean a bill was created.',
     fileReused: 'This exact file is already stored. The existing document is reused without another upload; this does not mean a bill already exists.',

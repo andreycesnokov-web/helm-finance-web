@@ -78,13 +78,25 @@ export function insightOf(row, ctx = {}) {
   if (FOREIGN.test(d) && dir === 'out') return res('foreign', { tax: 'pph26', ask: true })
   if (RENT.test(d) && dir === 'out') return res('rent', { category: 'Rent', tax: 'pph42' })
   const person = cp && !COMPANY.test(` ${cp} `)
-  // The owner is a person too, but money to or from the owner is not pay: loan, reimbursement or dividends.
+  // An incoming owner payment can be repayable debt or non-repayable capital.
+  // A bank narrative cannot decide which one it is.
   if (person && (ctx.ownerNames || []).some((n) => nameWords(n).length >= 2 && mentions(cp, n))) {
-    return res('owner', { category: dir === 'in' ? 'Owner funding (loan)' : 'Owner withdrawal / dividends', ask: true })
+    return res('owner', { ask: true })
   }
-  if (person && dir === 'in') return res('from_person', { category: 'Owner funding (loan)', ask: true })
+  if (person && dir === 'in') return res('from_person', { ask: true })
   if (person && dir === 'out') return res('to_person', { tax: 'pph21', ask: true })
   return res('other')
+}
+
+export function needsExplicitOwnerDecision(row, insight) {
+  return insight.kind === 'owner' || (row.direction === 'in' && insight.kind === 'from_person')
+}
+
+export function statementCategoryId(row, insight, decision, categoriesByName) {
+  if (decision?.category_id !== undefined) return decision.category_id
+  if (row.final_category_id != null) return row.final_category_id
+  if (needsExplicitOwnerDecision(row, insight)) return ''
+  return row.suggested_category_id ?? categoriesByName.get(String(insight.category || '').toLowerCase())?.id ?? ''
 }
 
 /** Group a statement's rows for the review header: counts by kind. */

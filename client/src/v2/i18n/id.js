@@ -277,6 +277,8 @@ export default {
     hiring: 'Mau merekrut?', hiringText: 'Tanyakan AI CFO dampak satu orang baru ke runway sebelum memutuskan.', askCfo: 'Tanya AI CFO',
   },
   fund: {
+    chooseInstrument: 'Pilih dulu: setoran modal tanpa pengembalian atau pinjaman yang harus dikembalikan.',
+    unlinkedRegister: 'Daftar ini belum otomatis terhubung ke transaksi bank yang diimpor. Catatan di sini tidak membuat pembayaran baru; periksa apakah jumlah yang sama sudah tercatat sebelum menambahkannya.',
     ipTitle: 'Pembayaran masuk dari gateway',
     ipConnect: 'Hubungkan gateway',
     ipOff: 'Hubungkan gateway dan penerimaan akan muncul di sini dengan sendirinya.',
@@ -791,6 +793,7 @@ export default {
     since: 'diarsipkan {d}',
   },
   imp: {
+    fundingChoiceRequired: 'Pilih kategori secara jelas untuk {n} transfer yang melibatkan pemilik atau transfer masuk dari perorangan. Ini bisa berupa modal, pinjaman, pelunasan pinjaman, atau transaksi lain; mutasi bank tidak menentukan syaratnya.',
     newCategory: {"add": "+ Kategori baru", "title": "Kategori baru", "name": "Nama kategori", "unknown": "Penyimpanan kategori belum terkonfirmasi. Periksa daftar sebelum mencoba lagi.", "check": "Periksa kategori tersimpan", "notFound": "Kategori belum ada dalam daftar. Periksa lagi; permintaan baru tidak dikirim."},
     safe: {"receiptNote": "Hasil tersimpan adalah konfirmasi permintaan Anda sendiri. Ini bukti historis, bukan saldo rekening saat ini.", "openingLater": "Saldo awal ditinjau pada tanggal awal laporan setelah penguraian. Tidak ada penyesuaian pada langkah ini.", "reviewTitle": "Tinjau laporan dan saldo awal", "historical": "Saldo tercatat sebelum {d}: {v}.", "unknown": "Riwayat saldo awal tidak lengkap atau tanpa tanggal. Saldo tidak diasumsikan dan koreksi awal tidak tersedia. Baris dapat ditinjau; kecocokan rekening belum terverifikasi.", "current": "Saldo rekening tercatat saat ini: {v}. Bisa mencakup transaksi setelah periode laporan.", "applyOpening": "Sertakan koreksi saldo awal atomik menjadi {v} dalam konfirmasi ini", "reason": "Alasan koreksi saldo awal", "reasonRequired": "Masukkan alasan koreksi saldo awal.", "check": "Periksa hasil konfirmasi", "retry": "Ulangi konfirmasi asli", "reload": "Muat ulang tinjauan", "select": "Sertakan baris dalam konfirmasi", "pending": "Hasil belum terkonfirmasi. Periksa permintaan asli sebelum konfirmasi baru. Hasil yang tidak ditemukan bukan bukti rollback.", "recovered": "Konfirmasi asli ditemukan. Tidak ada penulisan kedua.", "partial": "Baris pilihan dikonfirmasi. Tinjau baris tersisa sebelum melanjutkan."},
     openingReason: 'Saldo awal sesuai rekening koran',
@@ -885,7 +888,8 @@ export default {
       to_person: 'Gaji, jasa, atau pengembalian pinjaman? Gaji atau jasa → PPh 21.',
       intercompany: 'Pinjaman atau pengembalian? Baris yang sama ada di mutasi perusahaan lain.',
       foreign: 'Pilih tagihan yang dibayar.',
-      owner: 'Penggantian, pinjaman, atau dividen? Tanpa dokumen akuntan tidak menerima sebagai biaya.',
+      owner: 'Pelunasan pinjaman, penarikan, penggantian, atau pembayaran lain kepada pemilik? Pilih kategori secara jelas.',
+      ownerIncoming: 'Apakah ini setoran modal tanpa pengembalian, pinjaman yang harus dikembalikan, atau penerimaan lain? Pilih kategori secara jelas.',
     },
     tax: {
       pph26: 'Luar negeri: PPh 26 20% ≈ {v} (atau tarif P3B dengan form DGT) — dikonfirmasi akuntan.',
@@ -1577,6 +1581,15 @@ export default {
     aiCost: 'Biaya AI · 30 hari', log: 'Log admin', logSub: 'Perubahan paket dan akses · hanya tambah', logNa: 'Log admin tidak tersedia.',
   },
   od: {
+    ownerFinancing: {
+      title: 'Dana masuk dari pemilik: pilih ketentuannya',
+      current: { equity: 'Saat ini: setoran modal tanpa pengembalian', loan: 'Saat ini: pinjaman pemilik yang harus dikembalikan' },
+      explain: 'Perubahan kategori mengoreksi transaksi bank yang sudah ada tanpa membuat pembayaran baru. Faktur pemasok tidak diperlukan di sini; dasar pendanaan dan keputusan tentang kontrak diperiksa terpisah.',
+      noInvoice: 'Penerimaan pendanaan — faktur pemasok tidak diminta',
+      equity: 'Setoran modal — tanpa pengembalian', loan: 'Pinjaman pemilik — dikembalikan',
+      declared: 'Setoran modal dikonfirmasi; dana masuk bank diverifikasi',
+      declaredHelp: 'Ini konfirmasi awal sifat penerimaan, bukan pemeriksaan dasar hukumnya. Pemeriksaan akuntan tetap merupakan tahap terpisah.',
+    },
     paymentLink: 'Pembayaran',
     invoiceDuplicate: 'Kemungkinan nomor referensi sama: {ref}. Periksa dokumen yang ada; ini tidak berarti tagihan sudah dibuat.',
     fileReused: 'File yang sama sudah tersimpan. Dokumen yang ada dipakai tanpa unggahan ulang; ini tidak berarti tagihan sudah ada.',

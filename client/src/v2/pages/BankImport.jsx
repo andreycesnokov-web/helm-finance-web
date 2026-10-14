@@ -22,7 +22,7 @@ import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
-import { insightOf } from '../lib/statementInsights'
+import { insightOf, needsExplicitOwnerDecision, statementCategoryId } from '../lib/statementInsights'
 import { catLabel } from '../lib/categoryLabel'
 import Modal from '../components/Modal'
 import { canRecordCompanyMoney } from '../lib/financePermissions'
@@ -300,7 +300,7 @@ function RowsStep({ batchId }) {
   const bucketOf = (r) => (dec[r.id]?.exclude ? 'excluded' : r.match_status === 'duplicate' ? 'duplicate'
     : r.review_status === 'matched_existing' && r.suggested_match_type === 'transfer' ? 'suggested'   // a same-amount pair in this statement
     : r.review_status || 'needs_review')
-  const catFor = (r, ins) => dec[r.id]?.category_id ?? r.final_category_id ?? r.suggested_category_id ?? catByName.get(String(ins.category || '').toLowerCase())?.id ?? ''
+  const catFor = (r, ins) => statementCategoryId(r, ins, dec[r.id], catByName)
   const counts = Object.fromEntries(BUCKETS.map((b) => [b, rows.filter((r) => bucketOf(r) === b).length]))
   const shown = tab === 'all' ? rows : rows.filter((r) => bucketOf(r) === tab)
   const ccy = batch.currency || 'IDR'
@@ -311,8 +311,10 @@ function RowsStep({ batchId }) {
   const io={send:confirmImport,read:readImportConfirmReceipt}
   const recovered=async retry=>{if(recovering||!importCurrent(request))return;setRecovering(true);try{const r=retry?await resumeImportConfirm(request,batchId,io):await recoverImportConfirm(request,batchId,io);if(!importCurrent(request))return;setRecoveryMsg(t(r?.ok?'imp.safe.recovered':'imp.safe.pending'));if(r?.ok){invalidate();rev.reload()}}catch{if(importCurrent(request))setRecoveryMsg(t('imp.safe.pending'))}finally{if(importCurrent(request))setRecovering(false)}}
   const reviewed=data.reviewed,selected=rows.filter(r=>!r.linked_transaction_id&&dec[r.id]?.selected!==false),pending=importPending(request,batchId)
+  const unresolvedFunding=selected.filter(r=>!['excluded','duplicate','matched_existing'].includes(bucketOf(r))&&needsExplicitOwnerDecision(r,insightOf(r,ctx))&&!catFor(r,insightOf(r,ctx)))
   const confirm = async () => {
     if (confirming.current||!importCurrent(request)||!reviewed?.review_hash||!reviewed.can_confirm||!selected.length) return
+    if (unresolvedFunding.length) { setErr(t('imp.fundingChoiceRequired',{n:unresolvedFunding.length})); return }
     confirming.current=true
     setBusy(true); setErr('')
     try {
@@ -346,6 +348,7 @@ function RowsStep({ batchId }) {
       <PageHead title={t('imp.rowsTitle', { n: rows.length })} sub={t('imp.rowsSub')} back={{ to: '/business/bank-import', label: t('imp.step.file') }}
         actions={<button type="button" className="v2-btn v2-btn-primary" disabled={busy||!reviewed?.can_confirm||!selected.length||!reviewed?.review_hash||applyOpening&&!openingReason.trim()} onClick={confirm} data-imp-confirm>{busy ? t('imp.confirming') : t('imp.confirm')}</button>} />
       <Steps cur="rows" />
+      {unresolvedFunding.length>0&&<p role="status" className="v2-note">{t('imp.fundingChoiceRequired',{n:unresolvedFunding.length})}</p>}
       <Card title={t('imp.safe.reviewTitle')}>
         <p data-imp-historical>{reviewed?.opening_state==='known'?t('imp.safe.historical',{v:money(reviewed.historical_opening,{currency:ccy,full:true}),d:shortDate(batch.statement_start,lang)}):t('imp.safe.unknown')}</p>
         <p className="v2-muted">{t('imp.safe.current',{v:money(reviewed?.current_balance,{currency:ccy,full:true})})}</p>
@@ -387,7 +390,7 @@ function RowsStep({ batchId }) {
                         ))}
                       </select>
                     )}
-                  {ins.ask && b !== 'excluded' && !dec[r.id]?.ok && <span className="v2-imp-ask v2-small">{t(`imp.ask.${ins.kind}`)}</span>}
+                  {ins.ask && b !== 'excluded' && !dec[r.id]?.ok && <span className="v2-imp-ask v2-small">{t(ins.kind==='owner'&&r.direction==='in'?'imp.ask.ownerIncoming':`imp.ask.${ins.kind}`)}</span>}
                 </span>
                 <span className="v2-imp-acts">
                   {b !== 'duplicate' && b !== 'matched_existing' && (

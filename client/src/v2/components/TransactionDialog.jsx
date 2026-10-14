@@ -14,7 +14,7 @@ import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { canRecordCompanyMoney } from '../lib/financePermissions'
 
 const DIR_IN = ['income']
-export default function TransactionDialog({ tx, wallets = [], categories = [], onClose, onSaved }) {
+export default function TransactionDialog({ tx, wallets = [], categories = [], initialCategory = null, onClose, onSaved }) {
   const t = useT()
   const lang = useLang()
   const request = useBusinessRequest()
@@ -25,7 +25,7 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], o
   const isIn = DIR_IN.includes(tx.type)
   const cur = tx.currency_original || 'IDR'
   const [f, setF] = useState({
-    description: tx.description || '', category: tx.category || '', wallet_id: tx.wallet_id ? String(tx.wallet_id) : '',
+    description: tx.description || '', category: isIn && categories.some(c=>c.name===initialCategory)?initialCategory:tx.category || '', wallet_id: tx.wallet_id ? String(tx.wallet_id) : '',
     date: String(txDate(tx) || '').slice(0, 10), amount: String(tx.amount_original ?? ''),
   })
   const [busy, setBusy] = useState(false)

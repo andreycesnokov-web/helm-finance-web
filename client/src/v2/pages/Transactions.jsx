@@ -65,7 +65,7 @@ export default function Transactions() {
   }, [selectedId, tx.data, tx.loading, tx.error])
   const close = () => {
     setOpenTx(null)
-    if (selectedId) setSp((old) => { const n = new URLSearchParams(old); n.delete('tx'); return n }, { replace: true })
+    if (selectedId) setSp((old) => { const n = new URLSearchParams(old); n.delete('tx'); n.delete('category'); return n }, { replace: true })
   }
   const walletName = Object.fromEntries((wallets.data?.wallets || []).map((w) => [String(w.id), w.name]))
   const categories = (cats.data?.categories || []).map((c) => c.name).filter(Boolean)
@@ -152,7 +152,7 @@ export default function Transactions() {
           {rows.length > limit && <button type="button" className="v2-btn-link" onClick={() => setLimit((l) => l + PAGE)}>{t('tx.loadMore')}</button>}
         </div>
       </Card>
-      {openTx && <TransactionDialog tx={openTx} wallets={wallets.data?.wallets || []} categories={cats.data?.categories || []} onClose={close} onSaved={invalidate} />}
+      {openTx && <TransactionDialog tx={openTx} wallets={wallets.data?.wallets || []} categories={cats.data?.categories || []} initialCategory={selectedId?sp.get('category'):null} onClose={close} onSaved={invalidate} />}
     </div>
   )
 }

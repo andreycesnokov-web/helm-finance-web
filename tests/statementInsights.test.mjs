@@ -2,7 +2,7 @@
 // BCA and Permata lines; names are invented.
 import test from 'node:test'
 import assert from 'node:assert'
-import { insightOf, counterpartyOf, mentions } from '../client/src/v2/lib/statementInsights.js'
+import { insightOf, counterpartyOf, mentions, needsExplicitOwnerDecision, statementCategoryId } from '../client/src/v2/lib/statementInsights.js'
 
 const ctx = { company: 'Sunrise Trading Indonesia', otherCompanies: ['Sunrise Pay'] }
 const row = (description, direction, amount = 1000000) => ({ description, direction, amount })
@@ -32,15 +32,31 @@ test('gateway settlement, payment abroad, rent', () => {
 test('private persons: money in asks (owner funding?), money out reminds of PPh 21', () => {
   const a = insightOf(row('BI-FAST CR TRANSFER DR 013 JOHN DOE', 'in', 30000000), ctx)
   assert.strictEqual(a.kind, 'from_person'); assert.strictEqual(a.counterparty, 'JOHN DOE'); assert.strictEqual(a.ask, true)
+  assert.strictEqual(a.category, null, 'an incoming personal transfer must not silently become a founder loan')
+  assert.strictEqual(needsExplicitOwnerDecision(row('', 'in'), a), true)
   const b = insightOf(row('BI-FAST DB TRANSFER KE 008 JANE ROE KBB', 'out', 5000000), ctx)
   assert.strictEqual(b.kind, 'to_person'); assert.strictEqual(b.tax, 'pph21')
   assert.strictEqual(insightOf(row('TRF KE PT SUPPLIER JAYA 123 BANK MANDIRI', 'out'), ctx).kind, 'other', 'a company is not a person')
 })
 
-test('money to the owner is a withdrawal question, not pay', () => {
+test('money to or from the owner requires an explicit instrument decision', () => {
+  const incoming = insightOf(row('BI-FAST CR TRANSFER DR 013 ALEX OWNER', 'in', 8500000), { ...ctx, ownerNames: ['Alex Owner'] })
+  assert.strictEqual(incoming.kind, 'owner'); assert.strictEqual(incoming.category, null)
+  assert.strictEqual(needsExplicitOwnerDecision(row('', 'in'), incoming), true)
   const o = insightOf(row('BI-FAST DB TRANSFER KE 013 ALEX OWNER KBB', 'out', 900000), { ...ctx, ownerNames: ['Alex Owner'] })
-  assert.strictEqual(o.kind, 'owner'); assert.strictEqual(o.tax, null); assert.strictEqual(o.category, 'Owner withdrawal / dividends')
+  assert.strictEqual(o.kind, 'owner'); assert.strictEqual(o.tax, null); assert.strictEqual(o.category, null)
+  assert.strictEqual(needsExplicitOwnerDecision(row('', 'out'), o), true)
   assert.strictEqual(counterpartyOf('TRSF E-BANKING DB 0409/FTSCY/WS95051 29600000.00 CIRCLEKA INDONESIA'), 'CIRCLEKA INDONESIA')
+})
+
+test('an owner loan suggestion cannot silently override an explicit equity choice', () => {
+  const bank = { direction:'in', suggested_category_id:'loan-id', final_category_id:null }
+  const insight = { kind:'owner', category:null }
+  const categories = new Map()
+  assert.equal(statementCategoryId(bank,insight,null,categories),'')
+  assert.equal(statementCategoryId(bank,insight,{category_id:'capital-id'},categories),'capital-id')
+  assert.equal(statementCategoryId({...bank,final_category_id:'capital-id'},insight,null,categories),'capital-id')
+  assert.equal(statementCategoryId({...bank,direction:'out'},insight,null,categories),'')
 })
 
 test('counterparty and name matching', () => {
