@@ -1581,6 +1581,7 @@ export default {
     aiCost: 'AI cost · 30 days', log: 'Admin log', logSub: 'Plan and access changes · append-only', logNa: 'The admin log is not available.',
   },
   od: {
+    partnerPayout: { noInvoice: 'Partner payout — no supplier invoice required', help: 'Link the partner agreement to this payment. The verified bank entry confirms payment; accountant review is separate.' },
     ownerFinancing: {
       title: 'Receipt from owner',
       current: { equity: 'Currently: non-repayable capital contribution', loan: 'Currently: repayable owner loan' },

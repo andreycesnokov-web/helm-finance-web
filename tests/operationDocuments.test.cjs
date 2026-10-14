@@ -36,3 +36,15 @@ test('Recorded loan repayment needs the bank debit, not an invoice, contract or 
  s.bank_rows[0].direction='in';o=check(s).operations[0];assert.equal(o.status,'missing');assert.equal(o.requirements[0].state,'missing');
  s.transactions[0].category='Loan proceeds';o=check(s).operations[0];assert.equal(o.loan_repayment,false);assert(o.requirements.some(r=>r.type==='funding'), 'other financing still needs its own basis');
 });
+test('Partner payout is supported by its agreement and verified bank debit without inventing an invoice',()=>{
+ const s=base();s.transactions[0]=tx(1,{category:'Partner payouts'});
+ s.bank_rows=[{id:'r',linked_transaction_id:1,tx_date:'2026-09-01',direction:'out',amount:'30',review_status:'imported',batch_id:'b'}];s.batches=[{id:'b',currency:'IDR',status:'imported'}];
+ let o=check(s).operations[0];assert.equal(o.partner_payout,true);assert.equal(o.invoice,null);assert.equal(o.kind,'supplier');assert.equal(o.classification_source,'recorded_partner_payout');assert.deepEqual(o.requirements.map(r=>r.type),['payment','contract']);assert.equal(o.requirements.find(r=>r.type==='payment').state,'linked');assert.equal(o.requirements.find(r=>r.type==='contract').state,'missing');assert.equal(o.questions.length,0);assert.equal(o.status,'missing');
+ doc(s);s.documents[0].document_type='other';s.audit.find(a=>a.action==='operation_evidence_confirmed').metadata.role='contract';
+ o=check(s).operations[0];assert.equal(o.requirements.find(r=>r.type==='contract').state,'linked');assert.equal(o.status,'complete');assert.equal(check(s).summary.accountant_review_complete,false);
+ s.audit.push({id:'old-review',target_type:'transaction',target_id:1,action:'operation_reviewed',metadata:{version:'v1',kind:'supplier',reason:'Earlier general expense review',contract_required:false,contract_waiver:''}});
+ o=check(s).operations[0];assert.equal(o.status,'complete','a generic earlier review cannot waive the agreement rule');
+ s.documents[0].document_review_version='new-doc-version';o=check(s).operations[0];assert.equal(o.requirements.find(r=>r.type==='contract').state,'requires_review');assert(o.questions.includes('coverage_review'));assert.equal(o.status,'clarification');
+ s.documents[0].document_review_version='docv';s.bank_rows[0].direction='in';o=check(s).operations[0];assert.equal(o.requirements.find(r=>r.type==='payment').state,'missing');assert.equal(o.status,'missing');
+ s.transactions[0].category='Other expenses';o=check(s).operations[0];assert.equal(o.partner_payout,false);assert(o.requirements.some(r=>r.type==='basis'),'the partner rule must not affect other expenses');
+});

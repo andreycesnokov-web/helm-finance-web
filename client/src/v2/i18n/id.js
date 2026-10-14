@@ -1581,6 +1581,7 @@ export default {
     aiCost: 'Biaya AI · 30 hari', log: 'Log admin', logSub: 'Perubahan paket dan akses · hanya tambah', logNa: 'Log admin tidak tersedia.',
   },
   od: {
+    partnerPayout: { noInvoice: 'Pembayaran mitra — faktur pemasok tidak diperlukan', help: 'Tautkan perjanjian mitra ke pembayaran ini. Baris bank yang terverifikasi membuktikan pembayaran; pemeriksaan akuntan terpisah.' },
     ownerFinancing: {
       title: 'Dana masuk dari pemilik',
       current: { equity: 'Saat ini: setoran modal tanpa pengembalian', loan: 'Saat ini: pinjaman pemilik yang harus dikembalikan' },
