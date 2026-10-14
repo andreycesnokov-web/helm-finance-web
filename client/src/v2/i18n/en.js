@@ -1234,7 +1234,7 @@ export default {
       name: { pph21: 'PPh 21 (payroll tax)', pph23: 'PPh 23 (withholding on services)', pph4_2: 'PPh 4(2) (final tax, e.g. rent)', pph26: 'PPh 26 (payments abroad)', ppn: 'PPN (VAT)', bpjs: 'BPJS (social security)', other: 'Tax' },
       role: { company_pays: 'The company must pay it', company_withholds: 'The company withholds it from the payment and pays it', creditable: 'Can be credited if the company is PKP', info: 'For information' },
       src: { printed: 'printed on the document', read_from_image: 'read from a scan — please check', not_found_in_text: 'amount not found in the text' } },
-    fl: { where: 'Where it belongs', mode: { record: 'A bill, invoice or transaction', bank: 'A bank account for a month', counterparty: 'A counterparty', keep: 'Keep on file, no link' },
+    fl: { importNote: 'Saving files it with the account and month. Transactions are added only after you review and confirm the statement rows.', importRows: 'Import statement rows', where: 'Where it belongs', mode: { record: 'A bill, invoice or transaction', bank: 'A bank account for a month', counterparty: 'A counterparty', keep: 'Keep on file, no link' },
       account: 'Bank account', month: 'Month', monthOptional: 'Month (optional)', counterparty: 'Counterparty', reason: 'What it is',
       reasons: { payroll: 'Payroll', tax: 'Tax', contract: 'Contract', other: 'Other' }, keep: 'Keep', saved: 'Saved.', filed: 'Filed', statement: 'Statement' },
     missingFor: 'Missing for {m}', missingHint: 'Paid bills without a payment proof — your accountant needs them to close the month.', noneMissing: 'Nothing missing.',

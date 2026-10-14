@@ -75,6 +75,7 @@ function FileStep() {
   const targetMonth = /^\d{4}-\d{2}$/.test(sp.get('month') || '') ? sp.get('month') : null
   const [walletId, setWalletId] = useState(sp.get('wallet_id') || sp.get('wallet') || '')
   const [files, setFiles] = useState([])      // { name, state, read?, documentId?, error? }
+  const sourceDocumentId = sp.get('document_id')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [drag, setDrag] = useState(false)
@@ -83,6 +84,20 @@ function FileStep() {
   const main = files.find((f) => f.state === 'read' && f.read?.ok)
   const st = main?.read?.statement
   const wallet = list.find((w) => String(w.id) === String(walletId))
+  // Opening an already saved statement reads its existing scoped file. It does
+  // not upload, create a batch, confirm rows, or alter the ledger.
+  useEffect(() => {
+    if (!sourceDocumentId || !request.businessId || !request.isCurrent()
+      || sp.get('business_id') && sp.get('business_id') !== request.businessId) return
+    let cancelled = false
+    setFiles([{ name: t('docs.fl.statement'), state: 'reading', documentId: sourceDocumentId }])
+    readStatement(request, sourceDocumentId).then((r) => {
+      if (!cancelled && request.isCurrent()) setFiles([{ name: r.file_name || t('docs.fl.statement'), state: r.ok ? 'read' : 'unread', documentId: sourceDocumentId, read: r }])
+    }).catch((x) => {
+      if (!cancelled && request.isCurrent()) setFiles([{ name: t('docs.fl.statement'), state: 'failed', documentId: sourceDocumentId, error: x?.data?.error || x?.message }])
+    })
+    return () => { cancelled = true }
+  }, [sourceDocumentId, request, sp, t])
   useEffect(() => { if (!walletId && main?.read?.suggested_wallet_id) setWalletId(String(main.read.suggested_wallet_id)) }, [main, walletId])
 
   const add = async (picked) => {

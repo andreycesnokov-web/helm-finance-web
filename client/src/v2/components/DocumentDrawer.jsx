@@ -6,6 +6,8 @@
 // only thing that moves a document to the Company documents tab). Nothing is deleted.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
+import { canRecordCompanyMoney } from '../lib/financePermissions'
 import { useAuth } from '../../hooks/useAuth'
 import I from '../icons'
 import { Pill } from '../ui'
@@ -44,6 +46,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
   const t = useT()
   const lang = useLang()
   const { token } = useAuth()
+  const { active } = useWorkspace()
   const ref = useRef(null)
   const closeRef = useRef(null)
   const onCloseRef = useRef(onClose)
@@ -260,6 +263,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
                 )}
                 {mode === 'bank' && (
                   <>
+                    <p className="v2-muted v2-small" data-statement-filing-note>{t('docs.fl.importNote')}</p>
                     <div className="v2-field-row">
                       <label className="v2-field"><span className="v2-field-label">{t('docs.fl.account')}</span>
                         <select className="v2-select" value={fl.wallet_id} disabled={busy} onChange={(e) => setFl((f) => ({ ...f, wallet_id: e.target.value }))} aria-label={t('docs.fl.account')}>
@@ -271,6 +275,7 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
                     </div>
                     <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !fl.wallet_id || !fl.period}
                       onClick={() => run(() => fileDocument(token, doc.id, { kind: 'bank_account_period', wallet_id: fl.wallet_id, period: fl.period }), t('docs.fl.saved'))}>{t('docs.dr.save')}</button>
+                    {!busy && fl.wallet_id && active?.type === 'business' && String(active.id) === String(doc.business_id) && canRecordCompanyMoney(active.role) && <Link className="v2-btn v2-btn-primary" data-document-import to={`/business/bank-import?document_id=${encodeURIComponent(doc.id)}&business_id=${encodeURIComponent(doc.business_id)}&wallet_id=${encodeURIComponent(fl.wallet_id)}${fl.period ? '&month='+encodeURIComponent(fl.period) : ''}`}>{t('docs.fl.importRows')}</Link>}
                   </>
                 )}
                 {mode === 'counterparty' && (

@@ -1234,7 +1234,7 @@ export default {
       name: { pph21: 'PPh 21 (pajak gaji)', pph23: 'PPh 23 (potongan jasa)', pph4_2: 'PPh 4(2) (pajak final, mis. sewa)', pph26: 'PPh 26 (pembayaran ke luar negeri)', ppn: 'PPN', bpjs: 'BPJS', other: 'Pajak' },
       role: { company_pays: 'Perusahaan wajib membayar', company_withholds: 'Perusahaan memotong dari pembayaran dan menyetorkannya', creditable: 'Dapat dikreditkan jika perusahaan PKP', info: 'Informasi' },
       src: { printed: 'tercetak di dokumen', read_from_image: 'dibaca dari pindaian — mohon dicek', not_found_in_text: 'jumlah tidak ditemukan di teks' } },
-    fl: { where: 'Termasuk ke', mode: { record: 'Tagihan, faktur atau transaksi', bank: 'Rekening bank untuk satu bulan', counterparty: 'Mitra', keep: 'Simpan tanpa tautan' },
+    fl: { importNote: 'Simpan mengarsipkan file ke rekening dan bulan. Transaksi ditambahkan hanya setelah Anda meninjau dan mengonfirmasi baris mutasi.', importRows: 'Impor baris mutasi', where: 'Termasuk ke', mode: { record: 'Tagihan, faktur atau transaksi', bank: 'Rekening bank untuk satu bulan', counterparty: 'Mitra', keep: 'Simpan tanpa tautan' },
       account: 'Rekening bank', month: 'Bulan', monthOptional: 'Bulan (opsional)', counterparty: 'Mitra', reason: 'Jenisnya',
       reasons: { payroll: 'Penggajian', tax: 'Pajak', contract: 'Kontrak', other: 'Lainnya' }, keep: 'Simpan', saved: 'Tersimpan.', filed: 'Disimpan', statement: 'Rekening koran' },
     missingFor: 'Kurang untuk {m}', missingHint: 'Tagihan lunas tanpa bukti bayar — akuntan membutuhkannya untuk tutup buku.', noneMissing: 'Tidak ada yang kurang.',
