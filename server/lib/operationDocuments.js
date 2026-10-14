@@ -4,7 +4,7 @@ const access=require('./documentAccess');
 const {publicIntakeV2}=require('./documentPublicView');
 const publicFileRow=f=>f?Object.fromEntries(['file_name','mime_type','file_size','created_at','upload_channel'].map(k=>[k,f[k]??null])):null;
 const classification=d=>publicIntakeV2(d.extracted_json?.ai_intake_v2)||null;
-const {isInternalTransfer,isFinancingFlow,isFinancialCost}=require('./transactionClass');
+const {isInternalTransfer,isFinancingFlow,isFinancialCost,getTransactionCashDirection,cmpDec}=require('./transactionClass');
 const key=(type,id)=>type+':'+id;
 const stamp=x=>String(x||'').slice(0,10);
 const monthOf=x=>stamp(x).slice(0,7);
@@ -62,7 +62,17 @@ function documentControl(snapshot,{month,role,actor}) {
    return {id:doc.id,document_type:doc.document_type,document_version:doc.document_review_version,archived:!active(doc),file:publicFileRow(fileById.get(String(doc.file_id))),links:docLinks.map(l=>({link_id:l.id,target_type:l.target_type,target_id:l.target_id,version:(l.target_type==='debt'?debtById.get(String(l.target_id)):txById.get(String(l.target_id)))?.document_review_version})),coverage:confirmations,classification:classification(doc)};
   });
   const bankRows=(s.bank_rows||[]).filter(r=>payments.some(p=>(same(r.linked_transaction_id,p.id)||same(r.matched_transaction_id,p.id))&&monthOf(r.tx_date)===month));
-  const validBank=bankRows.filter(r=>{const p=payments.find(p=>same(r.linked_transaction_id,p.id)||same(r.matched_transaction_id,p.id));const b=(s.batches||[]).find(b=>same(b.id,r.batch_id));return !!p&&!!b&&!['cancelled','failed'].includes(b.status)&&stamp(r.tx_date)===stamp(p.transaction_date||p.created_at)&&Number(r.amount)===Math.abs(Number(p.amount_original))&&b.currency===p.currency_original&&['imported','confirmed','matched_existing'].includes(r.review_status);});
+  const validBank=bankRows.filter(r=>{
+   const p=payments.find(p=>r.linked_transaction_id!=null&&same(r.linked_transaction_id,p.id));
+   const b=(s.batches||[]).find(b=>same(b.id,r.batch_id));
+   // A suggested/manual match before confirm is not committed bank provenance.
+   // JSON numeric values above this precision bound need explicit human coverage;
+   // this never limits financial entry amounts or changes a ledger record.
+   const precise=v=>typeof v==='string'||typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=1e12;
+   if(!p||!b||!precise(r.amount)||!precise(p.amount_original))return false;
+   let amountMatches=false;try{amountMatches=cmpDec(String(r.amount),String(p.amount_original).replace(/^-/,''))===0}catch{return false}
+   return !['cancelled','failed'].includes(b.status)&&stamp(r.tx_date)===stamp(p.transaction_date||p.created_at)&&amountMatches&&r.direction===getTransactionCashDirection(p.type)&&b.currency===p.currency_original&&['imported','confirmed','matched_existing'].includes(r.review_status);
+  });
   const paymentSatisfied=payments.length>0&&payments.every(p=>validBank.some(r=>same(r.linked_transaction_id,p.id)||same(r.matched_transaction_id,p.id)));
   const wht=(s.withholding||[]).filter(w=>d&&same(w.debt_id,d.id)&&!['suggested','cancelled','void','draft'].includes(w.status)&&Number(w.withholding_amount)>0);
   const requirements=[];
