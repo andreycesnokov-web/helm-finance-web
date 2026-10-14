@@ -21,6 +21,7 @@ import { documentFileUrl } from '../lib/actions'
 import { money, shortDate } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
+import OperationDocuments, {operationDocumentsPath} from '../components/OperationDocuments'
 import UnreconciledTxDrawer from '../components/UnreconciledTxDrawer'
 import { findWithholdingRule } from '../../pages/business/InvoiceReviewDrawer'
 import TaxKnowledgeCard from '../../components/TaxKnowledgeCard'
@@ -380,6 +381,7 @@ function CloseTab({ month, onOpenChatModal }) {
     setSelectedTxId(null)
     setExpandedReasons({})
   }, [active?.id, month])
+  const operationDocs = useApi(`/accountant/operation-documents/package?month=${encodeURIComponent(month)}`)
   const tx = useApi('/transactions?period=all')
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
@@ -443,14 +445,16 @@ function CloseTab({ month, onOpenChatModal }) {
     debts: enrichedDebts,
     batches: batches.data?.batches || [],
     wallets: wallets.data?.wallets || [],
-  }), [month, tx.data, enrichedDebts, batches.data, wallets.data])
+    operationDocuments: operationDocs.data,
+  }), [month, tx.data, enrichedDebts, batches.data, wallets.data, operationDocs.data])
 
   const selectedTx = useMemo(() => {
     if (!selectedTxId || !r.unlinked_transactions) return null
     return r.unlinked_transactions.find((ut) => String(ut.id) === String(selectedTxId)) || null
   }, [selectedTxId, r.unlinked_transactions])
 
-  if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
+  if (tx.loading || debts.loading || operationDocs.loading) return <Card><Skeleton rows={6} /></Card>
+  if (operationDocs.error) return <ErrorBox error={operationDocs.error?.status===403?t('od.forbidden'):t('od.readFailed')} onRetry={operationDocs.reload}/>
   if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
   const events = taxCal.data?.events || complianceEvents(summary.data)
   const [y, m] = month.split('-').map(Number)
@@ -488,6 +492,7 @@ function CloseTab({ month, onOpenChatModal }) {
         batches: batches.data?.batches || [],
         wallets: wallets.data?.wallets || [],
         documents: rawDocs,
+        operationDocuments: operationDocs.data,
         token,
         lang: packageLang,
         signal: controller.signal,
@@ -531,7 +536,7 @@ function CloseTab({ month, onOpenChatModal }) {
     : (r.percent === 100 && bankReconPending)
     ? t('acct.reconciliationRequired')
     : t('acct.almost', { n: r.percent, k: left.length })
-  const statusSub = left.length === 0 && !r.is_closed
+  const statusSub = !r.automated_checks_passed ? t('od.classificationOnly', {pct:r.classification_percent ?? 0}) : left.length === 0 && !r.is_closed
     ? t('acct.awaitingAccountantSignoff', { n: r.complete, m: r.records })
     : (r.percent === 100 && bankReconPending)
     ? t('acct.recordCompletenessDetails', { pct: 100, done: r.checks.length - left.length, total: r.checks.length })
@@ -592,13 +597,14 @@ function CloseTab({ month, onOpenChatModal }) {
               <li key={c.key} className={c.done ? 'is-done' : ''}>
                 <span className="v2-check-mark" aria-hidden="true">{c.done ? <I.check size={14} /> : null}</span>
                 <span className="v2-check-text">
-                  <span>{t(`acct.check.${c.key}`, { ok: c.ok, n: c.total })}<span className="v2-sr"> — {c.done ? t('acct.done') : t('acct.notDone')}</span></span>
+                  <span>{c.key==='bills' ? <Link data-od-close-link to={operationDocumentsPath(month)}>{c.total?t('od.collected',{ok:c.ok,n:c.total}):t('od.empty')}</Link> : t(`acct.check.${c.key}`, { ok: c.ok, n: c.total })}<span className="v2-sr"> — {c.done ? t('acct.done') : t('acct.notDone')}</span></span>
+                  {c.key==='bills'&&<span className="v2-muted v2-small">{t('od.gaps',{missing:operationDocs.data?.summary?.missing,clarification:operationDocs.data?.summary?.clarification})}</span>}
                   {!c.done && c.missing.length > 0 && <span className="v2-muted v2-small">{c.missing.slice(0, 3).join(', ')}{c.missing.length > 3 ? ` +${c.missing.length - 3}` : ''}</span>}
                 </span>
                 {c.done ? <Pill tone="good">{t('acct.done')}</Pill>
                   : c.key === 'categories' ? <Link to="/business/transactions">{t('pulse.review')}</Link>
                   : c.key === 'statements' ? <Link to="/business/bank-import">{t('acc.import')}</Link>
-                  : <Link to="/business/accountant?tab=packages">{t('acct.seePackages')}</Link>}
+                  : <Link to={operationDocumentsPath(month)}>{t('acct.seePackages')}</Link>}
               </li>
             ))}
             <li>
@@ -725,88 +731,7 @@ function CloseTab({ month, onOpenChatModal }) {
   )
 }
 
-function PackagesTab({ month }) {
-  const t = useT()
-  const lang = useLang()
-  const [filter, setFilter] = useState('all')
-  const [sel, setSel] = useState(null)
-  const tx = useApi('/transactions?period=all')
-  const debts = useApi('/debts')
-  const rules = useApi('/accountant/rules')
-  // A slip is expected only when the verified engine has a withholding rate (as on Bill detail).
-  const slipNeeded = findWithholdingRule(rules.data?.rules || [])?.rate != null
-  const slips = useApi('/withholding-slips')
-  const rows = useMemo(() => packages({ month, slipNeeded, slips: slips.data, transactions: Array.isArray(tx.data) ? tx.data : [], debts: Array.isArray(debts.data) ? debts.data : [] }), [month, tx.data, debts.data, slipNeeded, slips.data])
-  if (tx.loading || debts.loading) return <Card><Skeleton rows={6} /></Card>
-  if (tx.error) return <ErrorBox error={tx.error} onRetry={tx.reload} />
-  const s = packageSummary(rows)
-  const shown = rows.filter((r) => filter === 'all' || (filter === 'incomplete' ? r.status !== 'complete' : r.kind === filter))
-  const cur = rows.find((r) => r.key === sel) || shown.find((r) => r.status !== 'complete') || null
-
-  return (
-    <div className="v2-page">
-      <div className="v2-tiles">
-        <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.complete')}</span><span className="v2-tile-val v2-num">{s.complete}</span><span className="v2-tile-sub">{t('acct.pk.ofN', { n: s.total })}</span></div>
-        <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.missing')}</span><span className="v2-tile-val v2-num">{s.missing}</span></div>
-        <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.nocat')}</span><span className="v2-tile-val v2-num">{s.nocat}</span></div>
-        <div className="v2-tile"><span className="v2-tile-label">{t('acct.pk.slips')}</span>
-          {s.slipsToMake == null
-            ? <><span className="v2-tile-val v2-muted">—</span><span className="v2-tile-sub">{t('bill.doc.notTracked')}</span></>
-            : <span className="v2-tile-val v2-num">{s.slipsToMake}</span>}</div>
-      </div>
-      <div className="v2-grid-detail">
-        <Card className="v2-col">
-          <div className="v2-chips" role="group" aria-label={t('acct.pk.filter')}>
-            {['all', 'incomplete', 'out', 'in', 'payroll'].map((k) => (
-              <button key={k} type="button" className="v2-chip v2-chip-sel" aria-pressed={filter === k} onClick={() => setFilter(k)}>
-                {k === 'all' ? t('acct.pk.f.allN', { n: rows.length }) : k === 'incomplete' ? t('acct.pk.f.incompleteN', { n: rows.length - s.complete }) : t(`acct.pk.f.${k}`)}
-              </button>
-            ))}
-          </div>
-          {shown.length === 0 ? <Empty icon={<I.documents size={28} />} title={t('acct.pk.emptyTitle')} text={t('acct.pk.emptyText')} /> : (
-            <ul className="v2-pklist">
-              {shown.map((r) => (
-                <li key={r.key}>
-                  <button type="button" className={`v2-pkrow${cur?.key === r.key ? ' is-on' : ''}`} onClick={() => setSel(r.key)} aria-pressed={cur?.key === r.key}>
-                    <span className="v2-num v2-pk-date">{shortDate(r.date, lang)}</span>
-                    <span className="v2-pk-what"><strong>{r.label || '—'}</strong>{r.note && <span className="v2-muted v2-small">{r.note}</span>}</span>
-                    <span className={`v2-num v2-r ${r.kind === 'in' ? 'v2-pos' : ''}`}>{money(r.kind === 'in' ? r.amount : -r.amount, { sign: true })}</span>
-                    <Pill tone={r.status === 'complete' ? 'good' : r.status === 'missing' ? 'warn' : r.status === 'nocat' ? 'crit' : 'neutral'}>
-                      {r.status === 'missing' ? t('acct.pk.st.missingN', { n: r.missing }) : t(`acct.pk.st.${r.status}`)}</Pill>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-        <aside className="v2-col">
-          {cur && (
-            <Card title={cur.label || '—'}>
-              <p className="v2-muted v2-small">{shortDate(cur.date, lang)} · {money(cur.amount)}</p>
-              <ul className="v2-check">
-                {cur.items.map((i) => (
-                  <li key={i.key} className={i.done ? 'is-done' : ''}>
-                    <span className="v2-check-mark" aria-hidden="true">{i.done ? <I.check size={14} /> : null}</span>
-                    <span className="v2-check-text"><span>{t(`acct.pk.item.${i.key}`)}</span>
-                      <span className="v2-muted v2-small">{i.done ? t('bill.doc.have') : i.unknown ? t('bill.doc.notTracked') : i.pending ? t('bill.doc.proofSub') : i.review ? t('bill.ck.notChecked') : t('bill.doc.missing')}</span></span>
-                    {!i.done && !i.unknown && !i.pending && (i.review || i.key === 'slip'
-                      ? <Link to={`/business/${cur.kind === 'in' ? 'receivables' : 'payables'}/${cur.id}`}>{t('bills.open')}</Link>
-                      : i.key === 'category'
-                      ? <Link to="/business/transactions">{t('tx.chooseCategory')}</Link>
-                      : <Link to="/business/documents">{t('bill.upload')}</Link>)}
-                  </li>
-                ))}
-              </ul>
-              {cur.key.startsWith('debt:') && <Link to={`/business/${cur.kind === 'in' ? 'receivables' : 'payables'}/${cur.id}`}>{t('bills.open')}</Link>}
-              <NotYet note={t('acct.packageSoon')}>{t('acct.pk.downloadFolder')}</NotYet>
-            </Card>
-          )}
-          <Card title={t('acct.pk.whatTitle')}><p className="v2-sec">{t('acct.pk.what')}</p></Card>
-        </aside>
-      </div>
-    </div>
-  )
-}
+function PackagesTab({month}) {return <OperationDocuments month={month}/>}
 
 function TaxesTab({ month }) {
   const t = useT()

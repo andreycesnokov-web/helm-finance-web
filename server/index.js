@@ -15681,6 +15681,8 @@ app.get('/api/accountant/tax-calendar', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+require('./lib/operationDocuments').install(app, {auth,requireBusiness,supabase,hasDocumentsAccess});
+
 // POST /api/documents/:id/archive — soft archive (no hard-delete of evidence).
 app.post('/api/documents/:id/archive', auth, async (req, res) => {
   try {

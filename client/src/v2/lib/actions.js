@@ -91,6 +91,15 @@ export const documentFileUrl = (token, id, mode = 'view', signal) =>
 export const updateDocument = (token, id, body) =>
   apiFetch(`/documents/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
 
+// Operation folders: document links + per-case review share the existing append-only audit.
+export const operationDocumentAction = (request, body) =>
+  apiFetch('/accountant/operation-documents/action', request, { method: 'POST', body })
+export const readOperationDocumentPackage = (request,month) =>
+  apiFetch(`/accountant/operation-documents/package?month=${encodeURIComponent(month)}`,request)
+export const uploadOperationDocument = (request,file,type) =>
+  uploadDocument(request,file,{document_type:type,upload_source:'accountant_upload'},null)
+export const readCompanyCategories = request => apiFetch('/cashflow-categories',request)
+
 export const linkDocument = (token, id, target_type, target_id) =>
   apiFetch(`${docUrl(id)}/links`, token, { method: 'POST', body: { target_type, target_id } })
 

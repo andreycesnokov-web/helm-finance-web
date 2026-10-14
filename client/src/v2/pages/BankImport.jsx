@@ -26,9 +26,8 @@ import { insightOf } from '../lib/statementInsights'
 import { catLabel } from '../lib/categoryLabel'
 import Modal from '../components/Modal'
 import { canRecordCompanyMoney } from '../lib/financePermissions'
-import { apiFetch } from '../../lib/api'
 import {
-  uploadStatementFile, readStatement, createImportBatch, suggestImport, createClassificationRule, fileDocument, confirmImport, readImportConfirmReceipt, createCategory,
+  uploadStatementFile, readStatement, createImportBatch, suggestImport, createClassificationRule, fileDocument, confirmImport, readImportConfirmReceipt, createCategory, readCompanyCategories,
 } from '../lib/actions'
 
 const STEPS = ['file', 'rows', 'done']
@@ -449,7 +448,7 @@ function ImportCategoryDialog({ request, direction, categories, onClose, onSaved
     if (submitting.current || !request.isCurrent()) return
     submitting.current = true; setBusy(true)
     try {
-      const result = await apiFetch('/cashflow-categories', request)
+      const result = await readCompanyCategories(request)
       if (!request.isCurrent()) return
       const category = matching(result.categories || [])
       if (category) onSaved(category)
