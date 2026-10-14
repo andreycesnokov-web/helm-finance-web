@@ -1,9 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { billDocumentEvidence } from '../client/src/v2/lib/billEvidence.js'
+import { billDocumentEvidence,hasDocumentDuplicate } from '../client/src/v2/lib/billEvidence.js'
 import { billChecklistItems } from '../client/src/v2/lib/obligations.js'
 const debt = { id: 12, type: 'payable', status: 'paid', last_payment_at: '2026-10-13', linked_transaction_id: 99 }
 const document = (id, type, target = 12) => ({ id, file_id: 'file-' + id, file: { file_name: id + '.pdf' }, document_type: type, links: [{ target_type: 'debt', target_id: target }] })
+test('duplicate false object is not a duplicate warning, and a positive warning identifies an existing match',()=>{
+ for(const r of [null,{duplicate:false},{duplicate:false,reference:'123'},{duplicate:true},{duplicate:true,reference:'123'}])assert.equal(hasDocumentDuplicate(r),false)
+ assert.equal(hasDocumentDuplicate({duplicate:true,reference:'123',match:{id:'doc'}}),true)
+})
 test('a paid ledger and receipt do not establish an invoice or proof document', () => {
   assert.deepEqual(billDocumentEvidence(debt, { documents: [] }), { known: true, invoice: null, proof: null })
   assert.equal(billChecklistItems(debt, { paid: true }).find(c => c.key === 'proof').done, false)

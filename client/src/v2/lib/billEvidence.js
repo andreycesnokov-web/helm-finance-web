@@ -1,5 +1,6 @@
 // Only an accessible, active document linked to this bill can satisfy a document row.
 // Payment receipts and ledger rows establish payment, not an uploaded proof file.
+export const hasDocumentDuplicate = result => result?.duplicate === true && !!result.reference && !!result.match?.id
 export function billDocumentEvidence(debt, response) {
   const docs = response?.documents
   const known = Array.isArray(docs) && !response?.error && docs.length < 200

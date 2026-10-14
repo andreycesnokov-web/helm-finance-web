@@ -13,6 +13,8 @@ import Modal from './Modal'
 import { financialActor } from '../../lib/financialRecovery'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { canRecordCompanyMoney, canSubmitBill } from '../lib/financePermissions'
+import {hasDocumentDuplicate} from '../lib/billEvidence'
+import {Link} from 'react-router-dom'
 import { uploadInvoiceFile, readInvoice, identifyDocument, createBill, updateBill, linkDocument } from '../lib/actions'
 
 const CURRENCIES = ['IDR', 'USD', 'SGD', 'EUR', 'MYR', 'AUD', 'CNY', 'JPY']
@@ -47,9 +49,9 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
 
   const upload = async (file) => {
     setErr(''); setDoc({ name: file.name, state: 'uploading' })
-    let id
+    let id, fileReused=false
     try { id = (await uploadInvoiceFile(request, file, kind))?.document?.id } catch (x) {
-      if (x?.status === 409 && x?.data?.existing_document_id) id = x.data.existing_document_id
+      if (x?.status === 409 && x?.data?.existing_document_id) {id = x.data.existing_document_id;fileReused=true}
       else { setDoc({ name: file.name, state: 'failed', error: x?.data?.error || x?.message }); return }
     }
     setDoc({ id, name: file.name, state: 'reading' })
@@ -92,7 +94,7 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
     if (next.currency && !CURRENCIES.includes(String(next.currency).toUpperCase())) delete next.currency
     else if (next.currency) next.currency = String(next.currency).toUpperCase()
     setF((x) => ({ ...x, ...next })); setFrom(src)
-    setDoc({ id, name: file.name, state: Object.keys(next).length ? 'read' : 'unread', dup, taxNote })
+    setDoc({ id, name: file.name, state: Object.keys(next).length ? 'read' : 'unread', dup, taxNote, fileReused })
   }
 
   const amount = num(f.amount)
@@ -129,7 +131,8 @@ export default function BillDialog({ mode = 'payable', debt: editing = null, onC
         <input ref={input} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" hidden data-billd-file onChange={(e) => { if (e.target.files?.[0]) upload(e.target.files[0]); e.target.value = '' }} />
       </div>
       </>}
-      {doc?.dup && <div className="v2-banner v2-tone-warn" role="status"><span className="v2-banner-text">{t('billd.dup')}</span></div>}
+      {hasDocumentDuplicate(doc?.dup) && <div data-billd-duplicate className="v2-banner v2-tone-warn" role="status"><span className="v2-banner-text">{t('od.invoiceDuplicate',{ref:doc.dup.reference})} <Link to={`/business/documents?doc=${encodeURIComponent(doc.dup.match.id)}`}>{t('docs.open')}</Link></span></div>}
+      {doc?.fileReused&&<p data-billd-file-reused className="v2-muted">{t('od.fileReused')}</p>}
       <div className="v2-field-row">
         <label className="v2-field"><span className="v2-field-label">{t(kind === 'payable' ? 'billd.vendor' : 'billd.customer')} {mark('counterparty')}</span>
           <input className="v2-input" list="billd-cps" value={f.counterparty} onChange={(e) => set('counterparty', e.target.value)} />
