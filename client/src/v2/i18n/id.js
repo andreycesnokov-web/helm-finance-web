@@ -1577,6 +1577,7 @@ export default {
     aiCost: 'Biaya AI · 30 hari', log: 'Log admin', logSub: 'Perubahan paket dan akses · hanya tambah', logNa: 'Log admin tidak tersedia.',
   },
   od: {
+    paymentLink: 'Pembayaran',
     invoiceDuplicate: 'Kemungkinan nomor referensi sama: {ref}. Periksa dokumen yang ada; ini tidak berarti tagihan sudah dibuat.',
     fileReused: 'File yang sama sudah tersimpan. Dokumen yang ada dipakai tanpa unggahan ulang; ini tidak berarti tagihan sudah ada.',
     history: 'Riwayat perubahan',

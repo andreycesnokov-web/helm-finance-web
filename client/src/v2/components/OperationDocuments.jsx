@@ -21,7 +21,7 @@ export default function OperationDocuments({month}){
  const filter=['all','incomplete','missing','clarification','complete'].includes(params.get('filter'))?params.get('filter'):'all';
  const scope=`${active?.id}|${scopeKey}|${month}`;
  useEffect(()=>{setPage(0);setSelected(null);setSaved(null)},[scope]);
- const result=data.data,operations=result?.operations||[],summary=result?.summary;
+ const result=data.data?.business_id===active?.id?data.data:null,operations=result?.operations||[],summary=result?.summary;
  const rows=operations.filter(o=>filter==='all'||(filter==='incomplete'?o.status!=='complete':filter==='missing'?o.missing_count>0:o.status===filter));
  const cur=operations.find(o=>o.key===selected);
  const pick=k=>{setParams(p=>{const n=new URLSearchParams(p);n.set('filter',k);return n},{replace:true});setPage(0)};
@@ -59,9 +59,9 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
  const [uploaded,setUploaded]=useState(null);
  const choices=uploaded&&!documents.some(d=>d.id===uploaded.id)?[uploaded,...documents]:documents;
  const selectedDoc=choices.find(d=>d.id===documentId);
- const save=async(action,doc=null,body={})=>{
+ const save=async(action,doc=null,body={},link=null)=>{
   if(busyRef.current||!manage||!request.isCurrent())return;busyRef.current=true;setBusy(true);setError(null);
-  try{const result=await operationDocumentAction(request,{target_type:o.target_type,target_id:o.target_id,version:o.version,action,document_id:doc?.id,body});if(!request.isCurrent())return;setOutcome({ok:true,result});onChanged(result);invalidate();}
+  try{const result=await operationDocumentAction(request,{target_type:link?.target_type||o.target_type,target_id:link?.target_id??o.target_id,version:link?.version||o.version,action,document_id:doc?.id,body});if(!request.isCurrent())return;setOutcome({ok:true,result});onChanged(result);invalidate();}
   catch(e){if(!request.isCurrent())return;setError(e.status===403?t('od.forbidden'):e.status===409?t('od.stale'):e.status===400?t('od.invalid'):t('od.unknown'));if(!e.status||e.status>=500)setOutcome({unknown:true});}
   finally{busyRef.current=false;if(request.isCurrent())setBusy(false)}
  };
@@ -94,7 +94,7 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
    <h3>{t('od.have')}</h3>{o.documents.map(d=><div key={d.id} className="v2-note"><strong>{d.file?.file_name||t('od.document')}</strong><p>{d.coverage.map(c=>`${t(`od.requirement.${c.role}`)}: ${t(`od.state.${c.state}`)} · ${c.reason}`).join('; ')||t('od.coverageNeeded')}</p>
     {d.classification&&<p className="v2-small">{t('od.aiSuggestion')}: {d.classification.business_meaning||d.classification.document_type} · {d.classification.source} · {d.classification.confidence||t('od.uncertain')}</p>}
     <button type="button" className="v2-btn-link" onClick={()=>open(d.id)}>{t('docs.open')}</button>
-    {manage&&<Btn variant="ghost" disabled={busy||outcome?.unknown} data-od-unlink={d.id} onClick={()=>save('unlink',d)}>{t('od.unlink')}</Btn>}
+    {manage&&d.links.map(l=><Btn key={l.link_id} variant="ghost" disabled={busy||outcome?.unknown||!l.version} data-od-unlink={d.id} data-od-link-target={l.target_type} onClick={()=>save('unlink',d,{},l)}>{t('od.unlink')} · {t(l.target_type==='debt'?'od.invoice':'od.paymentLink')}</Btn>)}
    </div>)}
    {manage&&<fieldset disabled={busy||outcome?.unknown} className="v2-od-form"><legend>{t('od.attach')}</legend>
     <label>{t('od.documentRole')}<select data-od-role className="v2-select" value={evidenceRole} onChange={e=>setEvidenceRole(e.target.value)}>{roles.map(k=><option key={k} value={k}>{t(`od.requirement.${k}`)}</option>)}</select></label>

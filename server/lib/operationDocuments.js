@@ -59,7 +59,7 @@ function documentControl(snapshot,{month,role,actor}) {
     const currencyMismatch=doc.gross_amount!=null&&doc.currency&&(doc.currency!==(d?.currency||t?.currency_original));
     return [{role:r,state:valid&&!currencyMismatch?'linked':'requires_review',reason:event.metadata.reason,source:'human_coverage_confirmation'}];
    });
-   return {id:doc.id,document_type:doc.document_type,document_version:doc.document_review_version,archived:!active(doc),file:publicFileRow(fileById.get(String(doc.file_id))),links:docLinks.map(l=>({link_id:l.id,target_type:l.target_type,target_id:l.target_id})),coverage:confirmations,classification:classification(doc)};
+   return {id:doc.id,document_type:doc.document_type,document_version:doc.document_review_version,archived:!active(doc),file:publicFileRow(fileById.get(String(doc.file_id))),links:docLinks.map(l=>({link_id:l.id,target_type:l.target_type,target_id:l.target_id,version:(l.target_type==='debt'?debtById.get(String(l.target_id)):txById.get(String(l.target_id)))?.document_review_version})),coverage:confirmations,classification:classification(doc)};
   });
   const bankRows=(s.bank_rows||[]).filter(r=>payments.some(p=>(same(r.linked_transaction_id,p.id)||same(r.matched_transaction_id,p.id))&&monthOf(r.tx_date)===month));
   const validBank=bankRows.filter(r=>{const p=payments.find(p=>same(r.linked_transaction_id,p.id)||same(r.matched_transaction_id,p.id));const b=(s.batches||[]).find(b=>same(b.id,r.batch_id));return !!p&&!!b&&!['cancelled','failed'].includes(b.status)&&stamp(r.tx_date)===stamp(p.transaction_date||p.created_at)&&Number(r.amount)===Math.abs(Number(p.amount_original))&&b.currency===p.currency_original&&['imported','confirmed','matched_existing'].includes(r.review_status);});

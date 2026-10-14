@@ -1577,6 +1577,7 @@ export default {
     aiCost: 'AI cost · 30 days', log: 'Admin log', logSub: 'Plan and access changes · append-only', logNa: 'The admin log is not available.',
   },
   od: {
+    paymentLink: 'Payment',
     invoiceDuplicate: 'Possible reference match: {ref}. Check the existing document; this does not by itself mean a bill was created.',
     fileReused: 'This exact file is already stored. The existing document is reused without another upload; this does not mean a bill already exists.',
     history: 'Change history',
