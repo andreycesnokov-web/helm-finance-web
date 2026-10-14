@@ -47,7 +47,7 @@ export default function OperationDocuments({month}){
     <div className="v2-chips" aria-label={t('od.filters')}>{['all','incomplete','missing','clarification','complete'].map(k=><button type="button" key={k} data-od-filter={k} className="v2-chip v2-chip-sel" aria-pressed={filter===k} onClick={()=>pick(k)}>{t(`od.filter.${k}`)}</button>)}</div>
     {!rows.length?<Empty title={t('od.emptyFilter')}/>:<ul className="v2-od-list" data-od-list>{rows.slice(page*50,(page+1)*50).map(o=><li key={o.key} data-operation={o.key}>
      <div><span className="v2-muted">{shortCalendarDate(o.date,lang)}</span><strong>{bankRecipient(o)?t('od.paymentTo',{name:bankRecipient(o)}):o.description||t('od.unnamed')}</strong><span>{money(o.amount,{currency:o.currency,full:true})}</span><span className="v2-small">{o.category?catLabel(t,o.category):t('od.noCategory')}</span></div>
-     <div className="v2-small">{o.invoice?<Link to={'/business/'+(o.invoice.type==='receivable'?'receivables':'payables')+'/'+o.invoice.id}>{t('od.invoice')}{o.invoice.number?' · '+o.invoice.number:''}</Link>:['funding','loan'].includes(o.kind)?t('od.ownerFinancing.noInvoice'):t('od.noInvoice')}</div>
+     <div className="v2-small">{o.invoice?<Link to={'/business/'+(o.invoice.type==='receivable'?'receivables':'payables')+'/'+o.invoice.id}>{t('od.invoice')}{o.invoice.number?' · '+o.invoice.number:''}</Link>:o.loan_repayment?t('od.ownerFinancing.repaymentNoInvoice'):['funding','loan'].includes(o.kind)?t('od.ownerFinancing.noInvoice'):t('od.noInvoice')}</div>
      <div className="v2-small">{t('od.have')}: {o.documents.map(d=>d.file?.file_name||t('od.document')).join(', ')||'—'}</div>
      <div className="v2-small">{t('od.missing')}: {o.requirements.filter(r=>r.mandatory&&r.state==='missing').map(r=>t(`od.requirement.${r.type}`)).join(', ')||'—'}</div>
      <div><Pill tone={o.status==='complete'?'good':'warn'}>{t(`od.status.${o.status}`)}</Pill><Btn variant="secondary" data-od-open={o.key} onClick={()=>setSelected(o.key)}>{t('od.openFolder')}</Btn></div>
@@ -97,6 +97,7 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
     <h3>{recipient?t('od.paymentTo',{name:recipient}):t(`od.operationKind.${o.direction==='in'||o.direction==='out'?o.direction:'other'}`)}</h3>
     <p className="v2-od-amount">{money(o.amount,{currency:o.currency,full:true})}</p>
     {recipient&&<p className="v2-muted v2-small">{t('od.recipientFromBank')}</p>}
+    {o.loan_repayment&&<p className="v2-muted v2-small">{t('od.ownerFinancing.repaymentNote')}</p>}
    </section>
    {o.target_type==='transaction'&&o.owner_financing_type&&<section className="v2-od-owner-financing" data-od-owner-financing>
     <div className="v2-od-owner-financing-copy">
@@ -114,11 +115,11 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
     {o.requirements.map(r=>{
      const linkedDocs=r.documents.map(id=>o.documents.find(d=>d.id===id)).filter(Boolean)
      const bankProof=r.type==='payment'&&r.state==='linked'&&r.explanation==='bank_row_or_transfer_pair'
-     const declaredCapital=r.type==='funding'&&r.explanation==='capital_classification_and_bank'
+     const declaredFunding=r.type==='funding'&&r.explanation==='owner_category_and_bank'
      const contractPending=r.type==='contract'&&r.explanation==='contract_decision_pending'
      return <li key={r.type} data-od-evidence-role={r.type} className={r.state==='linked'?'is-done':''}>
-      <div className="v2-od-evidence-head"><strong>{t(`od.requirement.${r.type}`)}</strong><span>{contractPending?t('od.contractUndecided'):bankProof?t('od.bankVerified'):declaredCapital?t('od.ownerFinancing.declared'):t(`od.state.${r.state}`)}</span></div>
-      {declaredCapital&&<p className="v2-muted v2-small">{t('od.ownerFinancing.declaredHelp')}</p>}
+      <div className="v2-od-evidence-head"><strong>{t(`od.requirement.${r.type}`)}</strong><span>{contractPending?t('od.contractUndecided'):bankProof?t('od.bankVerified'):declaredFunding?t('od.ownerFinancing.declared'):t(`od.state.${r.state}`)}</span></div>
+      {declaredFunding&&<p className="v2-muted v2-small">{t('od.ownerFinancing.declaredHelp')}</p>}
       {bankProof&&<div className="v2-od-evidence-files">{o.bank_rows.filter(row=>row.verified).map(row=><span key={row.id}><Link to={'/business/bank-import?batch='+row.batch_id}>{t('od.statement')}</Link>{row.document_id&&<button className="v2-btn-link" type="button" onClick={()=>open(row.document_id)}>{t('docs.open')}</button>}</span>)}</div>}
       {linkedDocs.length>0&&<div className="v2-od-evidence-files">{linkedDocs.map(d=><button type="button" className="v2-btn-link" key={d.id} onClick={()=>open(d.id)}>{d.file?.file_name||t('od.document')}</button>)}</div>}
       {contractPending&&<p className="v2-muted v2-small">{t('od.contractRowHelp')}</p>}
@@ -139,7 +140,7 @@ function OperationFolder({operation:o,documents,onClose,onChanged}){
     })}
    </ul>
    <input data-od-upload ref={fileInput} type="file" accept=".pdf,.png,.jpg,.jpeg,.csv,.xls,.xlsx" hidden onChange={e=>{upload(e.target.files?.[0],uploadRole.current);e.target.value=''}}/>
-   {manage&&<div className="v2-od-contract" data-od-contract>
+   {manage&&o.requirements.some(r=>r.type==='contract')&&<div className="v2-od-contract" data-od-contract>
     {reviewOpen&&<fieldset disabled={busy||outcome?.unknown} className="v2-od-form">
      <legend>{t('od.contractDecisionTitle')}</legend>
      <p className="v2-muted">{t('od.contractDecisionHelp')}</p>
