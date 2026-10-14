@@ -73,8 +73,11 @@ function documentControl(snapshot,{month,role,actor}) {
    let amountMatches=false;try{amountMatches=cmpDec(String(r.amount),String(p.amount_original).replace(/^-/,''))===0}catch{return false}
    return !['cancelled','failed'].includes(b.status)&&stamp(r.tx_date)===stamp(p.transaction_date||p.created_at)&&amountMatches&&r.direction===getTransactionCashDirection(p.type)&&b.currency===p.currency_original&&['imported','confirmed','matched_existing'].includes(r.review_status);
   });
-  const paymentSatisfied=payments.length>0&&payments.every(p=>validBank.some(r=>same(r.linked_transaction_id,p.id)||same(r.matched_transaction_id,p.id)));
-  const wht=(s.withholding||[]).filter(w=>d&&same(w.debt_id,d.id)&&!['suggested','cancelled','void','draft'].includes(w.status)&&Number(w.withholding_amount)>0);
+  const paymentSatisfied=payments.length>0&&payments.every(p=>validBank.some(r=>same(r.linked_transaction_id,p.id)));
+  // The existing withholding writer records waiting_slip or slip_received after
+  // the amount is confirmed. An arbitrary status must never imply a tax gap.
+  const recordedWithholding=new Set(['waiting_slip','slip_received','confirmed','reported','paid']);
+  const wht=(s.withholding||[]).filter(w=>d&&same(w.debt_id,d.id)&&recordedWithholding.has(w.status)&&Number(w.withholding_amount)>0);
   const requirements=[];
   function requirement(r,mandatory,source,automatic=false,na=false){const evidence=caseDocuments.flatMap(doc=>doc.coverage.filter(c=>c.role===r).map(c=>({...c,document_id:doc.id})));const linked=evidence.some(e=>e.state==='linked');requirements.push({type:r,mandatory,source,reason:r, state:na?'not_applicable':automatic||linked?'linked':evidence.length?'requires_review':'missing',documents:evidence.map(e=>e.document_id),explanation:automatic?'bank_row_or_transfer_pair':source,na_reason:na?(currentReview?.contract_waiver||'scenario_does_not_require_contract'):null});}
   if(kind==='supplier'||kind==='income')requirement('basis',true,'commercial_operation');
