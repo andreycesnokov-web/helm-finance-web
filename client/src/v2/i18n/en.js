@@ -1582,6 +1582,8 @@ export default {
   },
   od: {
     partnerPayout: { noInvoice: 'Partner payout — no supplier invoice required', help: 'Link the partner agreement to this payment. The verified bank entry confirms payment; accountant review is separate.' },
+    salaryPayout: { noInvoice: 'Salary payment — no supplier invoice required', help: 'Link the employment agreement to this salary payment. The verified bank entry confirms payment; payroll and accountant review are separate.' },
+    ownTransfer: { noInvoice: 'Own-account transfer — no invoice required', help: 'Explain the purpose and destination account. No invoice or contract is requested for this transfer.', title: 'Transfer between your accounts', prompt: 'Give a short explanation of why the money moved and where it went.', explanation: 'Explanation', save: 'Save explanation', unpaired: 'The matching entry in the other account is not verified. Document notes do not reconcile the transfer.' },
     ownerFinancing: {
       title: 'Receipt from owner',
       current: { equity: 'Currently: non-repayable capital contribution', loan: 'Currently: repayable owner loan' },
@@ -1630,7 +1632,8 @@ export default {
     "withholding": "Withholding document",
     "tax_payment": "Tax remittance evidence",
     "funding": "Funding / loan basis",
-    "counterpart": "Own-account transfer counterpart"
+    "counterpart": "Own-account transfer counterpart",
+    "explanation": "Explanation of the transfer"
   },
   "source": {
     "commercial_operation": "Commercial operation: an invoice, receipt or other explained primary basis.",

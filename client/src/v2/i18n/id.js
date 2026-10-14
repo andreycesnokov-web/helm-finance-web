@@ -1582,6 +1582,8 @@ export default {
   },
   od: {
     partnerPayout: { noInvoice: 'Pembayaran mitra — faktur pemasok tidak diperlukan', help: 'Tautkan perjanjian mitra ke pembayaran ini. Baris bank yang terverifikasi membuktikan pembayaran; pemeriksaan akuntan terpisah.' },
+    salaryPayout: { noInvoice: 'Pembayaran gaji — faktur pemasok tidak diperlukan', help: 'Tautkan perjanjian kerja ke pembayaran gaji ini. Baris bank yang terverifikasi membuktikan pembayaran; pemeriksaan penggajian dan akuntan terpisah.' },
+    ownTransfer: { noInvoice: 'Transfer antar rekening sendiri — faktur tidak diperlukan', help: 'Jelaskan tujuan dan rekening penerima. Faktur dan kontrak tidak diminta untuk transfer ini.', title: 'Transfer antar rekening sendiri', prompt: 'Jelaskan secara singkat mengapa dana dipindahkan dan ke rekening mana.', explanation: 'Penjelasan', save: 'Simpan penjelasan', unpaired: 'Catatan pasangan di rekening lain belum diverifikasi. Penjelasan tidak menggantikan rekonsiliasi transfer.' },
     ownerFinancing: {
       title: 'Dana masuk dari pemilik',
       current: { equity: 'Saat ini: setoran modal tanpa pengembalian', loan: 'Saat ini: pinjaman pemilik yang harus dikembalikan' },
@@ -1630,7 +1632,8 @@ export default {
     "withholding": "Dokumen pemotongan",
     "tax_payment": "Bukti penyetoran pajak",
     "funding": "Dasar pendanaan / pinjaman",
-    "counterpart": "Transaksi pasangan transfer rekening sendiri"
+    "counterpart": "Transaksi pasangan transfer rekening sendiri",
+    "explanation": "Penjelasan transfer"
   },
   "source": {
     "commercial_operation": "Transaksi komersial: faktur, kuitansi atau dasar lain dengan penjelasan.",

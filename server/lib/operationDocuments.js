@@ -40,17 +40,20 @@ function documentControl(snapshot,{month,role,actor}) {
   const ownerFinancingType=!d&&t&&getTransactionCashDirection(t.type)==='in'&&category==='Capital contribution'?'equity':!d&&t&&getTransactionCashDirection(t.type)==='in'&&category==='Owner funding (loan)'?'loan':null;
   const loanRepayment=!d&&t&&getTransactionCashDirection(t.type)==='out'&&category==='Loan repayments';
   const partnerPayout=!d&&t&&getTransactionCashDirection(t.type)==='out'&&category==='Partner payouts';
+  const salaryPayout=!d&&t&&getTransactionCashDirection(t.type)==='out'&&(category==='Salary and wages'||category==='Payroll'&&t.type==='payroll');
+  const ownTransfer=!d&&t&&(!!t.transfer_id||isInternalTransfer(t.type)||/^Transfer between own accounts(?: — (?:in|out))?$/.test(category||''));
   const classifiedFinancing=!!ownerFinancingType||!!loanRepayment;
-  const explicitCashRule=classifiedFinancing||partnerPayout;
+  const explicitCashRule=classifiedFinancing||partnerPayout||salaryPayout||ownTransfer;
   const expectedFundingKind=ownerFinancingType==='equity'?'funding':ownerFinancingType==='loan'?'loan':null;
   // A manual review for the opposite instrument cannot validate this category.
-  const currentReview=review?.metadata?.version===version&&(!expectedFundingKind||review.metadata.kind===expectedFundingKind)?review.metadata:null;
+  const expectedKind=expectedFundingKind||(ownTransfer?'internal_transfer':salaryPayout||partnerPayout?'supplier':null);
+  const currentReview=review?.metadata?.version===version&&(!expectedKind||review.metadata.kind===expectedKind)?review.metadata:null;
   let kind='unknown',classification_source='uncertain';
   if(d){kind=d.type==='payable'?'supplier':'income';classification_source='linked_invoice';}
-  else if(t?.transfer_id||isInternalTransfer(t?.type)||/^Transfer between own accounts/i.test(category||'')){kind='internal_transfer';classification_source='recorded_transfer';}
+  else if(ownTransfer){kind='internal_transfer';classification_source='recorded_transfer';}
   else if(isFinancingFlow(t?.type)||/^(Owner funding|Capital contribution|Loan proceeds|Loan repayments)/i.test(category||'')){kind=ownerFinancingType==='loan'||loanRepayment?'loan':'funding';classification_source='recorded_funding';}
   else if(isFinancialCost(t?.type)||/^(Bank fee and admin|Payment gateway fees)$/i.test(category||'')){kind='fee';classification_source='recorded_fee';}
-  else if(partnerPayout){kind='supplier';classification_source='recorded_partner_payout';}
+  else if(partnerPayout||salaryPayout){kind='supplier';classification_source=partnerPayout?'recorded_partner_payout':'recorded_salary_payout';}
   else if(category&&t?.type==='expense'&&!/^(Other expenses|Intercompany|Owner withdrawal)/i.test(category)){kind='supplier';classification_source='confirmed_category';}
   else if(category&&t?.type==='income'&&!/^(Other income|Intercompany)/i.test(category)){kind='income';classification_source='confirmed_category';}
   // For these explicit cash-flow choices the saved category is the user's answer.
@@ -91,7 +94,7 @@ function documentControl(snapshot,{month,role,actor}) {
   const wht=(s.withholding||[]).filter(w=>d&&same(w.debt_id,d.id)&&recordedWithholding.has(w.status)&&Number(w.withholding_amount)>0);
   const requirements=[];
   function requirement(r,mandatory,source,automatic=false,na=false){const evidence=caseDocuments.flatMap(doc=>doc.coverage.filter(c=>c.role===r).map(c=>({...c,document_id:doc.id})));const linked=evidence.some(e=>e.state==='linked');requirements.push({type:r,mandatory,source,reason:r, state:na?'not_applicable':automatic||linked?'linked':evidence.length?'requires_review':'missing',documents:evidence.map(e=>e.document_id),explanation:automatic?'bank_row_or_transfer_pair':source,na_reason:na?(currentReview?.contract_waiver||'scenario_does_not_require_contract'):null});}
-  if((kind==='supplier'&&!partnerPayout)||kind==='income')requirement('basis',true,'commercial_operation');
+  if((kind==='supplier'&&!partnerPayout&&!salaryPayout)||kind==='income')requirement('basis',true,'commercial_operation');
   if(kind==='fee')requirement('payment',true,'recorded_fee',paymentSatisfied);
   if(kind==='funding'||kind==='loan'){
    // Explicit owner capital/loan classification plus a verified imported credit
@@ -103,16 +106,21 @@ function documentControl(snapshot,{month,role,actor}) {
   }
   if(payments.length&&kind!=='fee'&&kind!=='internal_transfer')requirement('payment',true,'cash_operation',paymentSatisfied);
   const paired=kind==='internal_transfer'&&payments.length===2&&new Set(payments.map(p=>String(p.wallet_id))).size===2&&payments.every(p=>p.transfer_id&&same(p.transfer_id,payments[0].transfer_id))&&payments.some(p=>/out|expense/.test(p.type))&&payments.some(p=>/in|income/.test(p.type));
-  if(kind==='internal_transfer')requirements.push({type:'counterpart',mandatory:true,source:'internal_transfer',reason:'counterpart',state:paired?'linked':'requires_review',documents:[],explanation:'recorded_same_business_transfer_pair'});
+  if(kind==='internal_transfer'){
+   requirements.push({type:'explanation',mandatory:true,source:'own_account_transfer',reason:'explanation',state:currentReview?.kind==='internal_transfer'&&String(currentReview.reason||'').trim().length>=5?'linked':'missing',documents:[],explanation:currentReview?.reason||null});
+   // Pair reconciliation is visible, but it is not another document the user
+   // must upload. Never present an unpaired bank row as a verified pair.
+   requirements.push({type:'counterpart',mandatory:false,source:'internal_transfer',reason:'counterpart',state:paired?'linked':'requires_review',documents:[],explanation:'recorded_same_business_transfer_pair'});
+  }
   // An absent or stale human decision is not evidence that a contract is unnecessary.
   // Recorded fees and paired own-account transfers have an explicit rule; other
   // scenarios must be decided before this folder can be called complete.
-  const contractByRule=!currentReview&&['fee','internal_transfer'].includes(kind);
+  const contractByRule=kind==='internal_transfer'||kind==='fee'&&!currentReview;
   const contractUndecided=!explicitCashRule&&!currentReview&&!contractByRule;
   // Contract sufficiency is outside this preliminary cash folder for explicit
   // owner financing and loan repayment. It must not block saving their category.
   if(!classifiedFinancing){
-   if(partnerPayout)requirement('contract',true,'partner_payout_agreement');
+   if(partnerPayout||salaryPayout)requirement('contract',true,partnerPayout?'partner_payout_agreement':'salary_employment_agreement');
    else if(contractUndecided)requirements.push({type:'contract',mandatory:false,source:'scenario_confirmation',reason:'contract',state:'requires_review',documents:[],explanation:'contract_decision_pending',na_reason:null});
    else if(contractByRule)requirements.push({type:'contract',mandatory:false,source:'recorded_fee_or_transfer',reason:'contract',state:'not_applicable',documents:[],explanation:'recorded_fee_or_transfer',na_reason:'recorded_fee_or_transfer'});
    else {
@@ -123,12 +131,13 @@ function documentControl(snapshot,{month,role,actor}) {
   if(wht.length){requirement('withholding',true,'confirmed_withholding_record');requirement('tax_payment',true,'confirmed_withholding_record');}
   const questions=[];if(kind==='unknown')questions.push('unknown_type');if(review&&!currentReview&&!explicitCashRule)questions.push('stale_review');
   if(contractUndecided)questions.push('contract_decision');
-  if(requirements.some(r=>r.state==='requires_review'&&requiredRoles.includes(r.type)&&(r.type!=='contract'||partnerPayout)))questions.push('coverage_review');
-  if(kind==='internal_transfer'&&!paired)questions.push('counterpart_missing');
+  if(requirements.some(r=>r.state==='requires_review'&&requiredRoles.includes(r.type)&&(r.type!=='contract'||partnerPayout||salaryPayout)))questions.push('coverage_review');
+  // An unpaired transfer is a separate reconciliation warning, not a request
+  // for a fictitious invoice, contract, or payment-order document.
   const missing=requirements.filter(r=>r.mandatory&&r.state==='missing'),uncertain=questions.length>0;
   const complete=!missing.length&&!uncertain&&requirements.filter(r=>r.mandatory).every(r=>r.state==='linked'||r.state==='not_applicable');
   const history=audit.filter(a=>caseTargets.has(key(a.target_type,a.target_id))||caseDocIds.has(String(a.document_id))).map(a=>({id:a.id,action:a.action,date:a.created_at,reason:a.metadata?.reason||null}));
-  operations.push({key:group.key,target_type,target_id,version,date:stamp(t?.transaction_date||d?.invoice_date||d?.created_at),description:d?.counterparty||t?.counterparty_name||t?.description||'',direction:t?getTransactionCashDirection(t.type):d?.type==='payable'?'out':'in',amount:d?.original_amount??d?.amount??t?.amount_original,currency:d?.currency||t?.currency_original,category,owner_financing_type:ownerFinancingType,loan_repayment:!!loanRepayment,partner_payout:!!partnerPayout,invoice:d?{id:d.id,number:d.invoice_number,type:d.type}:null,payments:payments.map(p=>({id:p.id,date:stamp(p.transaction_date||p.created_at),amount:p.amount_original,currency:p.currency_original,description:p.description})),bank_rows:bankRows.map(r=>({id:r.id,date:r.tx_date,description:r.description,amount:r.amount,batch_id:r.batch_id,review_status:r.review_status,verified:validBank.some(v=>same(v.id,r.id)),document_id:(s.batches||[]).find(b=>same(b.id,r.batch_id))?.document_id||null})),documents:caseDocuments,requirements,questions,kind,classification_source,review:currentReview,status:complete?'complete':uncertain?'clarification':'missing',missing_count:missing.length,accountant_checked:!!d?.accountant_checked_at,history});
+  operations.push({key:group.key,target_type,target_id,version,date:stamp(t?.transaction_date||d?.invoice_date||d?.created_at),description:d?.counterparty||t?.counterparty_name||t?.description||'',direction:t?getTransactionCashDirection(t.type):d?.type==='payable'?'out':'in',amount:d?.original_amount??d?.amount??t?.amount_original,currency:d?.currency||t?.currency_original,category,owner_financing_type:ownerFinancingType,loan_repayment:!!loanRepayment,partner_payout:!!partnerPayout,salary_payout:!!salaryPayout,own_transfer:!!ownTransfer,transfer_pair_verified:kind==='internal_transfer'?paired:null,invoice:d?{id:d.id,number:d.invoice_number,type:d.type}:null,payments:payments.map(p=>({id:p.id,date:stamp(p.transaction_date||p.created_at),amount:p.amount_original,currency:p.currency_original,description:p.description})),bank_rows:bankRows.map(r=>({id:r.id,date:r.tx_date,description:r.description,amount:r.amount,batch_id:r.batch_id,review_status:r.review_status,verified:validBank.some(v=>same(v.id,r.id)),document_id:(s.batches||[]).find(b=>same(b.id,r.batch_id))?.document_id||null})),documents:caseDocuments,requirements,questions,kind,classification_source,review:currentReview,status:complete?'complete':uncertain?'clarification':'missing',missing_count:missing.length,accountant_checked:!!d?.accountant_checked_at,history});
  }
  operations.sort((a,b)=>b.date.localeCompare(a.date)||a.key.localeCompare(b.key));
  const summary={total:operations.length,complete:operations.filter(o=>o.status==='complete').length,missing:operations.filter(o=>o.missing_count>0).length,clarification:operations.filter(o=>o.status==='clarification').length,accountant_checked:operations.filter(o=>o.accountant_checked).length,empty:!operations.length,document_control_complete:operations.length>0&&operations.every(o=>o.status==='complete'),accountant_review_complete:false,is_closed:false,scope:s.scope||'company'};
