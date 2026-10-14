@@ -36,7 +36,7 @@ test('bill response loss and independent equivalent callers recover the original
  globalThis.fetch=async(url,options={})=>{
   if(url.endsWith('/financial-operations/recent'))return json({operations:[]});
   if(url.includes('/financial-operations/bill_create/')){reads.push(url);return json({state:'confirmed',result:committed});}
-  posts.push(JSON.parse(options.body));committed={id:123,debt:{id:123},audit_id:'audit',request_id:posts[0].request_key};throw Error('simulated commit response loss');
+  posts.push(JSON.parse(options.body));committed={debt:{id:123},audit_id:'audit',request_id:posts[0].request_key};throw Error('simulated commit response loss');
  };
  await assert.rejects(api.apiFetch('/debts',jwt(-1,'first'),{method:'POST',body:bill}),e=>e.code==='financial_outcome_unknown');
  const result=await api.apiFetch('/debts',jwt(-1,'second'),{method:'POST',body:{...bill,amount:30,description:null,due_date:null,invoice_date:null,invoice_number:null}});

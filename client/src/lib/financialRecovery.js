@@ -122,7 +122,9 @@ export async function managedFinancialRequest(path, context, options, execute) {
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('financial-recovery-confirmed', {
         detail: { actor: context.actor, business: context.business, operation: description.operation, key: record.key }
       }))
-      return { ...receipt.result, is_replay: true, result_is_historical: true, recovery: receipt }
+      // Native bill receipts keep the object under `debt`. Retained callers
+      // receive the same flat bill ID/fields as an ordinary successful create.
+      return { ...(description.operation === 'bill_create' ? receipt.result.debt : {}), ...receipt.result, is_replay: true, result_is_historical: true, recovery: receipt }
     }
     if (!record) {
       const reviewed = read(await reviewNamespace(context.actor, context.business))
