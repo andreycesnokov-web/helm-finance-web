@@ -12168,7 +12168,7 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     { data: wallets   },
     accessData,
   ] = await Promise.all([
-    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,wallet_id,source,scope')).order('created_at', { ascending: false }),
+    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,transaction_date,category,transfer_id,wallet_id,source,scope')).order('created_at', { ascending: false }),
     scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope')).gte('created_at', monthStart),
     scopeQ(supabase.from('debts').select('*')).or('is_training.is.null,is_training.eq.false'),
     scopeQ(supabase.from('wallets').select('id,name,currency,type,scope')).eq('is_active', true),
@@ -12441,7 +12441,9 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
 
   const [{ data: wallets }, { data: txs }, { data: rawDebts }, { data: employees }, { data: taxObs }] = await Promise.all([
     supabase.from('wallets').select('id,name,currency,type,scope').or(bizOr).eq('is_active', true),
-    WL.fetchAllRows(() => supabase.from('transactions').select('id,type,amount_original,amount_idr,created_at,wallet_id,source,scope').or(bizOr).order('id')).then((data) => ({ data })),
+    // transaction_date/category/transfer_id: burn is measured by the booked date and class, as on Pulse
+    // (an imported statement is created today but dated in the past).
+    WL.fetchAllRows(() => supabase.from('transactions').select('id,type,amount_original,amount_idr,created_at,transaction_date,category,transfer_id,wallet_id,source,scope').or(bizOr).order('id')).then((data) => ({ data })),
     supabase.from('debts').select('*').or(bizOr).or('is_training.is.null,is_training.eq.false'),
     supabase.from('payroll_employees').select('default_salary,pay_day,status').or(bizOr).neq('status', 'archived'),
     // Tax obligations: only verified-source, reviewed/owner-confirmed, unpaid ones
