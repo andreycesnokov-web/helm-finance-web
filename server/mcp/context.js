@@ -44,6 +44,10 @@ function guarded(name, ctx, handler) {
         // read company data still require an identity.
         return fail('authentication_required', 'Sign in to CFO Finance to use this tool.');
       }
+      if(ctx.services.commercialToolGate){
+        const denial=await ctx.services.commercialToolGate(name,args||{},ctx.mcpUser.userId);
+        if(denial)return fail(denial.error,denial.message);
+      }
       return ok(await handler(args || {}, ctx));
     } catch (e) {
       if (e instanceof ToolError) return fail(e.code, e.message, e.extra);

@@ -19,6 +19,12 @@ test('ambiguous outcome instructs recovery and never labels a possible commit ro
 test('disabled routes do not call business resolution or data layer',()=>{
  const routes=[],app={get(...a){routes.push(a)},post(...a){routes.push(a)}};
  install(app,{auth(){},requireBusiness(){throw Error('unexpected DB call')},supabase:{rpc(){throw Error('unexpected RPC')}},enabled:false});
- assert.equal(routes.length,4);
+ assert.equal(routes.length,6);
  for(const route of routes){let code,result,next=false;route[2]({}, {status(n){code=n;return this},json(v){result=v}},()=>{next=true});assert.equal(code,404);assert.equal(result.error,'not_found');assert.equal(next,false);}
+});
+
+test('AI identification reserves AI quota before the general document mutation rule',()=>{
+ const {workflow}=require('../server/lib/commercialBilling');
+ assert.deepEqual(workflow({method:'POST',originalUrl:'/api/documents/abc/identify'}),{feature:'ai',resource:'ai'});
+ assert.deepEqual(workflow({method:'PATCH',originalUrl:'/api/documents/abc'}),{feature:'documents'});
 });

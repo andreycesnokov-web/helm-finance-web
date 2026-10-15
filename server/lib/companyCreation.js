@@ -22,7 +22,7 @@ function creationError(res,error) {
   // A gateway failure can follow a committed RPC. Never label it as rollback.
   return res.status(503).json({error:'company_creation_outcome_unknown',outcome:'unknown',automatic_retry:false});
 }
-function registerCompanyCreation(app,{auth,supabase,currencies}) {
+function registerCompanyCreation(app,{auth,supabase,currencies,commercialEnabled=false}) {
   app.post('/api/businesses',auth,async(req,res)=>{
     res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
     let intent;
@@ -30,7 +30,7 @@ function registerCompanyCreation(app,{auth,supabase,currencies}) {
     const header=req.get('Idempotency-Key'),key=header||req.body?.request_key;
     if(!UUID.test(key||'')||header&&req.body?.request_key&&header.toLowerCase()!==req.body.request_key.toLowerCase())return res.status(400).json({error:'company_creation_key_required'});
     try {
-      const {data,error}=await supabase.rpc('rpc_create_business_once',{
+      const {data,error}=await supabase.rpc(commercialEnabled?'rpc_create_business_commercial_once':'rpc_create_business_once',{
         p_actor:req.user.userId,p_request_key:key.toLowerCase(),p_intent:intent,
         p_categories:DEFAULT_BUSINESS_CATEGORIES.map(([name,group_type,activity_type],sort_order)=>({name,group_type,activity_type,sort_order})),
       });

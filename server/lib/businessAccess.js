@@ -73,7 +73,8 @@ function computeCommercialAccess(business, now, billing) {
     && trialEnd > instant(extension.before);
   const validTrial = Number.isFinite(trialStart) && Number.isFinite(trialEnd)
     && (trialEnd - trialStart === TRIAL_DURATION_MS || validExtension);
-  const trialVersion = version(billing.selected_plan_version_id);
+  const scheduledDue = Number.isFinite(instant(billing.scheduled_at)) && instant(billing.scheduled_at) <= time;
+  const trialVersion = version(scheduledDue ? billing.scheduled_plan_version_id : billing.selected_plan_version_id);
   const trialActive = !!(validTrial && trialVersion && trialStart <= time && time < trialEnd);
   const grants = (billing.grants || []).filter(g => String(g.business_id) === String(business.id)
     && !g.revoked_at && g.audit_id && typeof g.reason === 'string' && g.reason.trim()
@@ -87,6 +88,7 @@ function computeCommercialAccess(business, now, billing) {
   periods.sort((a,b) => instant(b.starts_at)-instant(a.starts_at) || String(a.id).localeCompare(String(b.id)));
   const grant = grants[0], paid = periods[0];
   const selected = grant ? version(grant.plan_version_id) : paid ? version(paid.plan_version_id) : trialActive ? trialVersion : null;
+  if(!selected&&billing.legacy_fallback)return {...computeBusinessAccess(business,now),policy:'legacy',restricted:false,server_now:now.toISOString(),version:billing.version,features:{},limits:{}};
   const source = grant ? 'admin_override' : paid ? 'subscription' : trialActive ? 'trial' : 'restricted';
   const state = paid ? 'active' : trialActive ? 'trialing'
     : billing.pending_payment_id ? 'pending_payment' : Number.isFinite(trialStart) ? 'expired' : 'not_started';

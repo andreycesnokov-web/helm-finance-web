@@ -176,6 +176,10 @@ function auth(req, res, next) {
 // (next_app_user_id) — disjoint from positive Telegram ids.
 // ─────────────────────────────────────────────────────────────────────────────
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const COMMERCIAL_BILLING_ENABLED=process.env.COMMERCIAL_BILLING_ENABLED==='true';
+const COMMERCIAL_BILLING_FIXTURES=process.env.COMMERCIAL_BILLING_FIXTURES==='true' && process.env.CFO_DEPLOYMENT_ENV==='staging';
+require('./lib/commercialAdmission').install(app,{auth,supabase,enabled:COMMERCIAL_BILLING_ENABLED,allowFixtures:COMMERCIAL_BILLING_FIXTURES,
+ resolveBusiness:req=>_resolveActiveBusiness(supabase,uid=>findDefaultBusiness(uid),req)});
 const normalizeEmail = (e) => String(e || '').trim().toLowerCase();
 const hashEmailCode = (code) => crypto.createHash('sha256').update(`${JWT_SECRET}:${code}`).digest('hex');
 const sixDigitCode = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -1981,6 +1985,9 @@ async function resolveBotApprover(telegram_id, debtId) {
   const role = mem?.[0]?.role;
   if (!role) return { error: 'forbidden' };
 
+  const commercialDenial=await telegramPaidGate(businessId);
+  if(commercialDenial)return {error:commercialDenial.error};
+
   return { debt, userId: actor.userId, role };
 }
 
@@ -2337,6 +2344,7 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
       .limit(1);
     const debt = candidates?.[0];
     if (!debt) return res.status(404).json({ error: 'no_open_request', message: 'No open request to attach a receipt to.' });
+    const commercialDenial=await telegramPaidGate(debt.business_id);if(commercialDenial)return res.status(402).json(commercialDenial);
     const gate = await telegramPaidGate(debt.business_id);
     if (gate) return res.status(402).json(gate);
 
@@ -2543,6 +2551,7 @@ const AI_ACCOUNTANT_DISCLAIMER = {
 
 // Entitlement: an active AI Accountant add-on, OR full access during trial/founder.
 async function hasAccountantAddon(biz) {
+  if(COMMERCIAL_BILLING_ENABLED&&biz.business.billing_policy==='commercial_v2')return true;
   // Entitlement is per the ACTIVE business (honors its admin override / plan /
   // trial), not the owner's arbitrary default business. Mirrors hasDocumentsAccess
   // — fixes AI Accountant staying locked when the active business has a founder
@@ -7637,10 +7646,12 @@ function requireBotSecret(req) {
 // rollout is dark; enabling is an explicit Railway env step (owner action).
 const TELEGRAM_PAID_GATE_ENABLED = process.env.TELEGRAM_PAID_GATE_ENABLED === 'true';
 async function telegramPaidGate(businessId) {
-  if (!TELEGRAM_PAID_GATE_ENABLED || !businessId) return null;
+  if ((!TELEGRAM_PAID_GATE_ENABLED&&!COMMERCIAL_BILLING_ENABLED) || !businessId) return null;
   const { data } = await supabase.from('businesses').select('*').eq('id', businessId).limit(1);
   const business = data?.[0];
   if (!business) return null; // let the route's own not-found handling answer
+  if(COMMERCIAL_BILLING_ENABLED&&business.billing_policy==='commercial_v2')return {error:'commercial_channel_unavailable',message:'Use CFO OS V2. Commercial Telegram workflows are not enabled.',upgrade_url:'/business/billing'};
+  if(!TELEGRAM_PAID_GATE_ENABLED)return null;
   if (computeBusinessAccess(business).effective_plan !== 'free') return null;
   return {
     error: 'telegram_paid_plan_required',
@@ -9551,6 +9562,16 @@ async function getBusinessAccess(userId, businessId) {
     .select('role, status, businesses(*)').eq('user_id', userId).eq('business_id', businessId).eq('status', 'active').limit(1);
   if (!m?.length) return null;
   const business = m[0].businesses;
+  if(COMMERCIAL_BILLING_ENABLED){
+    const s=await require('./lib/commercialBilling').snapshot(supabase,userId,{business},COMMERCIAL_BILLING_FIXTURES);
+    if(s){
+    const access=computeBusinessAccess(business,new Date(s.server_now),s),f=access.features;
+    if(access.policy!=='legacy')return {business,membership:{role:m[0].role,status:m[0].status},access,limits:{...access.limits,
+      payroll_enabled:f.payroll===true,team_access_enabled:f.team===true,approval_flow_enabled:f.approvals===true,
+      export_enabled:f.export===true,integrations_enabled:f.integrations===true,
+      max_users:access.limits.users,max_businesses:access.limits.companies,max_ai_questions_per_month:access.limits.ai}};
+    }
+  }
   const access = computeBusinessAccess(business);
   const { data: limits } = await supabase.from('plan_limits').select('*').eq('plan', access.effective_plan).single();
   return { business, membership: { role: m[0].role, status: m[0].status }, access, limits: limits || {} };
@@ -9573,7 +9594,7 @@ async function getCurrentAccess(userId, businessId = null) {
   // If a specific business is known, resolve THAT one (no arbitrary pick).
   if (businessId) {
     const r = await getBusinessAccess(userId, businessId);
-    if (r) return { business: r.business, membership: r.membership, accessState: getAccessState(r.business), limits: r.limits };
+    if (r) return { business: r.business, membership: r.membership, accessState: {effectivePlan:r.access.effective_plan,isTrialActive:r.access.trial_status_effective==='active',daysLeft:r.access.daysLeft}, limits: r.limits };
   }
   // Legacy default: deterministic — prefer an owned business, then the oldest.
   const { data: memberships } = await supabase
@@ -9590,6 +9611,10 @@ async function getCurrentAccess(userId, businessId = null) {
     new Date(a.businesses?.created_at || 0) - new Date(b.businesses?.created_at || 0));
   const m = memberships[0];
   const business = m.businesses;
+  if(COMMERCIAL_BILLING_ENABLED&&business.billing_policy==='commercial_v2'){
+   const r=await getBusinessAccess(userId,business.id);
+   return {business:r.business,membership:r.membership,accessState:{effectivePlan:r.access.effective_plan,isTrialActive:r.access.trial_status_effective==='active',daysLeft:r.access.daysLeft},limits:r.limits};
+  }
   const accessState = getAccessState(business);
 
   const { data: limits } = await supabase
@@ -12050,6 +12075,12 @@ app.get('/api/access/status', auth, async (req, res) => {
     }
 
     // Compute access state
+    if(COMMERCIAL_BILLING_ENABLED&&business.billing_policy==='commercial_v2'){
+      const x=await getBusinessAccess(userId,business.id),a=x.access;
+      res.set('Cache-Control','private, no-store');
+      return res.json({business,membership,plan:{name:a.effective_plan,effective_plan:a.effective_plan,subscription_status:a.subscription_status,
+       trial_status:a.trial_status_effective,trial_started_at:a.trial_started_at,trial_ends_at:a.trial_ends_at,days_left_in_trial:a.daysLeft,is_trial_active:a.trial_status_effective==='active'},limits:x.limits,usage:{},commercial:a});
+    }
     const accessState = getAccessState(business);
 
     // Fetch plan limits for effective plan
@@ -13548,7 +13579,7 @@ app.delete('/api/businesses/:id', auth, async (req, res) => {
 });
 
 // Actor-only registration; company + owner + defaults + replay receipt are atomic.
-require('./lib/companyCreation').registerCompanyCreation(app, { auth, supabase, currencies: BUSINESS_ALLOWED_CURRENCIES });
+require('./lib/companyCreation').registerCompanyCreation(app, { auth, supabase, currencies: BUSINESS_ALLOWED_CURRENCIES,commercialEnabled:COMMERCIAL_BILLING_ENABLED });
 
 // ── PAYROLL V1 ───────────────────────────────────────────────────────────────
 
@@ -13978,6 +14009,7 @@ function canViewAllDocuments(role) { return canViewBusinessFinance(role); }
 
 // Business-specific entitlement (NOT the arbitrary .limit(1) path — see spec §16).
 async function hasDocumentsAccess(biz) {
+  if(COMMERCIAL_BILLING_ENABLED&&biz.business.billing_policy==='commercial_v2')return true;
   try {
     const r = await getBusinessAccess(biz.ownerUserId, biz.business.id);
     const plan = r?.access?.effective_plan;
@@ -15754,6 +15786,7 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
 
 // Personal Workspaces, Relationships, FX quotes, Wallet transfers & Funding Bridge.
 // Mounted under /api; shares auth, the service-role client and access helpers.
+require('./lib/commercialBilling').install(app,{auth,requireBusiness,requireAdmin,supabase,enabled:COMMERCIAL_BILLING_ENABLED,allowFixtures:COMMERCIAL_BILLING_FIXTURES});
 app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15777,6 +15810,11 @@ require('./mcp').attachMcp(app, {
       : (ev.client_name ? { client_name: ev.client_name } : null),
   }),
   services: {
+    commercialToolGate:async(name,args,actor)=>{
+      if(!COMMERCIAL_BILLING_ENABLED||['get_company_context','get_financial_summary','get_missing_documents','list_documents'].includes(name))return null;
+      const biz=await _resolveActiveBusiness(supabase,uid=>findDefaultBusiness(uid),{user:{userId:actor},headers:{},query:{},body:args.company_id?{business_id:args.company_id}:{}});
+      return biz.business.billing_policy==='commercial_v2'?{error:'commercial_channel_unavailable',message:'Use CFO OS V2 for this workflow. Commercial MCP writes and AI jobs are not enabled.'}:null;
+    },
     // identity → company. Read-only: a lookup can never bootstrap a workspace
     // (ensureDefaultBusiness would; findDefaultBusiness never does).
     listAccessibleWorkspaces: (userId) => require('./lib/workspaceAccess').listAccessibleWorkspaces(supabase, userId),

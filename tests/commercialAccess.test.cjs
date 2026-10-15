@@ -81,3 +81,12 @@ test('timestamps without timezone do not grant access',()=>{
 test('legacy resolver remains unchanged without the commercial snapshot',()=>{
  assert.equal(computeBusinessAccess(company,new Date(end)).effective_plan,'founder');
 });
+
+test('scheduled terms switch at the server boundary without extending trial or replacing paid terms',()=>{
+ const s=snapshot();s.scheduled_plan_version_id=other.id;s.scheduled_at='2026-10-16T00:00:00Z';
+ assert.equal(resolve(s,'2026-10-15T23:59:59Z').effective_plan,'starter');
+ assert.equal(resolve(s,s.scheduled_at).effective_plan,'pro');
+ assert.equal(resolve(s,end).restricted,true);
+ s.service_periods=[{...period(),starts_at:start}];
+ assert.equal(resolve(s,s.scheduled_at).effective_plan,'starter');
+});
