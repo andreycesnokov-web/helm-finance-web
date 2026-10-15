@@ -20,6 +20,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client } = require('pg');
+const { assertDisposableUrl, assertDisposableDatabase } = require('./_disposableDbGuard');
 
 const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || 'postgresql://postgres:postgrespassword@localhost:5432/testdb';
 const JWT_SECRET = 'http-api-test-secret-jwt-key-32chars!';
@@ -38,6 +39,7 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
   let docAId = null;
 
   before(async () => {
+    assertDisposableUrl(connectionString);
     pgClient = new Client({ connectionString, connectionTimeoutMillis: 4000 });
     try {
       await pgClient.connect();
@@ -46,6 +48,7 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
       skipped = true;
       return;
     }
+    await assertDisposableDatabase(pgClient); // creates tables and rows in this database: refuse a shared one
 
     // 1. Ensure initial tables exist in PostgreSQL WITHOUT migration 068
     await pgClient.query(`

@@ -4,6 +4,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 const { Client } = require('pg');
+const { assertDisposableUrl, assertDisposableDatabase } = require('./_disposableDbGuard');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -19,6 +20,7 @@ describe('Real PostgreSQL: Migration 068 & Bank Import Batch Document Linking', 
   const USER_ID = 1001;
 
   before(async () => {
+    assertDisposableUrl(connectionString);
     client = new Client({ connectionString, connectionTimeoutMillis: 4000 });
     try {
       await client.connect();
@@ -27,6 +29,7 @@ describe('Real PostgreSQL: Migration 068 & Bank Import Batch Document Linking', 
       skipped = true;
       return;
     }
+    await assertDisposableDatabase(client); // creates tables and rows in this database: refuse a shared one
 
     // Prepare core prerequisite tables
     await client.query(`

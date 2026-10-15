@@ -4,6 +4,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
 const { Client } = require('pg');
+const { assertDisposableUrl, assertDisposableDatabase } = require('./_disposableDbGuard');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -23,6 +24,7 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
   let debtIdA;
 
   before(async () => {
+    assertDisposableUrl(connectionString);
     client1 = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     client2 = new Client({ connectionString, connectionTimeoutMillis: 5000 });
 
@@ -33,6 +35,7 @@ describe('Real PostgreSQL Concurrency & Atomicity on 2 Independent Connections',
       console.error('PostgreSQL connection failed:', connErr.message);
       throw connErr;
     }
+    await assertDisposableDatabase(client1); // creates tables and rows in this database: refuse a shared one
 
     // 1. Initialize schema via client1
     await client1.query(`

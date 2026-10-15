@@ -15,6 +15,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, types } = require('pg');
+const { assertDisposableUrl, assertDisposableDatabase } = require('./_disposableDbGuard');
 types.setTypeParser(1082, (val) => val);
 
 let closeReadinessFn, packageExportDataFn;
@@ -43,6 +44,7 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
   let docId;
 
   before(async () => {
+    assertDisposableUrl(connectionString);
     pgClient = new Client({ connectionString, connectionTimeoutMillis: 5000 });
     try {
       await pgClient.connect();
@@ -54,6 +56,7 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
       skipped = true;
       return;
     }
+    await assertDisposableDatabase(pgClient); // creates tables and rows in this database: refuse a shared one
 
     // 1. Initialize complete schema
     await pgClient.query(`

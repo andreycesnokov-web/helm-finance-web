@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { Client } = require('pg');
+const { assertDisposableUrl, assertDisposableDatabase } = require('./_disposableDbGuard');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SNAPSHOT = path.join(ROOT, 'tests', 'fixtures', 'schema', 'prod_public_schema_2026-10-08.sql');
@@ -19,11 +20,14 @@ function urlForDatabase(name) {
 
 // Returns { connectionString, name, drop() } or null when PostgreSQL is not reachable.
 async function createProdSchemaDatabase(prefix, migrations = []) {
+  assertDisposableUrl(BASE_URL, { adminOnly: true });
   const admin = new Client({ connectionString: BASE_URL, connectionTimeoutMillis: 4000 });
   try { await admin.connect(); } catch (e) {
     console.warn(`[SKIP] PostgreSQL not reachable (${e.message}).`);
     return null;
   }
+  // Never create throwaway databases inside a shared cluster (staging / production): refuse, do not skip.
+  try { await assertDisposableDatabase(admin); } catch (e) { await admin.end().catch(() => {}); throw e; }
   const name = `${prefix}_${crypto.randomBytes(4).toString('hex')}`;
   await admin.query(`CREATE DATABASE ${name}`);
   // Supabase roles the schema and migrations refer to (cluster-wide, created once).
