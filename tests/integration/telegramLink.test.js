@@ -97,7 +97,7 @@ let db, supabase;
 async function freshDb() {
   db = new PGlite();
   await db.exec(`
-    CREATE TABLE users (id BIGINT PRIMARY KEY);
+    CREATE TABLE users (id BIGINT PRIMARY KEY, created_at timestamptz NOT NULL DEFAULT now()); -- created_at as in production: the session check reads it
     CREATE TABLE businesses (id uuid PRIMARY KEY);
     CREATE TABLE business_members (id BIGSERIAL PRIMARY KEY, user_id BIGINT, business_id uuid, status TEXT);
     CREATE TABLE debts (id BIGSERIAL PRIMARY KEY, user_id BIGINT);

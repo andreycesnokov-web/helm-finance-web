@@ -14,6 +14,7 @@ const { createOAuthIntegration, publicBaseUrl } = require('./oauth');
 
 function attachMcp(app, deps = {}) {
   const JWT_SECRET = deps.JWT_SECRET;
+  const sessionUserAllowed = deps.sessionUserAllowed; // the web's "user exists, token not older than user" check
   // Existing CFO services injected by server/index.js (the same functions the web routes
   // call). The MCP layer never reaches the business database on its own.
   const services = deps.services || {};
@@ -46,6 +47,7 @@ function attachMcp(app, deps = {}) {
     const oauthOn = oauth.enabled();
     const mcpUser = await resolveMcpUser(req, {
       JWT_SECRET,
+      sessionUserAllowed,
       verifyOAuth: oauthOn ? oauth.verifyAccessToken : null,
       resourceUrl: oauthOn ? oauth.resourceUrl() : null,
     });

@@ -158,7 +158,9 @@ test('flag OFF: every support route is 404 and NO table is touched', async () =>
   assert.strictEqual((await api('POST', `${CONV}/x/escalate`, { token: tok(OWNER_A), business: BIZ_A, body: { reason: 'r' } })).status, 404);
   assert.strictEqual((await api('PATCH', `${CONV}/x/close`, { token: tok(OWNER_A), business: BIZ_A })).status, 404);
   assert.strictEqual((await api('GET', '/api/admin/support/conversations', { token: tok(ADMIN) })).status, 404);
-  assert.deepStrictEqual(dbTouches.tables, [], `DB touched with the flag off: ${dbTouches.tables}`);
+  // `users` is read by the global session check (server/lib/sessionUser.js), not by this feature.
+  const featureTables = dbTouches.tables.filter((t) => t !== 'users');
+  assert.deepStrictEqual(featureTables, [], `DB touched with the flag off: ${featureTables}`);
   assert.strictEqual(convs().length, 0);
 });
 

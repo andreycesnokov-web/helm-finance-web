@@ -36,7 +36,8 @@ const scenario = { rows: {}, failTables: new Set() };
 function reset() {
   scenario.rows = {
     business_members: [],
-    users: [{ id: TG_USER, first_name: 'Leg', username: 'leg', language: 'en' }],
+    // EMAIL_USER signs in too, so it exists as a user (the session check refuses tokens of unknown users).
+    users: [{ id: TG_USER, first_name: 'Leg', username: 'leg', language: 'en' }, { id: EMAIL_USER }],
     user_channel_links: [],
     businesses: [{ id: BIZ, owner_user_id: TG_USER, name: 'Acme', type: 'business', status: 'active' }],
     debts: [],

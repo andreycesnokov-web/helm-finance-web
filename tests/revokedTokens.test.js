@@ -57,6 +57,8 @@ test('no server code verifies an app session JWT without the revocation check', 
   walk(root);
   assert.deepStrictEqual(offenders, []);
   const index = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
-  assert.ok((index.match(/verifyAppToken\(token, JWT_SECRET\)/g) || []).length >= 3, 'auth, receipt and training sites');
+  // One verification point (verifySession = revocation + session-user check), used by auth, receipt and training.
+  assert.strictEqual((index.match(/verifyAppToken\(token, JWT_SECRET\)/g) || []).length, 1, 'only inside verifySession');
+  assert.ok((index.match(/await verifySession\(token\)/g) || []).length >= 3, 'auth, receipt and training sites');
   assert.match(fs.readFileSync(path.join(root, 'mcp', 'auth.js'), 'utf8'), /verifyAppToken\(token, opts\.JWT_SECRET\)/);
 });

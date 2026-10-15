@@ -159,15 +159,25 @@ app.post('/api/auth/telegram', async (req, res) => {
 
 // --- Auth middleware -------------------------------------------------------
 
-function auth(req, res, next) {
+// A valid signature is not enough: the user must still exist and the token must not predate them
+// (server/lib/sessionUser.js). Shared by every place that accepts an app session.
+const sessionUserAllowed = require('./lib/sessionUser').createSessionUserCheck(supabase);
+async function verifySession(token) {
+  const payload = verifyAppToken(token, JWT_SECRET);
+  if (!(await sessionUserAllowed(payload))) throw new jwt.JsonWebTokenError('session user unknown');
+  return payload;
+}
+const sessionFailure = (res, e, error) => e && e.code === 'session_check_unavailable'
+  ? res.status(503).json({ error: 'session_check_unavailable', automatic_retry: false })
+  : res.status(401).json({ error });
+
+async function auth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'No token' });
-  try {
-    req.user = verifyAppToken(token, JWT_SECRET);
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
-  }
+  let payload;
+  try { payload = await verifySession(token); } catch (e) { return sessionFailure(res, e, 'Invalid token'); }
+  req.user = payload;
+  next();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2502,7 +2512,7 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
 app.get('/api/debts/:id/receipt', async (req, res) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
-    try { req.user = verifyAppToken(token, JWT_SECRET); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+    try { req.user = await verifySession(token); } catch (e) { return sessionFailure(res, e, 'Unauthorized'); }
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
@@ -8025,7 +8035,7 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
     let actingUserId = null;
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (token) {
-      try { actingUserId = verifyAppToken(token, JWT_SECRET).userId; } catch { /* fall through */ }
+      try { actingUserId = (await verifySession(token)).userId; } catch { /* fall through */ }
     }
     if (!actingUserId && requireBotSecret(req) && telegram_id) {
       // PR2.5: resolved rather than assumed. Flag off ⇒ Number(telegram_id), as before.
@@ -15804,6 +15814,7 @@ app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resol
 // ─────────────────────────────────────────────────────────────────────────────
 require('./mcp').attachMcp(app, {
   JWT_SECRET,
+  sessionUserAllowed,
   supabase,          // OAuth storage only (mcp_oauth_* tables, migration 057)
   auth,              // the consent page signs the user in with the existing CFO login
   onOAuthEvent: (ev) => recordAudit({

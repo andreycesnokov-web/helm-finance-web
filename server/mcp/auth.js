@@ -46,6 +46,7 @@ function bearerToken(req) {
  * @param {string} opts.JWT_SECRET
  * @param {(token:string)=>Promise<object>} [opts.verifyOAuth]  provider.verifyAccessToken, when OAuth is on
  * @param {string} [opts.resourceUrl]   canonical /mcp URL the token must be issued for
+ * @param {(payload:object)=>Promise<boolean>} [opts.sessionUserAllowed]  web session check for app JWTs
  * @returns {Promise<{userId:number, via:string, clientId?:string, scopes?:string[]}|null>}
  */
 async function resolveMcpUser(req, opts = {}) {
@@ -74,11 +75,12 @@ async function resolveMcpUser(req, opts = {}) {
     } catch { return null; }
   }
 
-  // 3. Existing CFO custom JWT.
+  // 3. Existing CFO custom JWT. With sessionUserAllowed (the web's check), the user must exist and the
+  //    token must not predate them; a failed check is unauthenticated, never a pass.
   try {
     const d = verifyAppToken(token, opts.JWT_SECRET);
-    if (d && d.userId != null) return { userId: d.userId, via: 'app_jwt' };
-  } catch { /* invalid/expired token → unauthenticated */ }
+    if (d && d.userId != null && (!opts.sessionUserAllowed || await opts.sessionUserAllowed(d))) return { userId: d.userId, via: 'app_jwt' };
+  } catch { /* invalid/expired token or unknown session user → unauthenticated */ }
 
   return null;
 }

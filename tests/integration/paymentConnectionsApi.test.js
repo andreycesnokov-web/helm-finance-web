@@ -160,7 +160,9 @@ test('flag OFF: every route is 404 and NO table is touched', async () => {
   assert.strictEqual((await api('PATCH', `${URL_LIST}/x`, { token: tok(OWNER_A), business: BIZ_A, body: { status: 'connected' } })).status, 404);
   assert.strictEqual((await api('GET', '/api/admin/payment-connections', { token: tok(ADMIN) })).status, 404);
   // The whole point of checking the flag before requireBusiness: nothing is read at all.
-  assert.deepStrictEqual(dbTouches.tables, [], `DB was touched with the flag off: ${dbTouches.tables}`);
+  // `users` is read by the global session check (server/lib/sessionUser.js), not by this feature.
+  const featureTables = dbTouches.tables.filter((t) => t !== 'users');
+  assert.deepStrictEqual(featureTables, [], `DB was touched with the flag off: ${featureTables}`);
   assert.strictEqual(rows().length, 0);
 });
 

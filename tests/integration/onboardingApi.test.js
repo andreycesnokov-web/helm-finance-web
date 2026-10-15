@@ -171,7 +171,9 @@ test('flag OFF: every route is 404 and NO table is touched', async () => {
                         ['GET', '/api/admin/onboarding/events']]) {
     assert.strictEqual((await api(m, p, { token: tok(m.startsWith('GET') && p.includes('admin') ? ADMIN : OWNER_A), business: BIZ_A })).status, 404, `${m} ${p}`);
   }
-  assert.deepStrictEqual(dbTouches.tables, [], `DB touched with the flag off: ${dbTouches.tables}`);
+  // `users` is read by the global session check (server/lib/sessionUser.js), not by this feature.
+  const featureTables = dbTouches.tables.filter((t) => t !== 'users');
+  assert.deepStrictEqual(featureTables, [], `DB touched with the flag off: ${featureTables}`);
 });
 
 // ── Locale resolution ────────────────────────────────────────────────────────────────────
