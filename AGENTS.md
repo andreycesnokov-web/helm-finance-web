@@ -21,7 +21,8 @@ If the Vault is present:
 
 1. Read `CURRENT_STATE.md`.
 2. Check freshness: take `commit:` from its frontmatter and run
-   `git merge-base --is-ancestor <commit> HEAD` and `git diff --name-only <commit> HEAD`.
+   `git merge-base --is-ancestor <commit> HEAD`, `git diff --name-only <commit>` (against the working
+   tree, so uncommitted edits count too) and `git status --short` (untracked files).
    Trust notes only for files outside that diff; read changed files directly. If HEAD does not contain
    `<commit>` (another branch), use the Vault as background only and verify every fact in code.
 3. Read `02 Modules/00 Module Index.md`, then only the module notes relevant to the task.
