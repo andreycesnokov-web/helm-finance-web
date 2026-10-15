@@ -497,6 +497,9 @@ export default {
       invite: 'Saya punya undangan ke perusahaan',
       tg: 'Sudah memakai CFO AI lewat Telegram?',
       tgLink: 'Masuk dengan Telegram',
+      tgTitle: 'Masuk lewat Telegram (lama)',
+      tgP: 'Hanya untuk pengguna Telegram yang sudah ada. Akun baru masuk dengan email.',
+      tgBack: 'Kembali ke masuk dengan email',
       terms: 'Dengan melanjutkan, Anda menerima ketentuan dan kebijakan privasi.',
     },
     r2: {

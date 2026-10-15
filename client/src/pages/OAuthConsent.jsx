@@ -54,8 +54,9 @@ const TEXT = {
 }
 const lang = () => (typeof navigator !== 'undefined' && /^ru/i.test(navigator.language || '') ? 'ru' : 'en')
 
-export default function OAuthConsent() {
-  const t = TEXT[lang()]
+// embedded: rendered inside the v2 auth frame (v2/auth/AuthApp.jsx), which supplies the brand header.
+export default function OAuthConsent({ embedded = false, language }) {
+  const t = TEXT[language === 'ru' || language === 'en' ? language : lang()]
   const { user, token, loading, logout } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -115,10 +116,10 @@ export default function OAuthConsent() {
   const canDraft = !!(info && Array.isArray(info.scopes) && info.scopes.some((s) => s.scope === 'cfo:drafts'))
 
   return (
-    <div style={{ maxWidth: 420, margin: '0 auto', padding: '48px 20px' }}>
-      <img src="/brand/logo_main_navy_transparent_2400.png" alt="CFO AI — Financial OS"
-        style={{ height: 48, width: 'auto', maxWidth: '70vw', objectFit: 'contain', display: 'block', marginBottom: 24 }} />
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 18 }}>{t.title}</h1>
+    <div style={embedded ? undefined : { maxWidth: 420, margin: '0 auto', padding: '48px 20px' }}>
+      {!embedded && <img src="/brand/logo_main_navy_transparent_2400.png" alt="CFO AI — Financial OS"
+        style={{ height: 48, width: 'auto', maxWidth: '70vw', objectFit: 'contain', display: 'block', marginBottom: 24 }} />}
+      <h1 className={embedded ? 'v2-auth-h1' : undefined} style={embedded ? undefined : { fontSize: 22, fontWeight: 700, marginBottom: 18 }}>{t.title}</h1>
 
       {!info && !error && <p style={muted}>{t.loading}</p>}
 

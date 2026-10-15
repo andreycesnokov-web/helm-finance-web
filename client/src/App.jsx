@@ -598,9 +598,9 @@ export default function App() {
         <Routes>
           <Route path="/login" element={V2_AUTH ? v2Auth('signin') : <Login />} />
           {/* "Sign in with CFO Finance" consent for AI clients (MCP OAuth). Handles sign-in itself. */}
-          <Route path="/oauth/consent" element={<OAuthConsent />} />
+          <Route path="/oauth/consent" element={V2_AUTH ? v2Auth('consent') : <OAuthConsent />} />
           {/* Upload link from an AI assistant (MCP upload_document). Sign-in required on the page. */}
-          <Route path="/upload" element={<UploadLink />} />
+          <Route path="/upload" element={V2_AUTH ? v2Auth('upload') : <UploadLink />} />
           {/* Email-primary identity UI — only when VITE_EMAIL_AUTH_ENABLED=true.
               Telegram login (/login) stays the default and is unchanged. */}
           {EMAIL_AUTH_UI && <Route path="/login/email" element={V2_AUTH ? v2Auth('signin') : <EmailLogin />} />}
@@ -610,7 +610,7 @@ export default function App() {
           {/* Legacy Telegram login: a real page when email auth is on; when off, /login
               already shows the widget, so just send /login/telegram back to /login. */}
           {EMAIL_AUTH_UI
-            ? <Route path="/login/telegram" element={<TelegramLogin />} />
+            ? <Route path="/login/telegram" element={V2_AUTH ? v2Auth('telegram') : <TelegramLogin />} />
             : <Route path="/login/telegram" element={<Navigate to="/login" replace />} />}
           <Route path="/" element={<PulseWrapper />} />
           <Route path="/add"          element={DESIGN_V2 ? <LegacyToV2 to="/business/add" /> : <Layout><Add /></Layout>} />
@@ -636,7 +636,8 @@ export default function App() {
           <Route path="/accountant/*" element={<AccountantRedirect to="/business/accountant" />} />
           <Route path="/documents"    element={DESIGN_V2 ? <LegacyToV2 to="/business/documents" /> : <Layout><Documents /></Layout>} />
           <Route path="/bank-import"  element={DESIGN_V2 ? <LegacyToV2 to="/business/bank-import" /> : <Layout><BankImport /></Layout>} />
-          <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
+          {/* v2: the manager / employee home (MemberHome) replaces the classic tutorial. */}
+          <Route path="/team-onboarding" element={DESIGN_V2 ? <LegacyToV2 to="/business/home" /> : <Layout><TeamOnboarding /></Layout>} />
           {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
               404s in any build without the flag (e.g. production). */}
           <Route path="/demo/personal-overview" element={<PreviewApp />} />
@@ -715,7 +716,8 @@ export default function App() {
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
           <Route path="/invite/:code" element={V2_AUTH ? v2Auth('join') : <JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
-          <Route path="/onboarding" element={<OnboardingRoute />} />
+          {/* v2: company setup and the first-day checklist live in /business (setup/*, onboarding). */}
+          <Route path="/onboarding" element={DESIGN_V2 ? <LegacyToV2 to="/business/onboarding" /> : <OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
           <Route path="/admin"           element={<Layout><Admin /></Layout>} />
           {/* Platform Admin Dashboard (read-only owner console) */}

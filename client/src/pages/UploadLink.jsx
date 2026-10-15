@@ -58,8 +58,9 @@ const tokenFromHash = () => {
   try { return new URLSearchParams(window.location.hash.replace(/^#/, '')).get('t') || '' } catch { return '' }
 }
 
-export default function UploadLink() {
-  const t = TEXT[lang()]
+// embedded: rendered inside the v2 auth frame (v2/auth/AuthApp.jsx), which supplies the brand header.
+export default function UploadLink({ embedded = false, language }) {
+  const t = TEXT[language === 'ru' || language === 'en' ? language : lang()]
   const { user, token, loading, logout } = useAuth()
   const navigate = useNavigate()
   const [linkToken] = useState(tokenFromHash)
@@ -130,10 +131,10 @@ export default function UploadLink() {
   const muted = { fontSize: 13, color: 'var(--text-3, #777)' }
 
   return (
-    <div style={{ maxWidth: 460, margin: '0 auto', padding: '48px 20px' }}>
-      <img src="/brand/logo_main_navy_transparent_2400.png" alt="CFO AI — Financial OS"
-        style={{ height: 48, width: 'auto', maxWidth: '70vw', objectFit: 'contain', display: 'block', marginBottom: 24 }} />
-      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 14 }}>{t.title}</h1>
+    <div style={embedded ? undefined : { maxWidth: 460, margin: '0 auto', padding: '48px 20px' }}>
+      {!embedded && <img src="/brand/logo_main_navy_transparent_2400.png" alt="CFO AI — Financial OS"
+        style={{ height: 48, width: 'auto', maxWidth: '70vw', objectFit: 'contain', display: 'block', marginBottom: 24 }} />}
+      <h1 className={embedded ? 'v2-auth-h1' : undefined} style={embedded ? undefined : { fontSize: 22, fontWeight: 700, marginBottom: 14 }}>{t.title}</h1>
 
       {!session && !error && <p style={muted}>{t.loading}</p>}
 

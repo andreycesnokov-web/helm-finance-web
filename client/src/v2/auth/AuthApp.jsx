@@ -1,7 +1,7 @@
 // Sign-in, the personal account before a company exists, and joining by invitation — designs
 // reg/R1 (sign in), R2 (check your email), R3 (account), R9 (invitation), R10 (errors).
-// Rendered by App.jsx only when VITE_DESIGN_V2 and VITE_EMAIL_AUTH_ENABLED are both on; the
-// Telegram sign-in page (/login/telegram) is unchanged.
+// Rendered by App.jsx only when VITE_DESIGN_V2 and VITE_EMAIL_AUTH_ENABLED are both on. The
+// Telegram widget, the upload link and the OAuth consent keep their logic and only get the v2 frame.
 //
 // Server routes (all existing): POST /api/auth/email/start · POST /api/auth/email/verify ·
 // GET/PATCH /api/me/profile · GET /api/workspaces · GET /api/invite/:code · POST /api/invite/:code/accept.
@@ -15,7 +15,10 @@ import { financialActor } from '../../lib/financialRecovery'
 import { confirmedInvitation } from '../lib/invitation'
 import { accountBody, ownProfile, profileMatches, readAccountDraft, writeAccountDraft, clearAccountDraft, confirmedAccountProfile } from '../lib/accountProfile'
 import I from '../icons'
-import { useT } from '../i18n'
+import { useT, useLang } from '../i18n'
+import UploadLink from '../../pages/UploadLink'
+import OAuthConsent from '../../pages/OAuthConsent'
+import TelegramLoginWidget from '../../components/TelegramLoginWidget'
 import {
   startEmailSignIn, verifyEmailSignIn, updateMyProfile, acceptInvite,
   lookupInvite, readInviteMembership, readMyProfile, readWorkspaces,
@@ -384,9 +387,43 @@ export function Join() {
   )
 }
 
+// Pages reached from outside the app — the AI assistant upload link (/upload), the MCP OAuth
+// consent (/oauth/consent) and the legacy Telegram sign-in (/login/telegram). Their logic is the
+// existing one (pages/UploadLink, pages/OAuthConsent, components/TelegramLoginWidget); only the
+// frame is v2, so no v2 user lands on the classic design.
+function FramedPage({ children }) {
+  return <AuthFrame><section className="v2-auth-card">{children}</section></AuthFrame>
+}
+
+// These two pages carry their own RU/EN copy; they follow the v2 language switch (ID falls back to EN).
+function UploadPage() {
+  const lang = useLang()
+  return <FramedPage><UploadLink embedded language={lang} /></FramedPage>
+}
+
+function ConsentPage() {
+  const lang = useLang()
+  return <FramedPage><OAuthConsent embedded language={lang} /></FramedPage>
+}
+
+function TelegramSignIn() {
+  const t = useT()
+  return (
+    <FramedPage>
+      <h1 className="v2-auth-h1">{t('auth.r1.tgTitle')}</h1>
+      <p className="v2-auth-p">{t('auth.r1.tgP')}</p>
+      <TelegramLoginWidget />
+      <Link to="/login" className="v2-btn v2-btn-secondary v2-btn-block">{t('auth.r1.tgBack')}</Link>
+    </FramedPage>
+  )
+}
+
 export default function AuthApp({ page }) {
   if (page === 'callback') return <SignInCallback />
   if (page === 'account') return <Account />
   if (page === 'join') return <Join />
+  if (page === 'upload') return <UploadPage />
+  if (page === 'consent') return <ConsentPage />
+  if (page === 'telegram') return <TelegramSignIn />
   return <SignIn />
 }

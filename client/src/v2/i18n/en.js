@@ -497,6 +497,9 @@ export default {
       invite: 'I have an invitation to a company',
       tg: 'Already use CFO AI through Telegram?',
       tgLink: 'Sign in with Telegram',
+      tgTitle: 'Legacy Telegram sign-in',
+      tgP: 'For existing Telegram users only. New accounts sign in with email.',
+      tgBack: 'Back to email sign-in',
       terms: 'By continuing you accept the terms and the privacy policy.',
     },
     r2: {
