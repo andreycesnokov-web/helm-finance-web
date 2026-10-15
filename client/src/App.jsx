@@ -7,6 +7,7 @@ import { useTranslation } from './hooks/useTranslation'
 import { getLang, setLang } from './i18n/index'
 import { apiFetch } from './lib/api'
 import { WorkspaceProvider } from './shell/WorkspaceProvider'
+import { legacyDestination } from './lib/routeIntent'
 
 // ── Localize text from backend (AI insight strings) ──────────────────────────
 const RU_TEXT_MAP = {
@@ -460,6 +461,7 @@ function PulseWrapper() {
   // Manager / employee: Web App is a learning & setup surface, not a finance
   // dashboard (the backend returns 403 on /pulse for these roles anyway).
   if (memberRole && ['manager', 'employee'].includes(memberRole)) {
+    if (DESIGN_V2) return <Navigate to="/business/home" replace />
     return (
       <Layout>
         <MemberTutorial />
@@ -564,6 +566,18 @@ const V2BusinessApp = DESIGN_V2 ? lazy(() => import('./v2/BusinessApp')) : null
 // Platform admin v2 (overview, companies, flags & system). Same flag, same lazy boundary;
 // every other /admin route stays the existing page.
 const V2AdminApp = DESIGN_V2 ? lazy(() => import('./v2/AdminApp')) : null
+// Sign-in, account and invitation in the v2 design (reg/R1–R10). Needs email sign-in too:
+// without it /login keeps the Telegram widget.
+const V2Auth = DESIGN_V2 ? lazy(() => import('./v2/auth/AuthApp')) : null
+const V2_AUTH = DESIGN_V2 && EMAIL_AUTH_UI
+const v2Auth = (page) => <Suspense fallback={null}><V2Auth page={page} /></Suspense>
+
+// With the v2 design on, the old top-level pages (bookmarks, bot links) open their v2 screens;
+// query parameters are kept. Without the flag they stay exactly as they were.
+function LegacyToV2({ to }) {
+  const location = useLocation()
+  return <Navigate to={legacyDestination(location, to)} replace />
+}
 
 // Redirect legacy /accountant addresses to /business/accountant with search query preservation (e.g. ?ask=... / ?q=...).
 function AccountantRedirect({ to = '/business/accountant' }) {
@@ -582,42 +596,46 @@ export default function App() {
       <AuthProvider>
         <SwipeBackIndicator />
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={V2_AUTH ? v2Auth('signin') : <Login />} />
           {/* "Sign in with CFO Finance" consent for AI clients (MCP OAuth). Handles sign-in itself. */}
           <Route path="/oauth/consent" element={<OAuthConsent />} />
           {/* Upload link from an AI assistant (MCP upload_document). Sign-in required on the page. */}
           <Route path="/upload" element={<UploadLink />} />
           {/* Email-primary identity UI — only when VITE_EMAIL_AUTH_ENABLED=true.
               Telegram login (/login) stays the default and is unchanged. */}
-          {EMAIL_AUTH_UI && <Route path="/login/email" element={<EmailLogin />} />}
-          {EMAIL_AUTH_UI && <Route path="/login/email/callback" element={<EmailCallback />} />}
-          {EMAIL_AUTH_UI && <Route path="/account" element={<PersonalProfile />} />}
+          {EMAIL_AUTH_UI && <Route path="/login/email" element={V2_AUTH ? v2Auth('signin') : <EmailLogin />} />}
+          {EMAIL_AUTH_UI && <Route path="/login/email/callback" element={V2_AUTH ? v2Auth('callback') : <EmailCallback />} />}
+          {EMAIL_AUTH_UI && <Route path="/account" element={V2_AUTH ? v2Auth('account') : <PersonalProfile />} />}
+          {V2_AUTH && <Route path="/join" element={v2Auth('join')} />}
           {/* Legacy Telegram login: a real page when email auth is on; when off, /login
               already shows the widget, so just send /login/telegram back to /login. */}
           {EMAIL_AUTH_UI
             ? <Route path="/login/telegram" element={<TelegramLogin />} />
             : <Route path="/login/telegram" element={<Navigate to="/login" replace />} />}
           <Route path="/" element={<PulseWrapper />} />
-          <Route path="/add"          element={<Layout><Add /></Layout>} />
-          <Route path="/radar"        element={<Layout><Radar /></Layout>} />
-          <Route path="/accounts"     element={<Layout><Accounts /></Layout>} />
-          <Route path="/accounts/:id" element={<Layout><WalletDetail /></Layout>} />
-          <Route path="/transactions" element={<Layout><Transactions /></Layout>} />
-          <Route path="/settings"     element={<Layout><Settings /></Layout>} />
-          <Route path="/cfo"          element={<Layout><AICFO /></Layout>} />
-          <Route path="/receivables"  element={<Layout><Receivables /></Layout>} />
-          <Route path="/payables"     element={<Layout><Payables /></Layout>} />
-          <Route path="/invoices"     element={<Layout><Invoices /></Layout>} />
-          <Route path="/payroll"      element={<Layout><Payroll /></Layout>} />
-          <Route path="/tasks"        element={<Layout><Tasks /></Layout>} />
-          <Route path="/approvals"    element={<Layout><Approvals /></Layout>} />
-          <Route path="/team"         element={<Layout><Team /></Layout>} />
+          <Route path="/add"          element={DESIGN_V2 ? <LegacyToV2 to="/business/add" /> : <Layout><Add /></Layout>} />
+          <Route path="/radar"        element={DESIGN_V2 ? <LegacyToV2 to="/business/radar" /> : <Layout><Radar /></Layout>} />
+          <Route path="/accounts"     element={DESIGN_V2 ? <LegacyToV2 to="/business/accounts" /> : <Layout><Accounts /></Layout>} />
+          <Route path="/accounts/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/accounts" /> : <Layout><WalletDetail /></Layout>} />
+          <Route path="/transactions" element={DESIGN_V2 ? <LegacyToV2 to="/business/transactions" /> : <Layout><Transactions /></Layout>} />
+          <Route path="/settings"     element={DESIGN_V2 ? <LegacyToV2 to="/business/settings" /> : <Layout><Settings /></Layout>} />
+          <Route path="/cfo"          element={DESIGN_V2 ? <LegacyToV2 to="/business/ai-cfo" /> : <Layout><AICFO /></Layout>} />
+          <Route path="/receivables"  element={DESIGN_V2 ? <LegacyToV2 to="/business/receivables" /> : <Layout><Receivables /></Layout>} />
+          <Route path="/payables"     element={DESIGN_V2 ? <LegacyToV2 to="/business/payables" /> : <Layout><Payables /></Layout>} />
+          <Route path="/invoices"     element={DESIGN_V2 ? <LegacyToV2 to="/business/invoices" /> : <Layout><Invoices /></Layout>} />
+          <Route path="/invoices/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/invoices" /> : <Navigate to="/invoices" replace />} />
+          <Route path="/payables/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/payables" /> : <Navigate to="/payables" replace />} />
+          <Route path="/receivables/:id" element={DESIGN_V2 ? <LegacyToV2 to="/business/receivables" /> : <Navigate to="/receivables" replace />} />
+          <Route path="/payroll"      element={DESIGN_V2 ? <LegacyToV2 to="/business/payroll" /> : <Layout><Payroll /></Layout>} />
+          <Route path="/tasks"        element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Tasks /></Layout>} />
+          <Route path="/approvals"    element={DESIGN_V2 ? <LegacyToV2 to="/business/approvals" /> : <Layout><Approvals /></Layout>} />
+          <Route path="/team"         element={DESIGN_V2 ? <LegacyToV2 to="/business/settings?tab=team" /> : <Layout><Team /></Layout>} />
           <Route path="/accountant/tax-profile" element={<AccountantRedirect to="/business/accountant/tax-profile" />} />
           <Route path="/accountant/calendar" element={<AccountantRedirect to="/business/accountant?tab=taxes" />} />
           <Route path="/accountant"   element={<AccountantRedirect to="/business/accountant" />} />
           <Route path="/accountant/*" element={<AccountantRedirect to="/business/accountant" />} />
-          <Route path="/documents"    element={<Layout><Documents /></Layout>} />
-          <Route path="/bank-import"  element={<Layout><BankImport /></Layout>} />
+          <Route path="/documents"    element={DESIGN_V2 ? <LegacyToV2 to="/business/documents" /> : <Layout><Documents /></Layout>} />
+          <Route path="/bank-import"  element={DESIGN_V2 ? <LegacyToV2 to="/business/bank-import" /> : <Layout><BankImport /></Layout>} />
           <Route path="/team-onboarding" element={<Layout><TeamOnboarding /></Layout>} />
           {/* Premium UI preview — standalone, synthetic only, gated by VITE_PREMIUM_UI_PREVIEW.
               404s in any build without the flag (e.g. production). */}
@@ -695,7 +713,7 @@ export default function App() {
           </Route>
           )}
           {/* Public invite page — no auth required to view, Telegram widget handles login */}
-          <Route path="/invite/:code" element={<JoinInvite />} />
+          <Route path="/invite/:code" element={V2_AUTH ? v2Auth('join') : <JoinInvite />} />
           {/* Standalone onboarding — accessible directly to re-run setup */}
           <Route path="/onboarding" element={<OnboardingRoute />} />
           {/* Hidden admin routes — not in sidebar, protected by ADMIN_TELEGRAM_IDS on backend */}
@@ -706,6 +724,7 @@ export default function App() {
               <Route path="/admin/dashboard" element={<Suspense fallback={null}><V2AdminApp page="overview" /></Suspense>} />
               {/* v2 only: the new Flags & system page. */}
               <Route path="/admin/system" element={<Suspense fallback={null}><V2AdminApp page="system" /></Suspense>} />
+              <Route path="/admin/billing" element={<Suspense fallback={null}><V2AdminApp page="billing" /></Suspense>} />
             </>
           ) : <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />}
           {/* Users console is also reachable at /admin/users (same list as /admin) so the

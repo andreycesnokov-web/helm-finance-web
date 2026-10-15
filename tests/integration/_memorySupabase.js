@@ -200,7 +200,24 @@ const client = {
       table('document_audit').push({ id: crypto.randomUUID(), document_id: doc.id, action: 'archived' });
       return { data: { id: doc.id, archived_at: doc.archived_at }, error: null };
     }
-    if (name === 'rpc_execute_wallet_transfer') {
+    // Metadata-only compatibility for the legacy PATCH route tests. Financial
+    // mutation/race proofs use postgresBusinessBalance, never this emulator.
+    if (name === 'rpc_insert_business_transactions' || name === 'rpc_insert_business_transactions_once') {
+      // Storage shape only. Atomic balances and replay are proved on PostgreSQL.
+      const rows = args.p_rows.map(row => ({ ...row, id: nextId('transactions'), business_id: args.p_business_id }));
+      table('transactions').push(...rows);
+      return { data: { saved: rows.length }, error: null };
+    }
+    if (name === 'rpc_patch_business_transaction') {
+      if (args.p_financial) return { data: null, error: { message: 'financial_rpc_requires_real_postgres' } };
+      const tx = table('transactions').find(t => t.id === args.p_transaction_id && t.business_id === args.p_business_id);
+      if (!tx) return { data: null, error: { message: 'transaction_not_found: Transaction not found in company' } };
+      if (tx.balance_version !== args.p_expected_version)
+        return { data: null, error: { message: 'transaction_version_conflict: Transaction changed' } };
+      Object.assign(tx, args.p_updates, { balance_version: tx.balance_version + 1 });
+      return { data: { ...tx }, error: null };
+    }
+    if (name === 'rpc_execute_wallet_transfer' || name === 'rpc_execute_wallet_transfer_guarded') {
       const {
         p_business_id,
         p_user_id,
@@ -289,7 +306,7 @@ const client = {
         error: null,
       };
     }
-    if (name === 'rpc_record_debt_payment') {
+    if (name === 'rpc_record_debt_payment' || name === 'rpc_record_debt_payment_guarded') {
       const {
         p_business_id,
         p_user_id,
@@ -370,7 +387,7 @@ const client = {
 
       const resultData = {
         ok: true,
-        is_fully_paid: isFullyPaid,
+        isFullyPaid,
         remaining: Math.max(0, total - newPaid),
         paid_amount: newPaid,
         status: newStatus,

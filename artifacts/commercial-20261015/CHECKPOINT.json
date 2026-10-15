@@ -1,0 +1,45 @@
+{
+  "status": "A_COMPLETE_B_PARTIAL_PREVIEW_ONLY",
+  "objective_complete": false,
+  "workspace": "Business + Platform/admin",
+  "base_head": "90ab5e6b7a2fc69cd0e5c5bd43e5bf6850e27760",
+  "stage_a_commit": "cc9e851",
+  "staging_head": "90ab5e6b7a2fc69cd0e5c5bd43e5bf6850e27760",
+  "staging_image": "sha256:e75803ba63cfbd60bdf14ad6220bafc27bf1c49e5f85ed27886e65e890a28fe3",
+  "source_sha256": {
+    "server/lib/businessAccess.js": "3d6ef3555b80e9146a93ef7142b48fc6c6db3d2bb68a4a8cdf3ad083a1822ff2",
+    "server/lib/commercialBilling.js": "898063a67e00a674d5d841967879aed14ef95ffdf0ef8d790e9539530a70a5b8",
+    "docs/commercial-foundation.preview.sql": "ebd569a82c33a74facc541e9eb3fd65aadd88c29b007af2ee4a1bab8224242da",
+    "tests/commercialAccess.test.cjs": "9443ec2b1816a6c69c2b564ad6a979e96767034af41be7cf2e67ed6aaa7a63d6",
+    "tests/commercialBilling.test.cjs": "961faa624886f28e8c2853e71c5761819eb29868d97e852d22476b6743e78227"
+  },
+  "tests": {
+    "new_node_cases": 36,
+    "legacy_cases": 18,
+    "native_preview_groups": 19,
+    "actual_http": false,
+    "browser": false,
+    "provider_sandbox": false
+  },
+  "shared_staging_rollout": false,
+  "shared_staging_schema_changed": false,
+  "production_changed": false,
+  "real_financial_records_changed": false,
+  "flags_changed": false,
+  "migration_applied_to_shared_database": false,
+  "provider": "unselected; Xendit preferred candidate per owner",
+  "blockers": [
+    "Provider selection and sandbox configuration",
+    "Unapproved commercial limits/features",
+    "Unapproved FX/refund/proration/MRR methodologies"
+  ],
+  "open_work": [
+    "B: paid periods, grants, atomic quota reservation, all caller admission enforcement, finalized migration",
+    "C: admin catalog and assignment",
+    "D: onboarding and billing UI",
+    "E: provider adapter and sandbox acceptance",
+    "F: lifecycle/referral/analytics",
+    "G: complete 22-group actual acceptance"
+  ],
+  "created_at_utc": "2026-10-15T00:02:20.274555+00:00"
+}

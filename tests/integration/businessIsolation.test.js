@@ -16,9 +16,12 @@ const BASE = process.env.BASE_URL, SECRET = process.env.JWT_SECRET;
 const URL = process.env.SUPABASE_URL, KEY = process.env.SUPABASE_SECRET_KEY;
 const USER = Number(process.env.ISO_TEST_USER || 0);
 if (!BASE || !SECRET || !URL || !KEY || !USER) {
+  if (process.env.HF_REQUIRE_FULL_CHECKS === '1') throw new Error('Isolation environment missing; full audit must not skip');
   console.log('SKIP — needs BASE_URL, JWT_SECRET, SUPABASE_URL, SUPABASE_SECRET_KEY, ISO_TEST_USER (local only).');
   process.exit(0);
 }
+if (![BASE, URL].every(value => ['localhost','127.0.0.1','[::1]'].includes(new (require('node:url').URL)(value).hostname)))
+  throw new Error('External API/Supabase forbidden: isolation cleanup is disposable-local only');
 const supabase = createClient(URL, KEY);
 const token = jwt.sign({ userId: USER }, SECRET, { expiresIn: '1h' });
 
@@ -26,6 +29,8 @@ let pass = 0, fail = 0;
 const ok = (m, c) => { if (c) { console.log('OK  ' + m); pass++; } else { console.log('XX  ' + m); fail++; } };
 
 async function api(method, path, { biz, body } = {}) {
+  if (method === 'POST' && ['/api/wallets','/api/transactions/batch'].includes(path))
+    body = { request_key: require('node:crypto').randomUUID(), ...body };
   const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
   if (biz) headers['x-business-id'] = biz;
   const res = await fetch(BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined });

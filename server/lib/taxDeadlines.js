@@ -23,6 +23,7 @@
 'use strict';
 
 const { ymd } = require('./dueDate');
+const { normalizePkpStatus } = require('./pkpStatus');
 
 const GENERAL = {
   ID_PPH21_MONTHLY: {
@@ -36,14 +37,17 @@ const GENERAL = {
     frequency: 'monthly', pay: { type: 'end_of_next_month' }, file: { type: 'end_of_next_month' },
     nil: () => 'required',
     // pkp_status is the profile's current field; vat_status is the older one.
-    applies: (p) => String(p?.pkp_status || p?.vat_status || '').toLowerCase() === 'pkp',
+    // pkp_status ('pkp_registered' | 'non_pkp' | legacy 'pkp') through the one normaliser; the older
+    // vat_status only when pkp_status says nothing.
+    applies: (p) => { const s = normalizePkpStatus(p?.pkp_status); return s === 'pkp_registered' || (s === 'unknown' && normalizePkpStatus(p?.vat_status) === 'pkp_registered') },
   },
   ID_PPH_BADAN_ANNUAL: {
     frequency: 'annual', pay: { type: 'months_after', months: 4 }, file: { type: 'months_after', months: 4 },
     nil: () => 'required',
     // Every PT files the annual return, active or not; an unknown entity type is treated as a PT
     // (the companies registered here are PTs) and the profile is asked for.
-    applies: (p) => !p?.legal_entity_type || /\bpt\b|perseroan/i.test(String(p.legal_entity_type)),
+    // Every legal entity (PT, CV, Yayasan, branch) files the annual return; an individual does not.
+    applies: (p) => !/individual|freelancer|perorangan|orang pribadi/i.test(String(p?.legal_entity_type || '')),
   },
 };
 const SOURCE = 'PMK 81/2024';

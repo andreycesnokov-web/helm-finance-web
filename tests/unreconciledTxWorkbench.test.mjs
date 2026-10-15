@@ -252,6 +252,7 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
   mem.__seed('transactions', [
     {
       id: 301,
+      balance_version: 0,
       business_id: BIZ_A,
       wallet_id: 'w-idr-main',
       amount_original: 500000,
@@ -263,6 +264,7 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
     },
     {
       id: 302,
+      balance_version: 0,
       business_id: BIZ_A,
       wallet_id: 'w-idr-main',
       amount_original: 1000000,
@@ -274,6 +276,7 @@ console.log('\n--- 6. Server PATCH /api/transactions/:id boundary guard HTTP end
     },
     {
       id: 303,
+      balance_version: 0,
       business_id: BIZ_A,
       wallet_id: 'w-idr-main',
       amount_original: 300000,

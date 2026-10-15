@@ -1,20 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
+import {useBusinessRequest} from '../lib/useBusinessRequest'
+import {financialActor} from '../lib/financialRecovery'
+import {performImportConfirm,recoverImportConfirm,resumeImportConfirm,importPending,importCurrent} from '../lib/importConfirmOperation'
 import { uploadDocument } from '../lib/documents'
 import { getLang } from '../i18n/index'
 
 const L = {
-  en: { title: 'Bank import', subtitle: 'Import a CSV/XLSX statement — review, then create transactions',
+  en: {historical: "Recorded balance before statement", historyUnknown: "Opening history is incomplete or undated. No starting balance is assumed; correction is unavailable.", currentBalance: "Current recorded balance (may include later movements)", applyOpening: "Correct historical opening atomically with confirmation", reason: "Reason for correction", reasonRequired: "Enter the opening correction reason.", checkResult: "Check confirmation result", retryOriginal: "Retry original confirmation", reloadReview: "Reload review", pending: "Result unconfirmed. Check the original request before continuing; missing receipt is not rollback.", recovered: "Original result confirmed without a second write.", partial: "Selected rows confirmed. Review the remaining rows.",  title: 'Bank import', subtitle: 'Import a CSV/XLSX statement — review, then create transactions',
     upload: 'Upload statement (CSV / XLSX)', wallet: 'Target account', map: 'Map columns', date: 'Date', amount: 'Amount',
     desc: 'Description', direction: 'Direction (optional)', ref: 'Reference (optional)', preview: 'Preview & review',
     debit: 'Debit column (optional)', credit: 'Credit column (optional)', dcHint: 'If the statement has separate Debit/Credit columns, map both — Amount is then ignored.',
     opening: 'Opening balance (optional)', closing: 'Closing balance (optional)', parse: 'Parse file', back: 'Back',
     rows: 'rows', duplicates: 'duplicates', toImport: 'to import', confirmImport: 'Confirm import', imported: 'Imported',
-    category: 'Category', type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Reconciliation',
+    category: 'Category', type: 'Type', income: 'Income', expense: 'Expense', dup: 'Duplicate', include: 'Include', reconciled: 'Statement rows',
     balanced: 'Balanced', unbalanced: 'Unbalanced', difference: 'Difference', noWallet: 'Select a target account first.',
     history: 'Recent imports', createTx: 'Will create transactions for included rows only.',
     suggesting: 'Analyzing with rules + AI…', confidence: 'Confidence', match: 'Match', suggestion: 'AI suggestion',
@@ -29,13 +32,13 @@ const L = {
     targetPeriod: 'Period',
     forPeriod: 'for period',
     clearPeriod: 'Show all' },
-  ru: { title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
+  ru: {historical: "Учтённый остаток до выписки", historyUnknown: "История неполная или без даты. Начальный остаток не предполагается, коррекция недоступна.", currentBalance: "Текущий учтённый остаток (возможны более поздние движения)", applyOpening: "Атомарно скорректировать исторический остаток с подтверждением", reason: "Причина коррекции", reasonRequired: "Укажите причину коррекции начального остатка.", checkResult: "Проверить результат подтверждения", retryOriginal: "Повторить исходное подтверждение", reloadReview: "Загрузить проверку заново", pending: "Результат не подтверждён. Проверьте исходный запрос; отсутствие receipt не доказывает откат.", recovered: "Исходный результат подтверждён без повторной записи.", partial: "Выбранные строки подтверждены. Проверьте оставшиеся.",  title: 'Импорт из банка', subtitle: 'Загрузи выписку CSV/XLSX — проверь, затем создадим транзакции',
     upload: 'Загрузить выписку (CSV / XLSX)', wallet: 'Счёт назначения', map: 'Сопоставь колонки', date: 'Дата', amount: 'Сумма',
     desc: 'Описание', direction: 'Направление (необязательно)', ref: 'Референс (необязательно)', preview: 'Превью и проверка',
     debit: 'Колонка Debit (необязательно)', credit: 'Колонка Credit (необязательно)', dcHint: 'Если в выписке отдельные колонки Debit/Credit — укажи обе, тогда «Сумма» игнорируется.',
     opening: 'Входящий остаток (необязательно)', closing: 'Исходящий остаток (необязательно)', parse: 'Разобрать файл', back: 'Назад',
     rows: 'строк', duplicates: 'дубликатов', toImport: 'к импорту', confirmImport: 'Подтвердить импорт', imported: 'Импортировано',
-    category: 'Категория', type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Сверка',
+    category: 'Категория', type: 'Тип', income: 'Доход', expense: 'Расход', dup: 'Дубликат', include: 'Включить', reconciled: 'Строки выписки',
     balanced: 'Сходится', unbalanced: 'Не сходится', difference: 'Разница', noWallet: 'Сначала выбери счёт назначения.',
     history: 'Последние импорты', createTx: 'Транзакции создаются только для включённых строк.',
     suggesting: 'Анализ правилами + AI…', confidence: 'Уверенность', match: 'Совпадение', suggestion: 'Подсказка AI',
@@ -50,13 +53,13 @@ const L = {
     targetPeriod: 'Период',
     forPeriod: 'за период',
     clearPeriod: 'Показать все' },
-  id: { title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
+  id: {historical: "Saldo tercatat sebelum laporan", historyUnknown: "Riwayat awal tidak lengkap atau tanpa tanggal. Saldo tidak diasumsikan; koreksi tidak tersedia.", currentBalance: "Saldo tercatat saat ini (bisa ada transaksi setelah laporan)", applyOpening: "Koreksi saldo historis secara atomik dengan konfirmasi", reason: "Alasan koreksi", reasonRequired: "Masukkan alasan koreksi awal.", checkResult: "Periksa hasil konfirmasi", retryOriginal: "Ulangi konfirmasi asli", reloadReview: "Muat ulang tinjauan", pending: "Hasil belum pasti. Periksa permintaan asli; receipt tidak ditemukan bukan rollback.", recovered: "Hasil asli dikonfirmasi tanpa penulisan kedua.", partial: "Baris pilihan dikonfirmasi. Tinjau baris tersisa.",  title: 'Impor bank', subtitle: 'Impor rekening koran CSV/XLSX — tinjau, lalu buat transaksi',
     upload: 'Unggah rekening (CSV / XLSX)', wallet: 'Akun tujuan', map: 'Petakan kolom', date: 'Tanggal', amount: 'Jumlah',
     desc: 'Deskripsi', direction: 'Arah (opsional)', ref: 'Referensi (opsional)', preview: 'Pratinjau & tinjau',
     debit: 'Kolom Debit (opsional)', credit: 'Kolom Credit (opsional)', dcHint: 'Jika rekening punya kolom Debit/Credit terpisah, petakan keduanya — Jumlah diabaikan.',
     opening: 'Saldo awal (opsional)', closing: 'Saldo akhir (opsional)', parse: 'Urai file', back: 'Kembali',
     rows: 'baris', duplicates: 'duplikat', toImport: 'akan diimpor', confirmImport: 'Konfirmasi impor', imported: 'Terimpor',
-    category: 'Kategori', type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Rekonsiliasi',
+    category: 'Kategori', type: 'Tipe', income: 'Pemasukan', expense: 'Pengeluaran', dup: 'Duplikat', include: 'Sertakan', reconciled: 'Baris laporan',
     balanced: 'Seimbang', unbalanced: 'Tidak seimbang', difference: 'Selisih', noWallet: 'Pilih akun tujuan dulu.',
     history: 'Impor terbaru', createTx: 'Transaksi hanya dibuat untuk baris yang disertakan.',
     suggesting: 'Menganalisis dengan aturan + AI…', confidence: 'Keyakinan', match: 'Kecocokan', suggestion: 'Saran AI',
@@ -162,6 +165,8 @@ const toISO = (v) => {
 
 export default function BankImport() {
   const { token } = useAuth()
+  const request=useBusinessRequest(),confirming=useRef(false)
+  const [reviewed,setReviewed]=useState(null),[recoveryMsg,setRecoveryMsg]=useState(''),[applyOpening,setApplyOpening]=useState(false),[openingReason,setOpeningReason]=useState('')
   const { t } = useTranslation()
   const lang = ['ru','id'].includes(getLang()) ? getLang() : 'en'
   const l = L[lang]
@@ -197,24 +202,27 @@ export default function BankImport() {
   }, [qMonth])
 
   const loadHistory = useCallback(() => {
-    apiFetch('/bank-import/batches', token).then(d => setHistory(d.batches || [])).catch(() => {})
-  }, [token])
+    apiFetch('/bank-import/batches', request).then(d => setHistory(d.batches || [])).catch(() => {})
+  }, [request])
 
   useEffect(() => {
-    apiFetch('/wallets', token).then(d => {
+    apiFetch('/wallets', request).then(d => {
       const list = d.wallets || []
       setWallets(list)
       if (qWalletId && list.some(w => String(w.id) === String(qWalletId))) {
         setWalletId(String(qWalletId))
       }
     }).catch(() => {})
-    apiFetch('/cashflow-categories', token).then(d => setCats(d.categories || [])).catch(() => {})
+    apiFetch('/cashflow-categories', request).then(d => setCats(d.categories || [])).catch(() => {})
     loadHistory()
   }, [token, loadHistory, qWalletId])
 
+  // History loading must not reread an explicitly opened batch and overwrite
+  // decisions made while that independent list request was still in flight.
+  const periodHistory = qBatchId ? null : history
   useEffect(() => {
     if (qBatchId && token) {
-      apiFetch(`/bank-imports/${qBatchId}/review`, token)
+      apiFetch(`/bank-imports/${qBatchId}/review`, request)
         .then(d => {
           if (d?.batch) {
             setBatch(d.batch)
@@ -222,6 +230,7 @@ export default function BankImport() {
             setCats(d.categories || []); setCps(d.counterparties || [])
             setSummary(d.summary || null); setCanMakeCat(!!d.canManageCategories)
             setRows((d.rows || []).map(toLocal))
+    setReviewed(d.reviewed);setBatch(d.batch)
           }
         })
         .catch(err => {
@@ -251,7 +260,7 @@ export default function BankImport() {
         openHistoryBatch(matchBatch)
       }
     }
-  }, [qBatchId, qMonth, qWalletId, history, token])
+  }, [qBatchId, qMonth, qWalletId, periodHistory, token, request])
 
   const openHistoryBatch = async (b) => {
     if (!b?.id) return
@@ -374,10 +383,11 @@ export default function BankImport() {
   }
 
   const loadReview = async (batchId) => {
-    const d = await apiFetch(`/bank-imports/${batchId}/review`, token)
+    const d = await apiFetch(`/bank-imports/${batchId}/review`, request)
     setCats(d.categories || []); setCps(d.counterparties || [])
     setSummary(d.summary || null); setCanMakeCat(!!d.canManageCategories)
     setRows((d.rows || []).map(toLocal))
+    setReviewed(d.reviewed);setBatch(d.batch)
   }
 
   const parseAndUpload = async () => {
@@ -387,7 +397,7 @@ export default function BankImport() {
       let documentId = null
       if (fileObj) {
         try {
-          const upRes = await uploadDocument(token, fileObj, { document_type: 'bank_document' })
+          const upRes = await uploadDocument(request, fileObj, { document_type: 'bank_document' })
           if (upRes?.document?.id) {
             documentId = upRes.document.id
           }
@@ -404,15 +414,15 @@ export default function BankImport() {
         }
       }
       const built = buildRows()
-      const d = await apiFetch('/bank-import/batches', token, { method: 'POST', body: {
+      const d = await apiFetch('/bank-import/batches', request, { method: 'POST', body: {
         wallet_id: walletId, file_name: fileName, file_type: fileName.split('.').pop(),
-        currency: 'IDR', opening_balance: num(opening), closing_balance: num(closing), rows: built,
+        currency: wallets.find(w=>w.id===walletId)?.currency, opening_balance: num(opening), closing_balance: num(closing), rows: built,
         document_id: documentId,
       } })
       setBatch(d.batch)
       setSuggesting(true)
       // Run rules + AI cascade, then load the enriched review queue.
-      try { await apiFetch(`/bank-imports/${d.batch.id}/suggest`, token, { method: 'POST' }) } catch { /* AI optional */ }
+      try { await apiFetch(`/bank-imports/${d.batch.id}/suggest`, request, { method: 'POST' }) } catch { /* AI optional */ }
       await loadReview(d.batch.id)
     } catch (e) { alert(e.message) } finally { setBusy(false); setSuggesting(false) }
   }
@@ -420,16 +430,23 @@ export default function BankImport() {
   const reSuggest = async () => {
     if (!batch) return
     setSuggesting(true)
-    try { await apiFetch(`/bank-imports/${batch.id}/suggest`, token, { method: 'POST' }); await loadReview(batch.id) }
+    try { await apiFetch(`/bank-imports/${batch.id}/suggest`, request, { method: 'POST' }); await loadReview(batch.id) }
     catch (e) { alert(e.message) } finally { setSuggesting(false) }
   }
 
+  useEffect(()=>{confirming.current=false;setBusy(false);setSuggesting(false);setBatch(null);setRows([]);setReviewed(null);setRecon(null);setRecoveryMsg('');setApplyOpening(false);setOpeningReason('');setWalletId('');setWallets([]);setHistory([]);setCats([]);setCps([]);setSummary(null);setFileObj(null);setFileName('');setHeaders([]);setRawRows([]);setOpening('');setClosing('')},[request.businessId,financialActor(request.token)])
+  const importIO={send:(identity,id,body)=>apiFetch(`/bank-imports/${encodeURIComponent(id)}/confirm`,identity,{method:'POST',body}),read:(identity,id,key)=>apiFetch(`/bank-imports/${encodeURIComponent(id)}/requests/${encodeURIComponent(key)}`,identity)}
+  const eligibleDecision=r=>!r.linked_transaction_id&&!['imported','excluded'].includes(r.review_status)&&(r._action==='exclude'||r._include&&r.match_status!=='duplicate')
+  const recover=async retry=>{if(!batch||!importCurrent(request)||confirming.current)return;confirming.current=true;setBusy(true);try{const r=retry?await resumeImportConfirm(request,batch.id,importIO):await recoverImportConfirm(request,batch.id,importIO);if(!importCurrent(request))return;setRecoveryMsg(r?.ok?l.recovered:l.pending);if(r?.ok){setRecon(r.reconciliation||null);await loadReview(batch.id);loadHistory()}}catch{if(importCurrent(request))setRecoveryMsg(l.pending)}finally{if(importCurrent(request)){confirming.current=false;setBusy(false)}}}
   const confirm = async (onlyRows) => {
-    const target = (onlyRows || rows).filter(r => r._include && r.match_status !== 'duplicate' && r.review_status !== 'imported')
+    if(confirming.current||!importCurrent(request)||!reviewed?.review_hash||!reviewed.can_confirm)return
+    const target = (onlyRows || rows).filter(eligibleDecision)
     if (!target.length) return
+    confirming.current=true
     setBusy(true)
     try {
       const payload = target.map(r => {
+        if(r._action==='exclude')return{row_id:r.id,match_action:'exclude'}
         const isLink = r._action === 'link' || (r.suggested_match_type && r._action === 'link') || (!r._action && !!r.matched_transaction_id)
         const matchTxId = r.matched_transaction_id || (r.suggested_match_type === 'existing_tx' ? Number(r.suggested_match_id) : null)
         return {
@@ -440,23 +457,25 @@ export default function BankImport() {
           matched_transaction_id: isLink ? matchTxId : null,
         }
       })
-      const res = await apiFetch(`/bank-imports/${batch.id}/confirm`, token, { method: 'POST', body: { rows: payload } })
+      if(applyOpening&&!openingReason.trim())throw Error(l.reasonRequired)
+      const res=await performImportConfirm(request,batch.id,{rows:payload,review_hash:reviewed.review_hash,opening:applyOpening?{expected_historical_opening:reviewed.historical_opening,target_opening:String(batch.opening_balance),reason:openingReason}:null},importIO)
+      if(!importCurrent(request))return
       setRecon(res.reconciliation || null)
       alert(`${l.imported}: ${res.imported}${res.linked ? ` · ${l.matchedExisting}: ${res.linked}` : ''}`)
       await offerRulePromotion()
-      setBatch(null); setRows([]); setHeaders([]); setRawRows([]); setSummary(null); setFileObj(null); setFileName(''); loadHistory()
-    } catch (e) { alert(e.message) } finally { setBusy(false) }
+      setApplyOpening(false);setRecoveryMsg(res.status==='imported'?l.recovered:l.partial);await loadReview(batch.id);loadHistory()
+    } catch(e){if(importCurrent(request))setRecoveryMsg(e?.data?.outcome==='rolled_back'?e?.data?.error||e.message:l.pending)}finally{if(importCurrent(request)){setBusy(false);confirming.current=false}}
   }
 
   // After confirm, offer to turn repeated confirmations into a reusable rule.
   const offerRulePromotion = async () => {
     try {
-      const d = await apiFetch('/classification-rules', token)
+      const d = await apiFetch('/classification-rules', request)
       if (!d.canManage || !(d.candidates || []).length) return
       for (const c of d.candidates.slice(0, 5)) {
         const msg = `${l.aiDisclaimer}\n\n"${c.match_value}" → ${c.category_name} (${c.count}×)\n${l.createRuleAsk}`
         if (window.confirm(msg)) {
-          await apiFetch('/classification-rules', token, { method: 'POST', body: {
+          await apiFetch('/classification-rules', request, { method: 'POST', body: {
             match_type: 'contains', match_value: c.match_value,
             category_id: c.category_id, transaction_type: c.transaction_type, created_from: 'confirmed_correction',
           } }).catch(() => {})
@@ -465,9 +484,11 @@ export default function BankImport() {
     } catch { /* non-blocking */ }
   }
 
-  const excludeRow = async (r) => {
-    try { await apiFetch(`/bank-imports/${batch.id}/rows/${r.id}/exclude`, token, { method: 'POST' }) } catch { /* */ }
-    setRows(rows.map(x => x.id === r.id ? { ...x, review_status: 'excluded', _include: false } : x))
+  const excludeRow = (r) => {
+    if(busy||importPending(request,batch.id)||!reviewed?.can_confirm||!importCurrent(request)||r.linked_transaction_id)return
+    // An explicit decision is committed with confirm. A standalone exclude POST
+    // invalidates the reviewed hash and splits the user's final decisions.
+    setRows(current=>current.map(x => x.id === r.id ? { ...x, _action:'exclude', _include:true } : x))
   }
 
   const createCategory = async () => {
@@ -475,7 +496,7 @@ export default function BankImport() {
     if (!name || !name.trim()) return
     const group_type = cats[0]?.group_type || 'operating'
     try {
-      const d = await apiFetch('/cashflow-categories', token, { method: 'POST', body: { name: name.trim(), group_type } })
+      const d = await apiFetch('/cashflow-categories', request, { method: 'POST', body: { name: name.trim(), group_type } })
       if (d.category) setCats([...cats, d.category])
     } catch (e) { alert(e.message) }
   }
@@ -502,7 +523,7 @@ export default function BankImport() {
   }
   const visibleRows = rows.filter(matchFilter)
 
-  const includeCount = rows.filter(r => r._include && r.match_status !== 'duplicate' && r.review_status !== 'imported').length
+  const includeCount = rows.filter(eligibleDecision).length
   const highRows = rows.filter(r => r.review_status === 'high_confidence' && r._include)
   const dupCount = rows.filter(r => r.match_status === 'duplicate').length
 
@@ -593,6 +614,14 @@ export default function BankImport() {
         </div>
       )}
 
+      {batch&&<div style={{padding:16,border:'1px solid var(--border)',borderRadius:12,marginBottom:12}} data-classic-import-safety>
+        <p>{reviewed?.opening_state==='known'?`${l.historical}: ${reviewed.historical_opening} ${batch.currency}`:l.historyUnknown}</p>
+        <p>{l.currentBalance}: {reviewed?.current_balance??'—'} {batch.currency}</p>
+        {reviewed?.opening_state==='known'&&reviewed.can_correct_opening&&batch.opening_balance!=null&&<label><input type="checkbox" checked={applyOpening} disabled={busy||importPending(request,batch.id)} onChange={e=>setApplyOpening(e.target.checked)}/>{l.applyOpening}: {batch.opening_balance} {batch.currency}</label>}
+        {applyOpening&&<input value={openingReason} maxLength={500} placeholder={l.reason} onChange={e=>setOpeningReason(e.target.value)}/>}
+        <div><button disabled={busy} onClick={()=>recover(false)} data-classic-import-recover>{l.checkResult}</button>{importPending(request,batch.id)&&<button disabled={busy} onClick={()=>recover(true)}>{l.retryOriginal}</button>}<button disabled={busy||importPending(request,batch.id)} onClick={()=>loadReview(batch.id)}>{l.reloadReview}</button></div>
+        {recoveryMsg&&<p role="status">{recoveryMsg}</p>}
+      </div>}
       {batch && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
@@ -625,8 +654,8 @@ export default function BankImport() {
 
           {/* Bulk actions */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-            <button className="btn btn-primary btn-sm" disabled={busy || includeCount === 0} onClick={() => confirm()}>{busy ? '…' : `${l.confirmSelected} · ${includeCount}`}</button>
-            <button className="btn btn-ghost btn-sm" disabled={busy || highRows.length === 0} onClick={() => confirm(highRows)}>{l.confirmHigh} · {highRows.length}</button>
+            <button className="btn btn-primary btn-sm" disabled={busy || !reviewed?.can_confirm || includeCount === 0} onClick={() => confirm()}>{busy ? '…' : `${l.confirmSelected} · ${includeCount}`}</button>
+            <button className="btn btn-ghost btn-sm" disabled={busy || !reviewed?.can_confirm || highRows.length === 0} onClick={() => confirm(highRows)}>{l.confirmHigh} · {highRows.length}</button>
             {canMakeCat && <button className="btn btn-ghost btn-sm" onClick={createCategory}>{l.createNewCategory}</button>}
           </div>
 
@@ -640,7 +669,7 @@ export default function BankImport() {
               <tbody>
                 {visibleRows.map((r) => {
                   const isDup = r.match_status === 'duplicate'
-                  const isExcluded = r.review_status === 'excluded'
+                  const isExcluded = r.review_status === 'excluded'||r._action==='exclude'
                   const badge = confBadge(r)
                   const setRow = (patch) => setRows(rows.map(x => x.id === r.id ? { ...x, ...patch } : x))
                   return (
@@ -685,7 +714,7 @@ export default function BankImport() {
                         )}
                       </td>
                       <td style={{ padding: 6, textAlign: 'center' }}>
-                        {!isExcluded && !isDup && <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => excludeRow(r)}>✕</button>}
+                        {!isExcluded && !r.linked_transaction_id && <button className="btn btn-ghost btn-sm" disabled={busy||!reviewed?.can_confirm||importPending(request,batch.id)} style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => excludeRow(r)}>✕</button>}
                       </td>
                     </tr>
                   )
@@ -693,7 +722,7 @@ export default function BankImport() {
               </tbody>
             </table>
           </div>
-          <button className="btn btn-primary btn-md" disabled={busy || includeCount === 0} onClick={() => confirm()} style={{ marginTop: 12 }}>
+          <button className="btn btn-primary btn-md" disabled={busy || !reviewed?.can_confirm || includeCount === 0} onClick={() => confirm()} style={{ marginTop: 12 }}>
             {busy ? '…' : `${l.confirmImport} · ${includeCount}`}
           </button>
         </div>
@@ -701,7 +730,7 @@ export default function BankImport() {
 
       {recon && (
         <div style={{ background: recon.status === 'balanced' ? 'var(--green-light,#E1F5EE)' : '#FEF3F2', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16, fontSize: 13 }}>
-          <b>{l.reconciled}: {recon.status === 'balanced' ? '✓ ' + l.balanced : '⚠ ' + l.unbalanced}</b> · {l.difference}: {fmt(recon.difference)} IDR
+          <b>{l.reconciled}: {recon.status === 'balanced' ? '✓ ' + l.balanced : '⚠ ' + l.unbalanced}</b> · {l.difference}: {fmt(recon.difference)} {batch?.currency || wallets.find(w=>String(w.id)===String(walletId))?.currency || ''}
         </div>
       )}
 

@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback,useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch, fmt } from '../lib/api'
+import {performProfileOperation,profileCurrent,profileDelta} from '../lib/businessProfileOperation'
+import {useBusinessRequest} from '../lib/useBusinessRequest'
 import { applicableMissingFields } from '../lib/accountantReadiness'
 import { getLang } from '../i18n/index'
 
@@ -42,6 +44,7 @@ const STATUS_COLOR = { upcoming: 'var(--text-3)', due_soon: 'var(--amber-dark)',
 
 export default function Accountant() {
   const { token } = useAuth()
+  const request=useBusinessRequest(),profileContext=useRef(null)
   const { t } = useTranslation()
   const lang = ['ru', 'id'].includes(getLang()) ? getLang() : 'en'
   const l = L[lang]
@@ -53,7 +56,9 @@ export default function Accountant() {
   const [editing, setEditing] = useState(false)
   const [form, setForm]       = useState({})
   const [saving, setSaving]   = useState(false)
+  const savingRef=useRef(false)
   const [loading, setLoading] = useState(true)
+  const [loadError,setLoadError]=useState(null)
   const [reminded, setReminded] = useState(false)
   const [summary, setSummary] = useState(null)
   const [question, setQuestion] = useState('')
@@ -73,28 +78,38 @@ export default function Accountant() {
   }
 
   const load = useCallback(() => {
-    setLoading(true)
+    const identity=request
+    profileContext.current=null;savingRef.current=false;setSaving(false)
+    setLoading(true);setLoadError(null)
     Promise.all([
       apiFetch(`/accountant/status?language=${getLang()}`, token),
-      apiFetch('/accountant/profile', token).catch(() => ({ profile: null })),
+      apiFetch('/accountant/profile', identity),
       apiFetch('/accountant/calendar', token).catch(() => ({ events: [] })),
       apiFetch('/accountant/rules', token).catch(() => ({ rules: [] })),
       apiFetch('/accountant/summary', token).catch(() => null),
-    ]).then(([s, p, c, r, sum]) => {
-      setStatus(s); setProfile(p.profile); setForm(p.profile || { country: 'Indonesia', jurisdiction: 'ID', reporting_currency: 'IDR' })
+      apiFetch('/business/current',token),
+    ]).then(([s, p, c, r, sum, current]) => {
+      if(!profileCurrent(identity))return
+      profileContext.current=identity
+      const b=current?.business||current||{},country=b.country||''
+      setStatus(s); setProfile(p.profile); setForm(p.profile || { country, jurisdiction: {Indonesia:'ID',Singapore:'SG',Malaysia:'MY',Thailand:'TH'}[country]||'', reporting_currency:b.base_currency||'' })
       setCalendar(c); setRules(r.rules || []); setSummary(sum)
-    }).catch(console.error).finally(() => setLoading(false))
-  }, [token])
+    }).catch(e=>{if(profileCurrent(identity))setLoadError(e.message)}).finally(() => {if(profileCurrent(identity))setLoading(false)})
+  }, [token,request])
   useEffect(() => { load() }, [load])
 
   const saveProfile = async () => {
+    if(savingRef.current)return
+    if(profileContext.current!==request||!profileCurrent(request))return
+    savingRef.current=true
     setSaving(true)
-    try { await apiFetch('/accountant/profile', token, { method: 'PUT', body: form }); setEditing(false); load() }
-    catch (e) { alert(e.message) } finally { setSaving(false) }
+    try {const r=await performProfileOperation(request,'save',profileDelta(form,profile),profile?.profile_version??0,{send:(identity,body)=>apiFetch('/accountant/profile',identity,{method:'PUT',body}),read:(identity,key)=>apiFetch(`/accountant/profile/requests/${encodeURIComponent(key)}`,identity)});if(!profileCurrent(request))return;if(r.historical)throw Error('Profile changed after this saved version. Reload before editing.');setEditing(false);load()}
+    catch (e) { if(profileCurrent(request))alert(e.message) } finally { if(profileCurrent(request)){setSaving(false);savingRef.current=false} }
   }
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
     <div style={{ width: 28, height: 28, border: '2.5px solid var(--border-2)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'tx-spin .7s linear infinite' }} /></div>
+  if(loadError)return <div role="alert"><p>{loadError}</p><button type="button" onClick={load}>{t('common.retry')}</button></div>
 
   const events = calendar?.events || []
   const field = (key, label, opts) => (

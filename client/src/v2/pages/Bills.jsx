@@ -3,22 +3,22 @@
 // /business/invoices (All). Data: GET /api/debts and GET /api/wallets.
 //
 // Writes reuse the existing components unchanged: DebtFormModal (Add a bill / New
-// invoice, business scope locked) and DebtPaymentModal (Mark paid / Mark received).
+// invoice, business scope locked) and PayBillDialog (Mark paid / Mark received, components/MoneyDialogs).
 // The previous pages stay one click away under "Classic view".
-import { useMemo, useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
-import DebtPaymentModal from '../../components/DebtPaymentModal'
-import DebtFormModal from '../../components/DebtFormModal'
+import { PayBillDialog } from '../components/MoneyDialogs'
+import BillDialog from '../components/BillDialog'
 import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi, useInvalidate } from '../data'
-import { money, shortDate, daysUntil } from '../lib/format'
+import { money, shortDate, shortCalendarDate, daysUntil } from '../lib/format'
 import { billStatus, billSummary, billRows, tabForPath, remaining } from '../lib/obligations'
+import { useWorkspace } from '../../shell/WorkspaceProvider'
+import { canRecordCompanyMoney, canSubmitBill } from '../lib/financePermissions'
 
 const TONE = { pending: 'info', late: 'crit', partial: 'warn', open: 'neutral', paid: 'good', cancelled: 'neutral' }
-const CLASSIC = { pay: '/business/payables/classic', collect: '/business/receivables/classic', all: '/business/invoices/classic' }
 // Each tab is its own route, so a reload or a shared link keeps the tab.
 const TAB_PATH = { pay: '/business/payables', collect: '/business/receivables', all: '/business/invoices' }
 const clean = (v) => (v == null || ['null', 'undefined'].includes(String(v).trim()) ? '' : String(v))
@@ -40,7 +40,7 @@ function Row({ d, onPay, t, lang }) {
   let action
   if (s === 'pending') action = <Btn to={detailPath(d)}>{t('bills.review')}</Btn>
   // A late invoice can still be marked received (existing POST /api/debts/:id/pay through
-  // DebtPaymentModal); sending a reminder is not built yet and stays "Coming soon".
+  // PayBillDialog); sending a reminder is not built yet and stays "Coming soon".
   else if (s === 'late' && receivable) action = <span className="v2-btnpair"><Btn onClick={() => onPay(d)}>{t('bills.markReceived')}</Btn><NotYet note={t('bills.reminderSoon')}>{t('bills.sendReminder')}</NotYet></span>
   else if (s === 'open' || s === 'partial' || s === 'late') action = <Btn onClick={() => onPay(d)}>{t(receivable ? 'bills.markReceived' : 'bills.markPaid')}</Btn>
   else action = <Btn to={detailPath(d)}>{t('bills.open')}</Btn>
@@ -50,7 +50,7 @@ function Row({ d, onPay, t, lang }) {
         <Link to={detailPath(d)} className="v2-brow-name">{clean(d.counterparty) || t('bills.noName')}</Link>
         <span className="v2-brow-note">{[clean(d.description), d.source_channel === 'mcp' ? t('bills.byAi') : null].filter(Boolean).join(' · ')}</span>
       </span>
-      <span role="cell" className="v2-brow-due v2-num">{d.due_date ? shortDate(d.due_date, lang) : '—'}</span>
+      <span role="cell" className="v2-brow-due v2-num">{d.due_date ? shortCalendarDate(d.due_date, lang) : '—'}</span>
       <span role="cell" className="v2-brow-status"><StatusPill d={d} /></span>
       <span role="cell" className="v2-brow-amt v2-num v2-r">{money(remaining(d), { currency: d.currency || 'IDR' })}</span>
       <span role="cell" className="v2-brow-act">{action}</span>
@@ -79,7 +79,6 @@ function Section({ title, rows, onPay, t, lang, who }) {
 export default function Bills() {
   const t = useT()
   const lang = useLang()
-  const { token } = useAuth()
   const loc = useLocation()
   const navigate = useNavigate()
   const invalidate = useInvalidate()
@@ -93,11 +92,13 @@ export default function Bills() {
   const [create, setCreate] = useState(null)   // 'payable' | 'receivable'
   const [pay, setPay] = useState(null)
   const [editDebt, setEditDebt] = useState(null)
+  const {active}=useWorkspace()
+  const canCreate=canSubmitBill(active?.role),canEdit=canRecordCompanyMoney(active?.role)
   const debts = useApi('/debts')
   const wallets = useApi('/wallets')
   // GET /api/wallets returns only this company's wallets (by business_id). A wallet labelled
   // 'personal' is still company-held (_specs/accounts-personal-scope-ambiguity.md), so it is
-  // not dropped; DebtPaymentModal lists it with its name.
+  // not dropped; PayBillDialog lists it with its name.
   const bizWallets = (wallets.data?.wallets || []).filter((x) => x.is_active !== false)
 
   const list = Array.isArray(debts.data) ? debts.data : []
@@ -106,13 +107,13 @@ export default function Bills() {
   // Handle ?edit=<id> query parameter (e.g. from Radar "Set date")
   useEffect(() => {
     const editId = new URLSearchParams(loc.search).get('edit')
-    if (editId && list.length > 0) {
+    if (canEdit && editId && list.length > 0) {
       const target = list.find(d => String(d.id) === String(editId))
       if (target) {
         setEditDebt(target)
       }
     }
-  }, [loc.search, list])
+  }, [loc.search, list,canEdit])
 
   const clearEditParam = () => {
     const params = new URLSearchParams(loc.search)
@@ -126,23 +127,20 @@ export default function Bills() {
 
   const head = (
     <PageHead title={t('nav.bills')} sub={t('bills.sub')}
-      actions={<>
+      actions={canCreate&&<>
         <Btn icon={<I.plus size={16} />} onClick={() => setCreate('payable')}>{t('bills.addBill')}</Btn>
         <Btn variant="primary" icon={<I.plus size={16} />} onClick={() => setCreate('receivable')}>{t('bills.newInvoice')}</Btn>
       </>} />
   )
   const modals = (
-    <>
-      {create && <DebtFormModal mode={create} token={token} lockBusinessScope
-        onClose={() => setCreate(null)} onSuccess={() => { setCreate(null); invalidate() }} />}
-      {pay && <DebtPaymentModal debt={pay} accounts={bizWallets} token={token}
-        onClose={() => setPay(null)} onSuccess={() => { setPay(null); invalidate() }} />}
-      {editDebt && <DebtFormModal mode={editDebt.type || 'payable'} initialDebt={editDebt} token={token} lockBusinessScope
-        onClose={clearEditParam} onSuccess={() => { clearEditParam(); invalidate() }} />}
-    </>
+    <Fragment key="bill-modals">
+      {create && <BillDialog mode={create} onClose={() => setCreate(null)} onSaved={invalidate} />}
+      {pay && <PayBillDialog debt={pay} accounts={bizWallets} onClose={() => setPay(null)} onSaved={invalidate} />}
+      {canEdit&&editDebt && <BillDialog debt={editDebt} onClose={clearEditParam} onSaved={invalidate} />}
+    </Fragment>
   )
-  if (debts.loading) return <>{head}<Card><Skeleton rows={6} /></Card>{modals}</>
-  if (debts.error) return <>{head}<ErrorBox error={debts.error} onRetry={debts.reload} />{modals}</>
+  if (debts.loading) return <div className="v2-page">{head}<Card><Skeleton rows={6} /></Card>{modals}</div>
+  if (debts.error) return <div className="v2-page">{head}<ErrorBox error={debts.error} onRetry={debts.reload} />{modals}</div>
 
   const collect = billRows(list, { tab: 'collect', view })
   const payRows = billRows(list, { tab: 'pay', view })
@@ -192,10 +190,6 @@ export default function Bills() {
             {(tab === 'pay' || tab === 'all') && <Section title={t('bills.toPay')} rows={payRows} onPay={setPay} t={t} lang={lang} who={t('bills.col.supplier')} />}
           </>
         )}
-        <div className="v2-foot">
-          <span>{t('bills.classicHint')}</span>
-          <Link to={CLASSIC[tab]}>{t('bills.classic')}</Link>
-        </div>
       </Card>
       {modals}
     </div>

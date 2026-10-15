@@ -26,6 +26,18 @@ const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } cat
 // existing server-side role check; it is listed in the batch report. All of them live in
 // client/src/v2/lib/actions.js — no other v2 file may write.
 export const WRITE_ALLOW = [
+  { method:'POST',path:"'/billing/plan'" },
+  { method:'POST',path:"'/billing/trial'" },
+  { method:'POST',path:"'/admin/billing/catalog/'" },
+  { method:'POST',path:"'/admin/billing/companies/'" },
+  { method: 'POST', path: "'/accountant/operation-documents/action'" }, // Scoped invoker RPC: link + audit; no money writes.
+  { method: 'POST', path: "'/me/avatar'" },
+  { method: 'POST', path: "'/business-directions'" },
+  { method: 'PATCH', path: '`/business-directions/' },
+  { method: 'DELETE', path: '`/business-directions/' },
+  { method: 'POST', path: "'/activity-types'" },
+  { method: 'PATCH', path: '`/activity-types/' },
+  { method: 'DELETE', path: '`/activity-types/' },
   { method: 'PATCH', path: '/approve' },        // PATCH /api/debts/:id/approve
   { method: 'PATCH', path: '/reject' },         // PATCH /api/debts/:id/reject
   { method: 'POST', path: '/request-info' },    // POST  /api/debts/:id/request-info
@@ -56,6 +68,54 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: '/identify`' },                   // POST   /api/documents/:id/identify (AI explanation)
   { method: 'POST', path: '/filing`' },                     // POST   /api/documents/:id/filing (bank account + month, counterparty, keep)
   { method: 'POST', path: '/tax-obligation`' },             // POST   /api/documents/:id/tax-obligation (tax from a document → tax calendar)
+  // Company tax profile editor (2026-10-10): existing routes, role-checked, critical fields audited.
+  { method: 'PUT', path: "'/accountant/profile'" },                  // PUT  /api/accountant/profile
+  { method: 'POST', path: "'/accountant/profile/verify'" },          // POST /api/accountant/profile/verify
+  { method: 'POST', path: "'/accountant/profile/from-documents'" },  // POST /api/accountant/profile/from-documents (AI suggests only)
+  // Sign-in and company setup (2026-10-10, reg/R1–R9): existing routes, checked on the server.
+  { method: 'POST', path: "'/auth/email/start'" },     // POST  /api/auth/email/start (public, rate-limited)
+  { method: 'POST', path: "'/auth/email/verify'" },    // POST  /api/auth/email/verify (public, one-time)
+  { method: 'PATCH', path: "'/me/profile'" },          // PATCH /api/me/profile
+  { method: 'POST', path: '/accept`' },                // POST  /api/invite/:code/accept
+  // Settings (2026-10-10, Settings + w2/S2): existing routes, role-checked on the server.
+  { method: 'PATCH', path: "'/business/current'" },                        // PATCH  /api/business/current
+  { method: 'POST', path: "'/cashflow-categories'" },                      // POST   /api/cashflow-categories
+  { method: 'PATCH', path: '`/cashflow-categories/' },                     // PATCH  /api/cashflow-categories/:id
+  { method: 'DELETE', path: '`/cashflow-categories/' },                    // DELETE /api/cashflow-categories/:id (archive)
+  { method: 'POST', path: "'/account/integrations/telegram/link-token'" }, // POST   /api/account/integrations/telegram/link-token
+  { method: 'POST', path: "'/account/integrations/telegram/unlink'" },     // POST   /api/account/integrations/telegram/unlink
+  { method: 'POST', path: "'/payment-connections'" },                      // POST   /api/payment-connections
+  { method: 'POST', path: "'/team/invite'" },                              // POST   /api/team/invite
+  { method: 'DELETE', path: '`/team/invites/' },                           // DELETE /api/team/invites/:code
+  { method: 'PATCH', path: '`/team/members/' },                            // PATCH  /api/team/members/:memberId
+  { method: 'DELETE', path: '`/team/members/' },                           // DELETE /api/team/members/:memberId
+  // Accounts (2026-10-10, w2/C1 + C2): existing routes, canManageWallets on the server.
+  { method: 'POST', path: "'/wallets'" },               // POST   /api/wallets
+  { method: 'PUT', path: '`/wallets/' },                 // PUT    /api/wallets/:id (edit, restore)
+  { method: 'DELETE', path: '`/wallets/' },              // DELETE /api/wallets/:id (archive)
+  { method: 'POST', path: '/adjust-balance`' },          // POST   /api/wallets/:id/adjust-balance
+  // Bank statement import (2026-10-10, w2/H1–H3 + k/K4): role-checked on the server.
+  { method: 'POST', path: "'/bank-import/read'" },       // POST /api/bank-import/read (engine reads the file; no write)
+  { method: 'POST', path: "'/bank-import/batches'" },    // POST /api/bank-import/batches
+  { method: 'POST', path: '/suggest`' },                 // POST /api/bank-imports/:batchId/suggest
+  { method: 'POST', path: '/confirm`' },                 // POST /api/bank-imports/:batchId/confirm
+  { method: 'POST', path: "'/classification-rules'" },   // POST /api/classification-rules
+  // Bills and invoices (2026-10-10, w2/E1): read the uploaded invoice, create the record.
+  { method: 'POST', path: '/extract`' },                 // POST /api/documents/:id/extract (reads; writes nothing)
+  { method: 'POST', path: "'/debts'" },                  // POST /api/debts
+  { method: 'PATCH', path: "'/debts/' + encodeURIComponent" }, // PATCH /api/debts/:id (edit a bill)
+  // Counterparty card (2026-10-10, w2/G1): role-checked and audited on the server.
+  { method: 'POST', path: "'/archive', token" },               // POST   /api/counterparties/:id/archive
+  { method: 'DELETE', path: "'/bank-accounts/'" },             // DELETE /api/counterparties/:id/bank-accounts/:accountId
+  // Payroll (2026-10-10, w2/F1 + F2): canManagePayroll on the server.
+  { method: 'POST', path: "'/payroll/employees'" },                        // POST   /api/payroll/employees
+  { method: 'PATCH', path: "'/payroll/employees/' + encodeURIComponent" },  // PATCH  /api/payroll/employees/:id
+  { method: 'DELETE', path: "'/payroll/employees/' + encodeURIComponent" }, // DELETE /api/payroll/employees/:id (archive)
+  { method: 'POST', path: "'/payroll/payments'" },                         // POST   /api/payroll/payments
+  // Money windows (2026-10-10): v2 replacements of the v1 transfer and payment modals.
+  { method: 'POST', path: "'/wallets/transfer'" },                         // POST /api/wallets/transfer (atomic RPC)
+  { method: 'POST', path: "'/decisions/debts/' + encodeURIComponent" },    // POST /api/decisions/debts/:id/payment (simulation)
+  { method: 'POST', path: "'/pay', token" },                               // POST /api/debts/:id/pay (idempotent)
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
@@ -132,7 +192,9 @@ t('v2 makes no mutating request outside the reviewed allow-list', () => {
 })
 
 t('every allowed write exists on the server (batch 8 routes are the approved ones only)', () => {
-  const server = read(path.join(ROOT, 'server/index.js'))
+  const entry=read(path.join(ROOT,'server/index.js'))
+  assert.ok(/registerBusinessProfileOperations\(app,/.test(entry),'profile module must be registered on the real app')
+  const server = entry + read(path.join(ROOT, 'server/lib/companyCreation.js')) + read(path.join(ROOT, 'server/lib/teamOperations.js')) + read(path.join(ROOT,'server/lib/businessProfile.js'))
   for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,
@@ -140,7 +202,21 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/assets'/, /app\.post\('\/api\/business-funding'/, /app\.post\('\/api\/business-funding\/repayments\/:rid\/paid'/,
     /app\.post\('\/api\/documents\/:id\/signed-url'/, /app\.patch\('\/api\/documents\/:id'/, /app\.post\('\/api\/documents\/:id\/links'/,
     /app\.delete\('\/api\/documents\/:id\/links\/:linkId'/, /app\.post\('\/api\/documents\/:id\/archive'/,
-    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/, /app\.post\('\/api\/documents\/:id\/tax-obligation'/]) {
+    /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/, /app\.post\('\/api\/documents\/:id\/tax-obligation'/,
+    /app\.put\('\/api\/accountant\/profile'/, /app\.post\('\/api\/accountant\/profile\/verify'/, /app\.post\('\/api\/accountant\/profile\/from-documents'/,
+    /app\.post\('\/api\/auth\/email\/start'/, /app\.post\('\/api\/auth\/email\/verify'/, /app\.patch\('\/api\/me\/profile'/,
+    /app\.post\('\/api\/invite\/:code\/accept'/, /app\.post\('\/api\/businesses'/,
+    /app\.patch\('\/api\/business\/current'/, /app\.post\('\/api\/cashflow-categories'/, /app\.patch\('\/api\/cashflow-categories\/:id'/,
+    /app\.delete\('\/api\/cashflow-categories\/:id'/, /app\.post\('\/api\/account\/integrations\/telegram\/link-token'/,
+    /app\.post\('\/api\/account\/integrations\/telegram\/unlink'/, /app\.post\('\/api\/payment-connections'/, /app\.post\('\/api\/team\/invite'/,
+    /app\.delete\('\/api\/team\/invites\/:code'/, /app\.patch\('\/api\/team\/members\/:memberId'/, /app\.delete\('\/api\/team\/members\/:memberId'/,
+    /app\.post\('\/api\/wallets'/, /app\.put\('\/api\/wallets\/:id'/, /app\.delete\('\/api\/wallets\/:id'/, /app\.post\('\/api\/wallets\/:id\/adjust-balance'/,
+    /app\.post\('\/api\/bank-import\/read'/, /app\.post\('\/api\/bank-import\/batches'/, /app\.post\('\/api\/bank-imports\/:batchId\/suggest'/,
+    /app\.post\('\/api\/bank-imports\/:batchId\/confirm'/, /app\.post\('\/api\/classification-rules'/,
+    /app\.post\('\/api\/documents\/:id\/extract'/, /app\.post\('\/api\/debts'/, /app\.patch\('\/api\/debts\/:id'/,
+    /app\.post\('\/api\/counterparties\/:id\/archive'/, /app\.delete\('\/api\/counterparties\/:id\/bank-accounts\/:accountId'/,
+    /app\.post\('\/api\/payroll\/employees'/, /app\.patch\('\/api\/payroll\/employees\/:id'/, /app\.delete\('\/api\/payroll\/employees\/:id'/, /app\.post\('\/api\/payroll\/payments'/,
+    /app\.post\('\/api\/wallets\/transfer'/, /app\.post\('\/api\/decisions\/debts\/:id\/payment'/, /app\.post\('\/api\/debts\/:id\/pay'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

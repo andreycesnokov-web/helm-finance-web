@@ -59,7 +59,7 @@ function DocRow({ d, debtsById, txById, t, lang, onOpen, company = false }) {
     target = <span>{filingText(t, filing, lang)}</span>
   } else if (txLink) {
     const tx = txById.get(String(txLink.target_id))
-    target = <Link to="/business/transactions">{tx ? t('docs.linkedTo.transaction', { d: txLabel(tx, lang) }) : t('docs.linkedTo.transactionNoDate')}</Link>
+    target = <Link to={'/business/transactions?tx=' + encodeURIComponent(txLink.target_id)}>{tx ? t('docs.linkedTo.transaction', { d: txLabel(tx, lang) }) : t('docs.linkedTo.transactionNoDate')}</Link>
   }
   const look = !company && needsLook(d)
   const kind = company ? t(`docs.vault.${verdict?.docType}`) : d.document_type ? docTypeLabel(t, d.document_type) : null
@@ -95,6 +95,7 @@ export default function Documents() {
   const openId = params.get('doc')
   const [month, setMonth] = useState(defaultCloseMonth())
   const [upload, setUpload] = useState(null)   // null | { debt? } | { company: true }
+  const [limit, setLimit] = useState(LIMIT)
   const docs = useApi('/documents?limit=200')
   const debts = useApi('/debts')
   const txs = useApi('/transactions?period=all')
@@ -136,7 +137,6 @@ export default function Documents() {
             {monthOptions(12).map((m) => <option key={m.key} value={m.key}>{monthName(m.key)}</option>)}
           </select>
         )}
-        <Btn to="/business/documents/classic">{t('bills.classic')}</Btn>
       </>} />
   )
   const modal = upload && (upload.debt
@@ -149,7 +149,7 @@ export default function Documents() {
         onClose={() => setUpload(null)} onUploaded={changed} />)
   const renderList = (items, company = false) => (
     <ul className="v2-doclist">
-      {items.slice(0, LIMIT).map((d) => <DocRow key={d.id} d={d} debtsById={debtsById} txById={txById} t={t} lang={lang} onOpen={onOpen} company={company} />)}
+      {items.slice(0, limit).map((d) => <DocRow key={d.id} d={d} debtsById={debtsById} txById={txById} t={t} lang={lang} onOpen={onOpen} company={company} />)}
     </ul>
   )
   const rows = tab === 'look' ? look : tab === 'month' ? inMonth : vault
@@ -182,8 +182,8 @@ export default function Documents() {
               {rows.length === 0
                 ? <Empty icon={<I.documents size={28} />} title={t(tab === 'look' ? 'docs.allGood' : tab === 'month' ? 'docs.none' : 'docs.company.none')} />
                 : renderList(rows, tab === 'company')}
-              {rows.length > LIMIT && (
-                <p className="v2-muted v2-small">{t('docs.shown', { n: LIMIT, m: rows.length })} <Link to="/business/documents/classic">{t('bills.classic')}</Link></p>
+              {rows.length > limit && (
+                <p className="v2-muted v2-small">{t('docs.shown', { n: limit, m: rows.length })} <button type="button" className="v2-btn-link" onClick={() => setLimit((n) => n + 100)}>{t('docs.showMore')}</button></p>
               )}
               {tab === 'look' && recent.length > 0 && (
                 <>

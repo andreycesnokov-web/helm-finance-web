@@ -1,0 +1,3 @@
+import{test}from'node:test';import assert from'node:assert/strict';import{inputToMinor,minorToInput}from'../client/src/v2/lib/billingMoney.js';
+test('decimal prices round-trip exactly without floating-point arithmetic',()=>{for(const[x,n]of[['59','5900'],['149.01','14901'],['0.01','1'],['299,99','29999']])assert.equal(inputToMinor(x),n);assert.equal(minorToInput('14901'),'149.01')});
+test('currency minor unit rules and invalid precision',()=>{assert.equal(inputToMinor('59.001'),null);assert.equal(inputToMinor('-1'),null);assert.equal(inputToMinor('59.1','JPY'),null);assert.equal(inputToMinor('59','JPY'),'59');assert.equal(inputToMinor('9007199254740992'),null)});

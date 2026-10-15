@@ -228,6 +228,7 @@ const id = {
     legacyTitle: 'Akun lama belum terhubung',
     legacySub: 'Sumber transaksi ini tidak cocok dengan nama dompet mana pun. Impor atau ubah nama dompet agar sesuai.',
     importAsWallets: 'Impor sebagai dompet',
+    legacyReviewRequired: 'Impor otomatis nama rekening lama dinonaktifkan. Riwayat transaksi tetap tersimpan. Periksa perusahaan, mata uang dan pemetaan dompet setiap rekening sebelum menghubungkannya.',
     importing: 'Mengimpor…',
     adjustBalance: 'Koreksi saldo',
     currentBalance: 'Saldo saat ini',

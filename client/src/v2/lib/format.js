@@ -57,6 +57,16 @@ export function shortDate(d, lang = 'en') {
   return x.toLocaleDateString(loc, { day: 'numeric', month: 'short' })
 }
 
+/** A bill's calendar date keeps the day supplied by the API in every timezone. */
+export function shortCalendarDate(d, lang = 'en') {
+  const day = String(d || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return '—'
+  const x = new Date(day + 'T00:00:00Z')
+  if (!Number.isFinite(x.getTime()) || x.toISOString().slice(0, 10) !== day) return '—'
+  const loc = lang === 'ru' ? 'ru-RU' : lang === 'id' ? 'id-ID' : 'en-GB'
+  return x.toLocaleDateString(loc, { day: 'numeric', month: 'short', timeZone: 'UTC' })
+}
+
 /** Whole days from `from` (default today, local midnight) to `d`. */
 export function daysUntil(d, from = new Date()) {
   const a = new Date(from); a.setHours(0, 0, 0, 0)

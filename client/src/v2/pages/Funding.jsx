@@ -6,9 +6,14 @@
 // A founder loan is recorded here business-side only: the Personal↔Business bridge
 // (/api/funding) is NOT called. Before 064 the page says so and shows what the classifier
 // already marks as funding.
+// Incoming gateway payments (design w2/J1, replaces v1 "Incoming payments"): read-only list from
+// GET /api/incoming-payments — receipts awaiting review, never revenue by themselves. With the
+// server flag off the route 404s and the card says to connect a gateway. Money between the
+// owner's own companies comes from both statements (import marks it intercompany); a mirrored
+// loan record across two companies has no server route yet, so none is offered here.
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
 import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Empty, Skeleton, ErrorBox } from '../ui'
 import { useT, useLang } from '../i18n'
@@ -16,12 +21,38 @@ import { useApi, useInvalidate } from '../data'
 import { createFunding, markRepaymentPaid, actionError } from '../lib/actions'
 import { money, shortDate } from '../lib/format'
 
+function IncomingPayments({ t, lang }) {
+  const ip = useApi('/incoming-payments?limit=20')
+  if (ip.error?.status === 403) return null
+  const off = ip.error?.status === 404
+  const rows = Array.isArray(ip.data?.payments) ? ip.data.payments : []
+  const tone = (s) => (s === 'matched' ? 'good' : s === 'candidate' ? 'warn' : s === 'ignored' ? 'neutral' : 'info')
+  return (
+    <Card title={t('fund.ipTitle')} aside={<Link to="/business/settings?tab=connections">{t('fund.ipConnect')}</Link>}>
+      {ip.loading ? <Skeleton rows={3} />
+        : ip.error && !off ? <ErrorBox error={ip.error} onRetry={ip.reload} />
+        : !rows.length ? <p className="v2-sec" data-ip-empty>{t(off ? 'fund.ipOff' : 'fund.ipEmpty')}</p>
+        : (
+          <ul className="v2-moves" data-ip-list>{rows.map((r) => (
+            <li key={r.id}>
+              <span>{shortDate(String(r.transaction_at || r.created_at || '').slice(0, 10), lang)} · {r.payer_name || '—'}{r.provider ? ` · ${r.provider}` : ''}
+                {' '}<Pill tone={tone(r.reconciliation_status)}>{t(`fund.ipSt.${r.reconciliation_status || 'unmatched'}`)}</Pill></span>
+              <span className="v2-num">{r.net_amount == null ? '—' : money(r.net_amount, { currency: r.currency || 'IDR' })}
+                {r.fee_amount != null && <span className="v2-muted v2-small"> {t('fund.ipFee', { v: money(r.fee_amount, { currency: r.currency || 'IDR' }) })}</span>}</span>
+            </li>
+          ))}</ul>
+        )}
+      <p className="v2-muted v2-small">{t('fund.ipNote')}</p>
+    </Card>
+  )
+}
+
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const SOURCES = ['founder', 'investor', 'bank', 'other_lender']
-const EMPTY = { source_kind: 'founder', instrument: 'loan', lender_name: '', counterparty_id: '', amount: '', received_on: daysAgo(0), interest_rate_annual: '', due_on: '', terms_text: '' }
+const EMPTY = { source_kind: 'founder', instrument: '', lender_name: '', counterparty_id: '', amount: '', received_on: daysAgo(0), interest_rate_annual: '', due_on: '', terms_text: '' }
 
 function RecordForm({ onDone, t }) {
-  const { token } = useAuth()
+  const request = useBusinessRequest()
   const invalidate = useInvalidate()
   const cps = useApi('/counterparties')
   const [f, setF] = useState(EMPTY)
@@ -31,9 +62,9 @@ function RecordForm({ onDone, t }) {
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
   const loan = f.instrument === 'loan'
   const save = async (e) => {
-    e.preventDefault(); setBusy(true); setErr(null)
+    e.preventDefault(); if(!f.instrument){setErr(t('fund.chooseInstrument'));return} setBusy(true); setErr(null)
     try {
-      await createFunding(token, { ...f, counterparty_id: f.counterparty_id || null,
+      await createFunding(request, { ...f, counterparty_id: f.counterparty_id || null,
         interest_rate_annual: loan ? f.interest_rate_annual : null, due_on: loan ? f.due_on : null,
         schedule: loan && rows.length ? rows : undefined })
       invalidate(); onDone()
@@ -50,6 +81,7 @@ function RecordForm({ onDone, t }) {
           <div className="v2-seg" role="radiogroup" aria-labelledby="f-inst">
             {['loan', 'equity'].map((k) => <button key={k} type="button" role="radio" aria-checked={f.instrument === k} aria-pressed={f.instrument === k} className="v2-seg-btn" onClick={() => setF((x) => ({ ...x, instrument: k }))}>{t(`fund.inst.${k}`)}</button>)}
           </div>
+          {!f.instrument&&<span className="v2-muted v2-small">{t('fund.chooseInstrument')}</span>}
         </div>
         <div className="v2-field-row">
           <label className="v2-field"><span className="v2-field-label">{t('fund.from')}</span>
@@ -92,6 +124,7 @@ function RecordForm({ onDone, t }) {
           </fieldset>
         )}
         <p className="v2-muted v2-small">{t('fund.never')}</p>
+        <p className="v2-muted v2-small">{t('fund.unlinkedRegister')}</p>
         <div className="v2-decide-row">
           <button type="button" className="v2-btn v2-btn-secondary" onClick={onDone} disabled={busy}>{t('dec.cancel')}</button>
           <button type="submit" className="v2-btn v2-btn-primary" disabled={busy}>{t('fund.save')}</button>
@@ -105,7 +138,7 @@ function RecordForm({ onDone, t }) {
 export default function Funding() {
   const t = useT()
   const lang = useLang()
-  const { token } = useAuth()
+  const request = useBusinessRequest()
   const invalidate = useInvalidate()
   const reg = useApi('/business-funding')
   const ins = useApi(`/pulse/advanced-insights?from=${daysAgo(365)}&to=${daysAgo(0)}`)
@@ -117,7 +150,7 @@ export default function Funding() {
   const tot = reg.data?.totals
   const paid = async (r) => {
     setErr(null)
-    try { await markRepaymentPaid(token, r.id, { paid_on: daysAgo(0) }); invalidate() } catch (x) { setErr(actionError(x) === 'forbidden' ? t('fund.forbidden') : actionError(x)) }
+    try { await markRepaymentPaid(request, r.id, { paid_on: daysAgo(0) }); invalidate() } catch (x) { setErr(actionError(x) === 'forbidden' ? t('fund.forbidden') : actionError(x)) }
   }
   const head = <PageHead title={t('nav.funding')} sub={t('fund.sub')}
     actions={available ? (canEdit && <Btn variant="primary" icon={<I.plus size={16} />} onClick={() => setAdding(true)}>{t('fund.record')}</Btn>) : <NotYet note={t('fund.notApplied')}>{t('fund.record')}</NotYet>} />
@@ -167,9 +200,10 @@ export default function Funding() {
           <Card title={t('fund.howTitle')}><p className="v2-sec">{t('fund.how')}</p></Card>
           <Card title={t('fund.founderTitle')}><p className="v2-sec">{t('fund.founder')}</p></Card>
           <Card title={t('fund.updateTitle')}><p className="v2-sec">{t('fund.updateText')}</p><Link to="/business/ai-cfo">{t('fund.updateLink')}</Link></Card>
-          <Card title={t('fund.intercoTitle')}><p className="v2-sec">{t('fund.interco')}</p><Link to="/business/intercompany">{t('fund.intercoLink')}</Link></Card>
+          <Card title={t('fund.intercoTitle')}><p className="v2-sec">{t('fund.interco')}</p><Link to="/business/bank-import">{t('fund.intercoLink')}</Link></Card>
         </aside>
       </div>
+      <IncomingPayments t={t} lang={lang} />
       {reg.data?.upcoming?.length > 0 && (
         <Card title={t('fund.upcomingTitle')} aside={<Link to="/business/radar">{t('nav.radar')}</Link>}>
           <ul className="v2-moves">{reg.data.upcoming.slice(0, 8).map((u) => (

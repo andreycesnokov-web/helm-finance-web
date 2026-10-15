@@ -5,6 +5,7 @@
 import { Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { apiFetch } from '../../lib/api'
+import { submitCompanyCreation, finishCompanyCreation } from '../../lib/companyCreation'
 import { useAuth } from '../../hooks/useAuth'
 import { formatAmount } from '../../lib/money'
 import { t } from '../../i18n'
@@ -1861,7 +1862,9 @@ export function BusinessNew() {
     if (!f.name.trim()) { setErr('Business name is required.'); return }
     setBusy(true); setErr('')
     try {
-      const { business } = await apiFetch('/businesses', token, { method: 'POST', body: f })
+      const { user_role, ...body } = f // This UI hint never changes the server's owner role.
+      const { business } = await submitCompanyCreation(token, body)
+      finishCompanyCreation(token)
       applyActive({ id: business.id, name: business.name, type: 'business', role: 'owner' })
       refresh()
       navigate('/business/pulse')

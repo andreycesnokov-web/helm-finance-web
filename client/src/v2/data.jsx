@@ -27,15 +27,20 @@ export function V2DataProvider({ children }) {
   const cache = useRef(new Map())
   const [gen, setGen] = useState(0)
   const wsId = active?.id ?? null
+  const lastScope = useRef({ scopeKey, wsId })
 
-  useEffect(() => { cache.current = new Map(); setGen((g) => g + 1) }, [scopeKey, wsId])
+  useEffect(() => {
+    if (lastScope.current.scopeKey === scopeKey && lastScope.current.wsId === wsId) return
+    lastScope.current = { scopeKey, wsId }
+    cache.current = new Map(); setGen((g) => g + 1)
+  }, [scopeKey, wsId])
 
   const get = useCallback((path, { force = false } = {}) => {
     const key = `${wsId}|${path}`
     const hit = cache.current.get(key)
     if (!force && hit && (hit.at == null || Date.now() - hit.at < FRESH_MS)) return hit.p
     // Technical tags such as "[CFO_AI_DEMO_PACK_V1]" are hidden from every screen (lib/markers.js).
-    const p = apiFetch(path, token).then(scrubMarkers)
+    const p = apiFetch(path, { token, businessId: wsId, isCurrent: () => true }).then(scrubMarkers)
     const entry = { p, at: null }
     cache.current.set(key, entry)
     p.then(() => { entry.at = Date.now() },

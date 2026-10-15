@@ -9,9 +9,12 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (token) {
-      // Verify token still valid by fetching pulse
-      fetch('/api/pulse', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      // Verify the same CFO token through the existing balance-free workspace
+      // endpoint. Authentication must not fetch default-company finances before a
+      // bookmarked company has been selected, nor require a finance-viewing role.
+      // Only 401 means the token is bad; offline/server errors keep the session.
+      fetch('/api/workspaces', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => { if (r.status === 401) throw new Error('unauthorized') }, () => { /* offline: keep the session */ })
         .then(() => {
           const payload = JSON.parse(atob(token.split('.')[1]))
           setUser({ id: payload.userId, firstName: payload.firstName })

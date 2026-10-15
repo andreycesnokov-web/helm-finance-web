@@ -5,10 +5,10 @@
 //   document           Documents (upload and AI reading live there)
 //   statement          Bank import
 // The legacy Add page (scope 'personal' by default) is no longer reachable from v2.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
-import DebtFormModal from '../../components/DebtFormModal'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
+import BillDialog from '../components/BillDialog'
 import I from '../icons'
 import { PageHead, Card, Btn, Skeleton } from '../ui'
 import { useT } from '../i18n'
@@ -16,6 +16,8 @@ import { useApi, useInvalidate } from '../data'
 import { createBusinessTransaction, actionError } from '../lib/actions'
 import { addEntryBody } from '../lib/addEntry'
 import { money } from '../lib/format'
+import { financialActor } from '../../lib/financialRecovery'
+import { entryDraftKey, readEntryDraft, writeEntryDraft } from '../lib/entryDraft'
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const CHOICES = [
@@ -24,41 +26,57 @@ const CHOICES = [
 const EMPTY = (type) => ({ type, amount: '', wallet_id: '', date: today(), description: '', category: '' })
 
 export default function AddEntry() {
+  const request = useBusinessRequest()
+  const draftKey = entryDraftKey(financialActor(request.token), request.businessId)
+  return <ScopedAddEntry key={draftKey || 'unavailable'} request={request} draftKey={draftKey} />
+}
+
+function ScopedAddEntry({ request, draftKey }) {
   const t = useT()
-  const { token } = useAuth()
   const invalidate = useInvalidate()
   const wallets = useApi('/wallets')
-  const [kind, setKind] = useState('expense')
-  const [f, setF] = useState(EMPTY('expense'))
+  const [f, setF] = useState(() => readEntryDraft(localStorage, draftKey) || EMPTY('expense'))
+  const kind = f.type
+  const submitting = useRef(false)
   const [modal, setModal] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const [done, setDone] = useState(null)
+  const [draftStored, setDraftStored] = useState(true)
   const list = useMemo(() => (wallets.data?.wallets || []).filter((w) => w.is_active !== false), [wallets.data])
-  const selectedWalletId = f.wallet_id || (list.length === 1 ? list[0].id : '')
+  const selectedWalletId = f.wallet_id ? (list.some(w => w.id === f.wallet_id) ? f.wallet_id : '') : (list.length === 1 ? list[0].id : '')
   const selectedWallet = list.find((w) => w.id === selectedWalletId)
   const walletCurrency = (selectedWallet?.currency || 'IDR').toUpperCase()
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
+  useEffect(() => { setDraftStored(writeEntryDraft(localStorage, draftKey, f)) }, [draftKey, f])
 
   const pick = (k) => {
     setErr(null); setDone(null)
     if (k === 'payable' || k === 'receivable') { setModal(k); return }
-    setKind(k); setF((x) => ({ ...EMPTY(k), wallet_id: x.wallet_id }))
+    setF((x) => ({ ...EMPTY(k), wallet_id: x.wallet_id }))
   }
 
   const save = async (e) => {
     e.preventDefault()
+    if (submitting.current || !request.isCurrent()) return
     const body = addEntryBody({ ...f, wallet_id: selectedWalletId, currency: walletCurrency })
     if (body.error) { setErr(t(`add.err.${body.error}`)); return }
-    setBusy(true); setErr(null)
+    submitting.current = true; setBusy(true); setErr(null)
     try {
-      await createBusinessTransaction(token, body.tx)
+      await createBusinessTransaction(request, body.tx)
+      if (!request.isCurrent()) return
       invalidate()
       setDone({ type: body.tx.type, amount: body.tx.amount, currency: body.tx.currency })
       setF((x) => ({ ...EMPTY(x.type), wallet_id: x.wallet_id }))
     } catch (x) {
+      if (!request.isCurrent()) return
+      const d = x?.data
+      if (d && (d.error === 'insufficient_balance' || d.error === 'wallet_balance_negative')) {
+        setErr(t(`add.err.${d.error}`, { name: d.wallet_name, bal: money(d.balance, { currency: d.currency || 'IDR', full: true }), short: money(d.shortfall, { currency: d.currency || 'IDR', full: true }) }))
+        return
+      }
       setErr(actionError(x) === 'forbidden' ? t('add.forbidden') : (x?.data?.error || actionError(x)))
-    } finally { setBusy(false) }
+    } finally { submitting.current = false; if (request.isCurrent()) setBusy(false) }
   }
 
   return (
@@ -93,7 +111,7 @@ export default function AddEntry() {
             <label className="v2-field">
               <span className="v2-field-label">{t(kind === 'income' ? 'add.walletIn' : 'add.walletOut')}</span>
               {list.length === 0
-                ? <span className="v2-muted v2-small">{t('add.noWallets')} <Link to="/business/accounts/manage">{t('acc.add')}</Link></span>
+                ? <span className="v2-muted v2-small">{t('add.noWallets')} <Link to="/business/accounts">{t('acc.add')}</Link></span>
                 : (
                   <select id="add-wallet" className="v2-select" value={selectedWalletId} onChange={set('wallet_id')} required>
                     {list.length > 1 && <option value="">{t('add.pickWallet')}</option>}
@@ -114,6 +132,7 @@ export default function AddEntry() {
               <input id="add-category" className="v2-input" value={f.category} onChange={set('category')} maxLength={120} placeholder={t('add.categoryPh')} />
             </label>
             <p className="v2-muted v2-small">{t('add.businessNote')}</p>
+            <p className={draftStored ? 'v2-muted v2-small' : 'v2-inline-err'} role={draftStored ? undefined : 'alert'} data-entry-draft>{t(draftStored ? 'add.draftNote' : 'add.draftUnavailable')}</p>
             <div className="v2-decide-row">
               <Btn to="/business/transactions">{t('dec.cancel')}</Btn>
               <button type="submit" className="v2-btn v2-btn-primary" disabled={busy || list.length === 0}>{t(kind === 'income' ? 'add.saveIn' : 'add.saveOut')}</button>
@@ -124,8 +143,7 @@ export default function AddEntry() {
         )}
       </Card>
 
-      {modal && <DebtFormModal mode={modal} token={token} lockBusinessScope
-        onClose={() => setModal(null)} onSuccess={() => { setModal(null); invalidate(); setDone(null) }} />}
+      {modal && <BillDialog mode={modal} onClose={() => setModal(null)} onSaved={() => { invalidate(); setDone(null) }} />}
     </div>
   )
 }

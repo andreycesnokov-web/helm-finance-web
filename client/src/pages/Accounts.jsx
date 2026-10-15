@@ -90,8 +90,6 @@ export default function Accounts() {
   const [editWallet,   setEditWallet]   = useState(null)
   const [form,         setForm]         = useState(EMPTY_FORM)
   const [saving,       setSaving]       = useState(false)
-  const [backfilling,  setBackfilling]  = useState(false)
-  const [backfillDone, setBackfillDone] = useState(false)
 
   // ── Admin ─────────────────────────────────────────────────────────────────
   const [isAdmin,      setIsAdmin]      = useState(false)
@@ -218,22 +216,6 @@ export default function Accounts() {
   // and from "the request failed", and only this one invites a first wallet.
   const resolvedEmpty = !loading && !loadError && wallets.length === 0
 
-  // ── Backfill handler ──────────────────────────────────────────────────────
-  const handleBackfill = async () => {
-    if (!window.confirm('Import your existing account names as wallets? You can edit them afterwards.')) return
-    setBackfilling(true)
-    try {
-      const r = await apiFetch('/wallets/backfill', token, { method: 'POST', body: {} })
-      setBackfillDone(true)
-      await load()
-      if (r.created === 0) alert('All existing accounts are already in your wallet list.')
-    } catch (e) {
-      alert(e.message)
-    } finally {
-      setBackfilling(false)
-    }
-  }
-
   // ── Modal helpers ─────────────────────────────────────────────────────────
   const openAdd = () => {
     setEditWallet(null)
@@ -277,7 +259,8 @@ export default function Accounts() {
             type:            resolvedType,
             entity_name:     form.entity_name || null,
             opening_balance: Number(form.opening_balance) || 0,
-            sort_order:      wallets.length,
+            // Keep create intent stable after a committed response is lost.
+            // The refreshed list length includes that wallet and cannot be reused.
             scope:           form.scope || 'business',
           },
         })
@@ -308,6 +291,7 @@ export default function Accounts() {
         method: 'POST',
         body: {
           target_balance:   targetNum,
+          expected_balance: adjustWallet.balance,
           reason:           adjustForm.reason.trim(),
           transaction_date: adjustForm.transaction_date || undefined,
         },
@@ -382,16 +366,12 @@ export default function Accounts() {
       )}
 
       {/* Backfill banner — only when legacy accounts exist and no wallets yet. */}
-      {resolvedEmpty && legacySources.length > 0 && !backfillDone && (
+      {resolvedEmpty && legacySources.length > 0 && (
         <Card className="acct-backfill">
           <p className="acct-addmore-title">
             {t('accounts.youHaveAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
           </p>
-          <p className="acct-legacy-sub">{t('accounts.importSub')}</p>
-          <Btn variant="primary" onClick={handleBackfill} disabled={backfilling}>
-            {backfilling ? t('accounts.importing')
-              : t('accounts.importAccounts').replace('{n}', legacySources.length).replace('{s}', legacySources.length !== 1 ? 's' : '')}
-          </Btn>
+          <p className="acct-legacy-sub" role="status">{t('accounts.legacyReviewRequired')}</p>
         </Card>
       )}
 
@@ -424,15 +404,12 @@ export default function Accounts() {
           wallets. Same content, on the shared Card. */}
       {!loading && !loadError && wallets.length > 0 && legacySources.length > 0 && (
         <Card title={t('accounts.legacyTitle')}>
-          <p className="acct-legacy-sub">{t('accounts.legacySub')}</p>
+          <p className="acct-legacy-sub" role="status">{t('accounts.legacyReviewRequired')}</p>
           <div className="acct-legacy-chips">
             {legacySources.map((a) => (
               <span key={a.id} className="acct-chip">{a.name}</span>
             ))}
           </div>
-          <Btn variant="secondary" onClick={handleBackfill} disabled={backfilling}>
-            {backfilling ? t('accounts.importing') : t('accounts.importAsWallets')}
-          </Btn>
         </Card>
       )}
 

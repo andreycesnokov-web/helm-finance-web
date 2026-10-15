@@ -6,6 +6,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { apiFetch, setActiveBusinessId } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
+import FinancialRecovery from '../components/FinancialRecovery'
 
 const Ctx = createContext(null)
 export const useWorkspace = () => useContext(Ctx)
@@ -30,12 +31,19 @@ export function WorkspaceProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [scopeKey, setScopeKey] = useState(0)   // bump = clear workspace-scoped caches
+  // Synchronous selection identity: request guards must see a switch before React
+  // commits it, and must also work when localStorage is unavailable.
+  const selectionRef = useRef({ id: null, type: null, revision: 0 })
 
   const wsRef = useRef(workspaces)
   wsRef.current = workspaces
   const switchToRef = useRef(null)
 
   const applyActive = useCallback((w) => {
+    const id = w?.id == null ? null : String(w.id)
+    if (selectionRef.current.id !== id || selectionRef.current.type !== (w?.type ?? null)) {
+      selectionRef.current = { id, type: w?.type ?? null, revision: selectionRef.current.revision + 1 }
+    }
     setActive(w)
     if (w) {
       if (w.type === 'personal') setActiveBusinessId(null)
@@ -54,7 +62,8 @@ export function WorkspaceProvider({ children }) {
       const data = await apiFetch('/workspaces', token)
       const ws = { personal: data.personal || [], business: data.business || [] }
       setWorkspaces(ws)
-      let stored = null; try { stored = localStorage.getItem(LS_LAST) || localStorage.getItem(LS_ACTIVE) } catch {}
+      let stored = selectionRef.current.id
+      if (!stored) { try { stored = localStorage.getItem(LS_LAST) || localStorage.getItem(LS_ACTIVE) } catch {} }
       applyActive(pickActive(ws, stored))
     } catch (e) { setError(e.message || 'Failed to load workspaces') }
     finally { setLoading(false) }
@@ -112,8 +121,9 @@ export function WorkspaceProvider({ children }) {
   }, [workspaces, active, switchTo])
 
   return (
-    <Ctx.Provider value={{ workspaces, active, loading, error, scopeKey, switchTo, refresh: load, applyActive }}>
+    <Ctx.Provider value={{ workspaces, active, loading, error, scopeKey, selectionRef, switchTo, refresh: load, applyActive }}>
       {children}
+      <FinancialRecovery />
     </Ctx.Provider>
   )
 }

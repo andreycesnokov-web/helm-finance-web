@@ -56,7 +56,7 @@ export const isBankWallet = (w) =>
  *   statements   every bank account has a statement reaching the month end
  * Returns the checks and an overall percentage of complete records.
  */
-export function closeReadiness({ month, transactions = [], debts = [], batches = [], wallets = [] }) {
+export function closeReadiness({ month, transactions = [], debts = [], batches = [], wallets = [], operationDocuments = null }) {
   // Every company row counts, whatever its scope label (see lib/performance.js, isBizIdr).
   const tx = transactions.filter((t) => inMonth(txDate(t), month))
   const noCat = tx.filter(needsCategory)
@@ -159,15 +159,17 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     if (!isBank) return false
     return !isReconciledBankTx(t)
   })
-  const records = tx.length + bills.length
-  const complete = Math.max(0, records - noCat.length - noDoc.length)
-  const percent = records ? Math.round((complete / records) * 100) : null
+  const records = operationDocuments ? operationDocuments.summary.total : tx.length + bills.length
+  const complete = operationDocuments ? operationDocuments.summary.complete : Math.max(0, records - noCat.length - noDoc.length)
+  const classification_percent = tx.length ? Math.round((tx.length-noCat.length)/tx.length*100) : null
+  const percent = operationDocuments ? (operationDocuments.summary.total ? Math.floor(operationDocuments.summary.complete/operationDocuments.summary.total*100) : null) : records ? Math.round((complete / records) * 100) : null
   const checks = [
     { key: 'statements', done: banks.length > 0 && withStatements.length === banks.length, total: banks.length, ok: withStatements.length, missing: banks.filter((w) => !withStatements.includes(w)).map((w) => w.name) },
     { key: 'reconciliation', done: banks.length > 0 && reconciled.length === banks.length, total: banks.length, ok: reconciled.length, missing: banks.filter((w) => !reconciled.includes(w)).map((w) => w.name) },
     { key: 'bills', done: noDoc.length === 0 && bills.length > 0, total: bills.length, ok: bills.length - noDoc.length, missing: noDoc.map((d) => d.counterparty).filter(Boolean) },
     { key: 'categories', done: noCat.length === 0, total: tx.length, ok: tx.length - noCat.length, missing: noCat.map((t) => t.description).filter(Boolean) },
   ]
+  if(operationDocuments){const s=operationDocuments.summary;checks[2]={key:'bills',done:s.document_control_complete,total:s.total,ok:s.complete,missing:operationDocuments.operations.filter(o=>o.status!=='complete').map(o=>o.description)};}
   const automated_checks_passed = percent === 100 && checks.every((c) => c.done)
   // Hard rule: Without explicit accountant confirmation, is_closed remains false.
   // When all automated checks pass, status is 'prepared_for_review'.
@@ -178,6 +180,7 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     records,
     complete,
     percent,
+    classification_percent,
     is_closed,
     automated_checks_passed,
     status: is_closed ? 'closed' : automated_checks_passed ? 'prepared_for_review' : 'in_progress',
@@ -605,7 +608,7 @@ export function dedupeDocumentLinks(links) {
  * - discrepancies: missing bank statements, unreconciled accounts, bills without docs, uncategorised transactions, unavailable files
  * - registry: list of transactions, debts, and their linked document status
  */
-export function packageExportData({ month, companyName = '', businessId = '', transactions = [], debts = [], batches = [], wallets = [] }) {
+export function packageExportData({ month, companyName = '', businessId = '', transactions = [], debts = [], batches = [], wallets = [], operationDocuments = null }) {
   const matchBiz = (item) => !businessId || !item.business_id || String(item.business_id) === String(businessId)
   const scopedTx = transactions.filter(matchBiz)
   const scopedDebts = debts.filter(matchBiz)
@@ -618,6 +621,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
     debts: scopedDebts,
     batches: scopedBatches,
     wallets: scopedWallets,
+    operationDocuments,
   })
   const inM = (iso) => inMonth(iso, month)
   const monthTx = scopedTx.filter((t) => inM(txDate(t)))
@@ -654,7 +658,10 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
   ]
 
   return {
-    package_version: '1.0',
+    package_version: '1.1',
+    package_kind: 'preliminary',
+    operation_documents: operationDocuments,
+    document_control: operationDocuments?.summary || null,
     generated_at: new Date().toISOString(),
     month,
     company: {
@@ -681,10 +688,12 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       missing_bank_statements: missingStatements,
       unreconciled_bank_statements: unreconciledStatements,
       unlinked_transactions: readiness.unlinked_transactions || [],
-      bills_without_documents: missingBills,
+      bills_without_documents: operationDocuments ? [] : missingBills,
+      operations_with_document_gaps: operationDocuments?.operations.filter(o=>o.status!=='complete') || [],
       uncategorised_transactions: missingCategories,
     },
     limitations: [
+      ...(operationDocuments?.limitations || []),
       ...(!readiness.is_closed ? ['Month is not closed: awaiting accountant sign-off and verification.'] : []),
       ...(missingStatements.length ? [`Missing bank statements for: ${missingStatements.join(', ')}`] : []),
       ...(unreconciledStatements.length ? [`Unreconciled bank statements for: ${unreconciledStatements.join(', ')}`] : []),
@@ -692,7 +701,7 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
       ...(missingBills.length ? [`Bills without original documents: ${missingBills.length}`] : []),
       ...(missingCategories.length ? [`Transactions without category: ${missingCategories.length}`] : []),
     ],
-    records_registry: registry,
+    records_registry: operationDocuments ? operationDocuments.operations.map(o=>({type:'operation',...o})) : registry,
   }
 }
 
@@ -712,6 +721,7 @@ export async function createAccountantZipPackage({
   batches = [],
   wallets = [],
   documents = [],
+  operationDocuments = null,
   token = null,
   fetchSignedUrl = null,
   signal = null,
@@ -723,16 +733,17 @@ export async function createAccountantZipPackage({
     throw err
   }
 
-  const exportData = packageExportData({ month, companyName, businessId, transactions, debts, batches, wallets })
+  const exportData = packageExportData({ month, companyName, businessId, transactions, debts, batches, wallets, operationDocuments })
   const unavailableFiles = []
   const filesToZip = [
+    ...(operationDocuments ? [{name:'operation-documents.json',data:JSON.stringify(operationDocuments,null,2)}] : []),
     { name: 'documents/README.txt', data: `Financial documents for ${month} month close.\nUnavailable files are listed in discrepancies.json.\n` },
   ]
   const addedZipPaths = new Set(['documents/README.txt'])
 
   const inM = (iso) => inMonth(iso, month)
-  const monthDebtIds = new Set(exportData.records_registry.filter((r) => r.type === 'bill_or_invoice').map((r) => String(r.id)))
-  const monthTxIds = new Set(exportData.records_registry.filter((r) => r.type === 'transaction').map((r) => String(r.id)))
+  const monthDebtIds = new Set(operationDocuments ? operationDocuments.operations.flatMap(o=>o.invoice?[String(o.invoice.id)]:[]) : exportData.records_registry.filter((r) => r.type === 'bill_or_invoice').map((r) => String(r.id)))
+  const monthTxIds = new Set(operationDocuments ? operationDocuments.operations.flatMap(o=>o.payments.map(p=>String(p.id))) : exportData.records_registry.filter((r) => r.type === 'transaction').map((r) => String(r.id)))
 
   // Scope documents to selected company and month
   const matchBiz = (item) => !businessId || !item.business_id || String(item.business_id) === String(businessId)
@@ -753,7 +764,7 @@ export async function createAccountantZipPackage({
     return false
   }
 
-  const targetDocs = documents.filter(isDocInMonth)
+  const targetDocs = operationDocuments ? [...new Map(operationDocuments.operations.flatMap(o=>[...o.documents,...o.bank_rows.map(r=>operationDocuments.available_documents.find(d=>d.id===r.document_id)).filter(Boolean)]).map(d=>[d.id,d])).values()] : documents.filter(isDocInMonth)
 
   // 1. Process Financial Documents (Invoices, Receipts, etc.)
   for (const doc of targetDocs) {

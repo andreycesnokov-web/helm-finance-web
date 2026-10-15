@@ -103,7 +103,6 @@ export default function AICFO() {
           </div>
         </form>
         <div className="v2-chips">{chips.map((k) => <button key={k} type="button" className="v2-chip" onClick={() => openAsk(t(`cfo.chip.${k}`))}>{t(`cfo.chip.${k}`)}</button>)}</div>
-        <p className="v2-muted v2-small"><Link to="/business/ai-cfo/classic">{t('bills.classic')}</Link></p>
       </Card>
     </div>
   )

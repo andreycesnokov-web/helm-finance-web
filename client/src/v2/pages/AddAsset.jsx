@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import DocumentIntakeModal from '../../components/DocumentIntakeModal'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
-import { useAuth } from '../../hooks/useAuth'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
 import I from '../icons'
 import { PageHead, Card, Btn, NotYet } from '../ui'
 import { useT } from '../i18n'
@@ -24,7 +24,7 @@ export default function AddAsset() {
   const t = useT()
   const nav = useNavigate()
   const { active } = useWorkspace()
-  const { token } = useAuth()
+  const request = useBusinessRequest()
   const invalidate = useInvalidate()
   const reg = useApi('/assets')
   const debts = useApi('/debts?type=payable')
@@ -46,7 +46,7 @@ export default function AddAsset() {
     if (!f.name.trim() || !(Number(f.cost) > 0)) { setErr(t('addAsset.required')); return }
     setBusy(true); setErr(null)
     try {
-      await createAsset(token, { ...f, cost: f.cost, quantity: Number(f.quantity) || 1,
+      await createAsset(request, { ...f, cost: f.cost, quantity: Number(f.quantity) || 1,
         purchase_debt_id: f.purchase_debt_id || null, supplier_counterparty_id: f.supplier_counterparty_id || null, asset_group: f.asset_group || null })
       invalidate(); nav('/business/assets')
     } catch (e) {

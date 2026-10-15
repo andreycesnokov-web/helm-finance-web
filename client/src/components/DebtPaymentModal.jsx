@@ -23,6 +23,22 @@ import { apiFetch, fmt } from '../lib/api'
 
 const REC_COLOR = { safe: '#085041', caution: '#92400E', not_recommended: '#B42318', insufficient_data: '#475467' }
 const REC_BG    = { safe: '#E1F5EE', caution: '#FEF9EE', not_recommended: '#FEF3F2', insufficient_data: '#F2F4F7' }
+// Same list as server/lib/walletLedger.js MAY_GO_NEGATIVE.
+const MAY_GO_NEGATIVE = ['card', 'credit_card', 'credit_line', 'overdraft']
+
+// AI CFO factor lines in the app language (the server sends English labels).
+const FACTOR_T = {
+  exceeds_cash:            { en: 'Payment exceeds all business cash', ru: 'Платёж больше всех денег компании', id: 'Pembayaran melebihi seluruh kas usaha' },
+  wallet_negative:         { en: 'The account would go below zero', ru: 'Счёт ушёл бы в минус', id: 'Saldo rekening akan minus' },
+  runway_critical:         { en: 'Very little runway left after payment', ru: 'После платежа денег почти не останется', id: 'Runway sangat pendek setelah pembayaran' },
+  runway_low:              { en: 'Runway gets short after payment', ru: 'После платежа запас денег станет коротким', id: 'Runway menjadi pendek setelah pembayaran' },
+  large_payment:           { en: 'A large share of all cash', ru: 'Большая доля всех денег компании', id: 'Porsi besar dari seluruh kas' },
+  payroll_pressure:        { en: 'Payroll and near bills may not be covered', ru: 'Может не хватить на зарплату и ближайшие счета', id: 'Gaji dan tagihan terdekat mungkin tidak tertutup' },
+  below_reserve:           { en: 'Cash falls below the reserve', ru: 'Деньги опустятся ниже резерва', id: 'Kas turun di bawah cadangan' },
+  tax_obligation_pressure: { en: 'Upcoming taxes may not be covered', ru: 'Может не хватить на ближайшие налоги', id: 'Pajak terdekat mungkin tidak tertutup' },
+  no_burn:                 { en: 'No expense history yet', ru: 'Пока нет истории расходов', id: 'Belum ada riwayat pengeluaran' },
+}
+
 const REC_LABEL = {
   safe:               { en: 'SAFE', ru: 'БЕЗОПАСНО', id: 'AMAN' },
   caution:            { en: 'CAUTION', ru: 'ОСТОРОЖНО', id: 'HATI-HATI' },
@@ -39,21 +55,30 @@ const PAY_T = {
     noCurAcc: (c) => `No ${c} accounts available. Please add a ${c} account in Accounts first.`, noAcc: 'No accounts yet — add one in Accounts first.',
     fullIn: 'Will be marked as fully received', fullOut: 'Will be marked as fully paid', partial: (v, c) => `Partial payment — ${v} ${c} remaining`,
     processing: 'Processing…', markIn: '✓ Mark fully received', markOut: '✓ Mark fully paid', recordPartial: 'Record partial', cancel: 'Cancel',
-    failed: 'Payment failed. Please try again.', cash: 'Cash', runway: 'Runway', ack: 'I understand the financial risk and want to continue.' },
+    failed: 'Payment failed. Please try again.', cash: 'Cash', runway: 'Runway', ack: 'I understand the financial risk and want to continue.',
+    negBefore: (n, b) => `${n} already shows ${b} in the books. A bank account cannot be below zero — incoming money is missing. Import this account's bank statement or record the income, then mark the payment.`,
+    short: (n, b, s) => `${n} has ${b}. This payment would take it below zero — ${s} is missing. Choose another account or record the incoming money first.`,
+    importLink: 'Import bank statement' },
   ru: { titleIn: 'Отметить поступление', titleOut: 'Отметить оплату', total: 'Сумма', alreadyIn: 'Уже получено', alreadyOut: 'Уже оплачено',
     remaining: 'Осталось', amount: (c) => `Сумма платежа (${c})`, date: 'Дата платежа', intoAcc: 'На какой счёт поступили', fromAcc: 'С какого счёта оплачено',
     selectAcc: 'Выберите счёт…', crossOpt: (c) => `(${c} — другая валюта недоступна)`, crossErr: (c) => `Оплата в другой валюте пока не поддерживается. Выберите счёт в ${c}.`,
     noCurAcc: (c) => `Нет счетов в ${c}. Сначала добавьте счёт в ${c} в разделе «Счета».`, noAcc: 'Счетов пока нет — добавьте счёт в разделе «Счета».',
     fullIn: 'Будет отмечено как полностью полученное', fullOut: 'Будет отмечено как полностью оплаченное', partial: (v, c) => `Частичная оплата — останется ${v} ${c}`,
     processing: 'Сохраняем…', markIn: '✓ Отметить как полученное', markOut: '✓ Отметить как оплаченное', recordPartial: 'Записать частичную оплату', cancel: 'Отмена',
-    failed: 'Не удалось сохранить платёж. Попробуйте ещё раз.', cash: 'Касса', runway: 'Запас', ack: 'Я понимаю финансовый риск и хочу продолжить.' },
+    failed: 'Не удалось сохранить платёж. Попробуйте ещё раз.', cash: 'Касса', runway: 'Запас', ack: 'Я понимаю финансовый риск и хочу продолжить.',
+    negBefore: (n, b) => `На счёте ${n} по учёту уже ${b}. Банковский счёт не может быть в минусе — в учёте не хватает поступлений. Загрузите выписку по этому счёту или запишите поступление, потом отметьте оплату.`,
+    short: (n, b, s) => `На счёте ${n} ${b}. Этот платёж увёл бы счёт в минус — не хватает ${s}. Выберите другой счёт или сначала запишите поступление денег.`,
+    importLink: 'Загрузить выписку' },
   id: { titleIn: 'Catat pembayaran diterima', titleOut: 'Catat pembayaran', total: 'Jumlah total', alreadyIn: 'Sudah diterima', alreadyOut: 'Sudah dibayar',
     remaining: 'Sisa', amount: (c) => `Jumlah pembayaran (${c})`, date: 'Tanggal pembayaran', intoAcc: 'Diterima ke rekening', fromAcc: 'Dibayar dari rekening',
     selectAcc: 'Pilih rekening…', crossOpt: (c) => `(${c} — beda mata uang tidak tersedia)`, crossErr: (c) => `Pembayaran beda mata uang belum didukung. Pilih rekening dalam ${c}.`,
     noCurAcc: (c) => `Belum ada rekening ${c}. Tambahkan rekening ${c} di menu Rekening.`, noAcc: 'Belum ada rekening — tambahkan di menu Rekening.',
     fullIn: 'Akan ditandai sudah diterima penuh', fullOut: 'Akan ditandai lunas', partial: (v, c) => `Pembayaran sebagian — sisa ${v} ${c}`,
     processing: 'Memproses…', markIn: '✓ Tandai diterima penuh', markOut: '✓ Tandai lunas', recordPartial: 'Catat pembayaran sebagian', cancel: 'Batal',
-    failed: 'Pembayaran gagal disimpan. Coba lagi.', cash: 'Kas', runway: 'Runway', ack: 'Saya memahami risiko keuangan dan ingin lanjut.' },
+    failed: 'Pembayaran gagal disimpan. Coba lagi.', cash: 'Kas', runway: 'Runway', ack: 'Saya memahami risiko keuangan dan ingin lanjut.',
+    negBefore: (n, b) => `Saldo ${n} di pembukuan sudah ${b}. Rekening bank tidak bisa minus — ada uang masuk yang belum tercatat. Impor mutasi rekening ini atau catat pemasukan, lalu tandai pembayaran.`,
+    short: (n, b, s) => `Saldo ${n} ${b}. Pembayaran ini membuat saldo minus — kurang ${s}. Pilih rekening lain atau catat uang masuk terlebih dahulu.`,
+    importLink: 'Impor mutasi bank' },
 }
 
 export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuccess }) {
@@ -103,11 +128,23 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
     return () => { cancelled = true; clearTimeout(tid) }
   }, [walletId, amountNum, payDate, debt.id, token])
 
-  const blockedNoAck = sim && sim.recommendation === 'not_recommended' && !ack
-  const fmtRunway = (r) => r === null || r === undefined ? '—' : (r >= 999 ? '∞' : `${r}d`)
+  // A payment may not take a money account below zero — the server refuses it too (409).
+  // Balance: the AI CFO check when it has answered, else the account list.
+  const walletBefore = sim?.current?.wallet_balance ?? (selectedAcc ? Number(selectedAcc.balance) : null)
+  const walletBlocked = !isReceivable && !!selectedAcc && isCurrencyMatch && walletBefore !== null &&
+    Number.isFinite(walletBefore) && !MAY_GO_NEGATIVE.includes(String(selectedAcc.type || '').toLowerCase()) &&
+    walletBefore - amountNum < -0.005 && amountNum > 0
+  const blockText = (before, shortfall) => before < 0
+    ? T.negBefore(selectedAcc?.name || '', `${fmt(before)} ${debtCurrency}`)
+    : T.short(selectedAcc?.name || '', `${fmt(before)} ${debtCurrency}`, `${fmt(shortfall)} ${debtCurrency}`)
+
+  const blockedNoAck = sim && sim.recommendation === 'not_recommended' && !ack && !walletBlocked
+  // Runway is meaningless once cash is not positive: show a dash, never "-17716d".
+  const fmtRunway = (r) => r === null || r === undefined || r < 0 ? '—' : (r >= 999 ? '∞' : `${r}d`)
+  const factorText = (f) => (FACTOR_T[f.key] && (FACTOR_T[f.key][lang] || FACTOR_T[f.key].en)) || f.label
 
   const handlePay = async () => {
-    if (!canSubmit) return
+    if (!canSubmit || walletBlocked) return
     setPaying(true); setError('')
     try {
       const result = await apiFetch(`/debts/${debt.id}/pay`, token, {
@@ -125,7 +162,12 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
       })
       onSuccess(result)
     } catch (e) {
-      setError(e.message || T.failed)
+      const d = e?.data
+      if (e?.status === 409 && d && (d.error === 'insufficient_balance' || d.error === 'wallet_balance_negative')) {
+        setError(blockText(Number(d.balance), Number(d.shortfall)))
+      } else {
+        setError(e.message || T.failed)
+      }
     } finally {
       setPaying(false)
     }
@@ -284,9 +326,22 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
                 <div style={{ color: '#92400E' }}>{lang === 'ru' ? 'Зарплата в течение 7 дней' : 'Payroll in 7 days'}: {fmt(sim.upcoming.payroll_7d)}</div>
               )}
             </div>
-            {(sim.factors || []).filter(f => ['high','critical','medium'].includes(f.severity)).slice(0, 2).map((f, i) => (
-              <div key={i} style={{ fontSize: 11.5, color: REC_COLOR[sim.recommendation], marginTop: 5 }}>• {f.label}</div>
+            {!walletBlocked && (sim.factors || []).filter(f => ['high','critical','medium'].includes(f.severity)).slice(0, 2).map((f, i) => (
+              <div key={i} style={{ fontSize: 11.5, color: REC_COLOR[sim.recommendation], marginTop: 5 }}>• {factorText(f)}</div>
             ))}
+          </div>
+        )}
+
+        {/* Below zero is not allowed — the reason and the way out, instead of a risk checkbox */}
+        {walletBlocked && (
+          <div role="alert" style={{
+            background: 'var(--red-light)', color: 'var(--red-dark)', borderRadius: 10, padding: '10px 13px',
+            fontSize: 'var(--text-sm)', lineHeight: 1.5, marginBottom: 12, border: '1px solid rgba(240,68,56,.2)',
+          }}>
+            {blockText(walletBefore, amountNum - walletBefore)}
+            <div style={{ marginTop: 6 }}>
+              <a href="/business/bank-import" style={{ fontWeight: 700, color: 'inherit' }}>{T.importLink} →</a>
+            </div>
           </div>
         )}
 
@@ -299,7 +354,7 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
         )}
 
         {/* Error */}
-        {error && (
+        {error && !walletBlocked && (
           <div style={{
             background: 'var(--red-light)', color: 'var(--red-dark)',
             borderRadius: 10, padding: '9px 13px', fontSize: 'var(--text-sm)', marginBottom: 12,
@@ -311,14 +366,14 @@ export default function DebtPaymentModal({ debt, accounts, token, onClose, onSuc
 
         {/* Submit */}
         <button
-          disabled={!canSubmit || blockedNoAck}
+          disabled={!canSubmit || blockedNoAck || walletBlocked}
           onClick={handlePay}
           className="btn btn-block btn-lg"
           style={{
-            background: (canSubmit && !blockedNoAck)
+            background: (canSubmit && !blockedNoAck && !walletBlocked)
               ? (isReceivable ? 'var(--green-dark)' : 'var(--brand)')
               : 'var(--bg-3)',
-            color: (canSubmit && !blockedNoAck) ? '#fff' : 'var(--text-4)',
+            color: (canSubmit && !blockedNoAck && !walletBlocked) ? '#fff' : 'var(--text-4)',
             marginBottom: 8,
             opacity: paying ? 0.7 : 1,
           }}

@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback,useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch } from '../lib/api'
 import { applicableMissingFields, pkpSelectValue } from '../lib/accountantReadiness'
 import { getLang } from '../i18n/index'
+import {useBusinessRequest} from '../lib/useBusinessRequest'
+import {performProfileOperation,profileCurrent,profileDelta} from '../lib/businessProfileOperation'
 
 const L = {
-  en: { title: 'Tax profile', subtitle: 'Company tax & compliance configuration · Indonesia',
+  en: { historical: 'The profile changed after this saved version. Reload before editing.', reload: 'Reload', title: 'Tax profile', subtitle: 'Company tax & compliance configuration · Indonesia',
     completeness: 'Tax profile completeness', incomplete: 'Your tax profile is incomplete. Complete the required fields before generating compliance obligations.',
     save: 'Save', verify: 'Mark verified', verified: 'Verified', save_first: 'Save changes first',
     sec_identity: 'Company identity', sec_reg: 'Tax registration', sec_form: 'Legal form & regime',
@@ -13,7 +15,7 @@ const L = {
     applicable: 'Applicable obligations', excluded: 'Not applicable', missing: 'Missing data', needsReview: 'Needs review',
     sourceReq: 'Source verification required', noActive: 'No active verified rules for this jurisdiction yet.',
     disclaimer: 'This information is for guidance only and does not constitute legal, tax or accounting advice. Confirm calculations with a licensed professional before making a tax payment or filing a return.' },
-  ru: { title: 'Налоговый профиль', subtitle: 'Налоговая и compliance-конфигурация компании · Индонезия',
+  ru: { historical: 'Профиль изменился после сохранённой версии. Загрузите актуальный профиль.', reload: 'Обновить', title: 'Налоговый профиль', subtitle: 'Налоговая и compliance-конфигурация компании · Индонезия',
     completeness: 'Заполненность профиля', incomplete: 'Профиль не заполнен. Заполните обязательные поля перед генерацией обязательств.',
     save: 'Сохранить', verify: 'Подтвердить', verified: 'Подтверждён', save_first: 'Сначала сохраните',
     sec_identity: 'Идентификация компании', sec_reg: 'Налоговая регистрация', sec_form: 'Юр. форма и режим',
@@ -21,7 +23,7 @@ const L = {
     applicable: 'Применимые обязательства', excluded: 'Неприменимо', missing: 'Недостающие данные', needsReview: 'Нужна проверка',
     sourceReq: 'Требуется проверка источника', noActive: 'Пока нет активных проверенных правил для юрисдикции.',
     disclaimer: 'Информация носит рекомендательный характер и не является юридической, налоговой или бухгалтерской консультацией. Перед платежом или подачей отчётности подтвердите расчёты у лицензированного специалиста.' },
-  id: { title: 'Profil pajak', subtitle: 'Konfigurasi pajak & kepatuhan perusahaan · Indonesia',
+  id: { historical: 'Profil berubah setelah versi tersimpan. Muat ulang sebelum mengedit.', reload: 'Muat ulang', title: 'Profil pajak', subtitle: 'Konfigurasi pajak & kepatuhan perusahaan · Indonesia',
     completeness: 'Kelengkapan profil pajak', incomplete: 'Profil pajak belum lengkap. Lengkapi bidang wajib sebelum membuat kewajiban.',
     save: 'Simpan', verify: 'Tandai terverifikasi', verified: 'Terverifikasi', save_first: 'Simpan dulu',
     sec_identity: 'Identitas perusahaan', sec_reg: 'Registrasi pajak', sec_form: 'Bentuk hukum & rezim',
@@ -45,6 +47,8 @@ const OPTS = {
 
 export default function TaxProfile() {
   const { token } = useAuth()
+  const request=useBusinessRequest(),inFlight=useRef(false),profileContext=useRef(null)
+  const [before,setBefore]=useState(null),[readError,setReadError]=useState(null),[loading,setLoading]=useState(true)
   const lang = ['ru', 'id'].includes(getLang()) ? getLang() : 'en'
   const l = L[lang]
   const [p, setP] = useState({})
@@ -54,22 +58,27 @@ export default function TaxProfile() {
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(() => {
-    apiFetch('/accountant/profile', token).then(d => { setP(d.profile || {}); setDirty(false) }).catch(() => {})
-    apiFetch('/accountant/applicability', token).then(setAppl).catch(() => {})
-  }, [token])
+    profileContext.current=null;inFlight.current=false;setBusy(false);setLoading(true);setReadError(null)
+    apiFetch('/accountant/profile', request).then(d => {if(!profileCurrent(request))return;profileContext.current=request; setP(d.profile || {});setBefore(d.profile);setMeta(d.completeness); setDirty(false) }).catch(e => {if(profileCurrent(request))setReadError(e.message)}).finally(()=>{if(profileCurrent(request))setLoading(false)})
+    apiFetch('/accountant/applicability', request).then(d=>{if(profileCurrent(request))setAppl(d)}).catch(e=>{if(profileCurrent(request))setReadError(e.message)})
+  }, [request])
   useEffect(() => { if (token) load() }, [token, load])
   useEffect(() => { if (appl?.completeness) setMeta(appl.completeness) }, [appl])
 
   const set = (k, v) => { setP({ ...p, [k]: v }); setDirty(true) }
   const save = async () => {
+    if(inFlight.current||loading||readError||profileContext.current!==request||!profileCurrent(request))return
+    inFlight.current=true
     setBusy(true)
-    try { const d = await apiFetch('/accountant/profile', token, { method: 'PUT', body: p }); setP(d.profile); setMeta(d.completeness); setDirty(false); apiFetch('/accountant/applicability', token).then(setAppl).catch(() => {}) }
-    catch (e) { alert(e.message) } finally { setBusy(false) }
+    try { const d = await performProfileOperation(request,'save',profileDelta(p,before),before?.profile_version??0,{send:(identity,body)=>apiFetch('/accountant/profile',identity,{method:'PUT',body}),read:(identity,key)=>apiFetch(`/accountant/profile/requests/${encodeURIComponent(key)}`,identity)});if(!profileCurrent(request))return;if(d.historical)throw Error(l.historical);setP(d.current_profile||d.profile);setBefore(d.current_profile||d.profile); setMeta(d.completeness); setDirty(false);apiFetch('/accountant/applicability',request).then(d=>{if(profileCurrent(request))setAppl(d)}).catch(e=>{if(profileCurrent(request))setReadError(e.message)}) }
+    catch (e) {if(profileCurrent(request))alert(e.message)} finally {if(profileCurrent(request)){setBusy(false);inFlight.current=false}}
   }
   const verify = async () => {
+    if(inFlight.current||dirty||loading||readError||profileContext.current!==request||!profileCurrent(request))return
+    inFlight.current=true
     setBusy(true)
-    try { await apiFetch('/accountant/profile/verify', token, { method: 'POST' }); load() }
-    catch (e) { alert(e.message) } finally { setBusy(false) }
+    try { const d=await performProfileOperation(request,'verify',{},before?.profile_version,{send:(identity,body)=>apiFetch('/accountant/profile/verify',identity,{method:'POST',body}),read:(identity,key)=>apiFetch(`/accountant/profile/requests/${encodeURIComponent(key)}`,identity)});if(!profileCurrent(request))return;if(d.historical)throw Error(l.historical);load() }
+    catch (e) {if(profileCurrent(request))alert(e.message)} finally {if(profileCurrent(request)){setBusy(false);inFlight.current=false}}
   }
 
   // A stored legacy `pkp` has no matching option, which would render as blank and silently
@@ -89,7 +98,9 @@ export default function TaxProfile() {
   )
 
   const pct = meta.percent || 0
-  const verified = p.profile_status === 'verified'
+  const verified = p.profile_status === 'verified'&&p.profile_version!=null&&String(p.profile_version)===String(p.verified_profile_version)
+  if(loading)return <p>…</p>
+  if(readError)return <div role="alert"><p>{readError}</p><button type="button" onClick={load}>{l.reload}</button></div>
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto' }}>

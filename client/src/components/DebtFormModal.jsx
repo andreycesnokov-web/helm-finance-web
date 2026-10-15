@@ -101,7 +101,7 @@ export default function DebtFormModal({
       const body = { type: mode, counterparty: counterparty.trim(), amount: amountNum, due_date: dueDate || null, scope }
       body.description = description.trim() || null
       const debt = isEdit
-        ? await apiFetch(`/debts/${initialDebt.id}`, token, { method: 'PATCH', body })
+        ? await apiFetch(`/debts/${initialDebt.id}`, token, { method: 'PATCH', body:{...body,expected_version:initialDebt.bill_version} })
         : await apiFetch('/debts', token, { method: 'POST', body })
       onSuccess(debt)
     } catch (e) {

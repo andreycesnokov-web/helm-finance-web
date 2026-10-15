@@ -1,5 +1,5 @@
 // AI Accountant section nav: Month close · Documents by transaction · Tax calendar · Tax profile.
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useT } from '../i18n'
 
 const TABS = [
@@ -11,10 +11,13 @@ const TABS = [
 
 export default function AccountantTabs({ active }) {
   const t = useT()
+  const [sp]=useSearchParams()
+  const month=sp.get('month')
+  const contextual=to=>month&&/^20\d{2}-(0[1-9]|1[0-2])$/.test(month)?to+(to.includes('?')?'&':'?')+'month='+encodeURIComponent(month):to
   return (
     <nav className="v2-tabs" aria-label={t('acct.sections')}>
       {TABS.map(([k, to]) => (
-        <Link key={k} to={to} className={`v2-tab-link${active === k ? ' is-on' : ''}`} aria-current={active === k ? 'page' : undefined}>{t(`acct.tab.${k}`)}</Link>
+        <Link key={k} to={contextual(to)} className={`v2-tab-link${active === k ? ' is-on' : ''}`} aria-current={active === k ? 'page' : undefined}>{t(`acct.tab.${k}`)}</Link>
       ))}
     </nav>
   )

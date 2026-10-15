@@ -147,14 +147,14 @@ export default function Pulse() {
               {currencies.some((c) => c !== 'IDR') && p.rates_metadata && p.rates_metadata.source !== 'uninitialized' && (
                 <> · {
                   p.rates_metadata.source === 'bi_jisdor' ? 'JISDOR'
-                  : p.rates_metadata.source === 'bi_jisdor_hybrid' ? 'JISDOR + Market'
-                  : p.rates_metadata.source === 'exchangerate_api_hybrid' ? 'Market + Crypto'
-                  : p.rates_metadata.source === 'exchangerate_api' ? 'Market FX'
-                  : 'FX'
+                  : p.rates_metadata.source === 'bi_jisdor_hybrid' ? t('pulse.fx.jisdorMarket')
+                  : p.rates_metadata.source === 'exchangerate_api_hybrid' ? t('pulse.fx.marketCrypto')
+                  : p.rates_metadata.source === 'exchangerate_api' ? t('pulse.fx.market')
+                  : t('pulse.fx.any')
                 }{p.rates_metadata.rate_effective_date ? ` (${shortDate(p.rates_metadata.rate_effective_date, lang)})` : ''}{
-                  p.rates_metadata.status === 'weekend_holding' ? ' [Weekend]'
-                  : p.rates_metadata.status === 'degraded' ? ' [Fallback]'
-                  : p.rates_metadata.status === 'stale' ? ' [Stale]'
+                  p.rates_metadata.status === 'weekend_holding' ? ` · ${t('pulse.fx.weekend')}`
+                  : p.rates_metadata.status === 'degraded' ? ` · ${t('pulse.fx.fallback')}`
+                  : p.rates_metadata.status === 'stale' ? ` · ${t('pulse.fx.stale')}`
                   : ''
                 }</>
               )}

@@ -10,6 +10,7 @@ import { money, shortDate } from '../lib/format'
 import { determineUnreconciledReason } from '../lib/accounting'
 import { updateTransaction } from '../lib/actions'
 import { detailPath } from '../pages/Bills'
+import { catLabel } from '../lib/categoryLabel'
 
 export default function UnreconciledTxDrawer({
   tx,
@@ -250,7 +251,9 @@ export default function UnreconciledTxDrawer({
       const payload = {
         description: draft.description,
         category: draft.category || null,
+        expected_version: tx.balance_version,
       }
+      if (tx.balance_version == null) throw new Error('Reload the transaction before editing.')
       // Linked debt payments and opening balance cannot have wallet or date modified
       if (draft.wallet_id && !isOpening && !linkedDebt) {
         payload.wallet_id = draft.wallet_id
@@ -530,7 +533,7 @@ export default function UnreconciledTxDrawer({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span className="v2-muted">{t('acct.drawer.category')}:</span>
-                  <span style={{ fontWeight: 500 }}>{draft.category || t('tx.col.noCat', '—')}</span>
+                  <span style={{ fontWeight: 500 }}>{draft.category ? catLabel(t, draft.category) : t('tx.col.noCat', '—')}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span className="v2-muted">{t('acct.drawer.description')}:</span>

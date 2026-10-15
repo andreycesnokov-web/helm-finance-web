@@ -13,6 +13,7 @@ import { useApi, useInvalidate } from '../data'
 import { updatePnlMapping, actionError } from '../lib/actions'
 import { GROUPS } from '../lib/pnl'
 import I from '../icons'
+import { catLabel } from '../lib/categoryLabel'
 
 export default function ProfitGroups() {
   const t = useT()
@@ -64,20 +65,20 @@ export default function ProfitGroups() {
       <Card title={t('perf.groups.listTitle', { n: cats.length })}
         aside={q.data?.confirmed ? <Pill tone="good">{t('perf.groups.confirmed')}</Pill> : <Pill tone="warn">{t('perf.groups.notConfirmed')}</Pill>}>
         {cats.length === 0 ? (
-          <Empty title={t('perf.groups.emptyTitle')} text={t('perf.groups.emptyText')} action={<Btn to="/business/settings/classic">{t('perf.groups.manageCats')}</Btn>} />
+          <Empty title={t('perf.groups.emptyTitle')} text={t('perf.groups.emptyText')} action={<Btn to="/business/settings?tab=books">{t('perf.groups.manageCats')}</Btn>} />
         ) : (
           <>
             <ul className="v2-grouplist">
               {cats.map((c) => (
                 <li key={c.id} className="v2-grouprow">
                   <span className="v2-group-name">
-                    <strong>{c.name}</strong>
+                    <strong>{catLabel(t, c.name)}</strong>
                     <span className="v2-muted v2-small">{c.group_type === 'inflow' ? t('perf.groups.in') : c.group_type === 'outflow' ? t('perf.groups.out') : ''}
                       {c.suggestion && ` · ${t('perf.groups.suggested', { g: t(`perf.g.${c.suggestion.pnl_group}`) })}`}</span>
                     {c.suggestion?.note && <span className="v2-muted v2-small">{c.suggestion.note}</span>}
                   </span>
                   <label className="v2-field v2-group-pick">
-                    <span className="v2-sr">{t('perf.groups.groupFor', { name: c.name })}</span>
+                    <span className="v2-sr">{t('perf.groups.groupFor', { name: catLabel(t, c.name) })}</span>
                     <select className="v2-select" value={form[c.id] ?? ''} disabled={!canEdit || busy} onChange={(e) => setForm((f) => ({ ...f, [c.id]: e.target.value }))}>
                       <option value="">{t('perf.groups.none')}</option>
                       {GROUPS.map((g) => <option key={g} value={g}>{t(`perf.g.${g}`)}</option>)}
@@ -101,11 +102,11 @@ export default function ProfitGroups() {
       </Card>
 
       {(q.data?.missing_from_template || []).length > 0 && (
-        <Card title={t('perf.groups.missingTitle')} aside={<Link to="/business/settings/classic">{t('perf.groups.manageCats')}</Link>}>
+        <Card title={t('perf.groups.missingTitle')} aside={<Link to="/business/settings?tab=books">{t('perf.groups.manageCats')}</Link>}>
           <p className="v2-sec">{t('perf.groups.missingText')}</p>
           <ul className="v2-moves">
             {q.data.missing_from_template.map((m) => (
-              <li key={m.name}><span>{m.name}{m.note && <span className="v2-muted"> · {m.note}</span>}</span><Pill tone="neutral">{t(`perf.g.${m.pnl_group}`)}</Pill></li>
+              <li key={m.name}><span>{catLabel(t, m.name)}{m.note && <span className="v2-muted"> · {m.note}</span>}</span><Pill tone="neutral">{t(`perf.g.${m.pnl_group}`)}</Pill></li>
             ))}
           </ul>
         </Card>

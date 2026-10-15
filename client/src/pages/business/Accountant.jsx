@@ -16,9 +16,11 @@ import { openDocumentSafely, POPUP_BLOCKED_MESSAGE, OPEN_FAILED_MESSAGE } from '
 import { createRequestGuard } from '../../lib/requestGuard'
 import { buildReadiness, isFieldNotRequired } from '../../lib/accountantReadiness'
 import { groupChecklist, TRUNCATED_NOTICE } from '../../lib/documentKnowledge'
+import {useBusinessRequest} from '../../lib/useBusinessRequest'
+import {PROFILE_FIELDS,performProfileOperation,profileCurrent,profileDelta,readProfileDraft,saveProfileDraft,unconfirmedProfileFields} from '../../lib/businessProfileOperation'
 
 // Which UI fields persist to the backend today vs. live as local draft (await 040).
-const PERSISTED = new Set(['country', 'jurisdiction', 'legal_entity_type', 'npwp', 'pkp_status', 'vat_status', 'financial_year_start', 'financial_year_end', 'nib', 'employee_status'])
+const PERSISTED = new Set(PROFILE_FIELDS)
 const LEGAL_ENTITY = ['PT Local', 'PT PMA', 'CV', 'Yayasan', 'Individual / Freelancer', 'Representative Office / Branch', 'Other', 'Unknown']
 const draftKey = (bizId) => `accountant_draft_${bizId}`
 
@@ -36,6 +38,8 @@ const VSTATES = {
 export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) {
   const { token } = useAuth()
   const { active, scopeKey } = useWorkspace()
+  const request=useBusinessRequest(),savingRef=useRef(false),profileContext=useRef(null)
+  const [before,setBefore]=useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [form, setForm] = useState({})
@@ -65,15 +69,18 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
     // under business B.
     setProfileSaved(false); setSavedMissingFields([])
     setObligations({ applicable_rules: [], missing_profile_fields: [] })
+    profileContext.current=null;savingRef.current=false;setSaving(false);setBefore(null)
     if (!token || !active) return
     let on = true; setLoading(true); setError(null)
     Promise.all([
-      apiFetch('/accountant/profile', token).catch(() => ({ profile: null })),
+      apiFetch('/accountant/profile', request),
       apiFetch('/accountant/applicability', token).catch(() => ({ applicable_rules: [], missing_profile_fields: [] })),
     ]).then(([p, ap]) => {
-      if (!on) return
-      let draft = {}; try { draft = JSON.parse(localStorage.getItem(draftKey(active.id)) || '{}') } catch {}
-      setForm({ ...(p.profile || {}), ...draft })
+      if (!on||!profileCurrent(request)) return
+      const draft=readProfileDraft(request)
+      setBefore(draft?draft.before:p.profile)
+      profileContext.current=request
+      setForm({ ...(p.profile || {}), ...(draft?.form||{}) })
       setObligations(ap || { applicable_rules: [], missing_profile_fields: [] })
       setLoading(false)
     }).catch(e => { if (on) { setError(e.message); setLoading(false) } })
@@ -165,19 +172,25 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
   // reported as Missing — nothing is missing, it simply does not apply.
   const vstatus = (k) => isFieldNotRequired(form, k)
     ? 'not_required'
-    : (form.field_verification?.[k]) || (form[k] !== undefined && form[k] !== '' && form[k] !== null ? 'user_declared' : 'missing')
+    : (form.field_verification?.[k]?.state||form.field_verification?.[k]) || (form[k] !== undefined && form[k] !== '' && form[k] !== null ? 'user_declared' : 'missing')
 
   const save = useCallback(async () => {
+    if(savingRef.current||loading||profileContext.current!==request||!profileCurrent(request))return
+    savingRef.current=true
     setSaving(true); setError(null)
     try {
       // persist backend-supported fields
       const body = {}; for (const k of PERSISTED) if (form[k] !== undefined) body[k] = form[k]
-      const res = await apiFetch('/accountant/profile', token, { method: 'PUT', body }).catch(e => { throw e })
-      // local draft for not-yet-migrated fields
-      const draft = {}; for (const k of Object.keys(form)) if (!PERSISTED.has(k)) draft[k] = form[k]
-      try { localStorage.setItem(draftKey(active.id), JSON.stringify(draft)) } catch {}
+      saveProfileDraft(request,{form,before,verification:{}})
+      const res = await performProfileOperation(request,'save',profileDelta(body,before),before?.profile_version??0,{send:(identity,body)=>apiFetch('/accountant/profile',identity,{method:'PUT',body}),read:(identity,key)=>apiFetch(`/accountant/profile/requests/${encodeURIComponent(key)}`,identity)})
+      if(!profileCurrent(request))return
+      if(res.historical)throw Error('Profile changed after this saved version. Reload before editing.')
+      if(unconfirmedProfileFields(profileDelta(body,before),res.profile,res).length)throw Error('Submitted profile fields are not confirmed as saved.')
+      setBefore(res.current_profile||res.profile);setForm(res.current_profile||res.profile)
+      saveProfileDraft(request,{form:res.current_profile||res.profile,before:res.current_profile||res.profile,verification:{}})
       // refresh obligations + build readiness summary
-      const ap = await apiFetch('/accountant/applicability', token).catch(() => obligations)
+      const ap = await apiFetch('/accountant/applicability', request)
+      if(!profileCurrent(request))return
       setObligations(ap)
       setSavedMissingFields(res?.completeness?.missing || ap.missing_profile_fields || [])
       setProfileSaved(true)
@@ -187,8 +200,8 @@ export function BusinessAccountant({ onProfileSaved, onDocumentsChanged } = {}) 
       // The profile drives which documents are required — reload the checklist so the
       // readiness card and the Compliance Documents card stay on the same answer.
       loadIntake()
-    } catch (e) { setError(e.message) } finally { setSaving(false) }
-  }, [form, token, active, obligations, loadIntake, onProfileSaved])
+    } catch (e) {if(profileCurrent(request))setError(e.message)} finally {if(profileCurrent(request)){setSaving(false);savingRef.current=false}}
+  }, [form, before,request,loading,token, active, obligations, loadIntake, onProfileSaved])
 
   // Readiness is DERIVED from the checklist payload, not from a second local list, so the
   // card can never contradict Compliance Documents.

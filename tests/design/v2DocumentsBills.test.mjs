@@ -52,7 +52,7 @@ for (const [file, name, english] of [
   ['client/src/components/DebtPaymentModal.jsx', 'PAY_T', ['Record payment made', 'Total amount', 'Select account…']],
   ['client/src/components/DocumentIntakeModal.jsx', 'INTAKE_T', ['Drag &amp; drop files here', 'Uploading to <b>', 'Open existing document']],
 ]) {
-  const src = fs.readFileSync(path.join(ROOT, file), 'utf8')
+  const src = fs.readFileSync(path.join(ROOT, file), 'utf8').replace(/\r\n/g, '\n')
   const k = keysOf(src, name)
   ok(`${name}: ru keys = en keys`, k.ru === k.en && k.en.length > 0)
   ok(`${name}: id keys = en keys`, k.id === k.en)

@@ -4,7 +4,7 @@
 // available:false — the card shows the defaults and explains why it cannot save yet.
 // The weekly brief is only a stored choice: nothing sends it yet (no scheduler exists).
 import { useState } from 'react'
-import { useAuth } from '../../hooks/useAuth'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { useApi, useInvalidate } from '../data'
 import { updateBusinessTargets, actionError } from '../lib/actions'
 import { runwayTarget, minCash } from '../lib/pulseModel'
@@ -24,7 +24,7 @@ const hh = (h) => `${String(h).padStart(2, '0')}:00`
 export default function TargetsCard() {
   const t = useT()
   const lang = useLang()
-  const { token } = useAuth()
+  const request = useBusinessRequest()
   const invalidate = useInvalidate()
   const q = useApi('/business/targets')
   const [form, setForm] = useState(null)
@@ -55,7 +55,7 @@ export default function TargetsCard() {
     if (!Object.keys(body).length) { setForm(null); return }
     setBusy(true); setErr(null)
     try {
-      await updateBusinessTargets(token, body)
+      await updateBusinessTargets(request, body)
       setForm(null); setSaved(true); invalidate()
     } catch (x) {
       const code = actionError(x)
