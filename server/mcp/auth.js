@@ -11,7 +11,7 @@
 // (resolveActiveBusiness / role gates) apply unchanged.
 
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
+const { verifyAppToken } = require('../lib/revokedTokens');
 
 const READ_SCOPE = 'cfo:read';
 const DRAFTS_SCOPE = 'cfo:drafts';
@@ -76,7 +76,7 @@ async function resolveMcpUser(req, opts = {}) {
 
   // 3. Existing CFO custom JWT.
   try {
-    const d = jwt.verify(token, opts.JWT_SECRET);
+    const d = verifyAppToken(token, opts.JWT_SECRET);
     if (d && d.userId != null) return { userId: d.userId, via: 'app_jwt' };
   } catch { /* invalid/expired token → unauthenticated */ }
 

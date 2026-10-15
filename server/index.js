@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { verifyAppToken } = require('./lib/revokedTokens');
 const { createClient } = require('@supabase/supabase-js');
 const { calculateDueDate, ymd } = require('./lib/dueDate');
 const { computeActivationBlockers, isEffectiveApprovedReview, validReviewTransition } = require('./lib/taxGate');
@@ -162,7 +163,7 @@ function auth(req, res, next) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'No token' });
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    req.user = verifyAppToken(token, JWT_SECRET);
     next();
   } catch {
     res.status(401).json({ error: 'Invalid token' });
@@ -2501,7 +2502,7 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
 app.get('/api/debts/:id/receipt', async (req, res) => {
   try {
     const token = req.headers.authorization?.replace('Bearer ', '') || req.query.token;
-    try { req.user = jwt.verify(token, JWT_SECRET); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+    try { req.user = verifyAppToken(token, JWT_SECRET); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
     const biz = await requireBusiness(req, res);
     if (!biz) return;
     if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Forbidden' });
@@ -8022,7 +8023,7 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
     let actingUserId = null;
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (token) {
-      try { actingUserId = jwt.verify(token, JWT_SECRET).userId; } catch { /* fall through */ }
+      try { actingUserId = verifyAppToken(token, JWT_SECRET).userId; } catch { /* fall through */ }
     }
     if (!actingUserId && requireBotSecret(req) && telegram_id) {
       // PR2.5: resolved rather than assumed. Flag off ⇒ Number(telegram_id), as before.
