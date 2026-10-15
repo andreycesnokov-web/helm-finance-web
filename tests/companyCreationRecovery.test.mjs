@@ -45,6 +45,19 @@ test('unavailable durable storage or tab serialization and invalid timezone fail
  navigator.locks={request:(_key,fn)=>fn()};localStorage.setItem=()=>{throw Error('blocked')}
  await assert.rejects(creation.submitCompanyCreation(token(-1),body),{code:'company_recovery_storage_required'});assert.equal(posts.length,0)
 })
+test('a creation recorded as completed in this browser but unknown to the server is dropped, not shown as saved',async()=>{
+ storage.set('companyCreation:v1:-1',JSON.stringify({actor:'-1',key:id,body,state:'completed',result:{creation_request_id:id,business:{id,type:'business',name:'PT Old Reset Co',owner_user_id:-1}}}))
+ creation.saveCompanyDraft(token(-1),{name:'PT Old Reset Co'})
+ result=null
+ assert.equal((await creation.checkCompanyCreation(token(-1))).state,'stale')
+ assert.equal(creation.pendingCompanyCreation(token(-1)),null);assert.equal(creation.companyDraft(token(-1)),null);assert.equal(posts.length,0)
+})
+test('an invalid session (401) clears the stale local creation state and says so',async()=>{
+ storage.set('companyCreation:v1:-1',JSON.stringify({actor:'-1',key:id,body,state:'completed',result:{creation_request_id:id,business:{id,type:'business',name:'PT Ghost',owner_user_id:-1}}}))
+ globalThis.fetch=async()=>new Response(JSON.stringify({error:'Invalid token'}),{status:401})
+ await assert.rejects(creation.checkCompanyCreation(token(-1)),{code:'company_session_invalid',status:401})
+ assert.equal(creation.pendingCompanyCreation(token(-1)),null)
+})
 test('a foreign actor response is never accepted as our completed company',async()=>{
  await assert.rejects(creation.submitCompanyCreation(token(-1),body))
  result.business.owner_user_id=-2

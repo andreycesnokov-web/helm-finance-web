@@ -20,9 +20,11 @@ async function request(token,path,{body,key,isCurrent}={}){
   res=await fetch('/api'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json','Idempotency-Key':key}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});
   const text=await res.text();check();data=JSON.parse(text);if(res.ok&&(!data||typeof data!=='object'))throw 0;
  }catch(e){check();throw error('company_creation_outcome_unknown',503)}
+ if(res.status===401){clearActor(actorOf(token));throw error('company_session_invalid',401)} // the session no longer exists: its local state is stale
  if(!res.ok){const e=error(data.error||'company_creation_failed',res.status);e.data=data;throw e}
  return data;
 }
+function clearActor(actor){try{localStorage.removeItem(PREFIX+actor);localStorage.removeItem(DRAFT+actor)}catch{}}
 function confirmed(result,key,actor){return result?.creation_request_id===key&&UUID.test(result.business?.id||'')&&result.business?.type==='business'&&String(result.business.owner_user_id)===actor}
 export async function submitCompanyCreation(token,body,{isCurrent}={}){
  const actor=actorOf(token),check=guard(token,isCurrent);
@@ -48,6 +50,9 @@ export async function checkCompanyCreation(token,{isCurrent}={}){
   write(PREFIX+actor,{...pending,state:'completed',result:state.result});return state;
  }
  if(state.state!=='not_found')throw error('company_creation_outcome_unknown',503);
+ // A creation this browser recorded as completed is unknown to the server (database reset, or a
+ // record left by an earlier account with the same id): never show it as saved — drop it.
+ if(pending.state==='completed'){clearActor(actor);return {state:'stale'}}
  return state;
 }
 export function finishCompanyCreation(token){const actor=actorOf(token),x=pendingCompanyCreation(token);if(x?.state!=='completed')throw error('company_creation_pending');localStorage.removeItem(PREFIX+actor);localStorage.removeItem(DRAFT+actor)}

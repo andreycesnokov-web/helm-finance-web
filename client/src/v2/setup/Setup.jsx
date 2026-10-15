@@ -109,7 +109,7 @@ function SetupChrome() {
 export function SetupAbout() {
   const t = useT()
   const nav = useNavigate()
-  const { token } = useAuth()
+  const { token, logout } = useAuth()
   const { applyActive, refresh, selectionRef, loading } = useWorkspace()
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
@@ -128,8 +128,14 @@ export function SetupAbout() {
     if(busy)return
     setBusy(true);setChecked(false);const selection=selectionRef.current
     const isCurrent=()=>mounted.current&&selectionRef.current===selection
-    try { await checkCompanyCreation(token,{isCurrent});if(isCurrent()){setPending(pendingCompanyCreation(token));setChecked(true);setErr({})} }
-    catch(x){if(isCurrent())setErr({form_:t('setup.creation.unknown')})}
+    try {
+      const state=await checkCompanyCreation(token,{isCurrent})
+      if(isCurrent()){const next=pendingCompanyCreation(token);setPending(next);setChecked(state?.state!=='stale'&&!!next);setErr({})}
+    }
+    catch(x){
+      if(x?.code==='company_session_invalid'){logout();return} // stale session: its saved state is already cleared
+      if(isCurrent())setErr({form_:t('setup.creation.unknown')})
+    }
     finally{if(mounted.current)setBusy(false)}
   }
   useEffect(() => { if(!loading&&pendingCompanyCreation(token))check() }, [token,loading])
@@ -155,6 +161,7 @@ export function SetupAbout() {
       if (!isCurrent()) return
       setPending(pendingCompanyCreation(token));setChecked(true);setErr({})
     } catch (x) {
+      if(x?.code==='company_session_invalid'){logout();return}
       if(isCurrent()){
         setPending(pendingCompanyCreation(token))
         const message=x?.code==='company_recovery_storage_required'?t('setup.creation.storage'):x?.code==='company_serialization_required'?t('setup.creation.browser'):x?.status===400?t('setup.creation.invalid'):t('setup.creation.unknown')
