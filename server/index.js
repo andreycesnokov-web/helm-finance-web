@@ -4073,13 +4073,13 @@ function isValidStatementDate(v) {
 // Batch-level corruption check: null when the statement period is usable.
 function statementPeriodProblem(batch) {
   const s = batch.statement_start, e = batch.statement_end;
-  if (s && !isValidStatementDate(s)) return 'Statement start is not a valid date';
-  if (e && !isValidStatementDate(e)) return 'Statement end is not a valid date';
-  if (s && e) {
-    const days = (Date.parse(String(e).slice(0, 10)) - Date.parse(String(s).slice(0, 10))) / 86400000;
-    if (days < 0) return 'Statement start is after its end';
-    if (days > 366 * 5) return 'Statement spans more than 5 years';
-  }
+  // Both ends are required: cfo_import_review_state (reviewed confirm) refuses a batch without them.
+  if (!s || !e) return 'Statement period is missing';
+  if (!isValidStatementDate(s)) return 'Statement start is not a valid date';
+  if (!isValidStatementDate(e)) return 'Statement end is not a valid date';
+  const days = (Date.parse(String(e).slice(0, 10)) - Date.parse(String(s).slice(0, 10))) / 86400000;
+  if (days < 0) return 'Statement start is after its end';
+  if (days > 366 * 5) return 'Statement spans more than 5 years';
   return null;
 }
 
@@ -6738,12 +6738,14 @@ async function confirmReviewedBankImport(req,res,batchId) {
     if (!batch) return res.status(404).json({ error: 'Batch not found' });
     const reviewed=bankImportReview.importRequest(req.body,batchId);
     res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
+    // Before any RPC: cfo_import_review_state raises on a missing or reversed period, which would
+    // otherwise reach the client as 503 "outcome unknown" instead of a clear 400.
+    const periodProblem = statementPeriodProblem(batch);
+    if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
     if(await bankImportReview.replay(supabase,req,res,biz,batch.id,reviewed))return;
     const openingState=await bankImportReview.reviewedState(supabase,biz.business.id,batch.id,req.user.userId);
     const opening=await bankImportReview.pricedOpening(reviewed,openingState,fx);
     if (batch.status === 'cancelled') return res.status(409).json({ error: 'Batch was cancelled', code: 'batch_closed' });
-    const periodProblem = statementPeriodProblem(batch);
-    if (periodProblem) return res.status(400).json({ error: `${periodProblem}. The statement looks corrupt; upload it again. Nothing was imported.`, code: 'corrupt_statement_period' });
 
     const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
     if (!payloadRows.length) return res.status(400).json({ error: 'rows required' });
