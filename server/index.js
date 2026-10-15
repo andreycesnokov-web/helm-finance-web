@@ -12163,13 +12163,11 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
 
   const [
     { data: allTxs    },
-    { data: monthTxs  },
     { data: rawDebts  },
     { data: wallets   },
     accessData,
   ] = await Promise.all([
     scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,transaction_date,category,transfer_id,wallet_id,source,scope')).order('created_at', { ascending: false }),
-    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,created_at,wallet_id,source,scope')).gte('created_at', monthStart),
     scopeQ(supabase.from('debts').select('*')).or('is_training.is.null,is_training.eq.false'),
     scopeQ(supabase.from('wallets').select('id,name,currency,type,scope')).eq('is_active', true),
     getCurrentAccess(biz ? biz.ownerUserId : userId),
@@ -12266,9 +12264,17 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     + persTxs.filter(t => t.type === 'correction').reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── This month (business wallets only, transfers excluded) ─────────────────
-  const bizMonthTxs   = (monthTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
+  // By the month the money moved, as on Pulse: an imported statement is created today but dated
+  // earlier, and an opening balance is written as income without being income.
+  const monthStartD   = new Date(monthStart);
+  const monthTxs      = (allTxs || []).filter(t => {
+    const d = new Date(FININ.effectiveDate(t));
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === monthStartD.getFullYear() && d.getMonth() === monthStartD.getMonth();
+  });
+  const bizMonthTxs   = monthTxs.filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
   const isXfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
-  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const isOpening = (t) => FININ.classifyTransaction(t).class === 'opening_balance';
+  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type) && !isXfer(t) && !isOpening(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
   const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── Burn rate & runway — rolling 30-day window (business wallets only) ────

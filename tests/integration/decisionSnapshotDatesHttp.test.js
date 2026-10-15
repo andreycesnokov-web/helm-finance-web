@@ -42,10 +42,12 @@ describe('Payment simulation burn follows transaction_date (real PostgreSQL)', (
       amount_original, amount_idr, currency_original, booked_rate, rate_source, source, wallet_id, scope, is_opening_balance, transaction_date, category)
       VALUES ($1, $2, $2, $3, $4, $4, 'IDR', 1, 'native', $5, $6, 'business', $7, $8, $9)`,
     [BIZ, OWNER, type, amount, extra.source || 'bank_import', WALLET, !!extra.opening, date, extra.category || null]);
-    // Opening balance recorded today; the statement rows are dated 20 and 10 days ago but created now.
+    // Opening balance recorded today; the statement rows are dated in the past but created now.
     await tx('income', 50000000, daysAgo(0), { opening: true, source: 'wallet_opening_balance' });
-    await tx('expense', 6000000, daysAgo(20), { category: 'Аренда' });
-    await tx('expense', 3000000, daysAgo(10), { category: 'Зарплата' });
+    await tx('income', 7000000, daysAgo(40), { category: 'Service revenue' });
+    await tx('expense', 6000000, daysAgo(20), { category: 'Rent' });
+    await tx('expense', 3000000, daysAgo(10), { category: 'Salary and wages' });
+    await tx('income', 2000000, daysAgo(0), { category: 'Service revenue', source: 'manual' });
     debtId = (await admin.query(`INSERT INTO public.debts (business_id, type, counterparty, amount, original_amount, currency)
       VALUES ($1, 'payable', 'Vendor Dates', 3000000, 3000000, 'IDR') RETURNING id`, [BIZ])).rows[0].id;
 
@@ -77,10 +79,24 @@ describe('Payment simulation burn follows transaction_date (real PostgreSQL)', (
       body: JSON.stringify({ amount: 3000000, wallet_id: WALLET }) });
     const body = await r.json();
     assert.strictEqual(r.status, 200, JSON.stringify(body));
-    // Cash 41M; 9M of expenses over a 21-day window (oldest row 20 days ago) ≈ 428,571 a day.
-    // After the 3M payment: 38M / 428,571 ≈ 89 days. A one-day window would give about 4 days.
-    assert.strictEqual(body.current.cash, 41000000);
-    assert.ok(body.after.runway_days >= 80 && body.after.runway_days <= 100, `runway after payment: ${body.after.runway_days}`);
+    // Cash 50M. Operating rows span 41 days, so the window is the last 30: 9M of expenses = 300,000 a
+    // day. After the 3M payment: 47M / 300,000 ≈ 157 days. A one-day window (every row "created
+    // today") gives about 5 days.
+    assert.strictEqual(body.current.cash, 50000000);
+    assert.ok(body.after.runway_days >= 140 && body.after.runway_days <= 175, `runway after payment: ${body.after.runway_days}`);
     assert.notStrictEqual(body.recommendation, 'not_recommended', JSON.stringify(body.factors));
+  });
+
+  it('the AI CFO context counts this month by booked date and never counts an opening balance as income', async (t) => {
+    if (skipped) return t.skip('PostgreSQL unavailable');
+    const r = await fetch(`${BASE}/ai-cfo/context`, { headers: { authorization: `Bearer ${token}`, 'x-business-id': BIZ } });
+    const ctx = await r.json();
+    assert.strictEqual(r.status, 200, JSON.stringify(ctx));
+    const thisMonth = (d) => d.slice(0, 7) === daysAgo(0).slice(0, 7);
+    const expenses = [[6000000, daysAgo(20)], [3000000, daysAgo(10)]].filter(([, d]) => thisMonth(d)).reduce((s, [a]) => s + a, 0);
+    assert.strictEqual(ctx.current_month.income, 2000000, 'only the 2M booked this month — not the opening balance or last month');
+    assert.strictEqual(ctx.current_month.expenses, expenses);
+    // Net operating drain over the dated window keeps the runway in months, far from "critical".
+    assert.ok(ctx.runway_days > 60, `runway: ${ctx.runway_days}`);
   });
 });
