@@ -122,5 +122,32 @@ Then exact source/tree/image hashes, OFF behavior, actual API/native DB/browser 
 desktop/mobile RU/EN/ID, rollback image and checkpoint. Provider sandbox acceptance and
 email delivery acceptance remain separately BLOCKED until real prerequisites exist.
 
-Current stage B scope is the pure resolver only. Catalog persistence, activation, quota,
-route enforcement, UI, provider, admin, lifecycle/referral and full acceptance remain open.
+Stage B now also contains a SQL PREVIEW under docs/ (not an applied migration), with
+plan_versions rooted in plan_limits, billing account/command/event storage, automatic
+not-started enrollment for newly created Business rows, membership/email-verified
+atomic select/activate commands, snapshot read and own receipt recovery. The Express
+module commercialBilling.js is deliberately NOT installed in index.js: workflow
+admission, quota enforcement and the complete migration are still unfinished.
+
+Native PostgreSQL 17 results: 19 preview groups PASS on a newly restored separate
+database (including concurrent trial activation, immutable terms, role denial and
+expired recovery). 36 local Node tests cover projection and input/recovery/OFF policy;
+the existing 18-case legacy resolver suite passed unchanged. These are not the user's
+complete 22 acceptance groups and not live HTTP/browser/provider acceptance.
+
+Backup/restore first failed because postgres is not the vault owner; the failed copy
+was retained and never used for acceptance. A fresh full backup and fresh restore with
+the existing supabase_admin role passed. A later fresh native copy preserved original
+ACLs and tested RPCs under service_role. Backup files stay protected on the staging
+host; no vault data or credentials were exported into source or output artifacts.
+
+Additional audit finding: plan_limits has ZERO rows in the running staging database.
+No inferred commercial limits may be taken from historical migration seed text.
+
+Owner steering: provider is not selected; Xendit is the preferred candidate. Do not
+represent that preference as a configured/accepted payment provider. No public limits,
+FX source, MRR, refund or proration policy has been approved by this task.
+
+Still open: actual migrations/rollout, catalog/admin lifecycle commands and V2 UI,
+central endpoint/job/MCP/Telegram enforcement, quotas, complete onboarding, paid
+period persistence/payment adapter, notifications/referral/analytics and full acceptance.

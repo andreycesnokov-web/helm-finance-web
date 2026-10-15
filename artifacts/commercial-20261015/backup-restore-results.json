@@ -1,0 +1,21 @@
+{
+  "status": "BACKUP_RESTORE_VERIFIED",
+  "backup_path": "/opt/cfo-os-staging-20261011/backups/commercial-20261014T235614Z/pre-commercial.dump",
+  "sha256": "f3d42667c34be91cfc7d361dbac49500ec3ae1ee8ba2538786b7b0af6850b2c4",
+  "bytes": 1797733,
+  "restored_database": "commercial_rehearsal_20261014t235614z",
+  "source_counts": {
+    "businesses": 311,
+    "transactions": 1403,
+    "documents": 139,
+    "plans": 0
+  },
+  "restored_counts": {
+    "businesses": 311,
+    "transactions": 1403,
+    "documents": 139,
+    "plans": 0
+  },
+  "live_schema_changed": false,
+  "live_data_changed": false
+}

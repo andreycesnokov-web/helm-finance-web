@@ -1,0 +1,87 @@
+{
+  "status": "NATIVE_PREVIEW_ONLY",
+  "database": "commercial_native_20261015_000020",
+  "preview_sha256": "ebd569a82c33a74facc541e9eb3fd65aadd88c29b007af2ee4a1bab8224242da",
+  "tests": [
+    {
+      "name": "existing companies retain legacy enrollment",
+      "status": "PASS"
+    },
+    {
+      "name": "new company is not started until explicit activation",
+      "status": "PASS"
+    },
+    {
+      "name": "unapproved fixture is denied for public activation",
+      "status": "PASS"
+    },
+    {
+      "name": "cross-company actor denied",
+      "status": "PASS"
+    },
+    {
+      "name": "unverified owner denied",
+      "status": "PASS"
+    },
+    {
+      "name": "activation requires explicit plan selection",
+      "status": "PASS"
+    },
+    {
+      "name": "selection persists and resumes on a new connection",
+      "status": "PASS"
+    },
+    {
+      "name": "same command replays after response loss",
+      "status": "PASS"
+    },
+    {
+      "name": "request key cannot change intent",
+      "status": "PASS"
+    },
+    {
+      "name": "stale command cannot overwrite account",
+      "status": "PASS"
+    },
+    {
+      "name": "two concurrent activations yield one exact 168h interval",
+      "status": "PASS"
+    },
+    {
+      "name": "both tabs receive the same original interval",
+      "status": "PASS"
+    },
+    {
+      "name": "snapshot resumes selected terms under current membership",
+      "status": "PASS"
+    },
+    {
+      "name": "public catalog omits unapproved staging fixtures",
+      "status": "PASS"
+    },
+    {
+      "name": "expired receipt recovery does not require new trial/email/quota",
+      "status": "PASS"
+    },
+    {
+      "name": "cross-company receipt recovery denied",
+      "status": "PASS"
+    },
+    {
+      "name": "accepted terms are immutable",
+      "status": "PASS"
+    },
+    {
+      "name": "anon and authenticated have no billing access",
+      "status": "PASS"
+    },
+    {
+      "name": "no new monetary operation on copied ledger",
+      "status": "PASS"
+    }
+  ],
+  "count": 19,
+  "live_schema_changed": false,
+  "live_data_changed": false,
+  "provider_tested": false
+}
