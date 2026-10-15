@@ -50,6 +50,7 @@ import { SetupFrame, SetupAbout, SetupStep } from './setup/Setup'
 import MemberHome from './pages/MemberHome'
 import AccountHistory from './pages/AccountHistory'
 import InvoiceReview from './pages/InvoiceReview'
+import Billing,{BillingBanner} from './pages/Billing'
 import LegacyRedirect from './components/LegacyRedirect'
 import { requestedBusiness, businessSwitchDestination } from '../lib/routeIntent'
 
@@ -85,7 +86,7 @@ function V2Frame() {
   return (
     <V2DataProvider key={`${active.id}:${scopeKey}`}>
       <AskProvider>
-        <V2Shell member={member}><Outlet /></V2Shell>
+        <V2Shell member={member}>{!member&&<BillingBanner/>}<Outlet /></V2Shell>
       </AskProvider>
     </V2DataProvider>
   )
@@ -102,6 +103,8 @@ export default function BusinessApp() {
         </Route>
         <Route element={<V2Frame />}>
           <Route path="home" element={<MemberHome />} />
+          <Route path="billing" element={<Billing />} />
+          <Route path="trial" element={<Billing />} />
           {/* Overview */}
           <Route path="pulse" element={<V2Pulse />} />
           <Route path="radar" element={<V2Radar />} />

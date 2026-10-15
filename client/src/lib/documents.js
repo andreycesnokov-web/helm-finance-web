@@ -45,18 +45,21 @@ export async function uploadDocument(token, file, meta = {}, link = null, onStag
   }
   // opts.businessId: upload into a specific company instead of the active workspace (the
   // AI-assistant upload link names its company). The server still checks membership.
-  const headers = opts.businessId ? { 'x-business-id': opts.businessId } : undefined
+  const quotaKey=opts.requestKey||crypto.randomUUID()
+  const headers = { ...(opts.businessId ? { 'x-business-id': opts.businessId } : {}),'Idempotency-Key':quotaKey }
   // Preliminary hash so the backend can short-circuit a same-business duplicate
   // before we waste an upload. The backend re-verifies the hash server-side.
   const sha256 = await sha256Hex(file)
   onStage?.('storing')
   const init = await apiFetch('/documents/upload-init', token, { method: 'POST', headers, body: { ...payload, sha256 } })
-  const putRes = await fetch(init.upload_url, {
+  let putRes
+  try { putRes = await fetch(init.upload_url, {
     method: 'PUT',
     headers: { 'content-type': payload.mime_type, 'x-upsert': 'false' },
     body: file,
   })
   if (!putRes.ok) throw new Error('Upload to storage failed')
+  }catch(e){await apiFetch('/billing/quotas/'+quotaKey+'/release',token,{method:'POST',headers,body:{}}).catch(()=>{});throw e}
   onStage?.('creating')
   return apiFetch('/documents/upload-complete', token, {
     method: 'POST',

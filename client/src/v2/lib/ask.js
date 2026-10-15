@@ -7,7 +7,7 @@ import { apiFetch } from '../../lib/api'
 import { getLang } from '../../i18n/index'
 
 export const askAccountant = (token, question, options = {}) =>
-  apiFetch('/accountant/ask', token, { method: 'POST', body: { question: String(question).slice(0, 500), language: getLang() }, ...options })
+  apiFetch('/accountant/ask', token, { method: 'POST',headers:{'Idempotency-Key':crypto.randomUUID()}, body: { question: String(question).slice(0, 500), language: getLang() }, ...options })
 
 export const askCfo = (token, question, options = {}) =>
-  apiFetch('/ai-cfo/ask', token, { method: 'POST', body: { question: String(question).slice(0, 2000), language: getLang() }, ...options })
+  apiFetch('/ai-cfo/ask', token, { method: 'POST',headers:{'Idempotency-Key':crypto.randomUUID()}, body: { question: String(question).slice(0, 2000), language: getLang() }, ...options })

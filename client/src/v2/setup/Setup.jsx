@@ -140,7 +140,7 @@ export function SetupAbout() {
     finishCompanyCreation(token)
     applyActive({ id: business.id, name: business.name, type: 'business', role: 'owner', business_code: business.business_code })
     refresh()
-    nav('/business/setup/docs?business_id='+encodeURIComponent(business.id))
+    nav((business.billing_policy==='commercial_v2'?'/business/trial':'/business/setup/docs')+'?business_id='+encodeURIComponent(business.id))
   }
   const submit = async (e) => {
     e.preventDefault()

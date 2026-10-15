@@ -110,7 +110,7 @@ export const archiveDocument = (token, id) =>
   apiFetch(`${docUrl(id)}/archive`, token, { method: 'POST', body: {} })
 
 export const identifyDocument = (token, id, body) =>
-  apiFetch(`${docUrl(id)}/identify`, token, { method: 'POST', body })
+  apiFetch(`${docUrl(id)}/identify`, token, { method: 'POST',headers:{'Idempotency-Key':crypto.randomUUID()}, body })
 
 export const fileDocument = (token, id, body) =>
   apiFetch(`${docUrl(id)}/filing`, token, { method: 'POST', body })
@@ -226,7 +226,7 @@ export const createGateway = (token, body) =>
   apiFetch('/payment-connections', token, { method: 'POST', body })
 
 export const inviteMember = (token, body) =>
-  apiFetch('/team/invite', token, { method: 'POST', body })
+  apiFetch('/team/invite', token, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body })
 
 export const revokeInvite = (token, code) =>
   apiFetch(`/team/invites/${encodeURIComponent(code)}`, token, { method: 'DELETE' })
@@ -266,7 +266,7 @@ export const uploadStatementFile = (token, file) =>
   uploadDocument(token, file, { title: file.name, document_type: 'bank_document' })
 
 export const readStatement = (token, documentId, sheetText) =>
-  apiFetch('/bank-import/read', token, { method: 'POST', body: { document_id: documentId, ...(sheetText ? { sheet_text: sheetText } : {}) } })
+  apiFetch('/bank-import/read', token, { method: 'POST',headers:{'Idempotency-Key':crypto.randomUUID()}, body: { document_id: documentId, ...(sheetText ? { sheet_text: sheetText } : {}) } })
 
 export const createImportBatch = (token, body) =>
   apiFetch('/bank-import/batches', token, { method: 'POST', body })
@@ -344,3 +344,19 @@ export const payBill = (token, id, idempotencyKey, body) =>
 // Member home (2026-10-10, w2/I1): the receipt of an expense / advance report.
 export const uploadReceiptFile = (token, file) =>
   uploadDocument(token, file, { title: file.name, document_type: 'payment_proof' })
+// Commercial commands keep the existing single V2 mutation boundary. The
+// server independently checks membership/platform authority, CAS and receipts.
+export const billingRead=(path,identity)=>{
+ if(!/^\/(billing(?:\/commands\/[0-9a-f-]+)?|admin\/billing\/(catalog|companies(?:\/[0-9a-f-]+)?))$/.test(path))throw Error('invalid_billing_path');
+ return apiFetch(path,identity)
+}
+export function billingCommand(path,identity,body){
+ const options={body}
+ if(path==='/billing/plan')return apiFetch('/billing/plan',identity,{...options,method:'POST'})
+ if(path==='/billing/trial')return apiFetch('/billing/trial',identity,{...options,method:'POST'})
+ let m=path.match(/^\/admin\/billing\/catalog\/(starter|control|pro)$/)
+ if(m)return apiFetch('/admin/billing/catalog/'+m[1],identity,{...options,method:'POST'})
+ m=path.match(/^\/admin\/billing\/companies\/([0-9a-f-]+)\/(assign|schedule|grant|revoke|extend)$/)
+ if(m)return apiFetch('/admin/billing/companies/'+m[1]+'/'+m[2],identity,{...options,method:'POST'})
+ throw Error('invalid_billing_path')
+}
