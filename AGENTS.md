@@ -13,6 +13,28 @@ Before changing product code, every AI agent must read:
 
 Do not start implementation from assumptions or stale chat memory.
 
+## Graphify-Aware Code Intelligence
+
+Graphify (claude.ai connector, workspace `cfo-ai`, repository `andreycesnokov-web/helm-finance-web`) is an
+optional tool for code exploration. The goal is efficiency, not MCP usage. The cloud index follows `main`
+only; unpushed and integration branches are not indexed.
+
+1. Use Graphify first for unfamiliar modules, complex dependencies, call analysis (`graphify_callers` /
+   `graphify_callees`) and impact analysis (`graphify_impact`, `graphify_tests_for`).
+2. For known files, small changes, `git diff`, infrastructure and configuration, use direct tools
+   (Read, Grep, Glob, git) without Graphify.
+3. Freshness: check once per session whether the graph lags HEAD (`freshness.commit` vs `git diff --name-only
+   <commit> HEAD`). Do not re-check the whole diff on every task; use the graph only for unchanged parts.
+4. Limit Graphify calls. If the first queries do not narrow the search, switch to ordinary tools.
+5. Do not load Graphify MCP tools unless the task needs them.
+6. Do not re-read the same files when the code has not changed.
+7. Judge efficiency by total cost (input, cache read/write, output tokens) and result quality, not input tokens alone.
+8. Do not save engineering decisions to Graphify Memory automatically or without review. Never store secrets,
+   JWTs, API keys, customer personal data or financial documents there.
+
+SQL, security, migrations, production and staging: always verify the real schema, configuration and code.
+The graph is not a source of truth about infrastructure state. If Graphify is unavailable, use ordinary tools.
+
 ## Workspace Type Must Be Explicit
 
 Every task must state which workspace type it affects:
