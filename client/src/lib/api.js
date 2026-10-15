@@ -64,8 +64,10 @@ async function performApiFetch(path, token, options = {}, journal = null, assert
   const readActor = recoveryRead ? financialActor(token && typeof token === 'object' ? token.token : token) : null
   let readSessionStored = false
   try { readSessionStored = recoveryRead && !!localStorage.getItem('hf_token') } catch {}
+  // POST /bank-import/read only parses an uploaded file; its { ok:false, reason } is an answer, not a lost booking.
   const mutation = !['GET', 'HEAD'].includes(String(options.method || 'GET').toUpperCase())
     && /^\/(transactions|wallets|debts|payroll|bank-imports?|personal\/(wallets|transactions)|funding)(\/|$)/.test(path)
+    && path !== '/bank-import/read'
   const unconfirmed = (cause) => {
     if (!mutation) throw cause
     journal?.unknown()

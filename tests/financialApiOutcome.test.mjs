@@ -14,6 +14,13 @@ test('HTTP200 HTML cannot become import success',async()=>{
  globalThis.fetch=async()=>({ok:true,status:200,text:async()=>'<html>proxy</html>'})
  await assert.rejects(apiFetch('/bank-imports/x/confirm','synthetic',{method:'POST',body:{rows:[]}}),e=>e.code==='financial_outcome_unknown')
 })
+test('reading a statement file is not a money mutation: an unreadable file returns its reason',async()=>{
+ const answer={ok:false,reason:'unknown_format',file_name:'export.csv',is_sheet:false}
+ globalThis.fetch=async()=>({ok:true,status:200,text:async()=>JSON.stringify(answer)})
+ assert.deepEqual(await apiFetch('/bank-import/read','synthetic',{method:'POST',body:{document_id:'d'}}),answer)
+ // The batch and confirm writes keep the strict financial acknowledgement.
+ await assert.rejects(apiFetch('/bank-import/batches','synthetic',{method:'POST',body:{rows:[]}}),e=>e.code==='financial_outcome_unknown')
+})
 test('empty/error-shaped HTTP success cannot acknowledge a financial PATCH',async()=>{
  for(const text of ['',JSON.stringify({ok:false,error:'proxy_failure'})]){
   globalThis.fetch=async()=>({ok:true,status:200,text:async()=>text})
