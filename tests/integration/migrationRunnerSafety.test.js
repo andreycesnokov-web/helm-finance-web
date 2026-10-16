@@ -24,6 +24,7 @@ async function fullTarget(prefix) {
   const db = await createProdSchemaDatabase(prefix, [...CHAIN, D4]); if (!db) return null; dbs.push(db);
   const c = new Client({ connectionString: db.connectionString }); await c.connect();
   await c.query(read('migrations/072_platform_admins.sql')); await c.query(read('migrations/073_platform_admins_security.sql'));
+  await c.query(read('migrations/074_supabase_auth_password_link.sql'));
   await c.query('SET search_path = "$user", public');
   for (const f of BILLING) await c.query(read(f));
   return { db, c };
@@ -70,7 +71,7 @@ test('runner on a fully migrated database: applies nothing, changes no function 
   assert.deepEqual([...new Set(plan.entries.map(e => e.state))], ['APPLIED_UNRECORDED']);
   const r1 = await migrate({ connectionString: db.connectionString, mode: 'apply', log: quiet });
   assert.equal(r1.ok, true, JSON.stringify(r1.postflight.filter(p => !p.ok)));
-  assert.deepEqual(r1.applied, []); assert.equal(r1.adopted.length, 20);
+  assert.deepEqual(r1.applied, []); assert.equal(r1.adopted.length, 21);
   assert.deepEqual(await fnHashes(c), h0, 'no function definition changed');
   assert.deepEqual([await balance(c, s.W), await balance(c, s.V)], b0, 'no balance changed');
   const r2 = await migrate({ connectionString: db.connectionString, mode: 'apply', log: quiet });

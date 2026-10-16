@@ -69,3 +69,52 @@ test('every place that accepts an app session goes through the session-user chec
   assert.match(index, /attachMcp\(app, \{\s*JWT_SECRET,\s*sessionUserAllowed,/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'server', 'mcp', 'auth.js'), 'utf8'), /opts\.sessionUserAllowed/);
 });
+
+// Password sessions (migration 074): the server-side session row decides, on every request, without caching.
+function fakeSessions(users, sessions, { failSessions = false } = {}) {
+  const calls = { sessions: 0 };
+  return {
+    calls,
+    from(table) {
+      const q = {};
+      const chain = {
+        select() { return chain; },
+        eq(col, v) { q[col] = v; return chain; },
+        async limit() {
+          if (table === 'users') return { data: users.filter(r => r.id === q.id), error: null };
+          assert.strictEqual(table, 'auth_app_sessions');
+          calls.sessions++;
+          if (failSessions) return { data: null, error: { message: 'db down' } };
+          return { data: sessions.filter(s => s.id === q.id), error: null };
+        },
+      };
+      return chain;
+    },
+  };
+}
+const SID = '11111111-2222-4333-8444-555555555555';
+const user = [{ id: -40, created_at: CREATED }];
+const future = new Date(Date.now() + 3600e3).toISOString(), past = new Date(Date.now() - 1000).toISOString();
+
+test('a password session is accepted only while its row is live, owned by the user, not revoked, not expired', async () => {
+  const p = { userId: -40, iat: createdS + 10, auth_method: 'password', sid: SID };
+  assert.strictEqual(await createSessionUserCheck(fakeSessions(user, [{ id: SID, user_id: -40, expires_at: future, revoked_at: null }]))(p), true);
+  assert.strictEqual(await createSessionUserCheck(fakeSessions(user, []))(p), false);
+  assert.strictEqual(await createSessionUserCheck(fakeSessions(user, [{ id: SID, user_id: -41, expires_at: future, revoked_at: null }]))(p), false);
+  assert.strictEqual(await createSessionUserCheck(fakeSessions(user, [{ id: SID, user_id: -40, expires_at: future, revoked_at: future }]))(p), false);
+  assert.strictEqual(await createSessionUserCheck(fakeSessions(user, [{ id: SID, user_id: -40, expires_at: past, revoked_at: null }]))(p), false);
+  assert.strictEqual(await createSessionUserCheck(fakeSessions(user, []))({ userId: -40, iat: createdS + 10, auth_method: 'password' }), false);
+  assert.strictEqual(await createSessionUserCheck(fakeSessions(user, []))({ userId: -40, iat: createdS + 10, sid: 'not-a-uuid' }), false);
+});
+
+test('password session lookups are never cached and fail closed', async () => {
+  const sb = fakeSessions(user, [{ id: SID, user_id: -40, expires_at: future, revoked_at: null }]);
+  const check = createSessionUserCheck(sb), p = { userId: -40, iat: createdS + 10, auth_method: 'password', sid: SID };
+  await check(p); await check(p);
+  assert.strictEqual(sb.calls.sessions, 2);
+  await assert.rejects(createSessionUserCheck(fakeSessions(user, [], { failSessions: true }))(p), SessionCheckUnavailable);
+  // Channels without a server session keep the existing contract (no session lookup at all).
+  const legacy = fakeSessions(user, []);
+  assert.strictEqual(await createSessionUserCheck(legacy)({ userId: -40, iat: createdS + 10, auth_channel: 'email' }), true);
+  assert.strictEqual(legacy.calls.sessions, 0);
+});

@@ -97,6 +97,11 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Requires migration 042 (user_email_identities / user_profiles / email_login_codes /
 // app_user_id_seq). Telegram auth is unaffected by this flag.
 const EMAIL_AUTH_ENABLED = process.env.EMAIL_AUTH_ENABLED === 'true';
+// Email + Password through Supabase Auth (migration 074, server/lib/passwordAuth.js). OFF by default: nothing
+// changes. When ON, the passwordless magic-link / 6-digit-code sign-in is OFF unless
+// EMAIL_MAGIC_LINK_LOGIN_ENABLED=true is set explicitly (fallback switch, documented in the runbook).
+const PASSWORD_AUTH_ENABLED = process.env.PASSWORD_AUTH_ENABLED === 'true';
+const MAGIC_LINK_LOGIN_ENABLED = !PASSWORD_AUTH_ENABLED || process.env.EMAIL_MAGIC_LINK_LOGIN_ENABLED === 'true';
 // DEV-ONLY: when true, the OTP code is returned in the API response for local testing.
 // NEVER enable in production. Off by default. HARD-DISABLED whenever NODE_ENV==='production'
 // regardless of the env var, so prod can never echo login codes/magic links in responses.
@@ -224,11 +229,21 @@ function rateLimited(key, max, windowMs) {
   e.n += 1; return e.n > max;
 }
 
-// Feature gate middleware — 404 when email auth is disabled (no surface area).
+// Feature gate middleware — 404 when email auth is disabled (no surface area). Guards the email identity
+// account routes (/api/me/*), which password users need too.
 function emailAuthGate(req, res, next) {
   if (!EMAIL_AUTH_ENABLED) return res.status(404).json({ error: 'not_found' });
   next();
 }
+// The passwordless sign-in routes only: also 404 once password sign-in replaced them.
+function magicLinkGate(req, res, next) {
+  if (!EMAIL_AUTH_ENABLED || !MAGIC_LINK_LOGIN_ENABLED) return res.status(404).json({ error: 'not_found' });
+  next();
+}
+require('./lib/passwordAuth').install(app, {
+  auth, supabase, enabled: PASSWORD_AUTH_ENABLED && EMAIL_AUTH_ENABLED, gotrueUrl: process.env.SUPABASE_URL,
+  apiKey: process.env.SUPABASE_SECRET_KEY, jwtSecret: JWT_SECRET, appBaseUrl: APP_BASE_URL, rateLimited,
+});
 
 // Resolve the internal user for an email, or create a new email-first user with a
 // NEGATIVE id + an identity + a Personal Account profile shell. Returns { id, display_name }.
@@ -319,7 +334,7 @@ const emailJwt = (user, email) => jwt.sign({
 // fallback code (both hashed, single-use, expiring). Always returns { ok:true }
 // (anti-enumeration). In DEV only (EMAIL_AUTH_DEV_RETURN_CODE) returns the magic link +
 // code for local testing — NEVER in production.
-app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
+app.post('/api/auth/email/start', magicLinkGate, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     if (!EMAIL_RE.test(email)) return res.status(400).json({ error: 'invalid_email' });
@@ -365,7 +380,7 @@ app.post('/api/auth/email/start', emailAuthGate, async (req, res) => {
 // POST /api/auth/email/verify — accepts EITHER { token } (magic link, primary) OR
 // { email, code } (6-digit fallback). Validates first (no user on a bad token/code),
 // then resolves/creates the user and atomically consumes the secret.
-app.post('/api/auth/email/verify', emailAuthGate, async (req, res) => {
+app.post('/api/auth/email/verify', magicLinkGate, async (req, res) => {
   try {
     const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
     let email = normalizeEmail(req.body?.email);
@@ -393,7 +408,7 @@ app.post('/api/auth/email/verify', emailAuthGate, async (req, res) => {
 
 // POST /api/auth/email/accept-invite — invited email user joins a business (no Telegram).
 // Body: { email, code }. The code (purpose='invite_accept') carries the business_invites code.
-app.post('/api/auth/email/accept-invite', emailAuthGate, async (req, res) => {
+app.post('/api/auth/email/accept-invite', magicLinkGate, async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const code = String(req.body?.code || '');
@@ -7568,7 +7583,7 @@ app.post('/api/team/invite', auth, async (req, res) => {
     // Optional email invite (Phase 1, gated): issue an accept-OTP for the email so the
     // invitee can join WITHOUT Telegram. The invite code links the membership target.
     let email_invited = null, email_invite_failed = false;
-    if (EMAIL_AUTH_ENABLED && req.body?.email) {
+    if (EMAIL_AUTH_ENABLED && MAGIC_LINK_LOGIN_ENABLED && req.body?.email) {
       const email = normalizeEmail(req.body.email);
       if (EMAIL_RE.test(email)) {
         // The invite row already exists; if the accept-OTP cannot be stored, report that
@@ -11389,6 +11404,8 @@ app.get('/api/admin/dashboard', auth, requireAdmin, async (req, res) => {
         // Booleans only — never the values of secrets/keys.
         feature_flags: {
           email_auth: EMAIL_AUTH_ENABLED,
+          password_auth: PASSWORD_AUTH_ENABLED,
+          magic_link_login: EMAIL_AUTH_ENABLED && MAGIC_LINK_LOGIN_ENABLED,
           personal_account_v1: process.env.PERSONAL_ACCOUNT_V1_ENABLED === 'true',
           telegram_active_business: TELEGRAM_ACTIVE_BUSINESS_ENABLED,
           telegram_paid_gate: TELEGRAM_PAID_GATE_ENABLED,
@@ -16035,7 +16052,8 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3001;
 // Loud startup warning: email auth is ON but no provider is configured (and not in dev
 // return-code mode) → magic links will NOT be delivered. Fail visibly, not silently.
-if (EMAIL_AUTH_ENABLED && EMAIL_PROVIDER !== 'resend' && !EMAIL_AUTH_DEV_RETURN_CODE) {
+// (Password sign-in mails through Supabase Auth's SMTP, not this provider.)
+if (EMAIL_AUTH_ENABLED && MAGIC_LINK_LOGIN_ENABLED && EMAIL_PROVIDER !== 'resend' && !EMAIL_AUTH_DEV_RETURN_CODE) {
   console.warn('[email-auth] WARNING: EMAIL_AUTH_ENABLED=true but no email provider is configured ' +
     '(set EMAIL_PROVIDER=resend + RESEND_API_KEY + EMAIL_FROM + APP_BASE_URL). Magic links will NOT be ' +
     'delivered — do not enable the production UI until this is fixed.');

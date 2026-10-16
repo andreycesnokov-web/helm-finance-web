@@ -55,6 +55,7 @@ export const MANIFEST = [
   { file: 'migrations/20261016090000_dated_opening_anchor.sql', probes: [fn('cfo_business_tz'), fn('rpc_reanchor_wallet_opening'), defHas('cfo_import_review_state', 'reanchor')] },
   { file: 'migrations/072_platform_admins.sql', probes: [table('platform_admins'), `to_regprocedure('public.fn_bootstrap_platform_super_admin(bigint)') IS NOT NULL`] },
   { file: 'migrations/073_platform_admins_security.sql', probes: [fn('rpc_platform_admin_grant'), defHas('fn_platform_admins_guard', 'cfo_platform_admins_last_super')] },
+  { file: 'migrations/074_supabase_auth_password_link.sql', probes: [table('auth_user_links'), table('auth_app_sessions'), fn('rpc_auth_password_session')] },
   { file: 'supabase/migrations/20261015033808_cfo_commercial_trial.sql', probes: [billingVersion('20261015033808'), table('billing_accounts')] },
   { file: 'supabase/migrations/20261017090000_billing_management_center.sql', probes: [billingVersion('20261017090000'), table('billing_overrides')] },
   { file: 'supabase/migrations/20261017120000_billing_enforcement.sql', probes: [billingVersion('20261017120000'), fn('billing_usage')] },
@@ -75,6 +76,12 @@ export const POSTFLIGHT = [
     `NOT EXISTS (SELECT 1 FROM pg_proc p, unnest(ARRAY['anon','authenticated']) r(role) WHERE p.pronamespace='public'::regnamespace
       AND p.proname IN ('fn_bootstrap_platform_super_admin','rpc_platform_admin_grant','rpc_platform_admin_revoke','apply_notification_grants')
       AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r.role) AND has_function_privilege(r.role, p.oid, 'EXECUTE'))`],
+  ['password sign-in bridge is service_role only (tables and RPCs closed to anon/authenticated)',
+    `NOT EXISTS (SELECT 1 FROM unnest(ARRAY['anon','authenticated']) r(role) WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r.role) AND (
+      has_table_privilege(r.role, 'public.auth_user_links', 'SELECT,INSERT,UPDATE,DELETE')
+      OR has_table_privilege(r.role, 'public.auth_app_sessions', 'SELECT,INSERT,UPDATE,DELETE')
+      OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'rpc\\_auth\\_%'
+        AND has_function_privilege(r.role, p.oid, 'EXECUTE'))))`],
   ['billing schema versions complete', `(SELECT count(*)=3 FROM public.billing_schema_versions WHERE version IN ('20261015033808','20261017090000','20261017120000'))`],
 ];
 
