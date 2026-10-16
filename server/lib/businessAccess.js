@@ -96,7 +96,11 @@ function computeCommercialAccess(business, now, billing) {
     && !o.revoked_at && o.audit_id && typeof o.reason === 'string' && o.reason.trim()
     && Number.isFinite(instant(o.starts_at)) && instant(o.starts_at) <= time && (o.ends_at == null || instant(o.ends_at) > time))
     .sort((a,b) => instant(a.starts_at)-instant(b.starts_at) || String(a.id).localeCompare(String(b.id))) : [];
-  const features = selected ? structuredClone(selected.features) : {}, limits = selected ? structuredClone(selected.limits) : {};
+  // Catalog defaults (same as SQL billing_feature_defaults): module keys a version predates stay allowed;
+  // 'always' features (Pulse, data export) are part of every plan.
+  const defaults = billing.feature_defaults || {};
+  const features = selected ? { ...(defaults.absent || {}), ...structuredClone(selected.features), ...(defaults.always || {}) } : {};
+  const limits = selected ? structuredClone(selected.limits) : {};
   let discount = null;
   for (const o of overrides) {
     if (o.kind === 'feature' && typeof o.value === 'boolean') features[o.key] = o.value;

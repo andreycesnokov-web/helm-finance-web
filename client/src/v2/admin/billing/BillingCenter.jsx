@@ -1,6 +1,6 @@
 // Billing Management Center — Platform admin only (requireAdmin on every route). Separate from the customer
 // Billing page in the Business workspace. No customer balances, transactions or documents are requested.
-import {Fragment} from 'react'
+import {Fragment,useState} from 'react'
 import {NavLink} from 'react-router-dom'
 import '../../billing.css'
 import {useAuth} from '../../../hooks/useAuth'
@@ -23,6 +23,17 @@ function Overview({token,c}){
    <p className="v2-muted v2-small">{c.paymentsOff}</p></Card></>;
 }
 
+// Base (plan) → individual (override) → effective limit, and the usage the server counts.
+function CompanyUsage({token,c,lang}){
+ const subs=useLoad('/admin/billing/subscriptions',token),[id,setId]=useState('');
+ const d=useLoad(id?'/admin/billing/companies/'+id:'/admin/billing/settings',token);
+ if(subs.loading)return <Loading/>;if(subs.error)return <ErrorBox error={subs.error} onRetry={subs.reload}/>;
+ const list=subs.data.subscriptions.filter(s=>s.policy!=='legacy'),val=x=>x===undefined?'—':x===null?c.unlimited:x===0?c.unavailable:String(x);
+ return <Card title={c.usageTitle}><label>{c.chooseCompany}<select value={id} onChange={e=>setId(e.target.value)}><option value="">—</option>{list.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+  {id&&!d.loading&&d.data?.limits&&<div className="v2-tablewrap"><table className="v2-table"><thead><tr><th>{c.limit}</th><th>{c.enforcement}</th><th>{c.base}</th><th>{c.individual}</th><th>{c.effectiveCol}</th><th>{c.used}</th><th>{c.policy}</th></tr></thead>
+   <tbody>{d.data.limits.map(l=>{const off=!l.counter&&!l.required;return <tr key={l.key}><td>{label(l.label_i18n,lang)}</td><td>{enforcementPill({...l,kind:'limit',module_status:'released'},c)}</td><td>{off?'—':val(l.base)}</td><td>{l.individual===undefined?'—':val(l.individual)}</td>
+    <td>{d.data.access.restricted||off?'—':val(l.effective)}</td><td className="v2-num">{l.used??'—'}</td><td>{l.counter?(l.policy==='soft'?c.soft:c.hard):'—'}</td></tr>})}</tbody></table></div>}</Card>;
+}
 function Catalog({token,c,lang}){
  const r=useLoad('/admin/billing/catalog',token);
  if(r.loading)return <Loading/>;if(r.error)return <ErrorBox error={r.error} onRetry={r.reload}/>;
@@ -30,7 +41,7 @@ function Catalog({token,c,lang}){
  const table=kind=><Card title={kind==='feature'?c.features:c.limits} key={kind}><div className="v2-tablewrap"><table className="v2-table"><thead><tr><th>{c.key}</th><th>{c.moduleStatus}</th><th>{c.enforcement}</th>{kind==='limit'&&<th>{c.reset}</th>}</tr></thead>
   <tbody>{rows(kind).map(i=><tr key={i.key}><td>{label(i.label_i18n,lang)}<div className="v2-muted v2-small">{i.key}</div></td><td>{c[i.module_status==='not_released'?'notReleased':i.module_status]}</td><td>{enforcementPill(i,c)}</td>
    {kind==='limit'&&<td>{i.reset_period==='month_utc'?c.monthUtc:'—'}</td>}</tr>)}</tbody></table></div></Card>;
- return <><p className="v2-muted">{c.catalogNote}</p>{table('feature')}{table('limit')}</>;
+ return <><p className="v2-muted">{c.catalogNote}</p><p className="v2-muted v2-small">{c.statusLegend}</p>{table('feature')}{table('limit')}<CompanyUsage token={token} c={c} lang={lang}/></>;
 }
 function Promotions({token,c,lang}){
  const r=useLoad('/admin/billing/overrides',token);

@@ -35,6 +35,7 @@ export const label=(o,lang)=>o?(o[lang]||o.en||''):'';
 export const planTitle=(v,lang)=>v?`${label(v.name_i18n,lang)||v.plan} · v${v.version}`:'—';
 export const newKey=()=>crypto.randomUUID();
 export function enforcementPill(item,c){
+ if(item.enforcement==='always')return <Pill tone="good">{c.available}</Pill>;
  if(item.module_status==='not_released')return <Pill tone="neutral">{c.notReleased}</Pill>;
  if(item.kind==='limit'&&!item.counter&&!item.required)return <Pill tone="warn">{c.noCounter}</Pill>;
  return item.enforcement==='server'?<Pill tone="good">{c.server}</Pill>:<Pill tone="warn">{c.notEnforced}</Pill>;

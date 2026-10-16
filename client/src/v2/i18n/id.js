@@ -24,7 +24,7 @@ export default {
     brand: 'CFO AI', notifications: 'Notifikasi', openMore: 'Buka menu ruang kerja',
     wsGroupCompany: 'Ruang kerja perusahaan', wsCreate: 'Buat ruang kerja perusahaan', wsCreateHint: 'Uang dan tim perusahaan terpisah', wsMember: 'Anggota', switchHint: 'Ganti perusahaan atau ke Pribadi', company: 'Perusahaan', personal: 'Pribadi',
     companies: 'Perusahaan', createCompany: 'Buat ruang kerja perusahaan',
-    loading: 'Memuat ruang kerja…', loadError: 'Gagal memuat ruang kerja', retry: 'Coba lagi',
+    loading: 'Memuat ruang kerja…', loadError: 'Gagal memuat ruang kerja', retry: 'Coba lagi', planRefused: 'Tindakan ini tidak termasuk dalam paket Anda.', seePlans: 'Lihat paket',
   },
   placeholder: {
     soon: 'Segera hadir', redesign: 'Layar ini bagian dari desain baru dan belum dibuat.',

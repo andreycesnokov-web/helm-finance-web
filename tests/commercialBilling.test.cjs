@@ -25,6 +25,8 @@ test('disabled routes do not call business resolution or data layer',()=>{
 
 test('AI identification reserves AI quota before the general document mutation rule',()=>{
  const {workflow}=require('../server/lib/commercialBilling');
- assert.deepEqual(workflow({method:'POST',originalUrl:'/api/documents/abc/identify'}),{feature:'ai',resource:'ai'});
- assert.deepEqual(workflow({method:'PATCH',originalUrl:'/api/documents/abc'}),{feature:'documents'});
+ const id=workflow({method:'POST',originalUrl:'/api/documents/abc/identify'});
+ assert.deepEqual([id.features,id.resource,id.requireKey],[['documents','ai'],'ai',true]);
+ assert.deepEqual(workflow({method:'PATCH',originalUrl:'/api/documents/abc'}).features,['documents']);
+ assert.equal(workflow({method:'GET',originalUrl:'/api/documents/abc'}),null,'reading own documents is never gated');
 });

@@ -83,11 +83,13 @@ export function Skeleton({ rows = 3 }) {
 
 export function ErrorBox({ error, onRetry }) {
   const t = useT()
-  const msg = typeof error === 'string' ? error : error?.message || 'Request failed'
+  const plan = error?.status === 402 && error?.data?.billing_url
+  const msg = plan ? t('shell.planRefused') : typeof error === 'string' ? error : error?.message || 'Request failed'
   return (
     <div className="v2-error" role="alert">
       <I.warn size={18} />
       <span className="v2-error-text">{msg}</span>
+      {plan && <a className="v2-btn v2-btn-secondary" href={error.data.billing_url}>{t('shell.seePlans')}</a>}
       {onRetry && <button type="button" className="v2-btn v2-btn-secondary" onClick={onRetry}>{t('shell.retry')}</button>}
     </div>
   )

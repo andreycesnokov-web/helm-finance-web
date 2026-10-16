@@ -10,7 +10,7 @@ const path = require('node:path');
 const { createProdSchemaDatabase } = require('./_prodSchemaDb');
 const { CHAIN, D4, seeder, startServer, openAdmin } = require('./_d4Harness');
 
-const MIGRATIONS = ['20261015033808_cfo_commercial_trial.sql', '20261017090000_billing_management_center.sql'];
+const MIGRATIONS = ['20261015033808_cfo_commercial_trial.sql', '20261017090000_billing_management_center.sql', '20261017120000_billing_enforcement.sql'];
 const ADMIN = 9100, A_OWNER = 1101, B_OWNER = 1102, MEMBER = 1103, C_OWNER = 1104, D_OWNER = 1105, E_OWNER = 1106;
 const F8 = { documents: true, ai: true, import: true, payroll: false, team: false, approvals: false, export: true, integrations: false };
 const L5 = { users: 2, companies: 1, documents: 3, ai: 100, imports: 10 };
@@ -101,7 +101,7 @@ test('plans: any code, legacy codes reserved, drafts never replace published ter
   assert.deepEqual(pv.body.changes.map(c => c.field).sort(), ['limits.users', 'price_minor']);
   assert.deepEqual(await counts(), before, 'preview wrote nothing');
   assert.equal(Number((await head('zero_activity')).catalog_version), Number(h.catalog_version));
-  for (const [over, code] of [[{ limits: { ...L5, transactions: 100 } }, 'billing_limit_without_counter'], [{ features: { ...F8, api: true } }, 'billing_feature_not_released'],
+  for (const [over, code] of [[{ limits: { ...L5, exports: 100 } }, 'billing_limit_without_counter'], [{ features: { ...F8, export: false } }, 'billing_feature_always_included'],
     [{ features: { ...F8, teleport: true } }, 'billing_unknown_feature'], [{ limit_policies: { storage_mb: 'soft' } }, 'billing_invalid_terms']]) {
     const bad = await api.call('/admin/billing/catalog/zero_activity/preview', { method: 'POST', user: ADMIN, body: { expected_version: Number(h.catalog_version), terms: { action: 'publish', ...terms('Z', over) } } });
     assert.equal(bad.body.valid, false); assert.equal(bad.body.error, code);
@@ -165,7 +165,7 @@ test('customer overrides: base + individual terms = effective (SQL and API agree
   assert.notEqual((await api.call('/payroll/runs', { method: 'POST', user: A_OWNER, biz: A, body: {} })).status, 402, 'the override is enforced on the server');
   const dup = await adminCmd(A, 'override', { kind: 'limit', key: 'users', value: 20, reason: 'Second seats override' });
   assert.equal(dup.status, 409); assert.equal(dup.body.error, 'billing_override_overlap');
-  for (const [kind, k] of [['limit', 'transactions'], ['limit', 'companies'], ['feature', 'radar']]) {
+  for (const [kind, k] of [['limit', 'exports'], ['limit', 'companies'], ['feature', 'pulse']]) {
     const r = await adminCmd(A, 'override', { kind, key: k, value: kind === 'limit' ? 5 : true, reason: 'Unenforceable override' });
     assert.equal(r.status, 400, k); assert.equal(r.body.error, 'billing_override_not_enforceable');
   }

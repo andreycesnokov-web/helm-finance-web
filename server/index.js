@@ -15962,9 +15962,11 @@ require('./mcp').attachMcp(app, {
   }),
   services: {
     commercialToolGate:async(name,args,actor)=>{
-      if(!COMMERCIAL_BILLING_ENABLED||['get_company_context','get_financial_summary','get_missing_documents','list_documents'].includes(name))return null;
+      // External API: reads and writes follow the company plan ('api' + the tool's feature; AI tools metered).
+      // Own data stays readable and exportable in the app regardless of the plan.
+      if(!COMMERCIAL_BILLING_ENABLED)return null;
       const biz=await _resolveActiveBusiness(supabase,uid=>findDefaultBusiness(uid),{user:{userId:actor},headers:{},query:{},body:args.company_id?{business_id:args.company_id}:{}});
-      return biz.business.billing_policy==='commercial_v2'?{error:'commercial_channel_unavailable',message:'Use CFO OS V2 for this workflow. Commercial MCP writes and AI jobs are not enabled.'}:null;
+      return require('./lib/commercialBilling').mcpGate(supabase,actor,biz,name,COMMERCIAL_BILLING_FIXTURES);
     },
     // identity → company. Read-only: a lookup can never bootstrap a workspace
     // (ensureDefaultBusiness would; findDefaultBusiness never does).
