@@ -13,7 +13,7 @@ const { CHAIN, D4 } = require('./_d4Harness');
 
 const ROOT = path.join(__dirname, '..', '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const BILLING = ['supabase/migrations/20261015033808_cfo_commercial_trial.sql', 'supabase/migrations/20261017090000_billing_management_center.sql', 'supabase/migrations/20261017120000_billing_enforcement.sql'];
+const BILLING = ['supabase/migrations/20261015033808_cfo_commercial_trial.sql', 'supabase/migrations/20261017090000_billing_management_center.sql', 'supabase/migrations/20261017120000_billing_enforcement.sql', 'supabase/migrations/20261018090000_billing_plan_matrix.sql'];
 const OWNER = 96001;
 const dbs = [];
 after(async () => { for (const d of dbs) await d.drop().catch(() => {}); });
@@ -71,7 +71,7 @@ test('runner on a fully migrated database: applies nothing, changes no function 
   assert.deepEqual([...new Set(plan.entries.map(e => e.state))], ['APPLIED_UNRECORDED']);
   const r1 = await migrate({ connectionString: db.connectionString, mode: 'apply', log: quiet });
   assert.equal(r1.ok, true, JSON.stringify(r1.postflight.filter(p => !p.ok)));
-  assert.deepEqual(r1.applied, []); assert.equal(r1.adopted.length, 21);
+  assert.deepEqual(r1.applied, []); assert.equal(r1.adopted.length, 22);
   assert.deepEqual(await fnHashes(c), h0, 'no function definition changed');
   assert.deepEqual([await balance(c, s.W), await balance(c, s.V)], b0, 'no balance changed');
   const r2 = await migrate({ connectionString: db.connectionString, mode: 'apply', log: quiet });

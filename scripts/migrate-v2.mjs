@@ -59,6 +59,7 @@ export const MANIFEST = [
   { file: 'supabase/migrations/20261015033808_cfo_commercial_trial.sql', probes: [billingVersion('20261015033808'), table('billing_accounts')] },
   { file: 'supabase/migrations/20261017090000_billing_management_center.sql', probes: [billingVersion('20261017090000'), table('billing_overrides')] },
   { file: 'supabase/migrations/20261017120000_billing_enforcement.sql', probes: [billingVersion('20261017120000'), fn('billing_usage')] },
+  { file: 'supabase/migrations/20261018090000_billing_plan_matrix.sql', probes: [billingVersion('20261018090000'), fn('billing_public_catalog')] },
 ];
 
 // Invariants that must hold after the run (by definition, not by table presence).
@@ -82,10 +83,13 @@ export const POSTFLIGHT = [
       OR has_table_privilege(r.role, 'public.auth_app_sessions', 'SELECT,INSERT,UPDATE,DELETE')
       OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'rpc\\_auth\\_%'
         AND has_function_privilege(r.role, p.oid, 'EXECUTE'))))`],
-  ['billing schema versions complete', `(SELECT count(*)=3 FROM public.billing_schema_versions WHERE version IN ('20261015033808','20261017090000','20261017120000'))`],
+  ['billing schema versions complete', `(SELECT count(*)=4 FROM public.billing_schema_versions WHERE version IN ('20261015033808','20261017090000','20261017120000','20261018090000'))`],
+  ['plan publication requires every metered limit to be decided (absent is never unlimited)', defHas('billing_terms_error', 'An undecided metered limit')],
 ];
 
-const sha = (text) => crypto.createHash('sha256').update(text).digest('hex');
+// Line endings are normalized first: a Windows checkout (core.autocrlf) and a Linux deploy of the same commit must
+// produce the same ledger checksum; any change of content still changes it.
+export const sha = (text) => crypto.createHash('sha256').update(String(text).replace(/\r\n/g, '\n')).digest('hex');
 
 export async function migrate({ connectionString, mode = 'plan', adopt = [], root = ROOT, log = console.log } = {}) {
   const c = new pg.Client({ connectionString });
