@@ -113,6 +113,9 @@ function classifyTransaction(tx) {
   // These are the rows that must never reach the revenue or OPEX buckets. A wallet
   // opening balance is written as type='income', so gating on type alone would file
   // it as revenue — which is exactly the bug this ordering prevents.
+  // D4-A: a moved opening anchor (and its reversal) is an opening balance, not a correction.
+  if (/^opening_reanchor(_reversal)?$/.test(src))
+    return { class: 'opening_balance', matched_on: 'source', needs_review: false };
   if (type === 'correction' || hit(RE.balance_correction, s))
     return { class: 'balance_correction', matched_on: 'type_or_keyword', needs_review: false };
   if (hit(RE.opening_balance, s) || /wallet_opening_balance/i.test(src))

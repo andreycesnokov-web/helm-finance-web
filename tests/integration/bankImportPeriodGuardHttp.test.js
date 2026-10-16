@@ -23,7 +23,7 @@ const RELEASE_MIGRATIONS = [
   '20261012110000_durable_company_creation.sql', '20261012123000_atomic_team_membership.sql',
   '20261013001000_atomic_business_profile.sql', '20261013031755_historical_bank_import_review_receipts.sql',
   '20261013062733_private_import_receipt_immutability.sql', '20261013114500_atomic_bill_creation.sql',
-  '20261014040810_operation_document_control.sql',
+  '20261014040810_operation_document_control.sql', '20261016090000_dated_opening_anchor.sql',
 ];
 const JWT_SECRET = 'bank-import-period-guard-test-secret-0123456789';
 const OWNER = 8102;

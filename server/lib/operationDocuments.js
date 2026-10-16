@@ -24,7 +24,7 @@ function documentControl(snapshot,{month,role,actor}) {
  for(const a of s.allocations||[]){if(a.transaction_id&&debtById.has(String(a.debt_id)))txDebt.set(String(a.transaction_id),String(a.debt_id));}
  for(const d of debts){if(d.linked_transaction_id&&txById.has(String(d.linked_transaction_id)))txDebt.set(String(d.linked_transaction_id),String(d.id));}
  const groups=new Map();
- for(const t of tx){if(t.is_opening_balance||t.source==='wallet_opening_balance'||t.type==='opening')continue;
+ for(const t of tx){if(t.is_opening_balance||t.source==='wallet_opening_balance'||t.type==='opening'||['opening_reanchor','opening_reanchor_reversal','bank_import_opening'].includes(t.source))continue;
   const debt=txDebt.get(String(t.id)),g=debt?key('debt',debt):t.transfer_id?'transfer:'+t.transfer_id:key('transaction',t.id);
   if(!groups.has(g))groups.set(g,{key:g,transactions:[],debt:debt?debtById.get(debt):null});groups.get(g).transactions.push(t);
  }

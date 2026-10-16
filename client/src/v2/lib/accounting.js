@@ -136,7 +136,7 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
       // all ledger transactions for this bank account in this month must be linked to statement rows.
       // An absent, null, or false statement link strictly means unreconciled.
       const isReconciledTx = (t) => {
-        if (t?.source === 'wallet_opening_balance' || t?.type === 'opening') return true
+        if (t?.source === 'wallet_opening_balance' || t?.type === 'opening' || OPENING_ANCHOR_SOURCES.includes(t?.source)) return true
         if (t?.linked_statement_row_id || t?.statement_row_id) return true
         if (t?.is_reconciled === true) return true
         return false
@@ -149,7 +149,7 @@ export function closeReadiness({ month, transactions = [], debts = [], batches =
     })
   )
   const isReconciledBankTx = (t) => {
-    if (t?.source === 'wallet_opening_balance' || t?.type === 'opening') return true
+    if (t?.source === 'wallet_opening_balance' || t?.type === 'opening' || OPENING_ANCHOR_SOURCES.includes(t?.source)) return true
     if (t?.linked_statement_row_id || t?.statement_row_id) return true
     if (t?.is_reconciled === true) return true
     return false
@@ -480,6 +480,10 @@ export function complianceEvents(summary) {
 }
 
 /** Progress of one event, from the statuses the engine stores. */
+// D4-A: opening-anchor bookkeeping rows (re-anchor pair, bank opening alignment) are not bank
+// movements; they never have a statement line and must not make a month unreconciled.
+export const OPENING_ANCHOR_SOURCES = Object.freeze(['opening_reanchor','opening_reanchor_reversal','bank_import_opening'])
+
 export function eventStage(e) {
   if (['paid', 'filed'].includes(e?.payment_status) || ['paid', 'filed'].includes(e?.status)) return 'done'
   if (e?.days != null && e.days < 0) return 'overdue'

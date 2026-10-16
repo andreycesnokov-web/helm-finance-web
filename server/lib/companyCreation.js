@@ -1,5 +1,5 @@
 'use strict';
-const { validTimezone } = require('./profileValidation');
+const { validBusinessTimezone: validTimezone } = require('./profileValidation');
 const { DEFAULT_BUSINESS_CATEGORIES } = require('./defaultCategories');
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function creationInput(body, currencies) {

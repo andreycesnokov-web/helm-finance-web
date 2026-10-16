@@ -35,6 +35,8 @@ export function classOf(tx) {
   const s = hay(tx)
   const type = (tx && tx.type) || ''
   const src = (tx && tx.source) || ''
+  // D4-A: a moved opening anchor (and its reversal) is an opening balance, not a correction.
+  if (/^opening_reanchor(_reversal)?$/.test(src)) return 'opening_balance'
   if (type === 'correction' || hit(RE.balance_correction, s)) return 'balance_correction'
   if (hit(RE.opening_balance, s) || /wallet_opening_balance/i.test(src)) return 'opening_balance'
   if (type === 'transfer' || hit(RE.transfer, s)) return 'transfer'

@@ -17,4 +17,14 @@ function ownAvatarPath(value, userId, projectURL, bucket = 'avatars') {
     return match ? { path: String(userId) + '/' + file, mime: AVATAR_MIME[match[1].toLowerCase()] } : null;
   } catch { return null; }
 }
-module.exports = { validTimezone, ownAvatarPath };
+// Company time zone (D4-A): stricter than a user zone. Same rule as public.cfo_business_tz:
+// IANA Area/Location only. POSIX names ("GMT+7", "+07:00") mean the opposite sign in PostgreSQL
+// and abbreviations ("WIB") are unknown to it, so an opening date would shift by a day.
+const IANA_AREA_LOCATION = /^[A-Z][A-Za-z]+\/[A-Za-z_]+(\/[A-Za-z_]+)?$/;
+function validBusinessTimezone(value) {
+  if (value == null || value === '') return true;
+  if (typeof value !== 'string' || value.length > 64 || !IANA_AREA_LOCATION.test(value)) return false;
+  return validTimezone(value);
+}
+
+module.exports = { validTimezone, validBusinessTimezone, IANA_AREA_LOCATION, ownAvatarPath };
