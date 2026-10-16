@@ -360,3 +360,11 @@ export function billingCommand(path,identity,body){
  if(m)return apiFetch('/admin/billing/companies/'+m[1]+'/'+m[2],identity,{...options,method:'POST'})
  throw Error('invalid_billing_path')
 }
+
+// Platform administrators (2026-10-16, P0 Security): super_admin only.
+export const grantAdmin = (token, email, role) =>
+  apiFetch('/admin/administrators', token, { method: 'POST', body: { email, role } })
+
+export const revokeAdmin = (token, userId) =>
+  apiFetch('/admin/administrators/' + encodeURIComponent(userId) + '/revoke', token, { method: 'POST' })
+

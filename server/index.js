@@ -121,6 +121,23 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SEC
 const JWT_SECRET = process.env.JWT_SECRET;
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
+// ── Platform Admin authorization (2026-10-16, P0 Security) ─────────────────
+// Database-backed RBAC (platform_admins) with verified email requirement.
+// Replaces environment-based ADMIN_TELEGRAM_IDS.
+const {
+  resolvePlatformAdmin,
+  createRequireAdmin,
+  createRequireSuperAdmin,
+  listPlatformAdmins,
+  grantPlatformAdminRole,
+  revokePlatformAdminRole,
+  bootstrapSuperAdmin,
+  clearAdminCache,
+} = require('./lib/platformAdmin');
+
+const requireAdmin = createRequireAdmin(supabase);
+const requireSuperAdmin = createRequireSuperAdmin(supabase);
+
 // --- Telegram Login verification ------------------------------------------
 
 function verifyTelegramAuth(data) {
@@ -151,7 +168,7 @@ app.post('/api/auth/telegram', async (req, res) => {
       }, { onConflict: 'id' })
       .select().single();
     if (error) throw error;
-    const token = jwt.sign({ userId: user.id, firstName: user.first_name }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ userId: user.id, firstName: user.first_name, auth_channel: 'telegram' }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, user });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -927,7 +944,7 @@ function canManageClassificationRules(role)   { return ['owner', 'ceo', 'admin',
 // tax_rules / official_sources are a PLATFORM-LEVEL registry, not business-owned.
 // Only a platform admin (or a future dedicated tax_rule_editor) may manage them.
 // A business Owner can never create or activate a global tax rule.
-function canEditTaxRules(userId)              { return isAdminUser(userId); }  // isAdminUser hoisted
+async function canEditTaxRules(userId, authChannel = 'email') { return Boolean(await resolvePlatformAdmin(supabase, userId, authChannel)); }
 
 // Append-only audit writer. Best-effort: auditing must never block the action.
 // business_id is null for platform-level entities (tax_rule, official_source).
@@ -3721,8 +3738,25 @@ app.post('/api/accountant/calendar/remind', auth, async (req, res) => {
 // a verified official source. A change creates a NEW version (old stays).
 // ═════════════════════════════════════════════════════════════════════════════
 
-function requireTaxRuleEditor(req, res) {
-  if (!canEditTaxRules(req.user.userId)) { res.status(403).json({ error: 'Platform tax-rule editor access required' }); return false; }
+async function requireTaxRuleEditor(req, res) {
+  const userId = req.user?.userId;
+  const authChannel = req.user?.auth_channel;
+  if (!userId) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  if (authChannel !== 'email') {
+    res.status(403).json({
+      error: 'admin_email_required',
+      message: 'Platform administration requires sign-in via verified email OTP / magic-link.',
+    });
+    return false;
+  }
+  const admin = await resolvePlatformAdmin(supabase, userId, authChannel);
+  if (!admin) {
+    res.status(403).json({ error: 'Platform tax-rule editor access required' });
+    return false;
+  }
   return true;
 }
 const TAX_RULE_EDITABLE = ['jurisdiction','country','legal_entity_type','legal_entity_types','tax_regime','tax_regimes','obligation_type','title','description','calculation_method','parameters','parameters_status','filing_frequency','payment_frequency','due_date_rule','due_date_rule_json','applies_when','official_source_id','effective_from','effective_to','interpretation_notes','exceptions','required_profile_fields'];
@@ -3741,7 +3775,7 @@ async function loadEffectiveApprovedReview(rule) {
 
 // ── Professional review records (PR1: model + read; full workflow in PR3) ─────
 app.get('/api/admin/tax-rules/:id/reviews', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data, error } = await supabase.from('tax_rule_reviews')
     .select('*').eq('tax_rule_id', req.params.id).order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
@@ -3750,7 +3784,7 @@ app.get('/api/admin/tax-rules/:id/reviews', auth, async (req, res) => {
 
 // Create a review request (queue entry). Starts as 'pending' — NOT approved.
 app.post('/api/admin/tax-rules/:id/reviews', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: rule } = await supabase.from('tax_rules').select('id, version').eq('id', req.params.id).single();
   if (!rule) return res.status(404).json({ error: 'Rule not found' });
   const allowed = ['reviewer_name', 'reviewer_role', 'license_number', 'license_type', 'issuing_authority', 'review_scope', 'review_notes'];
@@ -3766,7 +3800,7 @@ app.post('/api/admin/tax-rules/:id/reviews', auth, async (req, res) => {
 // you cannot mark a rule professionally reviewed without a real, license-checked
 // reviewer (spec §8/§29). Approval is the gate the activation step depends on.
 app.patch('/api/admin/tax-rule-reviews/:reviewId', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('tax_rule_reviews').select('*').eq('id', req.params.reviewId).single();
   if (!before) return res.status(404).json({ error: 'Review not found' });
   // License verification is a SEPARATE, audited action (verify-license) — it
@@ -3797,7 +3831,7 @@ app.patch('/api/admin/tax-rule-reviews/:reviewId', auth, async (req, res) => {
 // platform-admin action that records license verification (never self-service
 // by the reviewer). Audited. Method stored separately from the status value.
 app.post('/api/admin/tax-rule-reviews/:reviewId/verify-license', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('tax_rule_reviews').select('*').eq('id', req.params.reviewId).single();
   if (!before) return res.status(404).json({ error: 'Review not found' });
   const status = req.body?.status === 'failed' ? 'failed' : 'verified';
@@ -3816,14 +3850,14 @@ app.post('/api/admin/tax-rule-reviews/:reviewId/verify-license', auth, async (re
 
 // ── Official sources ─────────────────────────────────────────────────────────
 app.get('/api/admin/official-sources', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data, error } = await supabase.from('official_sources').select('*').order('jurisdiction').order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ sources: data || [] });
 });
 
 app.post('/api/admin/official-sources', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const body = {}; for (const k of SOURCE_EDITABLE) if (req.body[k] !== undefined) body[k] = req.body[k];
   if (!body.jurisdiction || !body.authority || !body.title || !body.url) return res.status(400).json({ error: 'jurisdiction, authority, title, url required' });
   body.status = body.status || 'draft';
@@ -3834,7 +3868,7 @@ app.post('/api/admin/official-sources', auth, async (req, res) => {
 });
 
 app.patch('/api/admin/official-sources/:id', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Source not found' });
   const updates = { updated_at: new Date().toISOString() };
@@ -3864,7 +3898,7 @@ async function returnRulesToReviewForSource(sourceId, reason, actorUserId) {
 // content_hash + notes + accessed_at. If the content hash CHANGED, dependent
 // active rules are returned to review (no silent active rule after a change).
 app.post('/api/admin/official-sources/:id/verify', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Source not found' });
   const newHash = req.body?.content_hash != null ? String(req.body.content_hash) : before.content_hash;
@@ -3885,7 +3919,7 @@ app.post('/api/admin/official-sources/:id/verify', auth, async (req, res) => {
 
 // Mark a source outdated — dependent active rules return to review.
 app.post('/api/admin/official-sources/:id/mark-outdated', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Source not found' });
   const { data } = await supabase.from('official_sources').update({ status: 'outdated', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
@@ -3896,7 +3930,7 @@ app.post('/api/admin/official-sources/:id/mark-outdated', auth, async (req, res)
 
 // Mark a source replaced (optionally record the superseding document).
 app.post('/api/admin/official-sources/:id/mark-replaced', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Source not found' });
   const superseded = Array.isArray(before.superseded_documents) ? before.superseded_documents : [];
@@ -3910,7 +3944,7 @@ app.post('/api/admin/official-sources/:id/mark-replaced', auth, async (req, res)
 // Append a known amendment (audited; does not auto-return rules — the editor
 // decides whether the amendment is material and re-verifies / marks outdated).
 app.post('/api/admin/official-sources/:id/amendment', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('official_sources').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Source not found' });
   const note = String(req.body?.note || '').trim();
@@ -3924,7 +3958,7 @@ app.post('/api/admin/official-sources/:id/amendment', auth, async (req, res) => 
 
 // ── Tax rules (versioned) ────────────────────────────────────────────────────
 app.get('/api/admin/tax-rules', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   let q = supabase.from('tax_rules').select('*, official_sources(*)').order('rule_code').order('version', { ascending: false });
   if (req.query.jurisdiction) q = q.eq('jurisdiction', req.query.jurisdiction);
   if (req.query.status) q = q.eq('status', req.query.status);
@@ -3954,7 +3988,7 @@ app.get('/api/admin/tax-rules', auth, async (req, res) => {
 });
 
 app.post('/api/admin/tax-rules', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const body = { status: 'draft', version: 1, created_by_user_id: req.user.userId };
   for (const k of TAX_RULE_EDITABLE) if (req.body[k] !== undefined) body[k] = req.body[k];
   if (!body.rule_code || !body.jurisdiction || !body.country || !body.obligation_type || !body.title)
@@ -3969,7 +4003,7 @@ app.post('/api/admin/tax-rules', auth, async (req, res) => {
 });
 
 app.patch('/api/admin/tax-rules/:id', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Rule not found' });
   // Only draft / under_review rules are editable. Active rules are immutable.
@@ -3986,7 +4020,7 @@ app.patch('/api/admin/tax-rules/:id', auth, async (req, res) => {
 // Lifecycle: submit (→under_review), activate (→active, requires verified
 // source), deprecate (→deprecated), new-version (clone as draft).
 app.post('/api/admin/tax-rules/:id/submit', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Rule not found' });
   if (before.status !== 'draft') return res.status(409).json({ error: 'Only a draft can be submitted for review' });
@@ -3997,7 +4031,7 @@ app.post('/api/admin/tax-rules/:id/submit', auth, async (req, res) => {
 });
 
 app.post('/api/admin/tax-rules/:id/activate', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('tax_rules').select('*, official_sources(*)').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Rule not found' });
   if (before.status === 'active') return res.status(409).json({ error: 'Already active' });
@@ -4015,7 +4049,7 @@ app.post('/api/admin/tax-rules/:id/activate', auth, async (req, res) => {
 });
 
 app.post('/api/admin/tax-rules/:id/deprecate', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: before } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
   if (!before) return res.status(404).json({ error: 'Rule not found' });
   const { data, error } = await supabase.from('tax_rules').update({ status: 'deprecated', updated_at: new Date().toISOString() }).eq('id', req.params.id).select().single();
@@ -4027,7 +4061,7 @@ app.post('/api/admin/tax-rules/:id/deprecate', auth, async (req, res) => {
 // Create a new version: old row stays immutable, new draft has version+1 and
 // supersedes_rule_id → old. Activating the new version later supersedes the old.
 app.post('/api/admin/tax-rules/:id/new-version', auth, async (req, res) => {
-  if (!requireTaxRuleEditor(req, res)) return;
+  if (!await requireTaxRuleEditor(req, res)) return;
   const { data: old } = await supabase.from('tax_rules').select('*').eq('id', req.params.id).single();
   if (!old) return res.status(404).json({ error: 'Rule not found' });
   // Highest existing version for this rule_code.
@@ -10356,20 +10390,13 @@ app.post('/api/wallets/backfill', auth, legacyAccountReview);
 for (const route of ['/api/accounts','/api/accounts/adjust','/api/accounts/delete','/api/accounts/rename'])
   app.post(route, auth, legacyAccountReview);
 
-// --- Platform Admin guard -------------------------------------------------
-
-function isAdminUser(userId) {
-  const ids = (process.env.ADMIN_TELEGRAM_IDS || '')
-    .split(',')
-    .map(x => x.trim())
-    .filter(Boolean);
-  return ids.includes(String(userId));
-}
-
-function requireAdmin(req, res, next) {
-  if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized' });
-  if (!isAdminUser(req.user.userId)) return res.status(403).json({ error: 'Admin access required' });
-  next();
+// --- Platform Admin helper ------------------------------------------------
+// Database-backed Platform Admin helper. Platform administration strictly requires
+// verified email sessions (auth_channel === 'email') and an active platform_admins record.
+async function isAdminUser(userId, authChannel = 'email') {
+  if (!userId) return false;
+  const admin = await resolvePlatformAdmin(supabase, userId, authChannel);
+  return Boolean(admin);
 }
 
 // POST /api/wallets/:id/adjust-balance
@@ -10644,6 +10671,84 @@ app.post('/api/wallets/transfer', auth, async (req, res) => {
 });
 
 // --- Admin endpoints -------------------------------------------------------
+
+// ── Platform Administrators Management (2026-10-16, P0 Security) ─────────
+// Listing admins and reading security audit: any platform admin (requireAdmin).
+// Granting and revoking roles: super_admin only (requireSuperAdmin).
+
+app.get('/api/admin/administrators', auth, requireAdmin, async (req, res) => {
+  try {
+    const administrators = await listPlatformAdmins(supabase);
+    res.json({ administrators });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/administrators', auth, requireSuperAdmin, async (req, res) => {
+  try {
+    const { email, role } = req.body || {};
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'email_required' });
+    }
+    if (!['super_admin', 'platform_admin'].includes(role)) {
+      return res.status(400).json({ error: 'invalid_role', message: "Role must be 'super_admin' or 'platform_admin'" });
+    }
+
+    const administrator = await grantPlatformAdminRole(supabase, {
+      email,
+      role,
+      actorUserId: req.user.userId,
+      actorEmail: req.user.email,
+      requestId: req.id || null,
+    });
+
+    res.json({ ok: true, administrator });
+  } catch (e) {
+    if (e.message?.includes('verified email identity')) {
+      return res.status(400).json({ error: 'unverified_email', message: e.message });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/administrators/:id/revoke', auth, requireSuperAdmin, async (req, res) => {
+  try {
+    const adminId = req.params.id;
+    const revoked = await revokePlatformAdminRole(supabase, {
+      adminId,
+      actorUserId: req.user.userId,
+      actorEmail: req.user.email,
+      requestId: req.id || null,
+    });
+
+    res.json({ ok: true, revoked });
+  } catch (e) {
+    if (e.message?.includes('Cannot revoke the last active super_admin')) {
+      return res.status(409).json({ error: 'last_super_admin', message: e.message });
+    }
+    if (e.message?.includes('not found')) {
+      return res.status(404).json({ error: 'not_found', message: e.message });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/administrators/audit', auth, requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('audit_events')
+      .select('*')
+      .eq('entity_type', 'platform_admin')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+    res.json({ events: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('/api/admin/users', auth, requireAdmin, async (req, res) => {
   try {
@@ -11085,10 +11190,15 @@ app.get('/api/admin/users/:id/cleanup-preflight', auth, requireAdmin, async (req
   }
 });
 
-// GET /api/admin/status  — any authenticated user can call; returns is_admin boolean
+// GET /api/admin/status — any authenticated user can call; returns is_admin boolean, role, auth_channel.
 // Used by frontend to conditionally show admin-only UI elements.
-app.get('/api/admin/status', auth, (req, res) => {
-  res.json({ is_admin: isAdminUser(req.user.userId) });
+app.get('/api/admin/status', auth, async (req, res) => {
+  const admin = await resolvePlatformAdmin(supabase, req.user?.userId, req.user?.auth_channel);
+  res.json({
+    is_admin: Boolean(admin),
+    role: admin ? admin.role : null,
+    auth_channel: req.user?.auth_channel || 'telegram',
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -14114,7 +14224,7 @@ app.get('/api/documents/health', auth, async (req, res) => {
     const h = await getDocumentsHealth();
     // Ordinary users get only availability. Bucket/env/audit internals are
     // visible to Platform Admin only.
-    if (!isAdminUser(req.user.userId)) return res.json({ available: h.documents_enabled, degraded: h.degraded });
+    if (!await isAdminUser(req.user.userId, req.user.auth_channel)) return res.json({ available: h.documents_enabled, degraded: h.degraded });
     res.json({ ...h, environment: IS_PROD ? 'production' : (process.env.NODE_ENV || 'development') });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

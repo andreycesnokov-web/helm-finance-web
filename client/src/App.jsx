@@ -727,6 +727,8 @@ export default function App() {
               {/* v2 only: the new Flags & system page. */}
               <Route path="/admin/system" element={<Suspense fallback={null}><V2AdminApp page="system" /></Suspense>} />
               <Route path="/admin/billing" element={<Suspense fallback={null}><V2AdminApp page="billing" /></Suspense>} />
+              <Route path="/admin/security" element={<Suspense fallback={null}><V2AdminApp page="security" /></Suspense>} />
+              <Route path="/admin/administrators" element={<Suspense fallback={null}><V2AdminApp page="security" /></Suspense>} />
             </>
           ) : <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />}
           {/* Users console is also reachable at /admin/users (same list as /admin) so the

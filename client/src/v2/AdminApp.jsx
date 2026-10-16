@@ -18,6 +18,7 @@ import AdminOverview from './admin/AdminOverview'
 import AdminCompanies from './admin/AdminCompanies'
 import AdminSystem from './admin/AdminSystem'
 import AdminBilling from './admin/AdminBilling'
+import AdminSecurity from './admin/AdminSecurity'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
 
@@ -35,6 +36,7 @@ function AdminShell({ children }) {
           {link('/admin/businesses', t('admin.companies'))}
           {link('/admin/system', t('admin.system'))}
           {link('/admin/billing', t('admin.plans'))}
+          {link('/admin/security', t('admin.security'))}
         </nav>
         <p className="v2-muted v2-small v2-admin-privacy"><I.admin size={14} /> {t('admin.privacy')}</p>
         <div className="v2-sidefoot">
@@ -50,7 +52,7 @@ function AdminShell({ children }) {
       <main id="v2-main" className="v2-main" tabIndex={-1}>
         <div className="v2-main-inner v2-admin-inner">
           <nav className="v2-tabs v2-phone" aria-label={t('admin.nav')}>
-            {[['/admin/dashboard', 'admin.overview'], ['/admin/businesses', 'admin.companies'], ['/admin/system', 'admin.system'],['/admin/billing','admin.plans']].map(([to, k]) => (
+            {[['/admin/dashboard', 'admin.overview'], ['/admin/businesses', 'admin.companies'], ['/admin/system', 'admin.system'],['/admin/billing','admin.plans'],['/admin/security','admin.security']].map(([to, k]) => (
               <NavLink key={to} to={to} className={({ isActive }) => `v2-tab-link${isActive ? ' is-on' : ''}`}>{t(k)}</NavLink>
             ))}
           </nav>
@@ -72,6 +74,7 @@ export default function AdminApp({ page }) {
       {page === 'companies' && <AdminCompanies selectedId={params.businessId || null} />}
       {page === 'system' && <AdminSystem />}
       {page === 'billing' && <AdminBilling />}
+      {page === 'security' && <AdminSecurity />}
     </AdminShell>
   )
 }
