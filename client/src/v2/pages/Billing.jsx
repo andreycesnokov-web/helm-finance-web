@@ -30,6 +30,8 @@ export default function Billing(){
   else setError(c.pending);
  }catch{setError(c.error)}finally{lock.current=false;setBusy(false)}};
  if(r.loading)return <Card><Skeleton rows={4}/></Card>;
+ const isBillingDisabled=Boolean(r.error&&r.error.status===404&&r.error.data&&typeof r.error.data==='object'&&!r.error.data.path&&(r.error.data.error==='not_found'||r.error.data.code==='billing_disabled'||r.error.data.error==='billing_disabled'));
+ if(isBillingDisabled)return <div className="v2-page"><PageHead title={c.title} sub={c.pilotTitle}/><Card><p>{c.pilotNotice}</p><div style={{marginTop:16}}><Btn to="/business/pulse">{c.back}</Btn></div></Card></div>;
  if(r.error)return <><PageHead title={c.title}/><ErrorBox error={r.error} onRetry={r.reload}/></>;
  const d=r.data,a=d.access,s=d.account,plans=s?.catalog||[],fmt=x=>x?new Date(x).toLocaleString(lang):'—';
  return <div className="v2-page"><PageHead title={c.title} sub={c.noCard}/><Card><p>{c.offline}</p>{d.policy==='legacy'?<p>{c.legacy}</p>:<>
