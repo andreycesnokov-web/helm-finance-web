@@ -55,7 +55,11 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
   if(!UUID.test(req.params.key||''))throw Error('billing_invalid_key');
   const{data:r,error:e}=await supabase.from('billing_quota_reservations').select('resource,units').eq('business_id',biz.business.id).eq('actor_user_id',req.user.userId).eq('request_key',req.params.key).maybeSingle();
   if(e)throw e;if(!r)return res.json({state:'not_found'});
-  const{data,error}=await supabase.rpc('rpc_billing_quota',{p_actor:req.user.userId,p_business:biz.business.id,p_key:req.params.key,p_resource:r.resource,p_units:r.units,p_action:'abandon',p_reason:'Client upload failed before completion'});if(error)throw error;res.json(data);
+  const{data,error}=await supabase.rpc('rpc_billing_quota',{p_actor:req.user.userId,p_business:biz.business.id,p_key:req.params.key,p_resource:r.resource,p_units:r.units,p_action:'abandon',p_reason:'Client upload failed before completion'});if(error)throw error;
+  // The storage reservation made next to the upload is returned with it.
+  const sk=deriveKey(req.params.key,'storage_mb');const{data:st}=await supabase.from('billing_quota_reservations').select('units,state').eq('business_id',biz.business.id).eq('request_key',sk).maybeSingle();
+  if(st?.state==='reserved')await supabase.rpc('rpc_billing_quota',{p_actor:req.user.userId,p_business:biz.business.id,p_key:sk,p_resource:'storage_mb',p_units:st.units,p_action:'abandon',p_reason:'Client upload failed before completion'});
+  res.json(data);
  }));
  if(requireAdmin){
  const admin=fn=>async(req,res)=>{res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});try{await fn(req,res)}catch(e){errorResponse(res,e)}};
@@ -95,7 +99,7 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
   const now=new Date(data.server_now),by=(list,id)=>(list||[]).filter(x=>String(x.business_id)===String(id));
   return {now,versions:data.versions,rows:data.companies.map(c=>{
    if(!c.account)return {id:c.id,name:c.name,policy:'legacy',access:computeBusinessAccess(c.business,now)};
-   const s={...c.account,plan_versions:data.versions,grants:by(data.grants,c.id),service_periods:by(data.service_periods,c.id),overrides:by(data.overrides,c.id)};
+   const s={...c.account,plan_versions:data.versions,grants:by(data.grants,c.id),service_periods:by(data.service_periods,c.id),overrides:by(data.overrides,c.id),feature_defaults:data.feature_defaults};
    return {id:c.id,name:c.name,policy:c.billing_policy==='commercial_v2'?'commercial_v2':'legacy_overlay',account:c.account,
     access:computeBusinessAccess(c.business,now,s),overrides:s.overrides};
   })};
@@ -153,10 +157,15 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
   // Admin has metadata access; never request wallets, transactions or document contents.
   const{data:a,error:e}=await supabase.from('billing_accounts').select('*').eq('business_id',b.id).maybeSingle();if(e)throw e;
   if(!a)return res.json({policy:'legacy',business:{id:b.id,name:b.name},access:computeBusinessAccess(b),account:{business_id:b.id,version:1,grants:[]},legacy_enrollment:true,usage:[],history:[]});
-  const [v,g,p,u,h,o]=await Promise.all([supabase.from('plan_versions').select('*'),supabase.from('billing_grants').select('*').eq('business_id',b.id),supabase.from('billing_service_periods').select('*').eq('business_id',b.id),supabase.from('billing_quota_reservations').select('resource,units,state,period_start').eq('business_id',b.id),supabase.from('billing_admin_commands').select('id,action,intent,result,created_at').eq('business_id',b.id).order('created_at',{ascending:false}).limit(30),supabase.from('billing_overrides').select('*').eq('business_id',b.id).order('created_at')]);
-  for(const x of [v,g,p,u,h,o])if(x.error)throw x.error;
-  const s={...a,plan_versions:v.data,grants:g.data,service_periods:p.data,overrides:o.data};
-  res.json({policy:'commercial_v2',business:{id:b.id,name:b.name},account:s,access:computeBusinessAccess(b,new Date(),s),usage:u.data,history:h.data});
+  const [v,g,p,u,h,o,fd,us,ci]=await Promise.all([supabase.from('plan_versions').select('*'),supabase.from('billing_grants').select('*').eq('business_id',b.id),supabase.from('billing_service_periods').select('*').eq('business_id',b.id),supabase.from('billing_quota_reservations').select('resource,units,state,period_start').eq('business_id',b.id),supabase.from('billing_admin_commands').select('id,action,intent,result,created_at').eq('business_id',b.id).order('created_at',{ascending:false}).limit(30),supabase.from('billing_overrides').select('*').eq('business_id',b.id).order('created_at'),supabase.rpc('billing_feature_defaults'),supabase.rpc('billing_usage',{p_business:b.id}),supabase.from('billing_catalog_items').select('*').eq('kind','limit').order('sort_order')]);
+  for(const x of [v,g,p,u,h,o,fd,us,ci])if(x.error)throw x.error;
+  const s={...a,plan_versions:v.data,grants:g.data,service_periods:p.data,overrides:o.data,feature_defaults:fd.data};
+  const access=computeBusinessAccess(b,new Date(),s),base=v.data.find(x=>String(x.id)===String(access.effective_plan_version_id));
+  // Base (plan), individual (override), effective and real usage per limit, as the server enforces them.
+  const limits=ci.data.map(i=>{const ov=(access.overrides_active||[]).find(x=>x.kind==='limit'&&x.key===i.key);
+   return {key:i.key,label_i18n:i.label_i18n,enforcement:i.enforcement,counter:i.counter,reset_period:i.reset_period,base:base?(base.limits?.[i.key]??null):null,
+    individual:ov?ov.value:undefined,effective:access.restricted?null:(access.limits?.[i.key]??null),used:i.counter?(us.data?.[i.counter]??0):null,policy:base?.limit_policies?.[i.key]||'hard'}});
+  res.json({policy:'commercial_v2',business:{id:b.id,name:b.name},account:s,access,usage:u.data,usage_now:us.data,limits,history:h.data});
  }));
  app.post('/api/admin/billing/companies/:id/:action',auth,gate,requireAdmin,admin(async(req,res)=>{
   const b=req.body||{};if(!UUID.test(req.params.id)||!UUID.test(b.request_key||'')||!Number.isSafeInteger(b.expected_version))throw Error('billing_invalid_command');
@@ -165,47 +174,88 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
  }));
  }
 }
-const READ_METHODS=new Set(['GET','HEAD','OPTIONS']);
+const billingRoutes=require('./billingRoutes');
+// Route → plan policy (server/lib/billingRoutes.js). null = never gated (own data, account, recovery, channel gates).
 function workflow(req){
  const path=(req.originalUrl||req.url||'').split('?')[0];
- // Auth, profile, billing, invite acceptance, support and all read/export/recovery
- // routes remain reachable. Financial receipts are read before admission.
- if(READ_METHODS.has(req.method)||/^\/api\/(billing|admin|auth|me|account|personal|mcp-oauth|telegram|bot|business-creation|businesses|support|onboarding|invite|invites|financial-operations)(\/|$)/.test(path)||/^\/api\/documents\/[^/]+\/signed-url$/.test(path))return null;
- // Every other API mutation is a new workflow unless explicitly exempted above.
- // Unknown future endpoints therefore cannot silently bypass commercial expiry.
- if(path==='/api/documents/upload-init')return {feature:'documents',resource:'documents',phase:'init'};
- if(path==='/api/documents/upload-complete')return {feature:'documents',resource:'documents',phase:'complete'};
- if(path==='/api/team/invite')return {feature:'team',resource:'users'};
- if(/\/bank-imports?\//.test(path))return {feature:'import',resource:/parse|upload|extract|\/read$/.test(path)?'imports':null};
- if(/\/ai(?:-cfo)?\//.test(path)||path==='/api/chat'||path==='/api/accountant/ask'||/^\/api\/documents\/[^/]+\/identify$/.test(path))return {feature:'ai',resource:'ai'};
- if(/\/documents\//.test(path)||path==='/api/documents')return {feature:'documents'};
- if(/\/payroll/.test(path))return {feature:'payroll'};
- return {feature:null};
+ const p=billingRoutes.classify(req.method,path);
+ return p.open||p.channel?null:p;
+}
+// Deterministic UUID for a second reservation of the same request (e.g. storage next to documents) or for a
+// non-UUID natural key (transfer_id): retries map to the same reservation.
+function deriveKey(raw,suffix){
+ const h=crypto.createHash('sha256').update(String(raw).toLowerCase()+':'+suffix).digest('hex');
+ return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-8${h.slice(17,20)}-${h.slice(20,32)}`;
+}
+const denial=(code,status,extra={})=>Object.assign(Error(code),{status},extra);
+// Rows a statement confirmation can still create (unlinked rows minus those the request links or excludes).
+async function importRows(supabase,biz,req){
+ const batch=((req.originalUrl||'').split('?')[0].match(/\/(?:bank-imports|bank-import\/batches)\/([^/]+)\/confirm$/)||[])[1];
+ if(!UUID.test(batch||''))throw denial('billing_invalid_command',400);
+ const{data,error}=await supabase.from('bank_import_rows').select('id').eq('business_id',biz.business.id).eq('batch_id',batch).is('linked_transaction_id',null);
+ if(error)throw error;
+ const skipped=(Array.isArray(req.body?.rows)?req.body.rows:[]).filter(r=>['link','exclude'].includes(r?.match_action)).length;
+ return Math.max(1,(data||[]).length-skipped);
 }
 async function snapshot(supabase,actor,biz,allowFixtures){
  const{data,error}=await supabase.rpc('rpc_billing_snapshot',{p_actor:actor,p_business:biz.business.id,p_allow_fixture:allowFixtures});
  if(error)throw error;if(data?.policy==='legacy')return null;if(!data||data.policy!=='commercial_v2')throw Error('billing_snapshot_unavailable');return data;
 }
-async function admit(supabase,actor,biz,policy,{key=null,allowFixtures=false,intent={},units=1}={}){
- const s=await snapshot(supabase,actor,biz,allowFixtures);if(!s)return null;
+const quota=(supabase,actor,biz,r,action,extra={})=>supabase.rpc('rpc_billing_quota',{p_actor:actor,p_business:biz.business.id,p_key:r.key,p_resource:r.resource,p_action:action,p_units:r.units,...extra});
+// Returns the reservations this request holds ([] when nothing is metered). Throws a billing_* error to refuse.
+async function admit(supabase,actor,biz,policy,{key=null,allowFixtures=false,intent={},req={}}={}){
+ const s=await snapshot(supabase,actor,biz,allowFixtures);if(!s)return [];
  if(policy.phase==='complete'){
-  if(!UUID.test(key||''))throw Object.assign(Error('billing_request_key_required'),{status:400});
+  if(!UUID.test(key||''))throw denial('billing_request_key_required',400);
+  key=key.toLowerCase();
   const{data:r,error}=await supabase.from('billing_quota_reservations').select('*').eq('business_id',biz.business.id).eq('actor_user_id',actor).eq('request_key',key).maybeSingle();
-  if(error)throw error;if(!r||r.resource!=='documents'||r.state==='released'||!intent.sha256||r.intent?.sha256!==intent.sha256)throw Object.assign(Error('billing_reservation_terminal'),{status:409});
-  const started=await supabase.rpc('rpc_billing_quota',{p_actor:actor,p_business:biz.business.id,p_key:key,p_resource:'documents',p_action:'start',p_units:1,p_intent:intent});if(started.error)throw started.error;
-  return {key,resource:'documents',phase:'complete'};
+  if(error)throw error;if(!r||r.resource!=='documents'||r.state==='released'||!intent.sha256||r.intent?.sha256!==intent.sha256)throw denial('billing_reservation_terminal',409);
+  const started=await quota(supabase,actor,biz,{key,resource:'documents',units:1},'start',{p_intent:intent});if(started.error)throw started.error;
+  const held=[{key,resource:'documents',units:1,phase:'complete'}];
+  const sk=deriveKey(key,'storage_mb');
+  const{data:st}=await supabase.from('billing_quota_reservations').select('units,state').eq('business_id',biz.business.id).eq('request_key',sk).maybeSingle();
+  if(st&&['reserved','processing'].includes(st.state))held.push({key:sk,resource:'storage_mb',units:st.units,phase:'complete'});
+  return held;
  }
  const a=computeBusinessAccess(biz.business,new Date(s.server_now),s);
- if(a.restricted){const e=Error('billing_restricted');e.status=402;throw e;}
- if(policy.feature&&a.features[policy.feature]!==true){const e=Error('billing_feature_denied');e.status=402;throw e;}
- if(policy.resource){
-  if(!UUID.test(key||'')){const e=Error('billing_request_key_required');e.status=400;throw e;}
-  if(!Number.isSafeInteger(units)||units<1||units>1000)throw Object.assign(Error('billing_invalid_command'),{status:400});
-  const{data,error}=await supabase.rpc('rpc_billing_quota',{p_actor:actor,p_business:biz.business.id,p_key:key,p_resource:policy.resource,p_action:'reserve',p_units:units,p_intent:intent});if(error)throw error;
-  if(data?.state==='released'||data?.state==='committed'){const e=Error('billing_reservation_terminal');e.status=409;throw e;}
-  if(data?.is_replay){const e=Error('billing_job_in_progress');e.status=409;throw e;}
-  return {key,resource:policy.resource,phase:policy.phase,units,over_limit:data?.over_limit===true};
+ if(a.restricted)throw denial('billing_restricted',402);
+ for(const f of policy.features||[])if(a.features[f]!==true)throw denial('billing_feature_denied',402,{feature:f});
+ if(!policy.resource)return [];
+ const units=typeof policy.units==='function'?policy.units(req):policy.units==='import_rows'?await importRows(supabase,biz,req):1;
+ if(!Number.isSafeInteger(units)||units<1||units>5000)throw denial('billing_invalid_command',400);
+ // Natural idempotency key of the operation: a retry reserves nothing twice. Without one, each request counts.
+ if(!key&&policy.requireKey)throw denial('billing_request_key_required',400);
+ const primary=!key?crypto.randomUUID():UUID.test(key)?key.toLowerCase():deriveKey(key,'natural');
+ const plan=[{key:primary,resource:policy.resource,units,phase:policy.phase}];
+ if(policy.storage)plan.push({key:deriveKey(primary,'storage_mb'),resource:'storage_mb',units:policy.storage(req),phase:policy.phase});
+ const held=[];
+ for(const r of plan){
+  const{data,error}=await quota(supabase,actor,biz,r,'reserve',{p_intent:r.resource==='documents'?intent:{}});
+  if(error||data?.state==='released'||data?.state==='committed'||data?.is_replay){
+   for(const h of held)await quota(supabase,actor,biz,h,'release',{p_reason:'Sibling reservation refused'});
+   if(error)throw error;
+   if(data?.is_replay&&!['released','committed'].includes(data.state))throw denial('billing_job_in_progress',409);
+   throw denial('billing_reservation_terminal',409);
+  }
+  held.push({...r,over_limit:data?.over_limit===true});
  }
- return null;
+ return held;
 }
-module.exports={input,errorResponse,install,workflow,snapshot,admit};
+// MCP / external API (reads and writes): 'api' + the tool's own feature; AI tools are metered per call.
+async function mcpGate(supabase,actor,biz,name,allowFixtures=false){
+ if(biz?.business?.billing_policy!=='commercial_v2')return null;
+ const s=await snapshot(supabase,actor,biz,allowFixtures);if(!s)return null;
+ const a=computeBusinessAccess(biz.business,new Date(s.server_now),s);
+ const deny=(error,message)=>({error,message,billing_url:'/business/billing'});
+ if(a.restricted)return deny('billing_restricted','The company plan is not active. Open CFO OS to review billing; your data stays available in the app.');
+ const needs=billingRoutes.MCP_TOOLS[name];
+ if(!needs)return deny('billing_feature_denied','This tool is not part of the company plan.');
+ for(const f of ['api',...needs])if(a.features[f]!==true)return deny('billing_feature_denied',`The company plan does not include ${f==='api'?'API / MCP access':f}.`);
+ const resource=billingRoutes.MCP_METERED[name];if(!resource)return {settle:async()=>{}};
+ const r={key:crypto.randomUUID(),resource,units:1};
+ const{data,error}=await quota(supabase,actor,biz,r,'reserve');
+ if(error){const code=String(error.message||'').match(/billing_[a-z_]+/)?.[0];if(code)return deny(code,'The company AI quota does not allow this request.');throw error}
+ if(!data)throw Error('billing_unavailable');
+ return {settle:async ok=>{try{await quota(supabase,actor,biz,r,ok?'commit':'release',ok?{}:{p_reason:'MCP tool failed'})}catch{console.error('[billing] mcp quota completion requires reconciliation')}}};
+}
+module.exports={input,errorResponse,install,workflow,snapshot,admit,mcpGate,deriveKey};

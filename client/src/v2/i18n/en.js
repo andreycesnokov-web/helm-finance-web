@@ -24,7 +24,7 @@ export default {
     brand: 'CFO AI', notifications: 'Notifications', openMore: 'Open workspace menu',
     wsGroupCompany: 'Company workspaces', wsCreate: 'Create company workspace', wsCreateHint: 'Separate company money and team', wsMember: 'Member', switchHint: 'Switch company or go to Personal', company: 'Company', personal: 'Personal',
     companies: 'Companies', createCompany: 'Create company workspace',
-    loading: 'Loading your workspace…', loadError: 'Couldn’t load your workspaces', retry: 'Try again',
+    loading: 'Loading your workspace…', loadError: 'Couldn’t load your workspaces', retry: 'Try again', planRefused: 'This action is not included in your plan.', seePlans: 'See plans',
   },
   placeholder: {
     soon: 'Coming soon', redesign: 'This screen is part of the new design and is not built yet.',

@@ -22,6 +22,13 @@ function useCountdown(seconds,onZero){
  return left;
 }
 const remaining=(sec,c)=>{const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60);return d?c.dh(d,h):c.hm(h,m)};
+// Shown when the server refuses an action because of the plan (402). The refusal itself is server-side.
+export function BillingDeniedBanner(){
+ const lang=useLang(),c=billingCopy(lang),[d,setD]=useState(null);
+ useEffect(()=>{const on=e=>setD(e.detail||{});window.addEventListener('cfo-billing-denied',on);return()=>window.removeEventListener('cfo-billing-denied',on)},[]);
+ if(!d)return null;
+ return <div className="v2-banner v2-tone-warn" role="alert"><span>{c.denied[d.error]||c.deniedFallback}</span><Link className="v2-btn v2-btn-secondary" to={d.billing_url||'/business/billing'} onClick={()=>setD(null)}>{c.seePlans}</Link><button type="button" className="v2-btn v2-btn-secondary" onClick={()=>setD(null)}>{c.dismiss}</button></div>
+}
 export function BillingBanner(){const r=useApi('/billing'),lang=useLang(),c=billingCopy(lang);if(!r.data||r.data.policy==='legacy')return null;
  const a=r.data.access,name=planName(versionOf(r.data.account,a.effective_plan_version_id),lang);
  return <div className="v2-banner v2-tone-info"><span>{a.restricted?(a.subscription_status==='not_started'?c.choosePrompt:c.restricted):c.current+': '+name}{a.trial_seconds_remaining>0?' · '+c.left+': '+remaining(a.trial_seconds_remaining,c):''}</span><Link className="v2-btn v2-btn-secondary" to="/business/billing">{c.title}</Link></div>}

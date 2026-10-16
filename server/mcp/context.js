@@ -38,6 +38,7 @@ function fail(code, message, extra = {}) {
 // generic error (logged server-side without payloads).
 function guarded(name, ctx, handler) {
   return async (args) => {
+    let gate = null;
     try {
       if (!ctx.mcpUser || ctx.mcpUser.userId == null) {
         // Only reachable in the explicit local MCP_ALLOW_UNAUTHENTICATED mode: tools that
@@ -45,11 +46,14 @@ function guarded(name, ctx, handler) {
         return fail('authentication_required', 'Sign in to CFO Finance to use this tool.');
       }
       if(ctx.services.commercialToolGate){
-        const denial=await ctx.services.commercialToolGate(name,args||{},ctx.mcpUser.userId);
-        if(denial)return fail(denial.error,denial.message);
+        gate=await ctx.services.commercialToolGate(name,args||{},ctx.mcpUser.userId);
+        if(gate?.error)return fail(gate.error,gate.message);
       }
-      return ok(await handler(args || {}, ctx));
+      const result = ok(await handler(args || {}, ctx));
+      await gate?.settle?.(true); // a metered call is counted only when the tool succeeded
+      return result;
     } catch (e) {
+      await gate?.settle?.(false);
       if (e instanceof ToolError) return fail(e.code, e.message, e.extra);
       console.error(`[mcp] tool ${name} failed: ${e && e.message}`);
       return fail('internal_error', 'CFO Finance could not complete this request.');

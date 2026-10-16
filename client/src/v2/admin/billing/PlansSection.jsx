@@ -10,7 +10,8 @@ export const planStatus=(head,versions)=>{if(head.archived_at)return 'archived';
 const editableLimit=i=>i.required||!!i.counter;
 function formFrom(v,head,items){
  const features={},limits={},policies={};
- for(const i of items.filter(i=>i.kind==='feature'))features[i.key]=i.module_status==='not_released'?false:v?.features?.[i.key]===true;
+ // 'always' items belong to every plan; not-released modules cannot be sold.
+ for(const i of items.filter(i=>i.kind==='feature'))features[i.key]=i.enforcement==='always'?true:i.module_status==='not_released'?false:v?.features?.[i.key]===true;
  for(const i of items.filter(i=>i.kind==='limit'&&editableLimit(i))){const x=v?.limits?.[i.key];
   limits[i.key]=x===undefined?{mode:'unavailable',n:''}:x===null?{mode:'unlimited',n:''}:x===0?{mode:'unavailable',n:''}:{mode:'number',n:String(x)};
   policies[i.key]=v?.limit_policies?.[i.key]==='soft'?'soft':'hard';}
@@ -57,7 +58,7 @@ function Editor({data,code,c,lang,cmd,reload,isNew}){
     <label>{c.effective}<input type="datetime-local" value={localInput(f.effective_at)} onChange={e=>e.target.value&&set('effective_at',new Date(e.target.value).toISOString())}/></label>
    </fieldset>
    <fieldset className="v2-bc-list"><legend>{c.features}</legend>{items.filter(i=>i.kind==='feature').map(i=><label key={i.key} className="v2-bc-item">
-    <input type="checkbox" checked={f.features[i.key]===true} disabled={i.module_status==='not_released'} onChange={e=>set('features',{...f.features,[i.key]:e.target.checked})}/>
+    <input type="checkbox" checked={f.features[i.key]===true} disabled={i.module_status==='not_released'||i.enforcement==='always'} onChange={e=>set('features',{...f.features,[i.key]:e.target.checked})}/>
     <span>{label(i.label_i18n,lang)}</span>{enforcementPill(i,c)}</label>)}</fieldset>
    <fieldset className="v2-bc-list"><legend>{c.limits}</legend>{items.filter(i=>i.kind==='limit').map(i=>{const l=f.limits[i.key];
     if(!editableLimit(i))return <div key={i.key} className="v2-bc-item v2-billing-off"><span>{label(i.label_i18n,lang)}</span>{enforcementPill(i,c)}</div>;

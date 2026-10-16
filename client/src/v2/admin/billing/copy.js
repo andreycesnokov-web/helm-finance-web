@@ -2,6 +2,7 @@
 // customer billingCopy so both screens name the same things the same way.
 import {billingCopy} from '../../lib/billingCopy'
 const en={
+ available:'Available — always included',usageTitle:'Company limits and usage',chooseCompany:'Company',used:'Used',statusLegend:'Available: part of every plan · Enforced: the server refuses when the plan does not allow it · Not enforced: shown for planning only · Not released: cannot be sold yet',
  title:'Billing',sub:'Plans, subscriptions and individual terms. Payments are not connected.',
  nav:{overview:'Overview',plans:'Plans',catalog:'Features & limits',subscriptions:'Subscriptions',overrides:'Customer overrides',promotions:'Promotions',payments:'Payments',settings:'Settings',audit:'Audit log'},
  mrr:'MRR',mrrOff:'Not available until payments are connected',commercial:'Commercial companies',legacyN:'Legacy policy companies',trialing:'On trial',activePaid:'Paid subscriptions',
@@ -33,6 +34,7 @@ const en={
  saved:'Saved',hours:h=>`${h} h`,
 };
 const ru={...en,
+ available:'Доступно — входит всегда',usageTitle:'Лимиты и расход компании',chooseCompany:'Компания',used:'Израсходовано',statusLegend:'Доступно: входит в любой тариф · Применяется сервером: сервер отказывает, если тариф не разрешает · Не применяется: только для планирования · Не выпущено: продавать пока нельзя',
  title:'Биллинг',sub:'Тарифы, подписки и индивидуальные условия. Платежи не подключены.',
  nav:{overview:'Обзор',plans:'Тарифы',catalog:'Функции и лимиты',subscriptions:'Подписки',overrides:'Индивидуальные условия',promotions:'Акции',payments:'Платежи',settings:'Настройки',audit:'Журнал изменений'},
  mrr:'MRR',mrrOff:'Недоступно, пока не подключены платежи',commercial:'Коммерческие компании',legacyN:'Компании на прежней политике',trialing:'На trial',activePaid:'Оплаченные подписки',
@@ -64,6 +66,7 @@ const ru={...en,
  saved:'Сохранено',hours:h=>`${h} ч`,
 };
 const id={...en,
+ available:'Tersedia — selalu termasuk',usageTitle:'Batas dan pemakaian perusahaan',chooseCompany:'Perusahaan',used:'Terpakai',statusLegend:'Tersedia: bagian dari setiap paket · Diterapkan server: server menolak jika paket tidak mengizinkan · Belum diterapkan: hanya untuk perencanaan · Belum rilis: belum dapat dijual',
  title:'Penagihan',sub:'Paket, langganan, dan ketentuan khusus. Pembayaran belum terhubung.',
  nav:{overview:'Ringkasan',plans:'Paket',catalog:'Fitur & batas',subscriptions:'Langganan',overrides:'Ketentuan khusus',promotions:'Promosi',payments:'Pembayaran',settings:'Pengaturan',audit:'Log audit'},
  mrr:'MRR',mrrOff:'Tidak tersedia sampai pembayaran terhubung',commercial:'Perusahaan komersial',legacyN:'Perusahaan kebijakan lama',trialing:'Uji coba',activePaid:'Langganan berbayar',

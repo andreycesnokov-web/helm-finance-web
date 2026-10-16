@@ -152,6 +152,10 @@ async function performApiFetch(path, token, options = {}, journal = null, assert
     // that only read err.message/err.status are unaffected.
     const err = new Error(data?.message || data?.error || `Request failed with status ${res.status}`)
     err.status = res.status; err.code = data?.error || null; err.data = data
+    // Plan refusal (feature not in plan, quota spent, access ended): the V2 shell shows the plan page link.
+    if (res.status === 402 && data?.billing_url && typeof window !== 'undefined') {
+      try { window.dispatchEvent(new CustomEvent('cfo-billing-denied', { detail: data })) } catch { /* */ }
+    }
     throw err
   }
   return data
