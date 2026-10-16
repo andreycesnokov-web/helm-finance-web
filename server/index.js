@@ -11603,6 +11603,14 @@ async function loadBusinessOr4xx(req, res) {
   return b;
 }
 
+// Legacy trial/override columns are ignored by the commercial policy: for commercial_v2 companies these
+// admin tools would be a silent no-op, so they refuse and point to the commercial admin commands.
+async function loadLegacyAccessBusinessOr4xx(req, res) {
+  const b = await loadBusinessOr4xx(req, res); if (!b) return null;
+  if (COMMERCIAL_BILLING_ENABLED && b.billing_policy === 'commercial_v2') { res.status(409).json({ error: 'billing_use_commercial_admin', admin_url: '/admin/billing' }); return null; }
+  return b;
+}
+
 // Apply an UPDATE to a business, write an access_audit row, return new access.
 async function applyAccessChange(before, patch, action, reason, actorUserId) {
   const prev = computeBusinessAccess(before);
@@ -11622,7 +11630,7 @@ async function applyAccessChange(before, patch, action, reason, actorUserId) {
 // POST /trial — activate a 7-day full trial or extend by 7/14/30 days.
 app.post('/api/admin/businesses/:businessId/trial', auth, requireAdmin, async (req, res) => {
   try {
-    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    const b = await loadLegacyAccessBusinessOr4xx(req, res); if (!b) return;
     const op = req.body?.action;
     const now = new Date();
     let patch, action;
@@ -11645,7 +11653,7 @@ app.post('/api/admin/businesses/:businessId/trial', auth, requireAdmin, async (r
 // PATCH /access — grant/change an admin override plan.
 app.patch('/api/admin/businesses/:businessId/access', auth, requireAdmin, async (req, res) => {
   try {
-    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    const b = await loadLegacyAccessBusinessOr4xx(req, res); if (!b) return;
     const plan = req.body?.plan;
     if (!OVERRIDE_PLANS.includes(plan)) return res.status(400).json({ error: `plan must be one of ${OVERRIDE_PLANS.join(', ')}` });
     let overrideEnds = null;
@@ -11664,7 +11672,7 @@ app.patch('/api/admin/businesses/:businessId/access', auth, requireAdmin, async 
 // DELETE /override — remove the override (fallback to subscription→trial→free).
 app.delete('/api/admin/businesses/:businessId/override', auth, requireAdmin, async (req, res) => {
   try {
-    const b = await loadBusinessOr4xx(req, res); if (!b) return;
+    const b = await loadLegacyAccessBusinessOr4xx(req, res); if (!b) return;
     if (!b.admin_override_plan) return res.status(400).json({ error: 'No active override' });
     const patch = { admin_override_plan: null, override_started_at: null, override_ends_at: null, override_reason: null, override_created_by_user_id: null, override_created_at: null };
     const access = await applyAccessChange(b, patch, 'override_removed', req.body?.reason, req.user.userId);
