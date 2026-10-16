@@ -26,6 +26,7 @@ before(async () => {
   admin = await openAdmin(db.connectionString);
   const m072 = fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '072_platform_admins.sql'), 'utf8');
   await admin.query(m072);
+  await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '073_platform_admins_security.sql'), 'utf8'));
   for (const m of MIGRATIONS) await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8'));
   // Production carries the legacy plan rows seeded by migration 005 (the snapshot is schema-only).
   await admin.query("INSERT INTO public.plan_limits(plan) VALUES ('free'),('business'),('founder'),('enterprise') ON CONFLICT DO NOTHING");

@@ -10393,7 +10393,8 @@ for (const route of ['/api/accounts','/api/accounts/adjust','/api/accounts/delet
 // --- Platform Admin helper ------------------------------------------------
 // Database-backed Platform Admin helper. Platform administration strictly requires
 // verified email sessions (auth_channel === 'email') and an active platform_admins record.
-async function isAdminUser(userId, authChannel = 'email') {
+// No default channel: a caller that omits it must not be treated as an email session.
+async function isAdminUser(userId, authChannel) {
   if (!userId) return false;
   const admin = await resolvePlatformAdmin(supabase, userId, authChannel);
   return Boolean(admin);
@@ -10705,10 +10706,11 @@ app.post('/api/admin/administrators', auth, requireSuperAdmin, async (req, res) 
 
     res.json({ ok: true, administrator });
   } catch (e) {
-    if (e.message?.includes('verified email identity')) {
-      return res.status(400).json({ error: 'unverified_email', message: e.message });
-    }
-    res.status(500).json({ error: e.message });
+    // Role change and audit are one transaction (073): any failure means nothing was granted.
+    const status = { email_not_verified: 400, invalid_email: 400, invalid_role: 400, user_not_found: 404, super_admin_required: 403,
+      cannot_revoke_last_super_admin: 409, platform_admin_change_requires_read_committed: 409 }[e.code];
+    if (status) return res.status(status).json({ error: e.code === 'email_not_verified' ? 'unverified_email' : e.code, message: e.message });
+    res.status(500).json({ error: 'admin_grant_failed', outcome: 'rolled_back' });
   }
 });
 
@@ -10724,13 +10726,11 @@ app.post('/api/admin/administrators/:id/revoke', auth, requireSuperAdmin, async 
 
     res.json({ ok: true, revoked });
   } catch (e) {
-    if (e.message?.includes('Cannot revoke the last active super_admin')) {
-      return res.status(409).json({ error: 'last_super_admin', message: e.message });
-    }
-    if (e.message?.includes('not found')) {
-      return res.status(404).json({ error: 'not_found', message: e.message });
-    }
-    res.status(500).json({ error: e.message });
+    if (e.code === 'cannot_revoke_last_super_admin') return res.status(409).json({ error: 'last_super_admin', message: 'Cannot revoke the last active super_admin' });
+    if (e.code === 'admin_not_found' || e.code === 'invalid_user_id') return res.status(404).json({ error: 'not_found', message: e.message });
+    if (e.code === 'super_admin_required') return res.status(403).json({ error: 'super_admin_required' });
+    if (e.code === 'platform_admin_change_requires_read_committed') return res.status(409).json({ error: e.code });
+    res.status(500).json({ error: 'admin_revoke_failed', outcome: 'rolled_back' });
   }
 });
 

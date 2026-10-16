@@ -24,6 +24,9 @@ before(async () => {
   db = await createProdSchemaDatabase('billing_enf', [...CHAIN, D4]);
   if (!db) return;
   admin = await openAdmin(db.connectionString);
+  // Platform admin is database-backed RBAC (072 + 073): an email session with an active platform_admins row.
+  await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '072_platform_admins.sql'), 'utf8'));
+  await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '073_platform_admins_security.sql'), 'utf8'));
   for (const m of MIGRATIONS) await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8'));
   await admin.query("INSERT INTO public.plan_limits(plan) VALUES ('free'),('business'),('founder'),('enterprise') ON CONFLICT DO NOTHING");
   seed = seeder(admin);
@@ -31,7 +34,9 @@ before(async () => {
     await admin.query('INSERT INTO public.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [u]);
     await admin.query('INSERT INTO public.user_email_identities (user_id, email, email_verified_at) VALUES ($1, $2, now())', [u, `enf${u}@test.local`]);
   }
-  Object.assign(process.env, { COMMERCIAL_BILLING_ENABLED: 'true', ADMIN_TELEGRAM_IDS: String(ADMIN) });
+  await admin.query("INSERT INTO public.platform_admins (user_id, role, is_active, created_by) VALUES ($1, 'super_admin', true, $1)", [ADMIN]);
+  Object.assign(process.env, { COMMERCIAL_BILLING_ENABLED: 'true' });
+  delete process.env.ADMIN_TELEGRAM_IDS;   // deprecated: never an admin grant
   delete process.env.COMMERCIAL_BILLING_FIXTURES;
   api = await startServer(db.connectionString);
   supa = createRealPgSupabase(db.connectionString);

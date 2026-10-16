@@ -20,7 +20,10 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.join(__dirname, '..');
 
 const { Client } = pg;
-const PG_URL = 'postgresql://postgres:postgres@127.0.0.1:54422/cfo_hardening_test';
+// A fresh disposable database per run (never a long-lived shared one); dropped at the end of the run.
+const ADMIN_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:54422/postgres';
+const TEST_DB = 'cfo_hardening_' + Math.random().toString(16).slice(2, 10);
+const PG_URL = (() => { const u = new URL(ADMIN_URL); u.pathname = '/' + TEST_DB; return u.toString(); })();
 const JWT_SECRET = 'audit-secret-key-123456789012345678901234567890';
 
 // Adapter to wrap real pg Client for Supabase from() queries
@@ -174,20 +177,17 @@ async function run() {
   console.log('   CFO AI — P1 ADVERSARIAL SECURITY & REGRESSION AUDIT SUITE');
   console.log('═══════════════════════════════════════════════════════════════════════\n');
 
-  // Preflight: Ensure cfo_hardening_test database is provisioned with snapshot + migration 072
-  const adminPg = new Client({ connectionString: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres' });
+  // Preflight: a fresh disposable database with the production schema snapshot
+  const adminPg = new Client({ connectionString: ADMIN_URL });
   await adminPg.connect();
-  const dbCheck = await adminPg.query("SELECT 1 FROM pg_database WHERE datname = 'cfo_hardening_test'");
-  if (dbCheck.rows.length === 0) {
-    console.log('Provisioning cfo_hardening_test database from production schema snapshot...');
-    await adminPg.query('CREATE DATABASE cfo_hardening_test');
-    const initPg = new Client({ connectionString: PG_URL });
-    await initPg.connect();
-    const snapshotSql = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'schema', 'prod_public_schema_2026-10-08.sql'), 'utf8');
-    await initPg.query(snapshotSql);
-    await initPg.end();
-  }
+  await adminPg.query('CREATE DATABASE ' + TEST_DB);
   await adminPg.end();
+  {
+    const snapPg = new Client({ connectionString: PG_URL });
+    await snapPg.connect();
+    await snapPg.query(fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'schema', 'prod_public_schema_2026-10-08.sql'), 'utf8'));
+    await snapPg.end();
+  }
 
   // Apply migration 072
   const initPg = new Client({ connectionString: PG_URL });
@@ -195,11 +195,12 @@ async function run() {
   await initPg.query('DROP FUNCTION IF EXISTS public.fn_bootstrap_platform_super_admin(INTEGER);');
   const m72Sql = fs.readFileSync(path.join(ROOT, 'migrations', '072_platform_admins.sql'), 'utf8');
   await initPg.query(m72Sql);
+  await initPg.query(fs.readFileSync(path.join(ROOT, 'migrations', '073_platform_admins_security.sql'), 'utf8'));
   await initPg.end();
 
   const mainPg = new Client({ connectionString: PG_URL });
   await mainPg.connect();
-  console.log('Connected to target DB: cfo_hardening_test\n');
+  console.log('Connected to disposable DB: ' + TEST_DB + '\n');
 
   let passCount = 0;
   let failCount = 0;
@@ -514,6 +515,12 @@ async function run() {
   }
 
   await mainPg.end();
+  {
+    const dropPg = new Client({ connectionString: ADMIN_URL });
+    await dropPg.connect();
+    await dropPg.query('DROP DATABASE IF EXISTS ' + TEST_DB + ' WITH (FORCE)');
+    await dropPg.end();
+  }
 
   console.log(`\n═══════════════════════════════════════════════════════════════════════`);
   console.log(`   AUDIT FINISHED: ${passCount} PASSED, ${failCount} FAILED`);

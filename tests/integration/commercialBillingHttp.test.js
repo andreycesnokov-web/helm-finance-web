@@ -30,6 +30,7 @@ before(async () => {
   // pg_dump's empty search_path, so apply it on a fresh session with the default search_path, like Supabase does.
   const m072 = fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '072_platform_admins.sql'), 'utf8');
   await admin.query(m072);
+  await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '073_platform_admins_security.sql'), 'utf8'));
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', COMMERCIAL), 'utf8'));
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', CENTER), 'utf8'));
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261017120000_billing_enforcement.sql'), 'utf8'));

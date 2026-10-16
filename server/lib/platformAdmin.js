@@ -169,324 +169,91 @@ async function listPlatformAdmins(supabase) {
   }));
 }
 
-/**
- * Grants or updates an administrator role. Can only be invoked by an active super_admin.
- */
-async function grantPlatformAdminRole(supabase, options) {
-  const targetRole = options?.targetRole || options?.role;
-  const targetEmail = options?.targetEmail || options?.email;
-  const actorUserId = options?.actorUserId;
-  const recordAudit = options?.recordAudit;
-
-  if (targetRole !== 'super_admin' && targetRole !== 'platform_admin') {
-    throw new Error('invalid_role');
+// Maps a PostgreSQL / PostgREST error from the admin RPCs to a stable code. Anything unknown fails closed.
+const RPC_CODES = ['super_admin_required', 'cannot_revoke_last_super_admin', 'platform_admin_change_requires_read_committed',
+  'admin_not_found', 'user_not_found', 'email_not_verified', 'invalid_role', 'invalid_email', 'super_admin_already_exists'];
+function rpcFailure(rpcErr, fallbackCode) {
+  const text = String(rpcErr?.message || '');
+  const code = RPC_CODES.find((c) => text.includes(c)) || fallbackCode;
+  const err = new Error(code === fallbackCode ? `${fallbackCode}: ${text || rpcErr?.code || 'unknown error'}` : code);
+  err.code = code;
+  return err;
+}
+function requireRpc(supabase, name) {
+  if (typeof supabase?.rpc !== 'function') {
+    const err = new Error(`admin_atomic_rpc_required: ${name} is mandatory (no non-atomic fallback exists)`);
+    err.code = 'admin_atomic_rpc_required';
+    throw err;
   }
-
-  const normalized = String(targetEmail || '').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-    throw new Error('invalid_email');
-  }
-
-  // Target email must exist and be verified
-  const { data: idRows, error: idErr } = await supabase
-    .from('user_email_identities')
-    .select('user_id, email_verified_at')
-    .eq('email', normalized)
-    .limit(1);
-
-  if (idErr) throw idErr;
-  if (!idRows || idRows.length === 0) {
-    throw new Error('user_not_found');
-  }
-
-  const target = idRows[0];
-  if (!target.email_verified_at) {
-    throw new Error('email_not_verified: user must have a verified email identity');
-  }
-
-  const targetUserId = Number(target.user_id);
-
-  // Read existing row for audit before state
-  const { data: existingRows } = await supabase
-    .from('platform_admins')
-    .select('*')
-    .eq('user_id', targetUserId)
-    .limit(1);
-
-  const before = existingRows?.[0] || null;
-
-  const nowISO = new Date().toISOString();
-  const upsertData = {
-    user_id: targetUserId,
-    role: targetRole,
-    is_active: true,
-    created_by: actorUserId,
-    updated_at: nowISO,
-    revoked_at: null,
-  };
-
-  const { error: upsertErr } = await supabase
-    .from('platform_admins')
-    .upsert(upsertData, { onConflict: 'user_id' });
-
-  if (upsertErr) throw upsertErr;
-
-  clearAdminCache(targetUserId);
-
-  const auditRow = {
-    business_id: null,
-    actor_user_id: actorUserId || null,
-    actor_role: 'super_admin',
-    channel: 'web',
-    entity_type: 'platform_admin',
-    entity_id: String(targetUserId),
-    action: before ? 'role_updated' : 'role_granted',
-    before_json: before,
-    after_json: upsertData,
-    request_id: options?.requestId || null,
-  };
-
-  if (typeof recordAudit === 'function') {
-    await recordAudit(auditRow);
-  } else {
-    try {
-      await supabase.from('audit_events').insert(auditRow);
-    } catch { /* best effort */ }
-  }
-
-  return {
-    userId: targetUserId,
-    role: targetRole,
-    email: normalized,
-    isActive: true,
-    is_active: true,
-  };
 }
 
 /**
- * Revokes an administrator's access. Enforces that the last active super_admin cannot be revoked.
+ * Grants or updates an administrator role (073: rpc_platform_admin_grant).
+ * Role change and audit row are written in ONE PostgreSQL transaction; the acting super_admin is re-checked in SQL.
+ */
+async function grantPlatformAdminRole(supabase, options) {
+  const targetRole = options?.targetRole || options?.role;
+  const targetEmail = String(options?.targetEmail || options?.email || '').trim().toLowerCase();
+  const actorUserId = Number(options?.actorUserId);
+  if (targetRole !== 'super_admin' && targetRole !== 'platform_admin') throw Object.assign(new Error('invalid_role'), { code: 'invalid_role' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) throw Object.assign(new Error('invalid_email'), { code: 'invalid_email' });
+  if (!Number.isSafeInteger(actorUserId)) throw Object.assign(new Error('super_admin_required'), { code: 'super_admin_required' });
+  requireRpc(supabase, 'rpc_platform_admin_grant');
+  const { data, error } = await supabase.rpc('rpc_platform_admin_grant', {
+    p_actor: actorUserId, p_email: targetEmail, p_role: targetRole, p_request_id: options?.requestId || null,
+  });
+  if (error) throw rpcFailure(error, 'admin_grant_failed');
+  if (!data || data.user_id == null) throw Object.assign(new Error('admin_grant_unconfirmed'), { code: 'admin_grant_unconfirmed' });
+  clearAdminCache(data.user_id);
+  return { userId: Number(data.user_id), role: data.role, email: targetEmail, isActive: true, is_active: true };
+}
+
+/**
+ * Revokes an administrator (073: rpc_platform_admin_revoke). The guard trigger keeps at least one active
+ * super_admin even under concurrent revocations; the audit row is written in the same transaction.
  */
 async function revokePlatformAdminRole(supabase, options) {
   const uid = Number(options?.targetUserId ?? options?.adminId ?? options?.userId);
-  if (!Number.isSafeInteger(uid)) throw new Error('invalid_user_id');
-  const actorUserId = options?.actorUserId;
-  const recordAudit = options?.recordAudit;
-
-  const { data: targetRows, error: targetErr } = await supabase
-    .from('platform_admins')
-    .select('*')
-    .eq('user_id', uid)
-    .limit(1);
-
-  if (targetErr) throw targetErr;
-  const target = targetRows?.[0];
-  if (!target || !target.is_active) {
-    throw new Error('admin_not_found');
-  }
-
-  // Guard: if revoking a super_admin, verify at least one other active super_admin exists
-  if (target.role === 'super_admin') {
-    const { data: supers, error: sErr } = await supabase
-      .from('platform_admins')
-      .select('user_id')
-      .eq('role', 'super_admin')
-      .eq('is_active', true)
-      .neq('user_id', uid);
-
-    if (sErr) throw sErr;
-    if (!supers || supers.length === 0) {
-      const err = new Error('Cannot revoke the last active super_admin');
-      err.code = 'cannot_revoke_last_super_admin';
-      throw err;
-    }
-  }
-
-  const nowISO = new Date().toISOString();
-  const { error: updateErr } = await supabase
-    .from('platform_admins')
-    .update({
-      is_active: false,
-      revoked_at: nowISO,
-      updated_at: nowISO,
-    })
-    .eq('user_id', uid);
-
-  if (updateErr) throw updateErr;
-
+  const actorUserId = Number(options?.actorUserId);
+  if (!Number.isSafeInteger(uid)) throw Object.assign(new Error('invalid_user_id'), { code: 'invalid_user_id' });
+  if (!Number.isSafeInteger(actorUserId)) throw Object.assign(new Error('super_admin_required'), { code: 'super_admin_required' });
+  requireRpc(supabase, 'rpc_platform_admin_revoke');
+  const { data, error } = await supabase.rpc('rpc_platform_admin_revoke', {
+    p_actor: actorUserId, p_target: uid, p_request_id: options?.requestId || null,
+  });
+  if (error) throw rpcFailure(error, 'admin_revoke_failed');
+  if (!data || data.ok !== true) throw Object.assign(new Error('admin_revoke_unconfirmed'), { code: 'admin_revoke_unconfirmed' });
   clearAdminCache(uid);
-
-  const auditRow = {
-    business_id: null,
-    actor_user_id: actorUserId || null,
-    actor_role: 'super_admin',
-    channel: 'web',
-    entity_type: 'platform_admin',
-    entity_id: String(uid),
-    action: 'role_revoked',
-    before_json: target,
-    after_json: { ...target, is_active: false, revoked_at: nowISO },
-    request_id: options?.requestId || null,
-  };
-
-  if (typeof recordAudit === 'function') {
-    await recordAudit(auditRow);
-  } else {
-    try {
-      await supabase.from('audit_events').insert(auditRow);
-    } catch { /* best effort */ }
-  }
-
   return { ok: true, userId: uid, is_active: false };
 }
 
 /**
- * Safe, idempotent bootstrap of the primary super_admin.
- * Fails closed if the email is not verified or if an active super_admin already exists for another user.
+ * Bootstrap of the first super_admin (CLI only). fn_bootstrap_platform_super_admin (073) serializes callers,
+ * verifies the email, refuses when another active super_admin exists and writes the audit row in the same
+ * transaction. There is no JavaScript fallback: without the RPC, bootstrap fails closed.
  */
-async function bootstrapSuperAdmin(supabase, emailOrOptions, maybeOptions = {}) {
+async function bootstrapSuperAdmin(supabase, emailOrOptions) {
   const rawEmail = typeof emailOrOptions === 'string' ? emailOrOptions : emailOrOptions?.email;
-  const recordAudit = typeof emailOrOptions === 'object' ? (emailOrOptions?.recordAudit || maybeOptions.recordAudit) : maybeOptions.recordAudit;
-
   const normalized = String(rawEmail || '').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-    throw new Error('invalid_email');
-  }
-
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error('invalid_email');
+  requireRpc(supabase, 'fn_bootstrap_platform_super_admin');
   const { data: idRows, error: idErr } = await supabase
-    .from('user_email_identities')
-    .select('user_id, email_verified_at')
-    .eq('email', normalized)
-    .limit(1);
-
+    .from('user_email_identities').select('user_id, email_verified_at').eq('email', normalized).limit(1);
   if (idErr) throw idErr;
-  if (!idRows || idRows.length === 0) {
-    throw new Error('email_identity_not_found');
-  }
-
-  const identity = idRows[0];
-  if (!identity.email_verified_at) {
-    throw new Error('email_not_verified');
-  }
-
-  const uid = Number(identity.user_id);
-
-  // Strict Fail-Closed Platform Admin Bootstrap using PostgreSQL stored procedure
-  // with pg_advisory_xact_lock for strict cross-process atomicity.
-  if (typeof supabase.rpc === 'function') {
-    const { data: rpcRes, error: rpcErr } = await supabase.rpc('fn_bootstrap_platform_super_admin', {
-      p_user_id: uid,
-    });
-
-    if (rpcErr) {
-      if (rpcErr.message?.includes('super_admin_already_exists') || rpcErr.code === 'P0003') {
-        const err = new Error('Active super_admin already exists');
-        err.code = 'super_admin_already_exists';
-        throw err;
-      }
-      if (rpcErr.message?.includes('email_not_verified') || rpcErr.code === 'P0002') {
-        throw new Error('email_not_verified');
-      }
-      // Fail closed on any other RPC error (no silent fallback to unlocked JS)
-      throw new Error(`bootstrap_rpc_failed: ${rpcErr.message || rpcErr.code}`);
-    }
-
-    if (rpcRes) {
-      const auditRow = {
-        business_id: null,
-        actor_user_id: uid,
-        actor_role: 'system_bootstrap',
-        channel: 'cli',
-        entity_type: 'platform_admin',
-        entity_id: String(uid),
-        action: 'role_bootstrap',
-        after_json: rpcRes,
-      };
-
-      if (typeof recordAudit === 'function') {
-        await recordAudit(auditRow);
-      } else {
-        const { error: insErr } = await supabase.from('audit_events').insert(auditRow);
-        if (insErr && (emailOrOptions?.requireAudit || maybeOptions?.requireAudit)) {
-          throw new Error(`mandatory_security_audit_failed: ${insErr.message}`);
-        }
-      }
-
-      return {
-        status: rpcRes.status,
-        userId: uid,
-        email: normalized,
-        role: 'super_admin',
-        is_active: true,
-      };
-    }
-  }
-
-  // Pure mock DB fallback strictly guarded by allowMockFallback (unit test harness without Postgres only)
-  const isMockAllowed = emailOrOptions?.allowMockFallback === true || maybeOptions?.allowMockFallback === true;
-  if (!isMockAllowed) {
-    throw new Error('bootstrap_atomic_rpc_required: PostgreSQL stored procedure fn_bootstrap_platform_super_admin is mandatory for secure bootstrap');
-  }
-
-  // Fallback (for unit tests / mock supabase implementations without rpc)
-  const { data: activeSupers, error: asErr } = await supabase
-    .from('platform_admins')
-    .select('user_id, role, is_active')
-    .eq('role', 'super_admin')
-    .eq('is_active', true);
-
-  if (asErr) throw asErr;
-
-  if (activeSupers && activeSupers.length > 0) {
-    const existing = activeSupers.find(s => Number(s.user_id) === uid);
-    if (existing) {
-      return { status: 'already_super_admin', userId: uid, email: normalized, role: 'super_admin', is_active: true };
-    }
-    // Another super_admin already exists!
-    const err = new Error('Active super_admin already exists');
-    err.code = 'super_admin_already_exists';
-    err.existingCount = activeSupers.length;
+  if (!idRows || idRows.length === 0) throw new Error('email_identity_not_found');
+  if (!idRows[0].email_verified_at) throw new Error('email_not_verified');
+  const uid = Number(idRows[0].user_id);
+  const { data, error } = await supabase.rpc('fn_bootstrap_platform_super_admin', { p_user_id: uid });
+  if (error) {
+    const err = rpcFailure(error, 'bootstrap_rpc_failed');
+    if (err.code === 'super_admin_already_exists') err.message = 'Active super_admin already exists';
     throw err;
   }
-
-  const nowISO = new Date().toISOString();
-  const upsertData = {
-    user_id: uid,
-    role: 'super_admin',
-    is_active: true,
-    created_by: uid,
-    updated_at: nowISO,
-    revoked_at: null,
-  };
-
-  const { error: insErr } = await supabase
-    .from('platform_admins')
-    .upsert(upsertData, { onConflict: 'user_id' });
-
-  if (insErr) throw insErr;
-
-  clearAdminCache(uid);
-
-  const auditRow = {
-    business_id: null,
-    actor_user_id: uid,
-    actor_role: 'system_bootstrap',
-    channel: 'cli',
-    entity_type: 'platform_admin',
-    entity_id: String(uid),
-    action: 'role_bootstrap',
-    after_json: upsertData,
-  };
-
-  if (typeof recordAudit === 'function') {
-    await recordAudit(auditRow);
-  } else {
-    const { error: insErr } = await supabase.from('audit_events').insert(auditRow);
-    if (insErr && (emailOrOptions?.requireAudit || maybeOptions?.requireAudit)) {
-      throw new Error(`mandatory_security_audit_failed: ${insErr.message}`);
-    }
+  if (!data || !['bootstrapped', 'already_super_admin'].includes(data.status)) {
+    throw Object.assign(new Error('bootstrap_unconfirmed'), { code: 'bootstrap_unconfirmed' });
   }
-
-  return { status: 'bootstrapped', userId: uid, email: normalized, role: 'super_admin', is_active: true };
+  clearAdminCache(uid);
+  return { status: data.status, userId: uid, email: normalized, role: 'super_admin', is_active: true };
 }
 
 module.exports = {

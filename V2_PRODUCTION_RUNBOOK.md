@@ -1,345 +1,277 @@
 # CFO AI V2.0 — Production Runbook
 
-**Target Branch:** `release/cfo-v2-rc1`  
-**Target Domains:**  
-- **Production (Main Domain):** `cfo.helmfinance.com`  
-- **Staging:** `staging.cfo.helmfinance.com`  
-**Release Tag:** `v2.0.0-rc1`  
-**Document Author:** Codex (Autonomous Release Integration Agent)  
-**Date:** 2026-10-16  
+**Release candidate branch:** `fix/v2-rc1-claude-security` (local; not pushed, not merged)
+**Target Domains:**
+- **Production (Main Domain):** `cfo.helmfinance.com`
+- **Staging:** `staging.cfo.helmfinance.com`
+**Release Tag:** `v2.0.0-rc1` (to be created only at sign-off)
+**Revised by:** Claude (security fix batch), 2026-10-16. Previous revision: Codex / AntiGravity (`a48b761`).
+
+> This revision replaces the migration, rollback and verification procedures of `a48b761`. The independent review
+> (`V2_CROSS_REVIEW_CLAUDE.md`) proved that the previous pre-flight referenced non-existent objects and led to
+> re-applying migrations, which silently removed idempotency enforcement from debt payments and wallet transfers.
+> Use only the procedures below.
 
 ---
 
 ## 1. Release Commits & Provenance
 
-The release candidate is compiled on branch `fix/v2-rc1-p1-hardening` (branched from `release/cfo-v2-rc1` @ `405827f`) with base `integration/pilot-rc1-main` (`dd9b569`).
+`fix/v2-rc1-claude-security` = `fix/v2-rc1-p1-hardening` (`a48b761`) + merge of `feat/billing-enforcement` (`be22c97`) + the security fix batch.
 
-Integrated commits:
-1. `dd9b569` — Base integration: D4 dated opening anchors (`6f70adb`, `9b5c843`, `b741e21`), UI pilot readiness (`b3f55ab`, `2c1e173`), atomic business profile editor, bill modal.
-2. `a7fee5b` — `fix(security): migrate platform admin to PostgreSQL RBAC and verified email auth` (AntiGravity).
-3. `40baef6` — `fix(security): resolve stale role cache and serialize concurrent bootstrap` (Codex P1 Hardening).
-4. `c617f54` — Merge branch `fix/platform-admin-auth-hardening` into `release/cfo-v2-rc1`.
-5. `a8d5d4c` — `feat: billing management center - plan versioning, custom overrides, and admin control` (merged with unified routes in `client/src/App.jsx` and `client/src/v2/AdminApp.jsx`).
-6. `e8ffc9f` — Merge branch `feat/billing-management-center` into `release/cfo-v2-rc1`.
-7. `d714871` — `fix(security): fail closed on audit failure during admin bootstrap and align integration harnesses with platform_admins`.
-8. `405827f` — `chore(release): CFO AI V2.0 Release Candidate 1 consolidated bundle`.
-9. `P1 Hardening Batch` — SEC-P1-03 (canonical single `BIGINT` bootstrap RPC, fail-closed on RPC failure, eliminate insecure JS fallback), RUNBOOK-P1-01 (comprehensive migration chain audit), OPS-P1-02 (safe multi-tier rollback protocol).
+| Commit | Content |
+|---|---|
+| `dd9b569` | Base integration: D4 dated opening anchors, UI pilot readiness |
+| `a7fee5b`, `40baef6`, `c617f54`, `d714871` | Platform admin PostgreSQL RBAC, verified-email admin sessions |
+| `bd69e07`, `a8d5d4c` (`e8ffc9f`) | Commercial billing Phase 1, Billing Management Center |
+| `a48b761` | AntiGravity P1 hardening (bootstrap RPC fail-closed) |
+| `38e1b86` | Merge of Billing Enforcement `be22c97` (module enforcement, metered resources, 402 UI) |
+| security fix batch (this branch) | `073_platform_admins_security.sql`, atomic admin audit, `scripts/migrate-v2.mjs`, corrected runbook |
 
 ---
 
-## 2. Database Migrations & Order of Execution (RUNBOOK-P1-01)
+## 2. Database Migrations (RUNBOOK-P1-01, corrected)
 
-The database migration chain requires strict execution across `migrations/` and `supabase/migrations/`. Operators must NOT skip intermediate migrations or assume prior states without running pre-flight verification.
+### 2.1 Rules
+1. **Never run migration files by hand** (`psql -f …`). Use the guarded runner `scripts/migrate-v2.mjs`.
+2. **Never re-apply a migration.** Re-running `070_atomic_business_balance.sql` on a migrated database replaces
+   `rpc_record_debt_payment_guarded` / `rpc_execute_wallet_transfer_guarded` with versions that accept payments and
+   transfers without a stable idempotency key (proven in `tests/integration/migrationRunnerSafety.test.js`).
+3. The state of each migration is decided by **the runner's ledger** (`public.cfo_migration_ledger`: file + SHA-256)
+   or, when the ledger has no row, by **several independent probes** of the real schema (objects AND function
+   definitions). All probes true → applied; all false → pending; mixed → **UNKNOWN: the run stops**.
+4. The runner stops at the **first error** (each file is its own transaction; nothing after a failed or UNKNOWN entry runs).
+5. After the run the runner checks **financial and security invariants by definition**. Any failure = do not open traffic.
+6. Scripts that are not migrations (`migrations/R001_*`, `migrations/_preflight_*`, `migrations/audit_*`, `*_down.sql`)
+   are never part of a release run.
 
-### Pre-Flight Schema Assessment SQL:
-Run this query before applying migrations to determine the database baseline:
-```sql
-SELECT
-  EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'financial_records') AS has_071,
-  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'wallets' AND column_name = 'opening_balance_date') AS has_d4_anchor,
-  EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'platform_admins') AS has_072_admin,
-  EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'company_subscriptions') AS has_billing_v1,
-  EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'billing_overrides') AS has_billing_center;
+### 2.2 Manifest (order = dependency order)
+
+| # | File | Depends on | Probes (all must agree) | Reversible |
+|---|---|---|---|---|
+| 1 | `migrations/069_bank_import_atomic_confirm.sql` | ≤068 | `rpc_confirm_bank_import` exists | no |
+| 2 | `migrations/070_atomic_business_balance.sql` | 1 | `transactions.balance_version`, `fn_business_balance_guard`, `fn_ledger_writer_lock` | no |
+| 3 | `migrations/071_financial_records_restrict_user_delete.sql` | 2 | `transactions.user_id` and `debts.user_id` FKs are `ON DELETE RESTRICT` | no |
+| 4 | `migrations/20261010143341_import_balance_compat.sql` | 3 | `fn_import_provenance_guard`, trigger `bank_import_provenance_guard`, index `transactions_bank_import_row_unique` | no |
+| 5 | `migrations/20261011001823_financial_writer_protocol.sql` | 4 | table `financial_write_requests`, trigger `financial_writer_gate`, `rpc_record_debt_payment_guarded` contains `idempotency_key_required` | no |
+| 6 | `migrations/20261011222631_intercompany_balances_security_invoker.sql` | 5 | view `intercompany_balances` has `security_invoker=true` | no |
+| 7 | `migrations/20261012032717_durable_financial_recovery.sql` | 6 | `rpc_execute_wallet_transfer_recovery`, constraint `debt_payment_idempotency_actor_key_unique`, index `financial_write_requests_recovery_recent` | no |
+| 8 | `migrations/20261012110000_durable_company_creation.sql` | 7 | table `business_creation_requests`, `rpc_create_business_once` | no |
+| 9 | `migrations/20261012123000_atomic_team_membership.sql` | 8 | `cfo_team_role_rank`, `rpc_accept_business_invite` | no |
+| 10 | `migrations/20261013001000_atomic_business_profile.sql` | 9 | `cfo_profile_missing`, `cfo_profile_same` | no |
+| 11 | `migrations/20261013031755_historical_bank_import_review_receipts.sql` | 10 | table `bank_import_confirm_requests`, `rpc_read_bank_import_confirm` | no |
+| 12 | `migrations/20261013062733_private_import_receipt_immutability.sql` | 11 | `cfo_import_receipt_immutable`, trigger `bank_import_confirm_requests_immutable` | no |
+| 13 | `migrations/20261013114500_atomic_bill_creation.sql` | 12 | table `bill_creation_requests`, `rpc_create_business_bill`, `debts.bill_version` | no |
+| 14 | `migrations/20261014040810_operation_document_control.sql` | 13 | `fn_operation_documents_version`, `rpc_operation_documents_snapshot` | no |
+| 15 | `migrations/20261016090000_dated_opening_anchor.sql` (D4) | 1–14 | `cfo_business_tz`, `rpc_reanchor_wallet_opening`, `cfo_import_review_state` contains `reanchor` | rehearsal only (`_down`, confirmed) |
+| 16 | `migrations/072_platform_admins.sql` | `users`, `user_email_identities` (042) | table `platform_admins`, `fn_bootstrap_platform_super_admin(bigint)` | rehearsal only |
+| 17 | `migrations/073_platform_admins_security.sql` | 16 | `rpc_platform_admin_grant`, guard contains `cfo_platform_admins_last_super` | rehearsal only |
+| 18 | `supabase/migrations/20261015033808_cfo_commercial_trial.sql` | 8, 042 | `billing_schema_versions` row `20261015033808`, table `billing_accounts` | **no** |
+| 19 | `supabase/migrations/20261017090000_billing_management_center.sql` | 18 | row `20261017090000`, table `billing_overrides` | rehearsal only (refuses if terms would be lost) |
+| 20 | `supabase/migrations/20261017120000_billing_enforcement.sql` | 19 | row `20261017120000`, function `billing_usage` | rehearsal only (refuses if usage exists) |
+
+Notes:
+- **073 is mandatory after 072.** 072 alone cancels every `DELETE` on `platform_admins` (orphaned, still-active admin rows after a user is deleted) and allows two concurrent revocations to remove every super_admin. 073 is forward-only and idempotent; it also removes and audits orphans left by 072.
+- **The backend of this release requires #20.** Without it, commercial companies are refused (fail closed), and admin billing details answer 503.
+- `20261015033808` uses unqualified names: the runner applies files with the default `search_path` (`"$user", public`).
+- No data migration is required: existing companies stay `billing_policy='legacy'`, accounts that activated a trial before configurable trials (`trial_hours IS NULL`) are treated as 168h, and plan versions that predate module enforcement keep those modules (`absent_allows`).
+
+### 2.3 Procedure
+```bash
+# 0. Backup first (Section 4). Then, on a host with the release checkout:
+export DATABASE_URL='postgresql://…'          # the target database (staging first)
+
+# 1. Plan — read-only. Every entry must be APPLIED, APPLIED_UNRECORDED or PENDING; any UNKNOWN or CHANGED = stop.
+node scripts/migrate-v2.mjs --plan
+
+# 2. Apply — pending entries in order, first error stops, then postflight.
+node scripts/migrate-v2.mjs --apply
+
+# 3. Postflight only (also after any incident).
+node scripts/migrate-v2.mjs --check
 ```
+- `UNKNOWN` (partially present migration): **stop**. Investigate the listed probes against the migration file. Only the
+  release owner may decide `--adopt=<file>` (record as applied without running) after a written diff review. There is no
+  option to force a re-run.
+- `CHANGED` (a file differs from the one recorded in the ledger): stop; the release content changed after it was applied.
+- Exit code 0 is required to continue. The runner prints every postflight check:
+  idempotency-key enforcement on debt payments and wallet transfers, ledger/financial writer gates, import provenance,
+  D4 re-anchor review state, platform admin guard (`RETURN OLD`, serialized), single non-DEFINER bootstrap function,
+  no orphaned admin rows, admin/notification-grant functions not executable by `anon`/`authenticated`, billing
+  schema versions 3/3.
 
-### Complete Unified Chronological Execution Chain:
-
-#### Stage A: Intermediate Migrations (If Database is at Schema 068 / Pre-October 9 Snapshot)
-If `has_071 = false`, apply intermediate migrations in chronological order:
-1. `migrations/069_bank_import_atomic_confirm.sql` — Atomic bank statement review confirmation.
-2. `migrations/070_atomic_business_balance.sql` — Atomic business balance calculation.
-3. `migrations/071_financial_records_restrict_user_delete.sql` — Immutable financial record delete guard.
-4. `migrations/20261010143341_import_balance_compat.sql` — Statement import balance compatibility.
-5. `migrations/20261011001823_financial_writer_protocol.sql` — Financial writer invariant protocol.
-6. `migrations/20261011222631_intercompany_balances_security_invoker.sql` — Intercompany security invoker view.
-7. `migrations/20261012032717_durable_financial_recovery.sql` — Idempotent financial recovery intents.
-8. `migrations/20261012110000_durable_company_creation.sql` — Durable company creation with owner transaction.
-9. `migrations/20261012123000_atomic_team_membership.sql` — Atomic team member invites and roles.
-10. `migrations/20261013001000_atomic_business_profile.sql` — Atomic company settings & tax profiles.
-11. `migrations/20261013031755_historical_bank_import_review_receipts.sql` — Import review receipts.
-12. `migrations/20261013062733_private_import_receipt_immutability.sql` — Immutable import receipts.
-13. `migrations/20261013114500_atomic_bill_creation.sql` — Atomic bill & invoice creation.
-14. `migrations/20261014040810_operation_document_control.sql` — Operational document attachment controls.
-
-#### Stage B: CFO AI V2.0 Core Migration Batch (Mandatory for Release Candidate)
-Apply these 4 migrations in strict sequential order:
-1. **Platform Admin Server-Side RBAC (072):**
-   - **File:** `migrations/072_platform_admins.sql`
-   - **Purpose:** Creates `public.platform_admins` table, role enum (`super_admin`, `platform_admin`), `fn_platform_admins_guard` trigger protecting the last active super_admin, and canonical atomic `fn_bootstrap_platform_super_admin(BIGINT)` secured by `pg_advisory_xact_lock(hashtext('cfo_platform_admin_bootstrap'))`.
-2. **D4 Dated Opening Balance Anchors (D4-A):**
-   - **File:** `migrations/20261016090000_dated_opening_anchor.sql`
-   - **Purpose:** Adds `opening_balance_date`, `opening_balance_reanchored_at`, and `opening_balance_reanchored_by` to `public.wallets`. Implements atomic re-anchoring function `fn_reanchor_wallet_opening_balance` to guarantee that historical transactions prior to the anchor date do not corrupt current wallet balances.
-3. **Commercial Billing Phase 1 (Supabase Migration):**
-   - **File:** `supabase/migrations/20261015033808_cfo_commercial_trial.sql`
-   - **Purpose:** Creates `billing_schema_versions`, `commercial_billing_plans`, `company_subscriptions`, `billing_access_grants`. Seeds standard plans (Starter, Control, Pro) and enforces 168-hour trial lifecycle.
-4. **Billing Management Center (Supabase Migration):**
-   - **File:** `supabase/migrations/20261017090000_billing_management_center.sql`
-   - **Purpose:** Creates `billing_overrides`, expands plan catalog with versioning columns (`version`, `is_published`, `change_summary`), and configures admin billing audit logs.
-
-### Post-Migration Verification SQL:
-Execute this verification script to ensure all schema invariants are satisfied:
+### 2.4 Additional pre-flight (read-only, before step 1)
 ```sql
--- 1. Verify all 6 critical V2 tables exist
-SELECT tablename FROM pg_tables WHERE schemaname = 'public' 
-AND tablename IN (
-  'platform_admins', 
-  'billing_schema_versions', 
-  'commercial_billing_plans', 
-  'company_subscriptions', 
-  'billing_access_grants', 
-  'billing_overrides'
-);
-
--- 2. Verify D4-A wallet columns exist
-SELECT column_name, data_type 
-FROM information_schema.columns 
-WHERE table_schema = 'public' AND table_name = 'wallets' 
-AND column_name IN ('opening_balance_date', 'opening_balance_reanchored_at', 'opening_balance_reanchored_by');
-
--- 3. Verify platform admin bootstrap stored procedure signature
-SELECT proname, pg_get_function_arguments(oid) as args
-FROM pg_proc 
-WHERE proname = 'fn_bootstrap_platform_super_admin';
--- Expected: Exactly 1 row with args: 'p_user_id bigint'
-
--- 4. Verify trigger protection on platform_admins
-SELECT tgname FROM pg_trigger WHERE tgname = 'trg_platform_admins_guard';
+-- A non-canonical bootstrap overload would make PostgREST calls ambiguous (42725/PGRST203).
+SELECT oid::regprocedure FROM pg_proc WHERE proname = 'fn_bootstrap_platform_super_admin';   -- expected: none or exactly (bigint)
+-- SECURITY DEFINER helpers must not be callable with the public anon key.
+SELECT p.oid::regprocedure, has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_exec
+  FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef;              -- expected: anon_exec = false
 ```
-If any check fails, do NOT start application traffic. Follow Section 5 (Recovery) or Section 9 (Rollback).
 
 ---
 
 ## 3. Environment Variables & Feature Flags
 
 ### Required Server Environment:
-- `NODE_ENV=production`
-- `PORT=3000` (or platform default)
-- `DATABASE_URL=postgresql://...` (Supabase / PostgreSQL connection string)
-- `SUPABASE_URL=https://...`
-- `SUPABASE_SERVICE_ROLE_KEY=ey...`
-- `JWT_SECRET=...` (Min 32 characters, high entropy)
-- `COMMERCIAL_BILLING_ENABLED=true` (Activates commercial billing APIs and catalog)
-- `COMMERCIAL_BILLING_FIXTURES=false` (Must NEVER be true in production)
-- `ADMIN_TELEGRAM_IDS=` (DEPRECATED: Ignored by authentication shield, leave blank or unset)
+- `NODE_ENV=production`, `PORT`, `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- `JWT_SECRET` (≥ 32 characters, high entropy)
+- `COMMERCIAL_BILLING_ENABLED` — `false` until the owner approves commercial billing for the environment. It is also the
+  **kill switch**: `false` turns off commercial admission and `/api/billing*` without touching data.
+- `COMMERCIAL_BILLING_FIXTURES=false` (fixtures only with `CFO_DEPLOYMENT_ENV=staging`; never in production)
+- `ADMIN_TELEGRAM_IDS` — **must be unset.** It grants nothing in this release, but older backends honour it with any
+  auth channel (see Section 9). Verify before every deployment and rollback.
 
 ### Required Client Environment (Vite Build):
-- `VITE_DESIGN_V2=true` (Activates V2 Navigation and Design 2.0 interface)
-- `VITE_API_URL=/api` (or fully qualified domain `https://cfo.helmfinance.com/api`)
-- `VITE_SUPABASE_URL=https://...`
-- `VITE_SUPABASE_ANON_KEY=ey...`
+- `VITE_DESIGN_V2=true` — a **build-time** constant: changing it requires a new frontend build. It never changes
+  backend behaviour (billing enforcement, admin RBAC).
+- `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 
 ---
 
-## 4. Production Backup Procedure
+## 4. Backup Procedure
 
-Before applying any migration or code deployment:
-1. **Database Snapshot:**
-   ```bash
-   # Supabase CLI or pg_dump:
-   pg_dump -h <DB_HOST> -p 5432 -U postgres -d postgres \
-     --format=custom --file="/backups/cfo_pre_v2_$(date +%Y%m%d_%H%M%S).dump"
-   ```
-2. **Configuration & Environment Snapshot:**
-   - Export environment variables from hosting platform (Railway/Kamatera) to encrypted vault.
-3. **Verify Dump Integrity:**
-   ```bash
-   pg_restore --list "/backups/cfo_pre_v2_*.dump" > /dev/null
-   echo "Exit code: $?" # Must return 0
-   ```
-
----
-
-## 5. Verified Recovery Procedure
-
-In case of fatal migration failure or corruption:
-1. **Stop Application Traffic:**
-   - Place load balancer / Cloudflare in maintenance mode (503 Service Unavailable).
-2. **Restore Database from Snapshot:**
-   ```bash
-   pg_restore -h <DB_HOST> -p 5432 -U postgres -d postgres \
-     --clean --if-exists --no-owner --no-privileges "/backups/cfo_pre_v2_*.dump"
-   ```
-3. **Verify Ledger & Balance Integrity:**
+Before any migration or code deployment:
+1. `pg_dump --format=custom` of the whole database (store outside the database host; record path and SHA-256).
+2. `pg_dump --schema-only` for diffing.
+3. Control values (store with the dump): row counts of `transactions`, `wallets`, `debts`, `platform_admins`,
+   `billing_accounts`, `billing_quota_reservations`; per-wallet ledger balances:
    ```sql
-   SELECT count(*) FROM public.transactions WHERE deleted_at IS NULL;
-   SELECT sum(balance) FROM public.wallets;
+   SELECT id, public.fn_wallet_ledger_balance(id) AS ledger_balance FROM public.wallets ORDER BY id;
    ```
-4. **Re-route Traffic.**
+4. `pg_restore --list <dump>` must succeed.
+5. Export of environment variables (encrypted).
+
+---
+
+## 5. Recovery from a Failed Migration
+
+The runner applies each file in its own transaction and stops at the first error, so a failed file leaves no
+partial state. Recovery is therefore:
+1. Read the runner output (`STOPPED at <file>: <error>`). Nothing after it ran.
+2. Fix the cause (never edit an applied migration), re-run `--plan`, then `--apply`.
+3. `--check` must pass before traffic is opened.
+
+Database restore is reserved for proven corruption (Section 9, state D) — never as a shortcut.
 
 ---
 
 ## 6. Super Admin Bootstrap Procedure
 
-Platform Admin privileges **CANNOT** be claimed through Telegram or self-service signup. Bootstrap is restricted to an authorized operator via server console.
+Platform admin privileges cannot be obtained through Telegram or self-service signup.
 
-### Prerequisites:
-1. The target administrator must have signed up via Email OTP / Magic Link and verified their email address.
-2. Verified identity must exist in `public.user_email_identities` (`email_verified_at IS NOT NULL`).
+Prerequisites: the administrator signed up via email OTP / magic link; `user_email_identities.email_verified_at` is set.
 
-### Bootstrap Command:
 ```bash
-# On server host:
 node scripts/bootstrapPlatformAdmin.mjs <OWNER_VERIFIED_EMAIL>
 ```
 
-### Security Invariants:
-- Fails closed if another `super_admin` already exists in `public.platform_admins`.
-- Fails closed if the email is unverified or unregistered.
-- Fails closed if audit event logging fails (`mandatory_security_audit_failed`).
-- Emits structured audit event into `public.audit_events`.
+Guarantees (073, verified through supabase-js → PostgREST → PostgreSQL in `tests/integration/platformAdminPostgrest.test.js`):
+- one bootstrap at a time (`pg_advisory_xact_lock`); refuses when another active super_admin exists;
+- refuses unverified or unknown emails;
+- the role and its `audit_events` row (`role_bootstrap`) are written in **one transaction** — no role without audit;
+- any RPC error (incl. `PGRST202`, `42883`, `42725`) fails closed; there is no non-atomic fallback.
+
+Grant / revoke (`/api/admin/administrators*`, super_admin only) call `rpc_platform_admin_grant` /
+`rpc_platform_admin_revoke`: role change and audit row in one transaction; the acting super_admin is re-checked in SQL;
+the last active super_admin cannot be revoked, demoted or deleted, also under concurrent requests.
 
 ---
 
 ## 7. Deployment Sequence
 
-### Step 1: Pre-Flight Check (Staging First)
-1. Verify git commit matches `release/cfo-v2-rc1` (`d714871`).
-2. Run database migration rehearsal on cloned database.
-3. Confirm clean migration execution.
-
-### Step 2: Database Migration Execution
-Apply CFO AI V2.0 Core Migrations in strict sequential order:
-```bash
-# 1. Platform Admin Server-Side RBAC (072)
-psql $DATABASE_URL -f migrations/072_platform_admins.sql
-
-# 2. D4 Dated Opening Balance Anchors (D4-A)
-psql $DATABASE_URL -f migrations/20261016090000_dated_opening_anchor.sql
-
-# 3. Commercial Billing Phase 1 (168h trial, plans, subscriptions)
-psql $DATABASE_URL -f supabase/migrations/20261015033808_cfo_commercial_trial.sql
-
-# 4. Billing Management Center (Plan versioning, overrides, admin audit)
-psql $DATABASE_URL -f supabase/migrations/20261017090000_billing_management_center.sql
-```
-
-### Step 3: Frontend Build & Asset Deployment
-```bash
-cd client
-npm ci
-VITE_DESIGN_V2=true npm run build
-# Deploy dist/ to CDN / Web Server
-```
-
-### Step 4: Backend Service Restart
-Restart Node.js process under systemd / Railway / Docker.
-
-### Step 5: Platform Admin Bootstrap
-Run `node scripts/bootstrapPlatformAdmin.mjs <OWNER_VERIFIED_EMAIL>`.
+1. **Staging first.** Check the deployed commit equals the signed-off release tag.
+2. Backup (Section 4).
+3. Set `COMMERCIAL_BILLING_ENABLED=false`, confirm `ADMIN_TELEGRAM_IDS` is unset.
+4. `node scripts/migrate-v2.mjs --plan`, then `--apply` (Section 2.3). Exit code 0 required.
+5. Frontend: `cd client && npm ci && VITE_DESIGN_V2=true npm run build`; deploy `dist/`.
+6. Backend: deploy the same release commit; restart.
+7. Bootstrap the super_admin (Section 6) if none exists.
+8. Smoke tests (Section 8). Enable `COMMERCIAL_BILLING_ENABLED=true` only by separate owner decision.
 
 ---
 
 ## 8. Post-Deployment Smoke Tests
 
-1. **Authentication Smoke Test:**
-   - Attempt login via Email OTP with standard user account -> verify dashboard loads in V2 (`/`).
-   - Attempt login with Telegram -> verify user account works, but no admin privileges are granted.
-2. **Admin Security Smoke Test:**
-   - Log in with non-admin email -> navigate to `/admin` -> verify immediate `403 Forbidden` / redirection.
-   - Log in with bootstrapped super_admin email -> navigate to `/admin` -> verify Billing Center and Security Center load.
-3. **Financial Ledger Smoke Test:**
-   - Open `/accounts` -> verify opening balance anchor and current wallet balances match bank statement.
-   - Record test expense -> verify wallet balance decreases by exact amount without double deduction.
-4. **Billing Smoke Test:**
-   - Open `/billing` -> verify Starter, Control, Pro plans display in currency.
-   - Verify 168-hour trial status is properly displayed without 404 error.
+1. **Authentication:** email login works; Telegram login works but has no admin privileges.
+2. **Admin security:** non-admin email → `/admin` → 403; bootstrapped super_admin → Billing Center loads.
+3. **Financial ledger:** wallet ledger balances equal the control values from the backup; a test expense
+   changes one balance exactly once; repeating a payment request with the same idempotency key does not pay twice.
+4. **Billing (only when enabled):** `/business/billing` loads; Starter/Control/Pro are **unpublished drafts** and are
+   *not* offered to customers until the owner publishes approved terms.
+5. `node scripts/migrate-v2.mjs --check` passes.
 
 ---
 
-## 9. Safe Multi-Tier Rollback Strategy (OPS-P1-02)
+## 9. Rollback (OPS-P1-02, corrected)
 
-If a critical regression or operational failure occurs post-release, operators must follow this multi-tier rollback protocol depending on the severity and blast radius.
+### 9.1 Forbidden
+- **Backend rollback to `dd9b569`, `cc3af8b` or any commit before this release.** Verified on the V2 schema
+  (`V2_CROSS_REVIEW_CLAUDE.md`, section C): the old backend ignores `platform_admins` and grants admin to every
+  user listed in `ADMIN_TELEGRAM_IDS` with any auth channel (Telegram included); real admins are locked out; trials
+  activated with a non-168h version become expired; customer overrides are ignored; and the old runbook's claim that
+  `dd9b569` has no commercial routes is false.
+- Restoring or setting `ADMIN_TELEGRAM_IDS` in any environment.
+- Down migrations on a database holding live data (they are for isolated rehearsal and refuse when data would be lost).
+- Re-applying migrations to "repair" a database (Section 2.1).
+- `pg_restore --clean` into the live database.
 
-### Tier 1: Frontend Fast Presentation Rollback (`VITE_DESIGN_V2=false`)
-- **Use Case:** Non-critical UI glitch, layout rendering bug, or client bundle regression in Design 2.0 components.
-- **Action:** Re-build and redeploy client bundle with `VITE_DESIGN_V2=false`.
-  ```bash
-  cd client && VITE_DESIGN_V2=false npm run build
-  # Redeploy dist/
-  ```
-- **Backend & Database Impact:** Zero downtime; backend remains at V2.0.
-- **Operational Boundaries & `commercial_v2` Subscriptions:**
-  - Companies created under V2.0 with `billing_policy='commercial_v2'` remain valid.
-  - The backend `commercialAdmission` middleware continues to honor their active 168h trial without blocking read or write mutations.
-  - The V1 interface does not show the new Billing Center or V2 navigation, but core transactions, accounts, and settings operate without error.
+### 9.2 Safe backend rollback target
+**Safe backend rollback target: unavailable** until this release is deployed and signed off. After sign-off, the safe
+target is the **previous signed-off build of the same schema generation** (a tagged commit that contains
+`platform_admins` RBAC, 073 and Billing Enforcement). Record that tag here at each release.
 
-### Tier 2: Application Code Rollback (Backend + Frontend to `dd9b569`)
-- **Use Case:** Critical server crash, memory leak, unhandled API exception, or severe regression in server routes.
-- **Action:** Redeploy application container from previous release tag (`pilot-rc1-main` @ `dd9b569`).
-- **CRITICAL HARD SECURITY BOUNDARY — PLATFORM ADMIN RBAC:**
-  - **STRICT PROHIBITION:** Under NO circumstances may `ADMIN_TELEGRAM_IDS` be restored as an administrative grant mechanism during a rollback. In accordance with CFO AI security governance (AGENTS.md):
-    - *Email is the primary identity entry.*
-    - *Telegram is legacy login and future paid add-on only.*
-    - *Admin privileges via Telegram are strictly forbidden.*
-  - **Preserving PostgreSQL RBAC:**
-    - The `public.platform_admins` table and `072_platform_admins.sql` are purely additive and do NOT disrupt legacy backend queries.
-    - Keep `public.platform_admins` and the `fn_platform_admins_guard` trigger intact in PostgreSQL.
-    - If administrative actions are needed while backend is on `dd9b569`, perform them directly via database SQL queries or apply an emergency hotfix preserving `server/lib/platformAdmin.js`.
-- **Handling `commercial_v2` Subscriptions during Backend Rollback:**
-  - In `dd9b569`, `commercial_billing` routes do not exist.
-  - Existing `company_subscriptions` and `billing_overrides` rows in PostgreSQL remain dormant and will not interfere with legacy company operations.
-  - Legacy companies continue to execute under standard pilot policy without forced commercial admission.
+### 9.3 Rollback matrix
 
-### Tier 3: Database Rollback (Restoring from Pre-Release Backup)
-- **Use Case:** Critical database corruption or unrecoverable ledger inconsistency.
-- **Action:**
-  1. Stop all client traffic immediately (Cloudflare 503 Maintenance Page).
-  2. Restore database from pre-release snapshot (Section 4):
-     ```bash
-     pg_restore -h $DB_HOST -U postgres -d postgres --clean --if-exists "/backups/cfo_pre_v2_*.dump"
-     ```
-  3. **Point-In-Time Transaction Reconciliation:**
-     - Extract any financial transactions created between V2 deployment and rollback start:
-       ```sql
-       -- If WAL or transaction audit logs are available, replay missing records:
-       SELECT id, business_id, wallet_id, amount, created_at 
-       FROM transactions WHERE created_at >= '<DEPLOY_TIMESTAMP>';
-       ```
-     - Re-verify wallet balances against actual bank statements before reopening traffic.
+| State | Symptom | Action | Verify before reopening |
+|---|---|---|---|
+| A. Frontend regression only | UI bug, backend healthy | Rebuild and redeploy the frontend (fix, or `VITE_DESIGN_V2=false` — requires a build; backend unchanged) | Section 8.1–8.3 |
+| B. Commercial billing misbehaves | Wrong 402s, quota errors, billing UI errors | Kill switch: `COMMERCIAL_BILLING_ENABLED=false` (admission and `/api/billing*` off; data untouched). Fix forward. | Customers can read, export and write; `--check` passes |
+| C. Backend defect (crash, regression) | 5xx, failing routes | Roll **forward** with a fix. If a previous signed-off build of the same schema generation exists (9.2), redeploy it. Otherwise: maintenance page (state D steps 1–2) while fixing. Never deploy pre-V2 code. | Admin: `SELECT user_id, role, is_active FROM platform_admins` matches the expected list; `/api/admin/status` for a super_admin; subscriptions: `GET /api/admin/billing/subscriptions` statuses unchanged (trialing/expired as before); `--check` passes |
+| D. Proven data corruption | Ledger/balance mismatch with bank evidence | 1. Maintenance page (stop new traffic). 2. `pg_dump` the CURRENT database (keeps every write since the backup). 3. Restore the pre-release backup into a **new** database. 4. Reconcile writes made after the backup (from the current dump, by id/created_at) with D4 balance checks. 5. Switch the application to the reconciled database. 6. `--check`, control balances, admin list. | Every wallet's ledger balance equals the control or bank value; no duplicate payment/transfer (`financial_write_requests` keys unique); admin list correct |
 
-### Down-Migration Policy:
-- Never execute down migrations (`DROP TABLE`) on a live production database while user traffic is connected. Down migrations (`*_down.sql`) are strictly reserved for isolated development and staging rehearsal tests.
+Restoring customer access after any state: verify the admin list, subscription/trial statuses, financial postflight
+(`--check`), then remove the maintenance page.
 
 ---
 
 ## 10. Monitoring & Alerting After Release
 
-Monitor the following metrics in Railway / Datadog / PM2:
-1. **HTTP Error Rate:**
-   - Alert threshold: 5xx errors > 0.5% over 5-minute rolling window.
-2. **Admin Auth Rejections:**
-   - Log filter: `[platformAdmin] unauthorized_access` — alert on sudden spikes indicating credential stuffing.
-3. **Database Connection Pool:**
-   - Monitor active pool connections; ensure no leaking client connections.
-4. **Audit Trail:**
-   - Verify `audit_events` table is actively recording platform admin grants and subscription changes.
+1. 5xx rate > 0.5% over 5 minutes.
+2. 402 rate by `error` code (`billing_feature_denied`, `billing_quota_reached`, `billing_restricted`) — sudden spikes
+   after a catalog change indicate wrong plan terms (state B).
+3. Admin auth rejections (`admin_email_required`, `super_admin_required`).
+4. `audit_events` with `entity_type='platform_admin'` for every admin change; no admin change without an audit row is
+   possible by construction (073).
+5. `[billing] quota completion requires reconciliation` log lines (lost responses keep their reservation).
 
 ---
 
 ## 11. Known Limitations & Deferred Items
 
-1. **Fine-Grained Quota Enforcement (WIP):**
-   - Document upload limit and AI query limits per subscription plan are currently in active development by Claude (`C:/tmp/cfo-enf`).
-   - **Current State in RC1:** Plan selection, 168h trial expiration, server access exceptions, and billing admin overrides are fully active. Fine-grained quota enforcement will be integrated in patch release v2.0.1.
-2. **Automated OCR Pipeline:**
-   - Document upload and storage are fully functional. Full asynchronous OCR parsing runs when cloud vision workers are provisioned; manual classification is the primary pilot workflow.
-3. **Payment Gateway Integration:**
-   - Commercial billing is in pilot mode (trial activation and admin overrides). Live payment gateways (Midtrans / Xendit / Stripe) are deliberately unconfigured and flag-gated off.
+1. Billing enforcement (module features, metered transactions/documents/storage/AI/integrations) is integrated. Not
+   enforced by design: Pulse and data export (always included), companies limit (needs an owner-level subscription
+   model), exports count; Vision OCR in document `extract` is not metered; AI is metered per request, not per token.
+2. Payments: no provider connected (`server/lib/paymentAdapter.js` adapter `none`). Eventstripe is an event-ticketing
+   platform without verified SaaS subscription APIs; direct Xendit is a separate future assessment.
+3. OCR / AI Accountant expansion: not part of this release.
 
 ---
 
 ## 12. Go / No-Go Checklist
 
-| Check Item | Requirement | Status | Result |
-|------------|-------------|--------|--------|
-| **P0 Security** | PostgreSQL `platform_admins` RBAC enforced on all admin endpoints | Verified by 17 unit tests + HTTP harness | **PASS** |
-| **Auth Shield** | `ADMIN_TELEGRAM_IDS` zero-grant verified across all codebase | Confirmed by AST and test suite | **PASS** |
-| **Financial Integrity** | Double-entry invariants, D4 dated opening balances preserved | Regression suite passed | **PASS** |
-| **Billing Trial** | 168-hour trial life-cycle, concurrency and expiry enforced on server | 9 integration scenarios passed | **PASS** |
-| **Billing Admin** | Versioning, custom overrides, admin audit trail functional | 6 integration scenarios passed | **PASS** |
-| **UI Design 2.0** | Design tokens, no hardcoded colors, RU/EN/ID localization complete | Guard tests + Vite production build passed | **PASS** |
-| **Staging Rehearsal** | Migrations successfully executed against PostgreSQL 17 | Verified on local rehearsal DB | **PASS** |
-| **Data Boundaries** | Personal vs Business wallet separation preserved | Confirmed by workspace guard tests | **PASS** |
+| Check | Requirement | Evidence | Status |
+|---|---|---|---|
+| Migration procedure | Guarded runner, no re-application, stop on UNKNOWN/error, postflight | `migrationRunnerSafety.test.js` 5/5 | PASS (local) |
+| Financial idempotency | Payments/transfers keyed; repeats are replays; balances unchanged by the runner | `migrationRunnerSafety.test.js` | PASS (local) |
+| Platform admin RBAC | DB-backed, verified email, no Telegram grant | `platformAdminAuth` 17, adversarial 16, `platformAdminSecurityPg` 7 | PASS (local) |
+| Last super_admin | Cannot be lost (DELETE, demotion, 25× concurrent revocation) | `platformAdminSecurityPg` | PASS (local) |
+| Admin audit | Atomic with the role change (bootstrap, grant, revoke) | `platformAdminSecurityPg`, `platformAdminPostgrest` | PASS (local) |
+| Real PostgREST path | Bootstrap/grant/revoke via supabase-js → PostgREST | `platformAdminPostgrest` 2/2 (local PostgREST v14.16) | PASS (local); repeat on staging |
+| Billing | Phase 1 9, Center 6, Enforcement 8 | integration suites | PASS (local) |
+| Staging rehearsal | `--plan/--apply/--check` on a staging copy | — | **PENDING** |
+| Rollback target | Signed-off build of the same schema generation | — | **UNAVAILABLE** (Section 9.2) |
 
-### Release Gate Sign-Off:
-- **Verdict:** **GO FOR STAGING REHEARSAL** / **CONDITIONAL GO FOR PRODUCTION PILOT** (pending owner email bootstrap approval).
+### Release Gate
+- Integration: see `V2_CLAUDE_SECURITY_FIX_REPORT.md`.
+- Staging: only after the owner approves running the runner on a staging copy and on staging.
+- Production: NO-GO until the staging rehearsal is complete and a rollback target exists.

@@ -201,6 +201,41 @@ function createMockSupabase(initialData = {}) {
       return builder;
     },
     async rpc(fn, args = {}) {
+      // 073 grant/revoke: role change and audit row succeed or fail together (mirrors the SQL functions;
+      // real semantics are covered by tests/integration/platformAdminSecurityPg.test.js).
+      const verified = (uid) => (tables.user_email_identities || []).some(r => Number(r.user_id) === Number(uid) && r.email_verified_at);
+      const isSuper = (uid) => (tables.platform_admins || []).some(r => Number(r.user_id) === Number(uid) && r.role === 'super_admin' && r.is_active) && verified(uid);
+      const audit = (row) => { if (tables.__failAudit) return false; (tables.audit_events ||= []).push(row); return true; };
+      if (fn === 'rpc_platform_admin_grant') {
+        if (!isSuper(args.p_actor)) return { data: null, error: { message: 'super_admin_required', code: 'P0004' } };
+        const ident = (tables.user_email_identities || []).find(r => r.email === args.p_email);
+        if (!ident) return { data: null, error: { message: 'user_not_found', code: 'P0006' } };
+        if (!ident.email_verified_at) return { data: null, error: { message: 'email_not_verified', code: 'P0002' } };
+        const uid = Number(ident.user_id), idx = (tables.platform_admins ||= []).findIndex(r => Number(r.user_id) === uid);
+        const before = idx >= 0 ? { ...tables.platform_admins[idx] } : null;
+        if (before && before.role === 'super_admin' && before.is_active && args.p_role !== 'super_admin'
+          && !tables.platform_admins.some(r => r.role === 'super_admin' && r.is_active && Number(r.user_id) !== uid))
+          return { data: null, error: { message: 'cannot_revoke_last_super_admin', code: 'P0001' } };
+        const row = { user_id: uid, role: args.p_role, is_active: true, revoked_at: null, created_by: args.p_actor };
+        if (!audit({ action: before ? 'role_updated' : 'role_granted', entity_type: 'platform_admin', entity_id: String(uid), actor_user_id: args.p_actor }))
+          return { data: null, error: { message: 'audit_store_unavailable', code: 'XX000' } };
+        if (idx >= 0) Object.assign(tables.platform_admins[idx], row); else tables.platform_admins.push(row);
+        return { data: { user_id: uid, role: args.p_role, is_active: true, email: args.p_email }, error: null };
+      }
+      if (fn === 'rpc_platform_admin_revoke') {
+        if (!isSuper(args.p_actor)) return { data: null, error: { message: 'super_admin_required', code: 'P0004' } };
+        const target = (tables.platform_admins || []).find(r => Number(r.user_id) === Number(args.p_target));
+        if (!target || !target.is_active) return { data: null, error: { message: 'admin_not_found', code: 'P0007' } };
+        if (target.role === 'super_admin' && !tables.platform_admins.some(r => r.role === 'super_admin' && r.is_active && r !== target))
+          return { data: null, error: { message: 'cannot_revoke_last_super_admin', code: 'P0001' } };
+        if (!audit({ action: 'role_revoked', entity_type: 'platform_admin', entity_id: String(args.p_target), actor_user_id: args.p_actor }))
+          return { data: null, error: { message: 'audit_store_unavailable', code: 'XX000' } };
+        target.is_active = false; target.revoked_at = new Date().toISOString();
+        return { data: { ok: true, user_id: Number(args.p_target), is_active: false }, error: null };
+      }
+      if (fn === 'fn_bootstrap_platform_super_admin' && tables.__failAudit) {
+        return { data: null, error: { message: 'audit_store_unavailable', code: 'XX000' } };
+      }
       if (fn === 'fn_bootstrap_platform_super_admin') {
         const uid = Number(args.p_user_id);
         const ident = (tables.user_email_identities || []).find(r => Number(r.user_id) === uid);
@@ -543,7 +578,7 @@ test('Scenario 12: Cannot revoke the last active super_admin', async () => {
         actorUserId: 901,
       });
     },
-    /Cannot revoke the last active super_admin/
+    /cannot_revoke_last_super_admin/
   );
 });
 
@@ -616,7 +651,7 @@ test('Scenario 15: Bootstrap procedure is idempotent and fails closed if super_a
   );
 });
 
-test('Scenario 16: Bootstrap fails closed if mandatory security audit recording fails', async () => {
+test('Scenario 16: Bootstrap fails closed if the audit row cannot be written (audit is inside the bootstrap transaction)', async () => {
   clearAdminCache();
   const db = createMockSupabase({
     users: [{ id: 1301, email: 'audit-test@helmfinance.com' }],
@@ -626,16 +661,12 @@ test('Scenario 16: Bootstrap fails closed if mandatory security audit recording 
 
   await assert.rejects(
     async () => {
-      await bootstrapSuperAdmin(db, {
-        email: 'audit-test@helmfinance.com',
-        requireAudit: true,
-        recordAudit: async () => {
-          throw new Error('mandatory_security_audit_failed: network_unreachable');
-        },
-      });
+      db._tables.__failAudit = true;
+      await bootstrapSuperAdmin(db, { email: 'audit-test@helmfinance.com' });
     },
-    /mandatory_security_audit_failed/
+    /bootstrap_rpc_failed/
   );
+  assert.strictEqual(db._tables.platform_admins.length, 0, 'no role without its audit row');
 });
 
 test('Audit Guard: ADMIN_TELEGRAM_IDS is not used to grant admin anywhere in codebase', () => {
