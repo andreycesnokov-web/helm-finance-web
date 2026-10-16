@@ -347,16 +347,17 @@ export const uploadReceiptFile = (token, file) =>
 // Commercial commands keep the existing single V2 mutation boundary. The
 // server independently checks membership/platform authority, CAS and receipts.
 export const billingRead=(path,identity)=>{
- if(!/^\/(billing(?:\/commands\/[0-9a-f-]+)?|admin\/billing\/(catalog|companies(?:\/[0-9a-f-]+)?))$/.test(path))throw Error('invalid_billing_path');
+ if(!/^\/(billing(?:\/commands\/[0-9a-f-]+)?|admin\/billing\/(catalog|overview|subscriptions|overrides|audit|payments|settings|companies(?:\/[0-9a-f-]+)?))$/.test(path))throw Error('invalid_billing_path');
  return apiFetch(path,identity)
 }
 export function billingCommand(path,identity,body){
  const options={body}
  if(path==='/billing/plan')return apiFetch('/billing/plan',identity,{...options,method:'POST'})
  if(path==='/billing/trial')return apiFetch('/billing/trial',identity,{...options,method:'POST'})
- let m=path.match(/^\/admin\/billing\/catalog\/(starter|control|pro)$/)
- if(m)return apiFetch('/admin/billing/catalog/'+m[1],identity,{...options,method:'POST'})
- m=path.match(/^\/admin\/billing\/companies\/([0-9a-f-]+)\/(assign|schedule|grant|revoke|extend)$/)
+ // Plan codes are data (any lowercase code); /preview is a dry run that writes nothing.
+ let m=path.match(/^\/admin\/billing\/catalog\/([a-z][a-z0-9_]{1,39})(\/preview)?$/)
+ if(m)return apiFetch('/admin/billing/catalog/'+m[1]+(m[2]||''),identity,{...options,method:'POST'})
+ m=path.match(/^\/admin\/billing\/companies\/([0-9a-f-]+)\/(assign|schedule|grant|revoke|extend|override|revoke_override)$/)
  if(m)return apiFetch('/admin/billing/companies/'+m[1]+'/'+m[2],identity,{...options,method:'POST'})
  throw Error('invalid_billing_path')
 }

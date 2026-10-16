@@ -65,14 +65,16 @@ function computeCommercialAccess(business, now, billing) {
       && v.limits && typeof v.limits === 'object' && !Array.isArray(v.limits) ? v : null;
   };
   const trialStart = instant(billing.trial_started_at), trialEnd = instant(billing.trial_ends_at);
+  // Trial length is fixed on the account at activation (NULL: activated before configurable trials = 168h).
+  const trialMs = Number.isSafeInteger(billing.trial_hours) && billing.trial_hours > 0 ? billing.trial_hours * 3600000 : TRIAL_DURATION_MS;
   // An audited admin extension may exceed 168h; a client clock cannot extend access.
   const extension = billing.trial_extension;
   const validExtension = extension && extension.audit_id && extension.reason?.trim()
     && extension.after === billing.trial_ends_at && Number.isFinite(instant(extension.before))
-    && instant(extension.before) >= trialStart + TRIAL_DURATION_MS
+    && instant(extension.before) >= trialStart + trialMs
     && trialEnd > instant(extension.before);
   const validTrial = Number.isFinite(trialStart) && Number.isFinite(trialEnd)
-    && (trialEnd - trialStart === TRIAL_DURATION_MS || validExtension);
+    && (trialEnd - trialStart === trialMs || validExtension);
   const scheduledDue = Number.isFinite(instant(billing.scheduled_at)) && instant(billing.scheduled_at) <= time;
   const trialVersion = version(scheduledDue ? billing.scheduled_plan_version_id : billing.selected_plan_version_id);
   const trialActive = !!(validTrial && trialVersion && trialStart <= time && time < trialEnd);
@@ -89,6 +91,18 @@ function computeCommercialAccess(business, now, billing) {
   const grant = grants[0], paid = periods[0];
   const selected = grant ? version(grant.plan_version_id) : paid ? version(paid.plan_version_id) : trialActive ? trialVersion : null;
   if(!selected&&billing.legacy_fallback)return {...computeBusinessAccess(business,now),policy:'legacy',restricted:false,server_now:now.toISOString(),version:billing.version,features:{},limits:{}};
+  // Customer overrides adjust the effective terms (never create access); later starts win for the same key.
+  const overrides = selected ? (billing.overrides || []).filter(o => String(o.business_id) === String(business.id)
+    && !o.revoked_at && o.audit_id && typeof o.reason === 'string' && o.reason.trim()
+    && Number.isFinite(instant(o.starts_at)) && instant(o.starts_at) <= time && (o.ends_at == null || instant(o.ends_at) > time))
+    .sort((a,b) => instant(a.starts_at)-instant(b.starts_at) || String(a.id).localeCompare(String(b.id))) : [];
+  const features = selected ? structuredClone(selected.features) : {}, limits = selected ? structuredClone(selected.limits) : {};
+  let discount = null;
+  for (const o of overrides) {
+    if (o.kind === 'feature' && typeof o.value === 'boolean') features[o.key] = o.value;
+    else if (o.kind === 'limit' && (o.value === null || Number.isSafeInteger(o.value) && o.value >= 0)) limits[o.key] = o.value;
+    else if (o.kind === 'discount' && Number.isFinite(o.value?.percent)) discount = o.value.percent;
+  }
   const source = grant ? 'admin_override' : paid ? 'subscription' : trialActive ? 'trial' : 'restricted';
   const state = paid ? 'active' : trialActive ? 'trialing'
     : billing.pending_payment_id ? 'pending_payment' : Number.isFinite(trialStart) ? 'expired' : 'not_started';
@@ -107,9 +121,10 @@ function computeCommercialAccess(business, now, billing) {
     daysLeft: trialActive ? Math.ceil((trialEnd-time)/86400000) : 0,
     trial_seconds_remaining: trialActive ? Math.ceil((trialEnd-time)/1000) : 0,
     override_active: !!grant, override_ends_at: grant?.ends_at || null,
-    // Clone so a caller cannot mutate a version snapshot through this result.
-    features: selected ? structuredClone(selected.features) : {},
-    limits: selected ? structuredClone(selected.limits) : {},
+    // Cloned above so a caller cannot mutate a version snapshot through this result.
+    features, limits, limit_policies: selected?.limit_policies ? structuredClone(selected.limit_policies) : {},
+    overrides_active: overrides.map(o => ({ id: o.id, kind: o.kind, key: o.key ?? null, value: o.value, ends_at: o.ends_at ?? null })),
+    discount_percent: discount, trial_hours: Math.round(trialMs / 3600000),
   };
 }
 

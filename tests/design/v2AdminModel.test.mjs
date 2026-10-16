@@ -46,10 +46,12 @@ t('needs-you: degraded DB first; all good otherwise', () => {
 
 t('privacy: admin screens never request client financial data', () => {
   const dir = path.join(ROOT, 'client/src/v2/admin')
-  const files = [...fs.readdirSync(dir).map((f) => path.join(dir, f)), path.join(ROOT, 'client/src/v2/AdminApp.jsx')]
+  // Recursive: sub-folders such as admin/billing/ are admin screens too.
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)])
+  const files = [...walk(dir), path.join(ROOT, 'client/src/v2/AdminApp.jsx')]
   for (const f of files) {
     const s = fs.readFileSync(f, 'utf8')
-    const paths = [...s.matchAll(/use(?:Admin)?Api\(\s*[`'"]([^`'"]+)/g)].map((m) => m[1])
+    const paths = [...s.matchAll(/use(?:Admin)?(?:Api|Load)\(\s*[`'"]([^`'"]+)/g)].map((m) => m[1])
     for (const p of paths) assert.ok(p.startsWith('/admin/'), `${path.basename(f)} reads ${p} — admin screens may only use /api/admin/*`)
     // An API path string starting with a client-finance resource (navigation links like
     // '/business/pulse' are fine — they are not requests).

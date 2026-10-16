@@ -11,7 +11,7 @@ const { CHAIN, D4, seeder, startServer, openAdmin } = require('./_d4Harness');
 
 const fs = require('node:fs');
 const path = require('node:path');
-const COMMERCIAL = '20261015033808_cfo_commercial_trial.sql';
+const COMMERCIAL = '20261015033808_cfo_commercial_trial.sql', CENTER = '20261017090000_billing_management_center.sql';
 const ADMIN = 9000, OWNER = 1001, UNVERIFIED = 1002, ACCOUNTANT = 1003, OTHER = 2001, RACER = 3001;
 const H168 = 168 * 3600 * 1000;
 const TEST_TERMS = {
@@ -29,6 +29,7 @@ before(async () => {
   // The commercial migration uses unqualified names (as applied on staging); the snapshot loader's session has
   // pg_dump's empty search_path, so apply it on a fresh session with the default search_path, like Supabase does.
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', COMMERCIAL), 'utf8'));
+  await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', CENTER), 'utf8'));
   seed = seeder(admin);
   for (const u of [ADMIN, OWNER, UNVERIFIED, ACCOUNTANT, OTHER, RACER]) await admin.query('INSERT INTO public.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [u]);
   for (const u of [OWNER, ACCOUNTANT, OTHER, RACER]) await admin.query(`INSERT INTO public.user_email_identities (user_id, email, email_verified_at) VALUES ($1, $2, now())`, [u, `u${u}@test.local`]);
@@ -54,7 +55,7 @@ async function publishTestTerms() {
     const p = cat.body.plans.find(x => x.plan === code);
     const r = await api.call('/admin/billing/catalog/' + code, { method: 'POST', user: ADMIN, body: { request_key: key(), expected_version: Number(p.catalog_version), terms: {
       action: 'version', name_i18n: { en: code, ru: code, id: code }, description_i18n: { en: 'test', ru: 'тест', id: 'uji' }, price_minor: t.price, currency: 'USD',
-      features: t.features, limits: t.limits, terms_version: 'test-only-v1', effective_at: new Date(Date.now() - 60000).toISOString(), approval_status: 'approved', publish: true } } });
+      features: t.features, limits: t.limits, terms_version: 'test-only-v1', effective_at: new Date(Date.now() - 60000).toISOString(), approval_status: 'approved', publish: true, confirm_publish: true } } });
     assert.equal(r.status, 200, JSON.stringify(r.body));
   }
 }

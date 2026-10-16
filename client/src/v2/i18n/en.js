@@ -1556,7 +1556,7 @@ export default {
     funnelNote: 'Profile and statement steps are not visible here without opening client data.',
     usersTitle: 'People', u: { total: 'Users', new7: 'New in 7 days', email: 'With an email login', telegram: 'Telegram-origin', personal: 'Personal workspaces' },
     aiTitle: 'AI usage · 30 days', aiNa: 'Not tracked yet — AI usage and cost need a usage store (PROPOSALS P-12).',
-    plans: 'Plans', plansNote: 'Prices are placeholders until billing is set.',
+    billing: 'Billing', plans: 'Plans', plansNote: 'Prices are placeholders until billing is set.',
     plan: { free: 'Free', founder: 'Founder', starter: 'Starter', business: 'Business', pro: 'Pro', enterprise: 'Enterprise', trial: 'Trial' },
     needsYou: 'Needs you', all: 'All', tone: { crit: 'Failing', warn: 'Watch', good: 'Healthy' },
     need: { warn: { dbError: '{what} could not be read (database error)', timeout: 'Some dashboard figures timed out and are missing', cap: 'Some figures hit the safety limit and are approximate', inconsistent: 'Some identity counts did not add up and are not shown', other: 'The server reported a problem with a figure' }, dbDegraded: 'Database unreachable or metrics timed out', trialsEnding: '{n} trials end this week', noLogin: '{n} users have no login method', allGood: 'Nothing needs you right now' },

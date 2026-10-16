@@ -16,6 +16,7 @@ function install(app,{auth,supabase,resolveBusiness,enabled=false,allowFixtures=
     }
     const key=req.get('Idempotency-Key')||req.body?.request_key||req.body?.request_id;
     const reservation=await billing.admit(supabase,req.user.userId,biz,policy,{key,allowFixtures,intent:policy.resource==='documents'?{sha256:req.body?.sha256}:{},units:policy.resource==='users'?Number(req.body?.max_uses??1):1});
+    if(reservation?.over_limit)res.set('X-Billing-Quota-Warning',reservation.resource);
     if(reservation)res.once('finish',()=>{
      const action=res.statusCode<400?'commit':'release';
      if(reservation.phase==='init'&&action==='commit')return;

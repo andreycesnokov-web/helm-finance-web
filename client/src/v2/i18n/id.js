@@ -1556,7 +1556,7 @@ export default {
     funnelNote: 'Langkah profil dan mutasi tidak terlihat di sini tanpa membuka data klien.',
     usersTitle: 'Orang', u: { total: 'Pengguna', new7: 'Baru dalam 7 hari', email: 'Dengan login email', telegram: 'Dari Telegram', personal: 'Ruang kerja pribadi' },
     aiTitle: 'Pemakaian AI · 30 hari', aiNa: 'Belum dilacak — pemakaian dan biaya AI perlu penyimpanan pemakaian (PROPOSALS P-12).',
-    plans: 'Paket', plansNote: 'Harga masih sementara sampai penagihan diatur.',
+    billing: 'Penagihan', plans: 'Paket', plansNote: 'Harga masih sementara sampai penagihan diatur.',
     plan: { free: 'Free', founder: 'Founder', starter: 'Starter', business: 'Business', pro: 'Pro', enterprise: 'Enterprise', trial: 'Coba' },
     needsYou: 'Perlu Anda', all: 'Semua', tone: { crit: 'Gagal', warn: 'Pantau', good: 'Sehat' },
     need: { warn: { dbError: '{what} tidak bisa dibaca (kesalahan basis data)', timeout: 'Sebagian angka dasbor habis waktu dan tidak ada', cap: 'Sebagian angka mencapai batas aman dan merupakan perkiraan', inconsistent: 'Sebagian hitungan identitas tidak cocok dan tidak ditampilkan', other: 'Server melaporkan masalah pada sebuah angka' }, dbDegraded: 'Basis data tidak terjangkau atau metrik habis waktu', trialsEnding: '{n} masa coba berakhir minggu ini', noLogin: '{n} pengguna tanpa metode login', allGood: 'Tidak ada yang perlu Anda saat ini' },
