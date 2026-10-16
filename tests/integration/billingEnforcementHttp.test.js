@@ -211,6 +211,36 @@ test('8. tenant isolation: the same user gets each company\'s own plan; non-memb
   notBilling(await call(OL, L, '/ai-cfo/context'), 'legacy company AI');
 });
 
+test('replays of keyed money writes stay replays under admission: header-keyed bill payment and bank import confirm', async (t) => {
+  if (skip()) return t.skip('no PostgreSQL');
+  await publish('replay_plan', terms('Replay', ALL_ON, { users: 5, companies: 1, documents: 50, ai: 10, imports: 5, transactions: 50, storage_mb: 50, integrations: 1 }));
+  const R = await company(OD, 'Enf Replay', 'replay_plan');
+  const w = await call(OD, R, '/wallets', 'POST', { request_key: key(), name: 'Replay cash', currency: 'IDR', opening_balance: 100000, opening_balance_date: '2026-09-30' });
+  assert.equal(w.status, 200, JSON.stringify(w.body)); const wallet = w.body.wallet.id;
+  const bill = await call(OD, R, '/debts', 'POST', { request_key: key(), type: 'payable', counterparty: 'Replay supplier', amount: 5000, currency: 'IDR', due_date: '2026-10-31' });
+  assert.equal(bill.status, 200, JSON.stringify(bill.body));
+  // The v2 client sends the payment key in the Idempotency-Key header; a lost response is retried with the same key.
+  const k = key(), pay = () => api.call(`/debts/${bill.body.id}/pay`, { method: 'POST', user: OD, biz: R, headers: { 'Idempotency-Key': k }, body: { amount: 2000, wallet_id: wallet, date: '2026-10-08' } });
+  const p1 = await pay(); assert.equal(p1.status, 200, JSON.stringify(p1.body));
+  await new Promise(r => setTimeout(r, 200));
+  const used = (await usage(R)).transactions;
+  const p2 = await pay(); assert.equal(p2.status, 200, 'replay must return the stored payment: ' + JSON.stringify(p2.body));
+  assert.equal(Number((await admin.query('SELECT paid_amount FROM public.debts WHERE id=$1', [bill.body.id])).rows[0].paid_amount), 2000, 'paid once');
+  await new Promise(r => setTimeout(r, 200));
+  assert.equal((await usage(R)).transactions, used, 'the payment replay consumed nothing');
+  const b = await call(OD, R, '/bank-import/batches', 'POST', { wallet_id: wallet, file_name: 'replay.csv', file_type: 'csv', currency: 'IDR', rows: [{ tx_date: '2026-10-09', description: 'Replay fee', amount: -700, row_index: 0 }] });
+  assert.equal(b.status, 200, JSON.stringify(b.body));
+  const rv = await call(OD, R, `/bank-imports/${b.body.batch.id}/review`);
+  const body = { request_key: key(), review_hash: rv.body.reviewed.review_hash, rows: rv.body.rows.map(r => ({ row_id: r.id, transaction_type: 'expense', scope: 'business' })) };
+  const c1 = await call(OD, R, `/bank-imports/${b.body.batch.id}/confirm`, 'POST', body); assert.equal(c1.status, 200, JSON.stringify(c1.body));
+  const c2 = await call(OD, R, `/bank-imports/${b.body.batch.id}/confirm`, 'POST', body); assert.equal(c2.status, 200, 'import replay: ' + JSON.stringify(c2.body));
+  assert.equal((await admin.query(`SELECT count(*)::int n FROM public.transactions WHERE business_id=$1 AND description='Replay fee'`, [R])).rows[0].n, 1, 'booked once');
+  // An unknown key still goes through admission and cannot re-confirm a confirmed batch.
+  const other = await call(OD, R, `/bank-imports/${b.body.batch.id}/confirm`, 'POST', { ...body, request_key: key() });
+  assert.notEqual(other.status, 200, 'a fresh key re-confirmed a confirmed batch');
+  assert.equal((await admin.query(`SELECT count(*)::int n FROM public.transactions WHERE business_id=$1 AND description='Replay fee'`, [R])).rows[0].n, 1);
+});
+
 test('migration down is fail-closed while usage of the new resources exists', async (t) => {
   if (skip()) return t.skip('no PostgreSQL');
   const down = fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261017120000_billing_enforcement_down.sql'), 'utf8');

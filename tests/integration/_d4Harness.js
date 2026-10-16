@@ -127,8 +127,8 @@ async function startServer(connectionString, { jwtSecret = 'd4-anchor-test-secre
   const BASE = `http://127.0.0.1:${server.address().port}/api`;
   const jwt = require('jsonwebtoken');
   const token = (userId, authChannel = 'email') => jwt.sign({ userId, auth_channel: authChannel }, jwtSecret, { expiresIn: '30m' });
-  async function call(pathname, { method = 'GET', body, user, biz, authChannel = 'email' } = {}) {
-    const r = await fetch(BASE + pathname, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${token(user, authChannel)}`, 'x-business-id': biz },
+  async function call(pathname, { method = 'GET', body, user, biz, authChannel = 'email', headers = {} } = {}) {
+    const r = await fetch(BASE + pathname, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${token(user, authChannel)}`, 'x-business-id': biz, ...headers },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     return { status: r.status, body: await r.json().catch(() => null) };
   }
