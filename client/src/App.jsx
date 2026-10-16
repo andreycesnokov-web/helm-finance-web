@@ -571,6 +571,8 @@ const V2AdminApp = DESIGN_V2 ? lazy(() => import('./v2/AdminApp')) : null
 const V2Auth = DESIGN_V2 ? lazy(() => import('./v2/auth/AuthApp')) : null
 const V2_AUTH = DESIGN_V2 && EMAIL_AUTH_UI
 const v2Auth = (page) => <Suspense fallback={null}><V2Auth page={page} /></Suspense>
+// Email + Password screens (server: PASSWORD_AUTH_ENABLED). The emailed links land on /auth/confirmed and /auth/reset.
+const PASSWORD_UI = V2_AUTH && import.meta.env.VITE_PASSWORD_AUTH_ENABLED === 'true'
 
 // With the v2 design on, the old top-level pages (bookmarks, bot links) open their v2 screens;
 // query parameters are kept. Without the flag they stay exactly as they were.
@@ -607,6 +609,10 @@ export default function App() {
           {EMAIL_AUTH_UI && <Route path="/login/email/callback" element={V2_AUTH ? v2Auth('callback') : <EmailCallback />} />}
           {EMAIL_AUTH_UI && <Route path="/account" element={V2_AUTH ? v2Auth('account') : <PersonalProfile />} />}
           {V2_AUTH && <Route path="/join" element={v2Auth('join')} />}
+          {PASSWORD_UI && <Route path="/register" element={v2Auth('register')} />}
+          {PASSWORD_UI && <Route path="/auth/confirmed" element={v2Auth('confirmed')} />}
+          {PASSWORD_UI && <Route path="/auth/forgot" element={v2Auth('forgot')} />}
+          {PASSWORD_UI && <Route path="/auth/reset" element={v2Auth('reset')} />}
           {/* Legacy Telegram login: a real page when email auth is on; when off, /login
               already shows the widget, so just send /login/telegram back to /login. */}
           {EMAIL_AUTH_UI

@@ -161,6 +161,24 @@ export const startEmailSignIn = (email) =>
 export const verifyEmailSignIn = (body) =>
   apiFetch('/auth/email/verify', null, { method: 'POST', body })
 
+// Email + Password (Supabase Auth behind the server; VITE_PASSWORD_AUTH_ENABLED). The browser never holds a
+// Supabase session: the emailed links land on /auth/confirmed and /auth/reset, which hand their token to the server.
+//   POST /api/auth/password/{register,resend,login,forgot,reset,confirmed} (public) · POST /api/auth/logout
+export const passwordRegister = (email, password) =>
+  apiFetch('/auth/password/register', null, { method: 'POST', body: { email, password } })
+export const passwordResend = (email) =>
+  apiFetch('/auth/password/resend', null, { method: 'POST', body: { email } })
+export const passwordSignIn = (email, password) =>
+  apiFetch('/auth/password/login', null, { method: 'POST', body: { email, password } })
+export const passwordForgot = (email) =>
+  apiFetch('/auth/password/forgot', null, { method: 'POST', body: { email } })
+export const passwordReset = (access_token, password) =>
+  apiFetch('/auth/password/reset', null, { method: 'POST', body: { access_token, password } })
+export const passwordLinkUsed = (access_token) =>
+  apiFetch('/auth/password/confirmed', null, { method: 'POST', body: { access_token } })
+export const endSession = (token) =>
+  apiFetch('/auth/logout', token, { method: 'POST', body: {} })
+
 export const updateMyProfile = (token, patch) =>
   apiFetch('/me/profile', token, { method: 'PATCH', body: patch })
 export const readMyAvatar = (token, signal) => apiFetch('/me/avatar', token, { responseType: 'avatar', signal })

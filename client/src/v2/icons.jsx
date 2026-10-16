@@ -36,6 +36,7 @@ export const I = {
   lock: (p) => <S {...p}><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></S>,
   warn: (p) => <S {...p}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" /></S>,
   check: (p) => <S {...p}><path d="M5 12l5 5 9-10" /></S>,
+  eye: (p) => <S {...p}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></S>,
   info: (p) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></S>,
   search: (p) => <S {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></S>,
   arrowUp: (p) => <S {...p}><path d="M12 19V5M5 12l7-7 7 7" /></S>,

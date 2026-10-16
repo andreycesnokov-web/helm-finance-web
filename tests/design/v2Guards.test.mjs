@@ -75,6 +75,14 @@ export const WRITE_ALLOW = [
   // Sign-in and company setup (2026-10-10, reg/R1–R9): existing routes, checked on the server.
   { method: 'POST', path: "'/auth/email/start'" },     // POST  /api/auth/email/start (public, rate-limited)
   { method: 'POST', path: "'/auth/email/verify'" },    // POST  /api/auth/email/verify (public, one-time)
+  // Email + Password through Supabase Auth (migration 074, server/lib/passwordAuth.js; public, rate-limited).
+  { method: 'POST', path: "'/auth/password/register'" },  // POST /api/auth/password/register
+  { method: 'POST', path: "'/auth/password/resend'" },    // POST /api/auth/password/resend
+  { method: 'POST', path: "'/auth/password/login'" },     // POST /api/auth/password/login
+  { method: 'POST', path: "'/auth/password/forgot'" },    // POST /api/auth/password/forgot
+  { method: 'POST', path: "'/auth/password/reset'" },     // POST /api/auth/password/reset (emailed-link session only)
+  { method: 'POST', path: "'/auth/password/confirmed'" }, // POST /api/auth/password/confirmed (drops the link's session)
+  { method: 'POST', path: "'/auth/logout'" },             // POST /api/auth/logout (signed in; ends the server session)
   { method: 'PATCH', path: "'/me/profile'" },          // PATCH /api/me/profile
   { method: 'POST', path: '/accept`' },                // POST  /api/invite/:code/accept
   // Settings (2026-10-10, Settings + w2/S2): existing routes, role-checked on the server.
@@ -197,7 +205,7 @@ t('v2 makes no mutating request outside the reviewed allow-list', () => {
 t('every allowed write exists on the server (batch 8 routes are the approved ones only)', () => {
   const entry=read(path.join(ROOT,'server/index.js'))
   assert.ok(/registerBusinessProfileOperations\(app,/.test(entry),'profile module must be registered on the real app')
-  const server = entry + read(path.join(ROOT, 'server/lib/companyCreation.js')) + read(path.join(ROOT, 'server/lib/teamOperations.js')) + read(path.join(ROOT,'server/lib/businessProfile.js'))
+  const server = entry + read(path.join(ROOT, 'server/lib/companyCreation.js')) + read(path.join(ROOT, 'server/lib/teamOperations.js')) + read(path.join(ROOT,'server/lib/businessProfile.js')) + read(path.join(ROOT,'server/lib/passwordAuth.js'))
   for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,
@@ -208,6 +216,9 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.patch\('\/api\/ai-accountant\/documents\/:id\/classification'/, /app\.post\('\/api\/documents\/:id\/identify'/, /app\.post\('\/api\/documents\/:id\/filing'/, /app\.post\('\/api\/documents\/:id\/tax-obligation'/,
     /app\.put\('\/api\/accountant\/profile'/, /app\.post\('\/api\/accountant\/profile\/verify'/, /app\.post\('\/api\/accountant\/profile\/from-documents'/,
     /app\.post\('\/api\/auth\/email\/start'/, /app\.post\('\/api\/auth\/email\/verify'/, /app\.patch\('\/api\/me\/profile'/,
+    /app\.post\('\/api\/auth\/password\/register'/, /\['\/api\/auth\/password\/resend', 'resend'/, /app\.post\('\/api\/auth\/password\/login'/,
+    /\['\/api\/auth\/password\/forgot', 'forgot'/, /app\.post\('\/api\/auth\/password\/reset'/, /app\.post\('\/api\/auth\/password\/confirmed'/,
+    /app\.post\('\/api\/auth\/logout', auth/,
     /app\.post\('\/api\/invite\/:code\/accept'/, /app\.post\('\/api\/businesses'/,
     /app\.patch\('\/api\/business\/current'/, /app\.post\('\/api\/cashflow-categories'/, /app\.patch\('\/api\/cashflow-categories\/:id'/,
     /app\.delete\('\/api\/cashflow-categories\/:id'/, /app\.post\('\/api\/account\/integrations\/telegram\/link-token'/,

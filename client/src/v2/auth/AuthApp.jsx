@@ -22,10 +22,13 @@ import TelegramLoginWidget from '../../components/TelegramLoginWidget'
 import {
   startEmailSignIn, verifyEmailSignIn, updateMyProfile, acceptInvite,
   lookupInvite, readInviteMembership, readMyProfile, readWorkspaces,
+  passwordRegister, passwordResend, passwordSignIn, passwordForgot, passwordReset, passwordLinkUsed,
 } from '../lib/actions'
 import '../v2.css'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
+// Email + Password sign-in (Supabase Auth behind the server). Off → the passwordless screens below stay as they are.
+export const PASSWORD_UI = import.meta.env.VITE_PASSWORD_AUTH_ENABLED === 'true'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const RESEND_SECONDS = 45
 const INVITE_KEY = 'post_login_redirect'
@@ -69,6 +72,10 @@ const errText = (t, e) => {
 
 /* ── R1 + R2: email → link sent ─────────────────────────────────────────── */
 export function SignIn() {
+  return PASSWORD_UI ? <PasswordSignIn /> : <LinkSignIn />
+}
+
+function LinkSignIn() {
   const t = useT()
   const nav = useNavigate()
   const { user } = useAuth()
@@ -145,6 +152,317 @@ export function SignIn() {
           <p className="v2-muted v2-small">{t('auth.r1.tg')} <Link to="/login/telegram">{t('auth.r1.tgLink')}</Link>. {t('auth.r1.terms')}</p>
         </section>
       </div>
+    </AuthFrame>
+  )
+}
+
+/* ── Email + Password: sign in, register, confirm, forgot, reset ─────────── */
+const pwBytes = (s) => new TextEncoder().encode(s).length
+function passwordIssue(t, password, repeat, email) {
+  if (!password) return t('auth.pw.err.required')
+  if (password.length < 10) return t('auth.pw.err.short')
+  if (pwBytes(password) > 72) return t('auth.pw.err.long')
+  if (email && password.trim().toLowerCase() === email) return t('auth.pw.err.weak')
+  if (repeat !== undefined && password !== repeat) return t('auth.pw.err.mismatch')
+  return ''
+}
+const pwErr = (t, e) => {
+  const code = e?.data?.error || ''
+  if (code === 'invalid_credentials') return t('auth.pw.err.credentials')
+  if (code === 'account_link_required') return t('auth.pw.err.linkRequired')
+  if (code === 'password_too_short') return t('auth.pw.err.short')
+  if (code === 'password_too_long') return t('auth.pw.err.long')
+  if (code === 'password_weak') return t('auth.pw.err.weak')
+  if (code === 'same_password') return t('auth.pw.err.same')
+  if (code === 'invalid_or_expired_link') return t('auth.pw.err.link')
+  return errText(t, e)
+}
+// The emailed links put their result in the URL fragment; read it once, then remove it from the address bar.
+function takeFragment() {
+  const f = Object.fromEntries(new URLSearchParams(window.location.hash.replace(/^#/, '')))
+  if (window.location.hash) window.history.replaceState(null, '', window.location.pathname)
+  return f
+}
+
+function PasswordField({ label, value, onChange, autoComplete, autoFocus, invalid, describedBy, hint }) {
+  const [show, setShow] = useState(false)
+  const t = useT()
+  return (
+    <label className="v2-field"><span className="v2-field-label">{label}</span>
+      <span className="v2-auth-pw">
+        <input className="v2-input" type={show ? 'text' : 'password'} autoComplete={autoComplete} autoFocus={autoFocus} value={value}
+          aria-label={label} aria-invalid={invalid || undefined} aria-describedby={describedBy} onChange={(e) => onChange(e.target.value)} />
+        <button type="button" className="v2-btn v2-btn-ghost v2-auth-pw-eye" aria-pressed={show} aria-label={t('auth.pw.show')}
+          onClick={() => setShow((s) => !s)}><I.eye size={18} /></button>
+      </span>
+      {hint && <span className="v2-muted v2-small">{hint}</span>}
+    </label>
+  )
+}
+
+function ResendLink({ email }) {
+  const t = useT()
+  const [state, setState] = useState('idle')   // idle | busy | sent | error
+  const [err, setErr] = useState('')
+  const send = async () => {
+    if (state === 'busy') return
+    setState('busy'); setErr('')
+    try { await passwordResend(email); setState('sent') } catch (x) { setErr(errText(t, x)); setState('error') }
+  }
+  return (
+    <>
+      <button type="button" className="v2-btn v2-btn-secondary v2-btn-block" disabled={state === 'busy' || state === 'sent'} onClick={send}>{t('auth.pw.resend')}</button>
+      {state === 'sent' && <p className="v2-muted v2-small" role="status">{t('auth.pw.resent')}</p>}
+      {err && <p className="v2-inline-err" role="alert">{err}</p>}
+    </>
+  )
+}
+
+function PasswordSignIn() {
+  const t = useT()
+  const nav = useNavigate()
+  const { user, loginWithToken } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [unconfirmed, setUnconfirmed] = useState('')
+  useEffect(() => { if (user) nav('/account', { replace: true }) }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+  const submit = async (e) => {
+    e.preventDefault()
+    const em = email.trim().toLowerCase()
+    if (!EMAIL_RE.test(em)) { setErr(t('auth.err.email')); return }
+    if (!password) { setErr(t('auth.pw.err.required')); return }
+    setBusy(true); setErr(''); setUnconfirmed('')
+    try {
+      const r = await passwordSignIn(em, password)
+      setPassword('')
+      loginWithToken(r.token, r.user ? { id: r.user.id, firstName: r.user.display_name } : null)
+      nav(consumePostLoginRedirect() || '/account', { replace: true })
+    } catch (x) {
+      if (x?.data?.error === 'email_not_confirmed') { setUnconfirmed(em); setErr(t('auth.pw.err.unconfirmed')) } else setErr(pwErr(t, x))
+    } finally { setBusy(false) }
+  }
+  return (
+    <AuthFrame wide>
+      <div className="v2-auth-split">
+        <section className="v2-auth-hero">
+          <h1 className="v2-auth-hero-h">{t('auth.r1.hero')}</h1>
+          <p className="v2-auth-hero-p">{t('auth.r1.heroP')}</p>
+          <ul className="v2-auth-ticks">
+            {['b1', 'b2', 'b3'].map((k) => <li key={k}><I.check size={18} />{t(`auth.r1.${k}`)}</li>)}
+          </ul>
+        </section>
+        <section className="v2-auth-card" aria-labelledby="pw-title">
+          <h2 id="pw-title" className="v2-auth-h1">{t('auth.pw.title')}</h2>
+          <p className="v2-auth-p">{t('auth.pw.p')}</p>
+          <form onSubmit={submit} noValidate>
+            <label className="v2-field"><span className="v2-field-label">{t('auth.email')}</span>
+              <input className="v2-input" type="email" autoComplete="username" autoFocus value={email} placeholder="name@company.com"
+                aria-invalid={!!err} aria-describedby={err ? 'pw-err' : undefined} onChange={(e) => { setEmail(e.target.value); setErr('') }} />
+            </label>
+            <PasswordField label={t('auth.pw.password')} value={password} autoComplete="current-password" invalid={!!err}
+              describedBy={err ? 'pw-err' : undefined} onChange={(v) => { setPassword(v); setErr('') }} />
+            {err && <p id="pw-err" className="v2-inline-err" role="alert">{err}</p>}
+            <button type="submit" className="v2-btn v2-btn-primary v2-btn-block" disabled={busy}>{busy ? t('auth.pw.busy') : t('auth.pw.submit')}</button>
+          </form>
+          {unconfirmed && <ResendLink email={unconfirmed} />}
+          <Link to="/auth/forgot" className="v2-btn-link">{t('auth.pw.forgot')}</Link>
+          <p className="v2-auth-p">{t('auth.pw.noAccount')} <Link to="/register">{t('auth.pw.register')}</Link></p>
+          <div className="v2-auth-or"><span>{t('auth.or')}</span></div>
+          <Link to="/join" className="v2-btn v2-btn-secondary v2-btn-block">{t('auth.r1.invite')}</Link>
+          <p className="v2-muted v2-small">{t('auth.r1.tg')} <Link to="/login/telegram">{t('auth.r1.tgLink')}</Link>. {t('auth.r1.terms')}</p>
+        </section>
+      </div>
+    </AuthFrame>
+  )
+}
+
+export function Register() {
+  const t = useT()
+  const nav = useNavigate()
+  const { user } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [repeat, setRepeat] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [sent, setSent] = useState('')
+  useEffect(() => { if (user) nav('/account', { replace: true }) }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+  const submit = async (e) => {
+    e.preventDefault()
+    const em = email.trim().toLowerCase()
+    if (!EMAIL_RE.test(em)) { setErr(t('auth.err.email')); return }
+    const issue = passwordIssue(t, password, repeat, em)
+    if (issue) { setErr(issue); return }
+    setBusy(true); setErr('')
+    try { await passwordRegister(em, password); setPassword(''); setRepeat(''); setSent(em) } catch (x) { setErr(pwErr(t, x)) } finally { setBusy(false) }
+  }
+  if (sent) {
+    return (
+      <AuthFrame>
+        <section className="v2-auth-card" aria-labelledby="reg-sent">
+          <span className="v2-auth-icon" aria-hidden="true"><I.send size={22} /></span>
+          <h1 id="reg-sent" className="v2-auth-h1">{t('auth.pw.sentTitle')}</h1>
+          <p className="v2-auth-p">{t('auth.pw.sentP', { email: sent })}</p>
+          <ResendLink email={sent} />
+          <Link to="/login" className="v2-btn-link">{t('auth.pw.back')}</Link>
+          <p className="v2-muted v2-small">{t('auth.r2.spam')}</p>
+        </section>
+      </AuthFrame>
+    )
+  }
+  return (
+    <AuthFrame>
+      <section className="v2-auth-card" aria-labelledby="reg-title">
+        <h1 id="reg-title" className="v2-auth-h1">{t('auth.pw.regTitle')}</h1>
+        <p className="v2-auth-p">{t('auth.pw.regP')}</p>
+        <form onSubmit={submit} noValidate>
+          <label className="v2-field"><span className="v2-field-label">{t('auth.email')}</span>
+            <input className="v2-input" type="email" autoComplete="username" autoFocus value={email} placeholder="name@company.com"
+              aria-invalid={!!err} onChange={(e) => { setEmail(e.target.value); setErr('') }} />
+          </label>
+          <PasswordField label={t('auth.pw.password')} value={password} autoComplete="new-password" hint={t('auth.pw.rule')}
+            invalid={!!err} onChange={(v) => { setPassword(v); setErr('') }} />
+          <PasswordField label={t('auth.pw.password2')} value={repeat} autoComplete="new-password" invalid={!!err}
+            onChange={(v) => { setRepeat(v); setErr('') }} />
+          {err && <p className="v2-inline-err" role="alert">{err}</p>}
+          <button type="submit" className="v2-btn v2-btn-primary v2-btn-block" disabled={busy}>{busy ? t('auth.sending') : t('auth.pw.regSubmit')}</button>
+        </form>
+        <p className="v2-auth-p">{t('auth.pw.haveAccount')} <Link to="/login">{t('auth.pw.signIn')}</Link></p>
+        <p className="v2-muted v2-small">{t('auth.r1.terms')}</p>
+      </section>
+    </AuthFrame>
+  )
+}
+
+function LinkProblem({ resend }) {
+  const t = useT()
+  const [email, setEmail] = useState('')
+  const [asked, setAsked] = useState('')
+  return (
+    <>
+      <span className="v2-auth-icon is-warn" aria-hidden="true"><I.warn size={22} /></span>
+      <h1 className="v2-auth-h1">{t('auth.pw.linkBadTitle')}</h1>
+      <p className="v2-auth-p">{t('auth.pw.linkBadP')}</p>
+      {resend && (!asked
+        ? <form onSubmit={(e) => { e.preventDefault(); const em = email.trim().toLowerCase(); if (EMAIL_RE.test(em)) setAsked(em) }} noValidate>
+            <label className="v2-field"><span className="v2-field-label">{t('auth.email')}</span>
+              <input className="v2-input" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+            <button type="submit" className="v2-btn v2-btn-secondary v2-btn-block">{t('auth.pw.resend')}</button>
+          </form>
+        : <ResendLink email={asked} />)}
+      {!resend && <Link to="/auth/forgot" className="v2-btn v2-btn-secondary v2-btn-block">{t('auth.pw.forgotSubmit')}</Link>}
+      <Link to="/login" className="v2-btn-link">{t('auth.pw.back')}</Link>
+    </>
+  )
+}
+
+export function EmailConfirmed() {
+  const t = useT()
+  const [state] = useState(() => {
+    const f = takeFragment()
+    if (f.access_token && !f.error) { passwordLinkUsed(f.access_token).catch(() => {}); return 'ok' }
+    return 'bad'
+  })
+  return (
+    <AuthFrame>
+      <section className="v2-auth-card" aria-live="polite">
+        {state === 'ok'
+          ? <>
+              <span className="v2-auth-icon" aria-hidden="true"><I.check size={22} /></span>
+              <h1 className="v2-auth-h1">{t('auth.pw.confirmedTitle')}</h1>
+              <p className="v2-auth-p">{t('auth.pw.confirmedP')}</p>
+              <Link to="/login" className="v2-btn v2-btn-primary v2-btn-block">{t('auth.pw.signIn')}</Link>
+            </>
+          : <LinkProblem resend />}
+      </section>
+    </AuthFrame>
+  )
+}
+
+export function ForgotPassword() {
+  const t = useT()
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [sent, setSent] = useState('')
+  const submit = async (e) => {
+    e.preventDefault()
+    const em = email.trim().toLowerCase()
+    if (!EMAIL_RE.test(em)) { setErr(t('auth.err.email')); return }
+    setBusy(true); setErr('')
+    try { await passwordForgot(em); setSent(em) } catch (x) { setErr(errText(t, x)) } finally { setBusy(false) }
+  }
+  return (
+    <AuthFrame>
+      <section className="v2-auth-card" aria-labelledby="fp-title">
+        <h1 id="fp-title" className="v2-auth-h1">{t('auth.pw.forgotTitle')}</h1>
+        {sent
+          ? <p className="v2-auth-p" role="status">{t('auth.pw.forgotSent', { email: sent })}</p>
+          : <>
+              <p className="v2-auth-p">{t('auth.pw.forgotP')}</p>
+              <form onSubmit={submit} noValidate>
+                <label className="v2-field"><span className="v2-field-label">{t('auth.email')}</span>
+                  <input className="v2-input" type="email" autoComplete="username" autoFocus value={email} placeholder="name@company.com"
+                    aria-invalid={!!err} onChange={(e) => { setEmail(e.target.value); setErr('') }} /></label>
+                {err && <p className="v2-inline-err" role="alert">{err}</p>}
+                <button type="submit" className="v2-btn v2-btn-primary v2-btn-block" disabled={busy}>{busy ? t('auth.sending') : t('auth.pw.forgotSubmit')}</button>
+              </form>
+            </>}
+        <Link to="/login" className="v2-btn-link">{t('auth.pw.back')}</Link>
+      </section>
+    </AuthFrame>
+  )
+}
+
+export function ResetPassword() {
+  const t = useT()
+  const { logout } = useAuth()
+  const link = useRef(null)
+  if (link.current === null) { const f = takeFragment(); link.current = f.access_token && !f.error ? f.access_token : '' }
+  const [password, setPassword] = useState('')
+  const [repeat, setRepeat] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const [state, setState] = useState(link.current ? 'form' : 'bad')   // form | done | bad
+  const submit = async (e) => {
+    e.preventDefault()
+    const issue = passwordIssue(t, password, repeat)
+    if (issue) { setErr(issue); return }
+    setBusy(true); setErr('')
+    try {
+      await passwordReset(link.current, password)
+      link.current = ''; setPassword(''); setRepeat('')
+      logout()   // every session of this account was revoked by the reset, this browser's included
+      setState('done')
+    } catch (x) {
+      if (x?.data?.error === 'invalid_or_expired_link') { link.current = ''; setState('bad') } else setErr(pwErr(t, x))
+    } finally { setBusy(false) }
+  }
+  return (
+    <AuthFrame>
+      <section className="v2-auth-card" aria-labelledby="rp-title" aria-live="polite">
+        {state === 'bad' && <LinkProblem />}
+        {state === 'done' && <>
+          <span className="v2-auth-icon" aria-hidden="true"><I.check size={22} /></span>
+          <h1 id="rp-title" className="v2-auth-h1">{t('auth.pw.resetTitle')}</h1>
+          <p className="v2-auth-p" role="status">{t('auth.pw.resetDone')}</p>
+          <Link to="/login" className="v2-btn v2-btn-primary v2-btn-block">{t('auth.pw.signIn')}</Link>
+        </>}
+        {state === 'form' && <>
+          <h1 id="rp-title" className="v2-auth-h1">{t('auth.pw.resetTitle')}</h1>
+          <p className="v2-auth-p">{t('auth.pw.resetP')}</p>
+          <form onSubmit={submit} noValidate>
+            <PasswordField label={t('auth.pw.password')} value={password} autoComplete="new-password" autoFocus hint={t('auth.pw.rule')}
+              invalid={!!err} onChange={(v) => { setPassword(v); setErr('') }} />
+            <PasswordField label={t('auth.pw.password2')} value={repeat} autoComplete="new-password" invalid={!!err}
+              onChange={(v) => { setRepeat(v); setErr('') }} />
+            {err && <p className="v2-inline-err" role="alert">{err}</p>}
+            <button type="submit" className="v2-btn v2-btn-primary v2-btn-block" disabled={busy}>{busy ? t('auth.sending') : t('auth.pw.resetSubmit')}</button>
+          </form>
+        </>}
+      </section>
     </AuthFrame>
   )
 }
@@ -425,5 +743,9 @@ export default function AuthApp({ page }) {
   if (page === 'upload') return <UploadPage />
   if (page === 'consent') return <ConsentPage />
   if (page === 'telegram') return <TelegramSignIn />
+  if (page === 'register') return <Register />
+  if (page === 'confirmed') return <EmailConfirmed />
+  if (page === 'forgot') return <ForgotPassword />
+  if (page === 'reset') return <ResetPassword />
   return <SignIn />
 }
