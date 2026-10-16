@@ -2,8 +2,15 @@
 -- Restores the previous definitions verbatim (sliced from 20261013031755 and 20261012032717) and
 -- drops the new functions. Rows appended by confirmed re-anchors are audited ledger entries and are
 -- NOT removed; the constraint is restored only when no 'wallet_reanchor' receipt exists.
+-- Requires: SET cfo.confirm_down = '20261016090000'; in the same session (refuses otherwise).
 BEGIN;
 SET LOCAL lock_timeout='5s';
+-- Fail closed: this file sits next to the forward migrations; an accidental run must do nothing.
+DO $$ BEGIN
+  IF current_setting('cfo.confirm_down',true) IS DISTINCT FROM '20261016090000' THEN
+    RAISE EXCEPTION 'd4_down_not_confirmed: run SET cfo.confirm_down = ''20261016090000'' in this session first';
+  END IF;
+END $$;
 DROP FUNCTION IF EXISTS public.rpc_reanchor_wallet_opening(uuid,uuid,bigint,text,jsonb,jsonb);
 DROP FUNCTION IF EXISTS public.rpc_wallet_reconciliation(uuid,uuid,bigint);
 CREATE OR REPLACE FUNCTION public.cfo_import_review_state(p_business uuid,p_batch uuid,p_actor bigint)

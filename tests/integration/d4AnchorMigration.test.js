@@ -103,7 +103,13 @@ describe('D4-A migration safety (real PostgreSQL)', () => {
   it('down restores the previous functions and keeps audited rows; up applies again', async (t) => {
     if (skipped) return t.skip('PostgreSQL unavailable');
     const before = await checksum(admin);
+    await assert.rejects(admin.query(H.migrationSql(H.D4_DOWN)), /d4_down_not_confirmed/, 'an accidental down run does nothing');
+    await admin.query('ROLLBACK').catch(() => {});
+    assert.deepStrictEqual(await checksum(admin), before);
+    assert.ok((await admin.query(`SELECT to_regprocedure('public.cfo_reanchor_math(uuid,uuid,date,jsonb,text)') p`)).rows[0].p, 'still installed');
+    await admin.query("SET cfo.confirm_down = '20261016090000'");
     await admin.query(H.migrationSql(H.D4_DOWN));
+    await admin.query('RESET cfo.confirm_down');
     const fns = (await admin.query(`SELECT proname FROM pg_proc WHERE proname IN ('cfo_reanchor_math','cfo_apply_reanchor','rpc_reanchor_wallet_opening','cfo_business_tz')`)).rows;
     assert.deepStrictEqual(fns, []);
     const def = (await admin.query(`SELECT pg_get_functiondef('public.cfo_import_review_state(uuid,uuid,bigint)'::regprocedure) d`)).rows[0].d;
