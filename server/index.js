@@ -18,6 +18,7 @@ const { balanceFailure, databaseFailureBody, nativeInputIsExact } = require('./l
 const financialRecovery = require('./lib/financialRecovery');
 const billCreation = require('./lib/billCreation');
 const bankImportReview = require('./lib/bankImportReview');
+const openingAnchor = require('./lib/openingAnchor');
 const walletHistory = require('./lib/walletHistory');
 const profileValidation = require('./lib/profileValidation');
 const TARGETS = require('./lib/businessTargets');   // Design v2 P-01/P-08 (migrations 058, 059)
@@ -912,6 +913,7 @@ async function replayFinancialCreate(req, res, biz, operation, rawIntent) {
 }
 financialRecovery.install(app,{auth,requireBusiness,supabase});
 bankImportReview.install(app,{auth,requireBusiness,supabase});
+openingAnchor.install(app,{auth,requireBusiness,supabase,fx,canView:canViewBusinessFinance,canWrite:canManageWallets});
 
 function canUseAiCfo(role)                     { return ['owner', 'ceo', 'admin', 'cfo', 'accountant'].includes(role); }
 // Category structure: who may create/edit/archive business categories.
@@ -10146,8 +10148,13 @@ app.get('/api/wallets', auth, async (req, res) => {
 
 app.post('/api/wallets', auth, async (req, res) => {
   const userId = req.user.userId;
-  const { name, currency, type, entity_name, color, opening_balance, sort_order, scope } = req.body;
+  const { name, currency, type, entity_name, color, opening_balance, sort_order, scope, opening_balance_date } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
+  // D4-A: an optional dated opening = the balance at the END of this day (the UI asks for the balance
+  // at the start of day D and sends D−1). Without it the opening stays undated, exactly as before.
+  if (opening_balance_date != null && (typeof opening_balance_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(opening_balance_date)
+      || Number.isNaN(Date.parse(opening_balance_date + 'T00:00:00Z')) || new Date(opening_balance_date + 'T00:00:00Z').toISOString().slice(0, 10) !== opening_balance_date))
+    return res.status(400).json({ error: 'invalid_opening_balance_date', code: 'invalid_opening_balance' });
   if (scope && !['business', 'personal'].includes(scope)) {
     return res.status(400).json({ error: "scope must be 'business' or 'personal'" });
   }
@@ -10195,14 +10202,14 @@ app.post('/api/wallets', auth, async (req, res) => {
     if (ob !== 0) {
       try {
         if (req.body.rate || req.body.booked_rate) {
-          obFxRes = await fx.toIdr(Math.abs(ob), cur, null, {
+          obFxRes = await fx.toIdr(Math.abs(ob), cur, opening_balance_date || null, {
             rate: req.body.rate || req.body.booked_rate,
             source: req.body.rate_source || 'manual',
             reason: req.body.manual_reason || 'opening_balance_manual_rate',
             actor: userId,
           });
         } else {
-          obFxRes = await fx.toIdr(Math.abs(ob), cur);
+          obFxRes = await fx.toIdr(Math.abs(ob), cur, opening_balance_date || undefined);
         }
       } catch (err) {
         if (balanceFailure(res, err)) return;
@@ -10219,6 +10226,7 @@ app.post('/api/wallets', auth, async (req, res) => {
       type: ob > 0 ? 'income' : 'expense', amount_original: Math.abs(ob), currency_original: cur,
       amount_idr: obFxRes.amount_idr, booked_rate: obFxRes.booked_rate, rate_source: obFxRes.rate_source,
       description: 'Opening balance · ' + name,
+      ...(opening_balance_date ? { transaction_date: opening_balance_date } : {}),
     } : null;
     const { request_key, ...intent } = req.body;
     const { data, error } = await supabase.rpc('rpc_create_business_wallet', {
@@ -11976,6 +11984,9 @@ app.patch('/api/business/current', auth, async (req, res) => {
     if (!name && !base_currency && timezone === undefined && country === undefined) {
       return res.status(400).json({ error: 'At least one field required: name, base_currency, timezone, country' });
     }
+    // D4-A: the company zone dates every legacy opening balance; refuse what PostgreSQL misreads.
+    if (timezone !== undefined && !profileValidation.validBusinessTimezone(timezone))
+      return res.status(400).json({ error: 'invalid_company_timezone', code: 'invalid_company_timezone' });
 
     // Workspace-aware + Business-only. This endpoint must NEVER mutate a Personal
     // Workspace. Explicit-but-inaccessible/stale ids are rejected (no silent fallback).
@@ -15693,7 +15704,7 @@ app.get('/api/accountant/tax-calendar', auth, async (req, res) => {
       .or(bizOrFilter(biz)).limit(20000);
     const active = new Set();
     for (const t of txs || []) {
-      if (t.source === 'wallet_opening_balance' || t.category === 'Opening balance') continue;
+      if (t.source === 'wallet_opening_balance' || t.category === 'Opening balance' || ['opening_reanchor','opening_reanchor_reversal','bank_import_opening'].includes(t.source)) continue;
       const d = String(t.transaction_date || t.created_at || '').slice(0, 10);
       if (d) { active.add(d.slice(0, 7)); active.add(d.slice(0, 4)); }
     }
