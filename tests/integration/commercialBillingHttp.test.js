@@ -28,13 +28,16 @@ before(async () => {
   admin = await openAdmin(db.connectionString);
   // The commercial migration uses unqualified names (as applied on staging); the snapshot loader's session has
   // pg_dump's empty search_path, so apply it on a fresh session with the default search_path, like Supabase does.
+  const m072 = fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '072_platform_admins.sql'), 'utf8');
+  await admin.query(m072);
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', COMMERCIAL), 'utf8'));
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', CENTER), 'utf8'));
   seed = seeder(admin);
   for (const u of [ADMIN, OWNER, UNVERIFIED, ACCOUNTANT, OTHER, RACER]) await admin.query('INSERT INTO public.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [u]);
-  for (const u of [OWNER, ACCOUNTANT, OTHER, RACER]) await admin.query(`INSERT INTO public.user_email_identities (user_id, email, email_verified_at) VALUES ($1, $2, now())`, [u, `u${u}@test.local`]);
+  for (const u of [ADMIN, OWNER, ACCOUNTANT, OTHER, RACER]) await admin.query(`INSERT INTO public.user_email_identities (user_id, email, email_verified_at) VALUES ($1, $2, now())`, [u, `u${u}@test.local`]);
   await admin.query(`INSERT INTO public.user_email_identities (user_id, email) VALUES ($1, 'unverified@test.local')`, [UNVERIFIED]);
-  Object.assign(process.env, { COMMERCIAL_BILLING_ENABLED: 'true', ADMIN_TELEGRAM_IDS: String(ADMIN) });
+  await admin.query("INSERT INTO public.platform_admins (user_id, role, is_active, created_by) VALUES ($1, 'super_admin', true, $1) ON CONFLICT (user_id) DO UPDATE SET is_active = true, role = 'super_admin'", [ADMIN]);
+  Object.assign(process.env, { COMMERCIAL_BILLING_ENABLED: 'true' });
   delete process.env.COMMERCIAL_BILLING_FIXTURES;
   api = await startServer(db.connectionString);
 });

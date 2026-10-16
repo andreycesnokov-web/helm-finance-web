@@ -404,9 +404,10 @@ async function bootstrapSuperAdmin(supabase, emailOrOptions, maybeOptions = {}) 
       if (typeof recordAudit === 'function') {
         await recordAudit(auditRow);
       } else {
-        try {
-          await supabase.from('audit_events').insert(auditRow);
-        } catch { /* best effort */ }
+        const { error: insErr } = await supabase.from('audit_events').insert(auditRow);
+        if (insErr && (emailOrOptions?.requireAudit || maybeOptions?.requireAudit)) {
+          throw new Error(`mandatory_security_audit_failed: ${insErr.message}`);
+        }
       }
 
       return {
@@ -472,9 +473,10 @@ async function bootstrapSuperAdmin(supabase, emailOrOptions, maybeOptions = {}) 
   if (typeof recordAudit === 'function') {
     await recordAudit(auditRow);
   } else {
-    try {
-      await supabase.from('audit_events').insert(auditRow);
-    } catch { /* best effort */ }
+    const { error: insErr } = await supabase.from('audit_events').insert(auditRow);
+    if (insErr && (emailOrOptions?.requireAudit || maybeOptions?.requireAudit)) {
+      throw new Error(`mandatory_security_audit_failed: ${insErr.message}`);
+    }
   }
 
   return { status: 'bootstrapped', userId: uid, email: normalized, role: 'super_admin', is_active: true };

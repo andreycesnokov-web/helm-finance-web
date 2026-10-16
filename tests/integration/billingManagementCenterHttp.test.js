@@ -24,6 +24,8 @@ before(async () => {
   db = await createProdSchemaDatabase('billing_center', [...CHAIN, D4]);
   if (!db) return;
   admin = await openAdmin(db.connectionString);
+  const m072 = fs.readFileSync(path.join(__dirname, '..', '..', 'migrations', '072_platform_admins.sql'), 'utf8');
+  await admin.query(m072);
   for (const m of MIGRATIONS) await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8'));
   // Production carries the legacy plan rows seeded by migration 005 (the snapshot is schema-only).
   await admin.query("INSERT INTO public.plan_limits(plan) VALUES ('free'),('business'),('founder'),('enterprise') ON CONFLICT DO NOTHING");
@@ -32,7 +34,8 @@ before(async () => {
     await admin.query('INSERT INTO public.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [u]);
     await admin.query(`INSERT INTO public.user_email_identities (user_id, email, email_verified_at) VALUES ($1, $2, now())`, [u, `c${u}@test.local`]);
   }
-  Object.assign(process.env, { COMMERCIAL_BILLING_ENABLED: 'true', ADMIN_TELEGRAM_IDS: String(ADMIN) });
+  await admin.query("INSERT INTO public.platform_admins (user_id, role, is_active, created_by) VALUES ($1, 'super_admin', true, $1) ON CONFLICT (user_id) DO UPDATE SET is_active = true, role = 'super_admin'", [ADMIN]);
+  Object.assign(process.env, { COMMERCIAL_BILLING_ENABLED: 'true' });
   delete process.env.COMMERCIAL_BILLING_FIXTURES;
   api = await startServer(db.connectionString);
 });

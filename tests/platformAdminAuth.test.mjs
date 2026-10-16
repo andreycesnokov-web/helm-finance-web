@@ -578,6 +578,28 @@ test('Scenario 15: Bootstrap procedure is idempotent and fails closed if super_a
   );
 });
 
+test('Scenario 16: Bootstrap fails closed if mandatory security audit recording fails', async () => {
+  clearAdminCache();
+  const db = createMockSupabase({
+    users: [{ id: 1301, email: 'audit-test@helmfinance.com' }],
+    user_email_identities: [{ user_id: 1301, email: 'audit-test@helmfinance.com', email_verified_at: '2026-10-16T10:00:00Z' }],
+    platform_admins: [],
+  });
+
+  await assert.rejects(
+    async () => {
+      await bootstrapSuperAdmin(db, {
+        email: 'audit-test@helmfinance.com',
+        requireAudit: true,
+        recordAudit: async () => {
+          throw new Error('mandatory_security_audit_failed: network_unreachable');
+        },
+      });
+    },
+    /mandatory_security_audit_failed/
+  );
+});
+
 test('Audit Guard: ADMIN_TELEGRAM_IDS is not used to grant admin anywhere in codebase', () => {
   const root = path.join(__dirname, '..', 'server');
   const indexJs = fs.readFileSync(path.join(root, 'index.js'), 'utf8');

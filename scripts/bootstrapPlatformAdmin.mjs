@@ -47,21 +47,21 @@ async function run() {
   console.log(`[bootstrap] Initiating platform admin bootstrap for: ${email}`)
   try {
     const res = await bootstrapSuperAdmin(supabase, email, {
+      requireAudit: true,
       recordAudit: async (auditData) => {
-        try {
-          await supabase.from('audit_events').insert({
-            business_id: null,
-            actor_user_id: auditData.actorUserId || auditData.actor_user_id,
-            actor_role: auditData.actorRole || auditData.actor_role,
-            entity_type: auditData.entityType || auditData.entity_type,
-            entity_id: String(auditData.entityId || auditData.entity_id),
-            action: auditData.action,
-            after_json: auditData.after || auditData.after_json,
-          })
-          console.log('[bootstrap] Audit event recorded successfully.')
-        } catch (e) {
-          console.warn('[bootstrap] Warning: Failed to record audit event:', e.message)
+        const { error: insErr } = await supabase.from('audit_events').insert({
+          business_id: null,
+          actor_user_id: auditData.actorUserId || auditData.actor_user_id,
+          actor_role: auditData.actorRole || auditData.actor_role,
+          entity_type: auditData.entityType || auditData.entity_type,
+          entity_id: String(auditData.entityId || auditData.entity_id),
+          action: auditData.action,
+          after_json: auditData.after || auditData.after_json,
+        })
+        if (insErr) {
+          throw new Error(`mandatory_security_audit_failed: ${insErr.message}`)
         }
+        console.log('[bootstrap] Mandatory security audit event recorded successfully.')
       },
     })
 
@@ -80,6 +80,8 @@ async function run() {
       console.error(`[bootstrap] FAILED: Email "${email}" has not been verified. Only verified email accounts can be assigned admin roles.`)
     } else if (err.code === 'super_admin_already_exists') {
       console.error(`[bootstrap] REFUSED: An active super_admin already exists in the system. Additional administrators must be appointed via Platform Admin UI/API by an existing super_admin.`)
+    } else if (err.message?.includes('mandatory_security_audit_failed')) {
+      console.error(`[bootstrap] REFUSED: Mandatory security audit logging failed. Admin bootstrap cannot proceed without durable audit recording. (${err.message})`)
     } else {
       console.error('[bootstrap] FAILED unexpected error:', err.message)
     }
