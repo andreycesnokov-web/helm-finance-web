@@ -30,6 +30,7 @@ before(async () => {
   // pg_dump's empty search_path, so apply it on a fresh session with the default search_path, like Supabase does.
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', COMMERCIAL), 'utf8'));
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', CENTER), 'utf8'));
+  await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261017120000_billing_enforcement.sql'), 'utf8'));
   seed = seeder(admin);
   for (const u of [ADMIN, OWNER, UNVERIFIED, ACCOUNTANT, OTHER, RACER]) await admin.query('INSERT INTO public.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [u]);
   for (const u of [OWNER, ACCOUNTANT, OTHER, RACER]) await admin.query(`INSERT INTO public.user_email_identities (user_id, email, email_verified_at) VALUES ($1, $2, now())`, [u, `u${u}@test.local`]);

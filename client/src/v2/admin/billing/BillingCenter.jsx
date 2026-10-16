@@ -31,8 +31,8 @@ function CompanyUsage({token,c,lang}){
  const list=subs.data.subscriptions.filter(s=>s.policy!=='legacy'),val=x=>x===undefined?'—':x===null?c.unlimited:x===0?c.unavailable:String(x);
  return <Card title={c.usageTitle}><label>{c.chooseCompany}<select value={id} onChange={e=>setId(e.target.value)}><option value="">—</option>{list.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
   {id&&!d.loading&&d.data?.limits&&<div className="v2-tablewrap"><table className="v2-table"><thead><tr><th>{c.limit}</th><th>{c.enforcement}</th><th>{c.base}</th><th>{c.individual}</th><th>{c.effectiveCol}</th><th>{c.used}</th><th>{c.policy}</th></tr></thead>
-   <tbody>{d.data.limits.map(l=><tr key={l.key}><td>{label(l.label_i18n,lang)}</td><td>{enforcementPill({...l,kind:'limit',module_status:'released'},c)}</td><td>{val(l.base)}</td><td>{l.individual===undefined?'—':val(l.individual)}</td>
-    <td>{d.data.access.restricted?'—':val(l.effective)}</td><td className="v2-num">{l.used??'—'}</td><td>{l.counter?(l.policy==='soft'?c.soft:c.hard):'—'}</td></tr>)}</tbody></table></div>}</Card>;
+   <tbody>{d.data.limits.map(l=>{const off=!l.counter&&!l.required;return <tr key={l.key}><td>{label(l.label_i18n,lang)}</td><td>{enforcementPill({...l,kind:'limit',module_status:'released'},c)}</td><td>{off?'—':val(l.base)}</td><td>{l.individual===undefined?'—':val(l.individual)}</td>
+    <td>{d.data.access.restricted||off?'—':val(l.effective)}</td><td className="v2-num">{l.used??'—'}</td><td>{l.counter?(l.policy==='soft'?c.soft:c.hard):'—'}</td></tr>})}</tbody></table></div>}</Card>;
 }
 function Catalog({token,c,lang}){
  const r=useLoad('/admin/billing/catalog',token);

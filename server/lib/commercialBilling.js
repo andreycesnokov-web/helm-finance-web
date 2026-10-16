@@ -163,7 +163,7 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
   const access=computeBusinessAccess(b,new Date(),s),base=v.data.find(x=>String(x.id)===String(access.effective_plan_version_id));
   // Base (plan), individual (override), effective and real usage per limit, as the server enforces them.
   const limits=ci.data.map(i=>{const ov=(access.overrides_active||[]).find(x=>x.kind==='limit'&&x.key===i.key);
-   return {key:i.key,label_i18n:i.label_i18n,enforcement:i.enforcement,counter:i.counter,reset_period:i.reset_period,base:base?(base.limits?.[i.key]??null):null,
+   return {key:i.key,label_i18n:i.label_i18n,enforcement:i.enforcement,required:i.required,counter:i.counter,reset_period:i.reset_period,base:base?(base.limits?.[i.key]??null):null,
     individual:ov?ov.value:undefined,effective:access.restricted?null:(access.limits?.[i.key]??null),used:i.counter?(us.data?.[i.counter]??0):null,policy:base?.limit_policies?.[i.key]||'hard'}});
   res.json({policy:'commercial_v2',business:{id:b.id,name:b.name},account:s,access,usage:u.data,usage_now:us.data,limits,history:h.data});
  }));
