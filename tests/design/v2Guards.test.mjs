@@ -116,6 +116,9 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: "'/wallets/transfer'" },                         // POST /api/wallets/transfer (atomic RPC)
   { method: 'POST', path: "'/decisions/debts/' + encodeURIComponent" },    // POST /api/decisions/debts/:id/payment (simulation)
   { method: 'POST', path: "'/pay', token" },                               // POST /api/debts/:id/pay (idempotent)
+  // Platform administrators (2026-10-16, P0 Security): super_admin only.
+  { method: 'POST', path: "'/admin/administrators'" },                     // POST /api/admin/administrators
+  { method: 'POST', path: "'/admin/administrators/' + encodeURIComponent" }, // POST /api/admin/administrators/:id/revoke
 ]
 const ACTIONS = path.join(V2, 'lib', 'actions.js')
 // POSTs that ask an existing AI endpoint a question and change no data. Only in lib/ask.js.
