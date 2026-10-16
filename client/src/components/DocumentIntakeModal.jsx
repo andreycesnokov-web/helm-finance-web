@@ -10,6 +10,7 @@
 //   * anything not strongly matched is marked "needs review" rather than filed silently.
 import { useState, useCallback, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { useTranslation } from '../hooks/useTranslation'
 import { apiFetch } from '../lib/api'
 import { uploadDocument, getSignedUrl, MAX_FILE_BYTES } from '../lib/documents'
 import { Btn, StatusBadge } from '../shell/ui'
@@ -78,7 +79,126 @@ const INTAKE_T = {
     done: 'Selesai', cancel: 'Batal', retry: 'Coba lagi', uploadN: (n) => `Unggah dan analisis ${n} berkas`, upload: 'Unggah',
   },
 }
-const intakeT = () => { let l = 'en'; try { l = localStorage.getItem('hf_lang') || 'en' } catch { /* */ } return INTAKE_T[l] || INTAKE_T.en }
+const intakeT = (lang) => {
+  let l = lang
+  if (!l) {
+    try { l = localStorage.getItem('hf_lang') || 'ru' } catch { l = 'ru' }
+  }
+  return INTAKE_T[l] || INTAKE_T.ru || INTAKE_T.en
+}
+
+const DOC_TYPE_I18N = {
+  en: {
+    vendor_invoice: 'Supplier invoice',
+    customer_invoice: 'Sales invoice',
+    tax_invoice: 'Tax invoice (faktur pajak)',
+    bukti_potong: 'Withholding slip (bukti potong)',
+    tax_billing: 'Tax billing code',
+    filing_confirmation: 'Filing receipt',
+    bank_document: 'Bank document',
+    invoice: 'Invoice',
+    receipt: 'Receipt',
+    bank_statement: 'Bank statement',
+    contract: 'Contract',
+    payment_proof: 'Payment proof',
+    tax: 'Tax document',
+    other: 'Other document',
+    npwp: 'NPWP',
+    nib: 'NIB',
+    akta: 'Akta / Deed',
+    sk_kemenkumham: 'SK Kemenkumham approval',
+    oss_license: 'OSS / business licence',
+    pkp_certificate: 'PKP certificate',
+    kpp_registration: 'KPP registration',
+    payroll_document: 'Payroll document',
+    bpjs_document: 'BPJS document',
+    tax_report: 'Tax report',
+    tax_payment_proof: 'Tax payment proof',
+    unknown: 'Other / unknown',
+  },
+  ru: {
+    vendor_invoice: 'Счёт поставщика',
+    customer_invoice: 'Счёт клиенту',
+    tax_invoice: 'Налоговый счёт (faktur pajak)',
+    bukti_potong: 'Справка об удержании (bukti potong)',
+    tax_billing: 'Код налогового платежа',
+    filing_confirmation: 'Квитанция о подаче',
+    bank_document: 'Банковский документ',
+    invoice: 'Счёт (инвойс)',
+    receipt: 'Чек / квитанция',
+    bank_statement: 'Банковская выписка',
+    contract: 'Договор',
+    payment_proof: 'Подтверждение оплаты',
+    tax: 'Налоговый документ',
+    other: 'Другой документ',
+    npwp: 'NPWP',
+    nib: 'NIB',
+    akta: 'Акт учреждения (akta)',
+    sk_kemenkumham: 'SK Kemenkumham',
+    oss_license: 'Лицензия OSS',
+    pkp_certificate: 'Свидетельство PKP',
+    kpp_registration: 'Регистрация в KPP',
+    payroll_document: 'Зарплатный документ',
+    bpjs_document: 'Документ BPJS',
+    tax_report: 'Налоговая отчётность',
+    tax_payment_proof: 'Подтверждение уплаты налога',
+    unknown: 'Другой / неизвестно',
+  },
+  id: {
+    vendor_invoice: 'Faktur pemasok',
+    customer_invoice: 'Faktur pelanggan',
+    tax_invoice: 'Faktur pajak',
+    bukti_potong: 'Bukti potong',
+    tax_billing: 'Kode billing pajak',
+    filing_confirmation: 'Bukti pelaporan',
+    bank_document: 'Dokumen bank',
+    invoice: 'Faktur',
+    receipt: 'Kwitansi / struk',
+    bank_statement: 'Mutasi bank',
+    contract: 'Kontrak',
+    payment_proof: 'Bukti pembayaran',
+    tax: 'Dokumen pajak',
+    other: 'Dokumen lainnya',
+    npwp: 'NPWP',
+    nib: 'NIB',
+    akta: 'Akta pendirian (akta)',
+    sk_kemenkumham: 'SK Kemenkumham',
+    oss_license: 'Izin OSS',
+    pkp_certificate: 'Sertifikat PKP',
+    kpp_registration: 'Pendaftaran KPP',
+    payroll_document: 'Dokumen gaji',
+    bpjs_document: 'Dokumen BPJS',
+    tax_report: 'Laporan pajak',
+    tax_payment_proof: 'Bukti bayar pajak',
+    unknown: 'Lainnya / tidak dikenal',
+  },
+}
+
+const CONF_LABEL = {
+  en: { high: 'high', medium: 'medium', low: 'low', unknown: 'low' },
+  ru: { high: 'высокая', medium: 'средняя', low: 'низкая', unknown: 'низкая' },
+  id: { high: 'tinggi', medium: 'sedang', low: 'rendah', unknown: 'rendah' },
+}
+
+const docTypeLabel = (type, l = 'ru') => {
+  const dict = DOC_TYPE_I18N[l] || DOC_TYPE_I18N.ru || DOC_TYPE_I18N.en
+  return dict[type] || TYPE_LABEL[type] || type || ''
+}
+
+const detectedLabel = (detected, l = 'ru') => {
+  if (!detected) return ''
+  const type = detected.doc_type || detected.type
+  if (type) {
+    const localized = docTypeLabel(type, l)
+    if (localized) return localized
+  }
+  return detected.label || ''
+}
+
+const confLabel = (conf, l = 'ru') => {
+  const c = String(conf || '').toLowerCase()
+  return (CONF_LABEL[l] || CONF_LABEL.ru)[c] || conf || ''
+}
 
 const STATE_LABEL = (it, T = intakeT()) => {
   if (it.status === 'queued') return T.queued
@@ -107,6 +227,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
   // and links best-effort, so uploading evidence FOR a specific record is one real call —
   // no global upload the user then has to hunt down and attach by hand.
   const { token } = useAuth()
+  const { lang } = useTranslation()
   const [items, setItems] = useState([])       // { file, status, detected, error }
   const [busy, setBusy] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -116,11 +237,12 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
   const addFiles = useCallback(async (fileList) => {
     const files = [...fileList]
     if (!files.length) return
+    const curT = intakeT(lang)
     const next = files.map(f => ({
       file: f,
       status: f.size > MAX_FILE_BYTES ? 'too_large' : 'queued',
       detected: null,
-      error: f.size > MAX_FILE_BYTES ? intakeT().tooLargeErr : null,
+      error: f.size > MAX_FILE_BYTES ? curT.tooLargeErr : null,
     }))
     setItems(prev => [...prev, ...next])
     try {
@@ -133,7 +255,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         return hit && !it.detected ? { ...it, detected: hit } : it
       }))
     } catch { /* preview only — upload still works without it */ }
-  }, [token])
+  }, [token, lang])
 
   const upload = async () => {
     // One click, one pass. A second click while a request is in flight would issue a
@@ -159,8 +281,9 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
         // and the row is what the Evidence Inbox lists — so we confirm its id before
         // claiming anything. Without this a storage PUT that succeeded while the
         // database insert failed would have read as "uploaded".
+        const curT = intakeT(lang)
         const documentId = res?.document?.id || null
-        if (!documentId) throw Object.assign(new Error(intakeT().noRecord), { partial: true })
+        if (!documentId) throw Object.assign(new Error(curT.noRecord), { partial: true })
         setItems(prev => prev.map((x, idx) => idx === i
           ? { ...x, status: 'uploaded', stage: 'done', documentId, fileId: res?.document?.file_id || null,
               // Where it actually went. Routing is confirmed-only now, so a fresh
@@ -169,6 +292,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
           : x))
         onDocumentCreated?.({ id: documentId, file_name: it.file.name })
       } catch (e) {
+        const curT = intakeT(lang)
         // upload-init answers a SHA-256 match with 409 { duplicate, existing_document_id }.
         // That id is the real existing document — surfaced, never guessed.
         const dup = e.code === 'duplicate' || /duplicate/i.test(e.message || '')
@@ -177,8 +301,8 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
           ? { ...x, status: dup ? 'duplicate' : 'failed', existingId, stage: null,
               partial: !!e.partial,
               error: dup
-                ? intakeT().dupErr
-                : (e.message || intakeT().uploadFailed) }
+                ? curT.dupErr
+                : (e.message || curT.uploadFailed) }
           : x))
       }
     }
@@ -199,11 +323,11 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
   // A failed file keeps its place in the queue so "Try again" can resend exactly it.
   const retryable = failed.length > 0
   const done = uploaded.length
-  const T = intakeT()
+  const T = intakeT(lang)
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-card,#fff)', borderRadius: 16, padding: 20, width: 620, maxWidth: '100%', maxHeight: '88vh', overflow: 'auto' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'var(--surface-overlay, rgba(0,24,51,0.48))', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface-card,#fff)', color: 'var(--text-primary,#003366)', fontFamily: 'var(--font-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)', borderRadius: 16, padding: 20, width: 620, maxWidth: '100%', maxHeight: '88vh', overflow: 'auto' }}>
         <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{heading || T.title}</div>
         <div style={{ fontSize: 12.5, color: 'var(--text-secondary,#555)', marginBottom: 12, lineHeight: 1.5 }}>
           {T.intro}
@@ -216,7 +340,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
 
         {defaultType && (
           <div style={{ background: 'var(--warning-soft,#FBF1DF)', borderRadius: 10, padding: '9px 12px', fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
-            {T.filingAs} <b>{TYPE_LABEL[defaultType] || defaultType}</b> {T.filingHint}
+            {T.filingAs} <b>{docTypeLabel(defaultType, lang)}</b> {T.filingHint}
           </div>
         )}
 
@@ -227,7 +351,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
           onDrop={e => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
           onClick={() => inputRef.current?.click()}
           style={{
-            border: `2px dashed ${dragOver ? 'var(--brand-blue,#3399FF)' : 'var(--border-default,#ccc)'}`,
+            border: `2px dashed ${dragOver ? 'var(--brand-electric-blue,#3399FF)' : 'var(--border-default,#ccc)'}`,
             background: dragOver ? 'var(--info-soft,#EFF6FF)' : 'transparent',
             borderRadius: 12, padding: '22px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: 12,
           }}>
@@ -248,7 +372,7 @@ export default function DocumentIntakeModal({ business, onClose, onUploaded, lin
                   <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{it.file.name}</span>
                   <span style={{ fontSize: 11.5, color: 'var(--text-muted,#888)' }}>
                     {it.detected
-                      ? <>{T.prelim} <b>{it.detected.label}</b> · {it.detected.confidence} {T.confidence}</>
+                      ? <>{T.prelim} <b>{detectedLabel(it.detected, lang)}</b> · {confLabel(it.detected.confidence, lang)} {T.confidence}</>
                       : T.detecting}
                     {it.error ? ` · ${it.error}` : ''}
                   </span>
