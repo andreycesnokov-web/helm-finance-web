@@ -2,6 +2,9 @@ import pg from 'pg';
 import jwt from 'jsonwebtoken';
 import http from 'http';
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import {
   resolvePlatformAdmin,
   createRequireAdmin,
@@ -11,6 +14,10 @@ import {
   revokePlatformAdminRole,
   bootstrapSuperAdmin,
 } from '../server/lib/platformAdmin.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOT = path.join(__dirname, '..');
 
 const { Client } = pg;
 const PG_URL = 'postgresql://postgres:postgres@127.0.0.1:54422/cfo_hardening_test';
@@ -84,6 +91,22 @@ function createPgSupabase(pgClient) {
             resolve({ data: null, error: e });
           }
         },
+        async insert(payload) {
+          const rows = Array.isArray(payload) ? payload : [payload];
+          for (const row of rows) {
+            const keys = Object.keys(row);
+            const cols = keys.map(k => `"${k}"`).join(', ');
+            const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+            const values = Object.values(row);
+            const sql = `INSERT INTO public."${tableName}" (${cols}) VALUES (${placeholders})`;
+            try {
+              await pgClient.query(sql, values);
+            } catch (e) {
+              return { data: null, error: e };
+            }
+          }
+          return { data: rows, error: null };
+        },
         async upsert(payload, { onConflict = 'user_id' } = {}) {
           const keys = Object.keys(payload);
           const cols = keys.map(k => `"${k}"`).join(', ');
@@ -150,6 +173,29 @@ async function run() {
   console.log('═══════════════════════════════════════════════════════════════════════');
   console.log('   CFO AI — P1 ADVERSARIAL SECURITY & REGRESSION AUDIT SUITE');
   console.log('═══════════════════════════════════════════════════════════════════════\n');
+
+  // Preflight: Ensure cfo_hardening_test database is provisioned with snapshot + migration 072
+  const adminPg = new Client({ connectionString: 'postgresql://postgres:postgres@127.0.0.1:54422/postgres' });
+  await adminPg.connect();
+  const dbCheck = await adminPg.query("SELECT 1 FROM pg_database WHERE datname = 'cfo_hardening_test'");
+  if (dbCheck.rows.length === 0) {
+    console.log('Provisioning cfo_hardening_test database from production schema snapshot...');
+    await adminPg.query('CREATE DATABASE cfo_hardening_test');
+    const initPg = new Client({ connectionString: PG_URL });
+    await initPg.connect();
+    const snapshotSql = fs.readFileSync(path.join(ROOT, 'tests', 'fixtures', 'schema', 'prod_public_schema_2026-10-08.sql'), 'utf8');
+    await initPg.query(snapshotSql);
+    await initPg.end();
+  }
+  await adminPg.end();
+
+  // Apply migration 072
+  const initPg = new Client({ connectionString: PG_URL });
+  await initPg.connect();
+  await initPg.query('DROP FUNCTION IF EXISTS public.fn_bootstrap_platform_super_admin(INTEGER);');
+  const m72Sql = fs.readFileSync(path.join(ROOT, 'migrations', '072_platform_admins.sql'), 'utf8');
+  await initPg.query(m72Sql);
+  await initPg.end();
 
   const mainPg = new Client({ connectionString: PG_URL });
   await mainPg.connect();
@@ -226,7 +272,7 @@ async function run() {
     const exactlyOneWinner = activeCount === 1 && ((p1Fulfilled && !p2Fulfilled) || (!p1Fulfilled && p2Fulfilled));
     if (!exactlyOneWinner) {
       raceCleanSerialization = false;
-      console.error(`  Round ${round} FAILED: activeCount=${activeCount}, p1=${p1.status}, p2=${p2.status}`);
+      console.error(`  Round ${round} FAILED: activeCount=${activeCount}, p1=${p1.status} (${p1.reason?.message || p1.reason}), p2=${p2.status} (${p2.reason?.message || p2.reason})`);
       break;
     }
 
@@ -427,7 +473,7 @@ async function run() {
     const rStatusRevoked = await req('/api/admin/status', staffToken);
     report('6.5 /api/admin/status immediately returns is_admin: false on revoked admin (zero cache delay)', rStatusRevoked.data.is_admin === false && rStatusRevoked.data.role === null);
 
-    server.close();
+    await new Promise(r => server.close(r));
   }
 
   console.log('\n--- 7. DATABASE TRIGGER: DELETE/DEMOTE LAST SUPER_ADMIN GUARD ---');

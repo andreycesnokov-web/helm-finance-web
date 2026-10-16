@@ -370,7 +370,8 @@ async function bootstrapSuperAdmin(supabase, emailOrOptions, maybeOptions = {}) 
 
   const uid = Number(identity.user_id);
 
-  // Use PostgreSQL stored procedure with pg_advisory_xact_lock for strict cross-process atomicity
+  // Strict Fail-Closed Platform Admin Bootstrap using PostgreSQL stored procedure
+  // with pg_advisory_xact_lock for strict cross-process atomicity.
   if (typeof supabase.rpc === 'function') {
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('fn_bootstrap_platform_super_admin', {
       p_user_id: uid,
@@ -385,11 +386,11 @@ async function bootstrapSuperAdmin(supabase, emailOrOptions, maybeOptions = {}) 
       if (rpcErr.message?.includes('email_not_verified') || rpcErr.code === 'P0002') {
         throw new Error('email_not_verified');
       }
-      // If function is not defined (e.g. mock DB in unit tests without RPC), fall back below
-      if (rpcErr.code !== 'PGRST202' && rpcErr.code !== '42883') {
-        throw new Error(`Bootstrap failed: ${rpcErr.message}`);
-      }
-    } else if (rpcRes) {
+      // Fail closed on any other RPC error (no silent fallback to unlocked JS)
+      throw new Error(`bootstrap_rpc_failed: ${rpcErr.message || rpcErr.code}`);
+    }
+
+    if (rpcRes) {
       const auditRow = {
         business_id: null,
         actor_user_id: uid,
@@ -418,6 +419,12 @@ async function bootstrapSuperAdmin(supabase, emailOrOptions, maybeOptions = {}) 
         is_active: true,
       };
     }
+  }
+
+  // Pure mock DB fallback strictly guarded by allowMockFallback (unit test harness without Postgres only)
+  const isMockAllowed = emailOrOptions?.allowMockFallback === true || maybeOptions?.allowMockFallback === true;
+  if (!isMockAllowed) {
+    throw new Error('bootstrap_atomic_rpc_required: PostgreSQL stored procedure fn_bootstrap_platform_super_admin is mandatory for secure bootstrap');
   }
 
   // Fallback (for unit tests / mock supabase implementations without rpc)

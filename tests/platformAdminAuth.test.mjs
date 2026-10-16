@@ -199,6 +199,44 @@ function createMockSupabase(initialData = {}) {
       };
 
       return builder;
+    },
+    async rpc(fn, args = {}) {
+      if (fn === 'fn_bootstrap_platform_super_admin') {
+        const uid = Number(args.p_user_id);
+        const ident = (tables.user_email_identities || []).find(r => Number(r.user_id) === uid);
+        if (!ident || !ident.email_verified_at) {
+          return { data: null, error: { message: 'email_not_verified', code: 'P0002' } };
+        }
+        const existingSuper = (tables.platform_admins || []).find(r => r.role === 'super_admin' && r.is_active);
+        if (existingSuper) {
+          if (Number(existingSuper.user_id) === uid) {
+            return {
+              data: { status: 'already_super_admin', user_id: uid, role: 'super_admin', is_active: true },
+              error: null,
+            };
+          }
+          return { data: null, error: { message: 'super_admin_already_exists', code: 'P0003' } };
+        }
+        const existingIdx = (tables.platform_admins || []).findIndex(r => Number(r.user_id) === uid);
+        if (existingIdx >= 0) {
+          tables.platform_admins[existingIdx].role = 'super_admin';
+          tables.platform_admins[existingIdx].is_active = true;
+          tables.platform_admins[existingIdx].revoked_at = null;
+        } else {
+          tables.platform_admins.push({
+            user_id: uid,
+            role: 'super_admin',
+            is_active: true,
+            created_by: uid,
+            updated_at: new Date().toISOString(),
+          });
+        }
+        return {
+          data: { status: 'bootstrapped', user_id: uid, role: 'super_admin', is_active: true },
+          error: null,
+        };
+      }
+      return { data: null, error: { message: `Unsupported rpc ${fn}`, code: 'PGRST202' } };
     }
   };
 }
