@@ -51,12 +51,12 @@ async function run() {
         try {
           await supabase.from('audit_events').insert({
             business_id: null,
-            actor_user_id: auditData.actorUserId,
-            actor_role: auditData.actorRole,
-            entity_type: auditData.entityType,
-            entity_id: String(auditData.entityId),
+            actor_user_id: auditData.actorUserId || auditData.actor_user_id,
+            actor_role: auditData.actorRole || auditData.actor_role,
+            entity_type: auditData.entityType || auditData.entity_type,
+            entity_id: String(auditData.entityId || auditData.entity_id),
             action: auditData.action,
-            after_json: auditData.after,
+            after_json: auditData.after || auditData.after_json,
           })
           console.log('[bootstrap] Audit event recorded successfully.')
         } catch (e) {

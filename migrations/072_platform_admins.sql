@@ -85,5 +85,78 @@ END $$;
 
 ALTER TABLE public.platform_admins ENABLE ROW LEVEL SECURITY;
 
+-- Atomic Bootstrap function protected by transaction-level advisory lock
+CREATE OR REPLACE FUNCTION public.fn_bootstrap_platform_super_admin(
+  p_user_id BIGINT
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_verified_at TIMESTAMPTZ;
+  v_existing_super_id BIGINT;
+BEGIN
+  -- 1. Acquire transaction-level advisory lock specifically for platform_admin bootstrap.
+  -- Hashtext of 'cfo_platform_admin_bootstrap' ensures a deterministic 64-bit advisory lock key across all connections.
+  PERFORM pg_advisory_xact_lock(hashtext('cfo_platform_admin_bootstrap'));
+
+  -- 2. Verify that target user has a verified email identity
+  SELECT email_verified_at INTO v_verified_at
+  FROM public.user_email_identities
+  WHERE user_id = p_user_id AND email_verified_at IS NOT NULL
+  LIMIT 1;
+
+  IF v_verified_at IS NULL THEN
+    RAISE EXCEPTION 'email_not_verified' USING ERRCODE = 'P0002';
+  END IF;
+
+  -- 3. Check for ANY existing active super_admin
+  SELECT user_id INTO v_existing_super_id
+  FROM public.platform_admins
+  WHERE role = 'super_admin' AND is_active = true
+  LIMIT 1;
+
+  -- 4. Idempotency or Rejection
+  IF v_existing_super_id IS NOT NULL THEN
+    IF v_existing_super_id = p_user_id THEN
+      RETURN jsonb_build_object(
+        'status', 'already_super_admin',
+        'user_id', p_user_id,
+        'role', 'super_admin',
+        'is_active', true
+      );
+    ELSE
+      RAISE EXCEPTION 'super_admin_already_exists' USING ERRCODE = 'P0003';
+    END IF;
+  END IF;
+
+  -- 5. Insert new super_admin
+  INSERT INTO public.platform_admins (user_id, role, is_active, created_by, updated_at)
+  VALUES (p_user_id, 'super_admin', true, p_user_id, now())
+  ON CONFLICT (user_id) DO UPDATE SET
+    role = 'super_admin',
+    is_active = true,
+    revoked_at = NULL,
+    updated_at = now();
+
+  RETURN jsonb_build_object(
+    'status', 'bootstrapped',
+    'user_id', p_user_id,
+    'role', 'super_admin',
+    'is_active', true
+  );
+END $$;
+
+REVOKE ALL ON FUNCTION public.fn_bootstrap_platform_super_admin(BIGINT) FROM PUBLIC;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION public.fn_bootstrap_platform_super_admin(BIGINT) FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION public.fn_bootstrap_platform_super_admin(BIGINT) FROM authenticated;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    GRANT EXECUTE ON FUNCTION public.fn_bootstrap_platform_super_admin(BIGINT) TO service_role;
+  END IF;
+END $$;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;

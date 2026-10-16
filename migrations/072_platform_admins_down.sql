@@ -12,6 +12,7 @@ END $$;
 
 DROP TRIGGER IF EXISTS trg_platform_admins_guard ON public.platform_admins;
 DROP FUNCTION IF EXISTS public.fn_platform_admins_guard();
+DROP FUNCTION IF EXISTS public.fn_bootstrap_platform_super_admin(BIGINT);
 DROP TABLE IF EXISTS public.platform_admins CASCADE;
 
 NOTIFY pgrst, 'reload schema';

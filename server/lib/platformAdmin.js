@@ -12,8 +12,8 @@
  * Telegram IDs, ADMIN_TELEGRAM_IDS, and user-supplied role claims are NEVER trusted.
  */
 
+// Backward-compatibility: maintain exported adminCache and clearAdminCache as no-ops
 const adminCache = new Map();
-const CACHE_TTL_MS = 5000; // 5 seconds cache TTL
 
 function clearAdminCache(userId) {
   if (userId !== undefined && userId !== null) {
@@ -26,21 +26,21 @@ function clearAdminCache(userId) {
 /**
  * Resolves the platform admin record for a user.
  * Returns null if the user is not an active platform admin or not email-authenticated.
+ * 
+ * Strict Hardening (SEC-P1-01):
+ * - NO in-memory caching of positive or negative authorizations.
+ * - Always queries PostgreSQL directly on EVERY administrative request.
+ * - Fails closed (returns null) on DB disconnect, outage, timeout, or query errors.
  */
-async function resolvePlatformAdmin(supabase, userId, authChannel, { now = Date.now } = {}) {
+async function resolvePlatformAdmin(supabase, userId, authChannel) {
   const uid = Number(userId);
   if (!Number.isSafeInteger(uid) || uid === 0) return null;
 
   // Strict rule: Telegram or non-email sessions NEVER receive platform admin privileges
   if (authChannel !== 'email') return null;
 
-  const cached = adminCache.get(uid);
-  if (cached && now() - cached.cachedAt < CACHE_TTL_MS) {
-    return cached.record;
-  }
-
   try {
-    // 1. Check platform_admins table for an active role
+    // 1. Check platform_admins table for an active role directly in PostgreSQL
     const { data: adminRows, error: adminErr } = await supabase
       .from('platform_admins')
       .select('user_id, role, is_active, created_at, created_by, updated_at, revoked_at')
@@ -50,17 +50,15 @@ async function resolvePlatformAdmin(supabase, userId, authChannel, { now = Date.
       .limit(1);
 
     if (adminErr || !adminRows || adminRows.length === 0) {
-      adminCache.set(uid, { record: null, cachedAt: now() });
       return null;
     }
 
     const admin = adminRows[0];
     if (admin.role !== 'super_admin' && admin.role !== 'platform_admin') {
-      adminCache.set(uid, { record: null, cachedAt: now() });
       return null;
     }
 
-    // 2. Check that the user has a verified email identity
+    // 2. Check that the user has a verified email identity directly in PostgreSQL
     const { data: emailRows, error: emailErr } = await supabase
       .from('user_email_identities')
       .select('email, email_verified_at')
@@ -70,11 +68,10 @@ async function resolvePlatformAdmin(supabase, userId, authChannel, { now = Date.
 
     if (emailErr || !emailRows || emailRows.length === 0) {
       // Role exists in DB, but email is not verified -> reject
-      adminCache.set(uid, { record: null, cachedAt: now() });
       return null;
     }
 
-    const record = {
+    return {
       userId: uid,
       role: admin.role,
       email: emailRows[0].email,
@@ -82,10 +79,8 @@ async function resolvePlatformAdmin(supabase, userId, authChannel, { now = Date.
       createdAt: admin.created_at,
       createdBy: admin.created_by,
     };
-
-    adminCache.set(uid, { record, cachedAt: now() });
-    return record;
   } catch {
+    // Fail-closed on database outage / error
     return null;
   }
 }
@@ -375,7 +370,56 @@ async function bootstrapSuperAdmin(supabase, emailOrOptions, maybeOptions = {}) 
 
   const uid = Number(identity.user_id);
 
-  // Check if active super_admins exist
+  // Use PostgreSQL stored procedure with pg_advisory_xact_lock for strict cross-process atomicity
+  if (typeof supabase.rpc === 'function') {
+    const { data: rpcRes, error: rpcErr } = await supabase.rpc('fn_bootstrap_platform_super_admin', {
+      p_user_id: uid,
+    });
+
+    if (rpcErr) {
+      if (rpcErr.message?.includes('super_admin_already_exists') || rpcErr.code === 'P0003') {
+        const err = new Error('Active super_admin already exists');
+        err.code = 'super_admin_already_exists';
+        throw err;
+      }
+      if (rpcErr.message?.includes('email_not_verified') || rpcErr.code === 'P0002') {
+        throw new Error('email_not_verified');
+      }
+      // If function is not defined (e.g. mock DB in unit tests without RPC), fall back below
+      if (rpcErr.code !== 'PGRST202' && rpcErr.code !== '42883') {
+        throw new Error(`Bootstrap failed: ${rpcErr.message}`);
+      }
+    } else if (rpcRes) {
+      const auditRow = {
+        business_id: null,
+        actor_user_id: uid,
+        actor_role: 'system_bootstrap',
+        channel: 'cli',
+        entity_type: 'platform_admin',
+        entity_id: String(uid),
+        action: 'role_bootstrap',
+        after_json: rpcRes,
+      };
+
+      if (typeof recordAudit === 'function') {
+        await recordAudit(auditRow);
+      } else {
+        try {
+          await supabase.from('audit_events').insert(auditRow);
+        } catch { /* best effort */ }
+      }
+
+      return {
+        status: rpcRes.status,
+        userId: uid,
+        email: normalized,
+        role: 'super_admin',
+        is_active: true,
+      };
+    }
+  }
+
+  // Fallback (for unit tests / mock supabase implementations without rpc)
   const { data: activeSupers, error: asErr } = await supabase
     .from('platform_admins')
     .select('user_id, role, is_active')
