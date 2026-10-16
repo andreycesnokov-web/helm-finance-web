@@ -4,7 +4,32 @@
 // Legacy companies and the flag OFF keep their existing behaviour (no admission at all).
 const billing=require('./commercialBilling');
 function install(app,{auth,supabase,resolveBusiness,enabled=false,allowFixtures=false}){
- if(!enabled)return;
+ if(!enabled){
+  // Flag OFF: commercial_v2 companies are "billing paused" (server/lib/billingPaused.js) — the same route table
+  // decides; no quota is counted, plan features still apply, costly external features are refused.
+  const paused=require('./billingPaused');
+  app.use('/api',(req,res,next)=>{
+   const policy=billing.workflow(req);if(!policy)return next();
+   auth(req,res,async()=>{
+    // Legacy behaviour is untouched: anything that is not positively a commercial_v2 company goes on to the route.
+    let biz=null;try{biz=await resolveBusiness(req)}catch{return next()}
+    if(biz?.business?.billing_policy!=='commercial_v2')return next();
+    try{
+     const p=await paused.pausedAccess(supabase,biz.business);
+     for(const f of policy.features||[]){
+      if(paused.COSTLY.includes(f))return res.status(503).json({error:'billing_paused',feature:f,automatic_retry:false,
+       message:'Commercial billing is paused; AI, API and integrations are unavailable until it is back.'});
+      if(p.features[f]!==true)return res.status(402).json({error:'billing_feature_denied',feature:f,automatic_retry:false});
+     }
+     next();
+    }catch(e){
+     const code=String(e?.message||'').match(/billing_[a-z_]+/)?.[0];
+     res.status(e.status||(code?402:503)).json({error:code||'billing_unavailable',automatic_retry:false});
+    }
+   });
+  });
+  return;
+ }
  app.use('/api',(req,res,next)=>{
   const policy=billing.workflow(req);if(!policy)return next();
   auth(req,res,async()=>{

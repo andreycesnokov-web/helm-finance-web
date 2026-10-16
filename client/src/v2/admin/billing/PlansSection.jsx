@@ -53,7 +53,7 @@ function Editor({data,code,c,lang,cmd,reload,isNew}){
     <label>{c.currency}<input value={f.currency} maxLength={3} onChange={e=>set('currency',e.target.value.toUpperCase())}/></label>
     <label>{c.monthly}<input inputMode="decimal" value={f.price_input} onChange={e=>set('price_input',e.target.value)}/></label>
     <label>{c.annual}<input inputMode="decimal" value={f.annual_input} onChange={e=>set('annual_input',e.target.value)}/></label>
-    <label>{c.trialHours}<input type="number" min="1" max="2160" value={f.trial_hours} onChange={e=>set('trial_hours',e.target.value)}/></label>
+    <label>{c.trialHours}<input type="number" min="1" max="2160" value={f.trial_hours} onChange={e=>set('trial_hours',e.target.value)}/>{/^d+$/.test(f.trial_hours)&&<span className="v2-muted v2-small">{c.days(Math.round(Number(f.trial_hours)/2.4)/10)}</span>}</label>
     <label>{c.termsVersion}<input value={f.terms_version} onChange={e=>set('terms_version',e.target.value)}/></label>
     <label>{c.effective}<input type="datetime-local" value={localInput(f.effective_at)} onChange={e=>e.target.value&&set('effective_at',new Date(e.target.value).toISOString())}/></label>
    </fieldset>
@@ -75,7 +75,9 @@ function Editor({data,code,c,lang,cmd,reload,isNew}){
    <button className="v2-btn v2-btn-secondary" disabled={cmd.busy} onClick={doPreview}>{c.preview}</button>
   </div>
   {preview&&<div className="v2-bc-preview" aria-live="polite"><Pill tone={preview.valid?'good':'crit'}>{preview.valid?c.valid:c.invalid}</Pill>{preview.error&&<span className="v2-muted v2-small"> {preview.error}</span>}
-   {preview.valid&&<><p className="v2-small">{c.subscribers(preview.subscribers??0)}</p><h4>{c.changes}</h4>{!preview.changes?.length?<p className="v2-muted">{c.noChanges}</p>:
+   {!preview.valid&&preview.error==='billing_terms_incomplete'&&<p className="v2-small">{c.incomplete}</p>}
+   {preview.valid&&<><p className="v2-small">{c.subscribers(preview.subscribers??0)}</p>
+    {preview.affected?.length>0&&<details className="v2-small"><summary>{c.affected(preview.affected.length)}</summary><ul>{preview.affected.map(a=><li key={a.business_id}>{a.name||a.business_id}{a.business_code?` · ${a.business_code}`:''}</li>)}</ul></details>}<h4>{c.changes}</h4>{!preview.changes?.length?<p className="v2-muted">{c.noChanges}</p>:
     <div className="v2-tablewrap"><table className="v2-table"><tbody>{preview.changes.map(x=><tr key={x.field}><td>{x.field}</td><td>{val(x.before)}</td><td>→ {val(x.after)}</td></tr>)}</tbody></table></div>}
     <label className="v2-bc-item"><input type="checkbox" checked={f.visible} onChange={e=>setF(x=>({...x,visible:e.target.checked}))}/>{c.visible}</label>
     <label className="v2-bc-item"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)}/>{c.confirmPublish}</label>

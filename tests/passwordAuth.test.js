@@ -150,3 +150,18 @@ test('logout ends the server session of a password token; other channels end on 
     assert.deepEqual((await h.post('/auth/logout', {}, tg)).body, { ok: true, revoked: 0 });
   } finally { h.close(); }
 });
+
+test('client IP forwarding to Supabase Auth: only when enabled, and only the trusted (right-most) proxy IP', async () => {
+  for (const forward of [false, true]) {
+    const seen = [];
+    const app = express(); app.use(express.json());
+    install(app, { auth: (q, r, n) => n(), supabase: { rpc: async () => ({ data: null, error: { message: 'x' } }) }, enabled: true, gotrueUrl: 'http://gotrue.test',
+      apiKey: 'k', jwtSecret: SECRET, appBaseUrl: 'https://app.test', rateLimited: () => false, forwardClientIp: forward, log: { error() {}, warn() {} },
+      fetchImpl: async (url, init) => { seen.push(init.headers['sb-forwarded-for']); return { ok: false, status: 400, json: async () => ({ error_code: 'invalid_credentials' }) }; } });
+    const server = app.listen(0);
+    try {
+      await fetch(`http://127.0.0.1:${server.address().port}/api/auth/password/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '6.6.6.6, 203.0.113.9' }, body: JSON.stringify({ email: 'a@x.co', password: 'whatever-123' }) });
+      assert.deepEqual(seen, [forward ? '203.0.113.9' : undefined]);
+    } finally { server.close(); }
+  }
+});

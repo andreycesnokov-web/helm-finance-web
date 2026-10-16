@@ -10,15 +10,18 @@ const path = require('node:path');
 const { createProdSchemaDatabase } = require('./_prodSchemaDb');
 const { CHAIN, D4, seeder, startServer, openAdmin } = require('./_d4Harness');
 
-const MIGRATIONS = ['20261015033808_cfo_commercial_trial.sql', '20261017090000_billing_management_center.sql', '20261017120000_billing_enforcement.sql'];
+const MIGRATIONS = ['20261015033808_cfo_commercial_trial.sql', '20261017090000_billing_management_center.sql', '20261017120000_billing_enforcement.sql', '20261018090000_billing_plan_matrix.sql'];
 const ADMIN = 9100, A_OWNER = 1101, B_OWNER = 1102, MEMBER = 1103, C_OWNER = 1104, D_OWNER = 1105, E_OWNER = 1106;
 const F8 = { documents: true, ai: true, import: true, payroll: false, team: false, approvals: false, export: true, integrations: false };
 const L5 = { users: 2, companies: 1, documents: 3, ai: 100, imports: 10 };
+// Metered limits a test does not care about are explicitly unlimited (publication requires every key: 20261018090000).
+const EXPLICIT = { transactions: null, storage_mb: null, integrations: null, accounts: null, bank_rows: null, mcp: null, ai_accountant: null, ai_extraction: null };
+
 let db, admin, api, seed;
 const key = () => crypto.randomUUID();
 const past = () => new Date(Date.now() - 60000).toISOString();
 const terms = (name, over = {}) => ({ name_i18n: { en: name, ru: name, id: name }, description_i18n: { en: 'test', ru: 'тест', id: 'uji' }, price_minor: 1900,
-  currency: 'USD', features: F8, limits: L5, terms_version: 'test-only', effective_at: past(), approval_status: 'approved', ...over });
+  currency: 'USD', features: F8, limits: { ...EXPLICIT, ...L5 }, terms_version: 'test-only', effective_at: past(), approval_status: 'approved', ...over, limits: { ...EXPLICIT, ...(over.limits || L5) } });
 
 before(async () => {
   db = await createProdSchemaDatabase('billing_center', [...CHAIN, D4]);
@@ -103,7 +106,7 @@ test('plans: any code, legacy codes reserved, drafts never replace published ter
   assert.deepEqual(await counts(), before, 'preview wrote nothing');
   assert.equal(Number((await head('zero_activity')).catalog_version), Number(h.catalog_version));
   for (const [over, code] of [[{ limits: { ...L5, exports: 100 } }, 'billing_limit_without_counter'], [{ features: { ...F8, export: false } }, 'billing_feature_always_included'],
-    [{ features: { ...F8, teleport: true } }, 'billing_unknown_feature'], [{ limit_policies: { storage_mb: 'soft' } }, 'billing_invalid_terms']]) {
+    [{ features: { ...F8, teleport: true } }, 'billing_unknown_feature'], [{ limit_policies: { exports: 'soft' } }, 'billing_invalid_terms']]) {
     const bad = await api.call('/admin/billing/catalog/zero_activity/preview', { method: 'POST', user: ADMIN, body: { expected_version: Number(h.catalog_version), terms: { action: 'publish', ...terms('Z', over) } } });
     assert.equal(bad.body.valid, false); assert.equal(bad.body.error, code);
   }

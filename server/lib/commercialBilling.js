@@ -21,8 +21,20 @@ function errorResponse(res,error) {
  if(code)return res.status(known[code]).json({error:code,outcome:'rolled_back',automatic_retry:false});
  return res.status(503).json({error:'billing_outcome_unknown',outcome:'unknown',automatic_retry:false,recover_command:true});
 }
-function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,allowFixtures=false}) {
+function install(app,{auth,requireBusiness,requireAdmin,requireSuperAdmin,supabase,enabled=false,allowFixtures=false}) {
  const gate=(_req,res,next)=>enabled?next():res.status(404).json({error:'not_found'});
+ // Public pricing: the published commercial catalog only (no identity, no drafts, no fixtures, no internal notes).
+ // Same source as the in-app plan picker; cached for 30 s. Readable by any origin (no credentials).
+ let publicCache={at:0,body:null};
+ app.get('/api/public/plans',async(_req,res)=>{
+  res.set({'Cache-Control':'public, max-age=60','Access-Control-Allow-Origin':'*'});
+  try{
+   if(!publicCache.body||Date.now()-publicCache.at>30000){const{data,error}=await supabase.rpc('billing_public_catalog');if(error)throw error;publicCache={at:Date.now(),body:data}}
+   res.json(publicCache.body);
+  }catch{res.status(503).json({error:'catalog_unavailable'})}
+ });
+ // Changing or publishing plans is reserved to a Platform SUPER admin (checked here, on the server).
+ const catalogWriter=requireSuperAdmin||((_req,res)=>res.status(403).json({error:'super_admin_required'}));
  const respond=fn=>async(req,res)=>{
   res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});
   try{const biz=await requireBusiness(req,res);if(biz)await fn(req,res,biz);}catch(e){errorResponse(res,e)}
@@ -69,10 +81,10 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
   // Rows without versions are legacy plan codes (free/business/founder/enterprise): not part of the commercial catalog.
   const versioned=new Set(v.data.map(x=>x.plan));res.json({plans:p.data.filter(x=>versioned.has(x.plan)),versions:v.data,catalog_items:c.data,allow_fixtures:allowFixtures});
  }));
- app.post('/api/admin/billing/catalog/:code',auth,gate,requireAdmin,admin(async(req,res)=>{
+ app.post('/api/admin/billing/catalog/:code',auth,gate,catalogWriter,admin(async(req,res)=>{
   const b=req.body||{};if(!UUID.test(b.request_key||'')||!Number.isSafeInteger(b.expected_version)||b.expected_version<0)throw Error('billing_invalid_command');
   const{data,error}=await supabase.rpc('rpc_billing_catalog_command',{p_actor:req.user.userId,p_key:b.request_key,p_code:req.params.code,p_expected:b.expected_version,p_payload:b.terms});
-  if(error)throw error;res.json(data);
+  if(error)throw error;publicCache={at:0,body:null};res.json(data); // the pricing page shows a new publication at once
  }));
  // Billing Management Center (Platform admin): read models + preview. Every write still goes through the
  // CAS/idempotent/audited RPCs above. Customer balances, transactions and documents are never read here.
@@ -92,7 +104,23 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
  app.post('/api/admin/billing/catalog/:code/preview',auth,gate,requireAdmin,admin(async(req,res)=>{
   const b=req.body||{};if(!Number.isSafeInteger(b.expected_version)||b.expected_version<0||!b.terms||typeof b.terms!=='object'||Array.isArray(b.terms))throw Error('billing_invalid_command');
   const{data,error}=await supabase.rpc('rpc_billing_catalog_command',{p_actor:req.user.userId,p_key:crypto.randomUUID(),p_code:req.params.code,p_expected:b.expected_version,p_payload:{...b.terms,dry_run:true}});
-  if(error)throw error;res.json({...data,changes:['draft','publish'].includes(data.action)?diffTerms(data.current,b.terms):[]});
+  if(error)throw error;
+  // Companies whose subscription is (or is scheduled to be) on a version of this plan. They keep their pinned version;
+  // the list shows who would be affected by an explicit move to the new version.
+  let affected=null;
+  try{
+   const{data:vs,error:ve}=await supabase.from('plan_versions').select('id').eq('plan',req.params.code);if(ve)throw ve;
+   const ids=(vs||[]).map(v=>v.id),seen=new Map();
+   if(ids.length)for(const col of ['selected_plan_version_id','scheduled_plan_version_id']){
+    const{data:acc,error:ae}=await supabase.from('billing_accounts').select('business_id,trial_ends_at').in(col,ids).limit(200);if(ae)throw ae;
+    for(const x of acc||[])seen.set(x.business_id,x);
+   }
+   const list=[...seen.values()].slice(0,200);
+   const{data:bs}=list.length?await supabase.from('businesses').select('id,name,business_code').in('id',list.map(x=>x.business_id)):{data:[]};
+   const byId=new Map((bs||[]).map(x=>[x.id,x]));
+   affected=list.map(x=>({business_id:x.business_id,name:byId.get(x.business_id)?.name||null,business_code:byId.get(x.business_id)?.business_code||null,trial_ends_at:x.trial_ends_at}));
+  }catch{affected=null}   // the list is informational; it never blocks a preview
+  res.json({...data,affected,changes:['draft','publish'].includes(data.action)?diffTerms(data.current,b.terms):[]});
  }));
  async function adminRows(){
   const{data,error}=await supabase.rpc('rpc_billing_admin_rows');if(error)throw error;
@@ -251,11 +279,18 @@ async function mcpGate(supabase,actor,biz,name,allowFixtures=false){
  const needs=billingRoutes.MCP_TOOLS[name];
  if(!needs)return deny('billing_feature_denied','This tool is not part of the company plan.');
  for(const f of ['api',...needs])if(a.features[f]!==true)return deny('billing_feature_denied',`The company plan does not include ${f==='api'?'API / MCP access':f}.`);
- const resource=billingRoutes.MCP_METERED[name];if(!resource)return {settle:async()=>{}};
- const r={key:crypto.randomUUID(),resource,units:1};
- const{data,error}=await quota(supabase,actor,biz,r,'reserve');
- if(error){const code=String(error.message||'').match(/billing_[a-z_]+/)?.[0];if(code)return deny(code,'The company AI quota does not allow this request.');throw error}
- if(!data)throw Error('billing_unavailable');
- return {settle:async ok=>{try{await quota(supabase,actor,biz,r,ok?'commit':'release',ok?{}:{p_reason:'MCP tool failed'})}catch{console.error('[billing] mcp quota completion requires reconciliation')}}};
+ // Every call counts one `mcp` request; AI tools also count their AI quota. All or nothing.
+ const held=[];
+ for(const resource of ['mcp',billingRoutes.MCP_METERED[name]].filter(Boolean)){
+  const r={key:crypto.randomUUID(),resource,units:1};
+  const{data,error}=await quota(supabase,actor,biz,r,'reserve');
+  if(error||!data){
+   for(const h of held)try{await quota(supabase,actor,biz,h,'release',{p_reason:'MCP sibling quota refused'})}catch{/* reconciled later */}
+   const code=String(error?.message||'').match(/billing_[a-z_]+/)?.[0];if(code)return deny(code,resource==='mcp'?'The company MCP / API quota does not allow this request.':'The company AI quota does not allow this request.');
+   throw error||Error('billing_unavailable');
+  }
+  held.push(r);
+ }
+ return {settle:async ok=>{for(const r of held)try{await quota(supabase,actor,biz,r,ok?'commit':'release',ok?{}:{p_reason:'MCP tool failed'})}catch{console.error('[billing] mcp quota completion requires reconciliation')}}};
 }
 module.exports={input,errorResponse,install,workflow,snapshot,admit,mcpGate,deriveKey};

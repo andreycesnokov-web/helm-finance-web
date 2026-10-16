@@ -134,6 +134,7 @@ async function startServer(connectionString, { jwtSecret = 'd4-anchor-test-secre
   }
   return {
     call,
+    base: BASE,
     async stop() {
       if (server?.listening) { server.closeAllConnections(); await new Promise(r => server.close(r)); }
       try { await supa.pool.end(); } catch { /* */ }

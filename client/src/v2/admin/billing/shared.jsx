@@ -18,7 +18,7 @@ export function useCommand(token,c){
  const run=async(path,body,after)=>{
   if(lock.current)return null;lock.current=true;setBusy(true);setError('');
   try{const r=await billingCommand(path,token,body);setUnknown(null);await after?.(r);return r}
-  catch(e){const code=e?.data?.error||e?.message||'';if(e?.data?.outcome==='unknown'){setUnknown({path,body});setError(c.unknown)}else{setUnknown(null);setError(c.error+(code?' · '+code:''))}return null}
+  catch(e){const code=e?.data?.error||e?.message||'';if(e?.data?.outcome==='unknown'){setUnknown({path,body});setError(c.unknown)}else{setUnknown(null);setError(code==='super_admin_required'&&c.superOnly?c.superOnly:code==='billing_terms_incomplete'&&c.incomplete?c.incomplete:c.error+(code?' · '+code:''))}return null}
   finally{lock.current=false;setBusy(false)}
  };
  const retry=after=>unknown&&run(unknown.path,unknown.body,after);

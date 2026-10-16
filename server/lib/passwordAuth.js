@@ -41,10 +41,13 @@ function tokenClaims(token) {
 
 function createGoTrue({ url, apiKey, fetchImpl = fetch }) {
   const base = String(url || '').replace(/\/$/, '') + '/auth/v1';
-  return async function call(path, { method = 'POST', body, token, query } = {}) {
+  return async function call(path, { method = 'POST', body, token, query, clientIp } = {}) {
     const q = query ? '?' + new URLSearchParams(query).toString() : '';
     const headers = { apikey: apiKey, 'content-type': 'application/json' };
     if (token) headers.authorization = 'Bearer ' + token;
+    // Supabase Auth rate-limits per IP; every call comes from this server. With forwarding enabled (secret API key
+    // + project setting / GOTRUE_SECURITY_SB_FORWARDED_FOR_ENABLED), Auth limits the end user's IP instead.
+    if (clientIp) headers['sb-forwarded-for'] = clientIp;
     const r = await fetchImpl(base + path + q, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const data = await r.json().catch(() => null);
     const code = data?.error_code || data?.code || data?.error || null;
@@ -52,10 +55,12 @@ function createGoTrue({ url, apiKey, fetchImpl = fetch }) {
   };
 }
 
-function install(app, { auth, supabase, enabled, gotrueUrl, apiKey, jwtSecret, appBaseUrl, rateLimited, log = console, ttlSeconds = DEFAULT_TTL_S, fetchImpl }) {
+function install(app, { auth, supabase, enabled, gotrueUrl, apiKey, jwtSecret, appBaseUrl, rateLimited, log = console, ttlSeconds = DEFAULT_TTL_S, fetchImpl, forwardClientIp = false }) {
   if (!enabled) return { enabled: false };
   if (!gotrueUrl || !apiKey || !jwtSecret || !appBaseUrl) throw new Error('password_auth_misconfigured: SUPABASE_URL, SUPABASE_SECRET_KEY, JWT_SECRET and APP_BASE_URL are required');
-  const gotrue = createGoTrue({ url: gotrueUrl, apiKey, fetchImpl });
+  const gotrue0 = createGoTrue({ url: gotrueUrl, apiKey, fetchImpl });
+  // Same calls, with the trusted client IP forwarded when enabled (AUTH_FORWARD_CLIENT_IP=true).
+  const gotrue = (path, opts = {}) => gotrue0(path, { ...opts, clientIp: forwardClientIp ? opts.clientIp : undefined });
   const redirect = (path) => appBaseUrl.replace(/\/$/, '') + path;
   const email = (v) => String(v || '').trim().toLowerCase();
   // The right-most X-Forwarded-For entry is the one the platform proxy appended; earlier entries are client-supplied.
@@ -86,7 +91,7 @@ function install(app, { auth, supabase, enabled, gotrueUrl, apiKey, jwtSecret, a
       const problem = passwordProblem(req.body?.password, em);
       if (problem) return res.status(400).json({ error: problem });
       if (limited('register', req, em)) return res.status(429).json({ error: 'rate_limited' });
-      const r = await gotrue('/signup', { body: { email: em, password: req.body.password }, query: { redirect_to: redirect('/auth/confirmed') } });
+      const r = await gotrue('/signup', { body: { email: em, password: req.body.password }, query: { redirect_to: redirect('/auth/confirmed') }, clientIp: ip(req) });
       if (r.code === 'weak_password') return res.status(400).json({ error: 'password_weak' });
       // An existing account gets the same answer (GoTrue returns an obfuscated user and sends nothing new), and so
       // does a repeat inside GoTrue's per-address email interval: the first email is on its way.
@@ -106,7 +111,7 @@ function install(app, { auth, supabase, enabled, gotrueUrl, apiKey, jwtSecret, a
         if (!EMAIL_RE.test(em)) return res.status(400).json({ error: 'invalid_email' });
         if (limited(kind, req, em)) return res.status(429).json({ error: 'rate_limited' });
         const target = kind === 'forgot' ? '/auth/reset' : '/auth/confirmed';
-        const r = await gotrue(path, { body: { email: em, ...(extra || {}) }, query: { redirect_to: redirect(target) } });
+        const r = await gotrue(path, { body: { email: em, ...(extra || {}) }, query: { redirect_to: redirect(target) }, clientIp: ip(req) });
         if (r.code !== 'over_email_send_rate_limit' && (r.status === 429 || /rate_limit/.test(r.code || ''))) return res.status(429).json({ error: 'rate_limited' });
         if (!r.ok && r.status >= 500) { log.error(`[password-auth] ${kind} failed: ${r.status} ${r.code || ''}`); return unavailable(res); }
         return res.json({ ok: true });   // unknown, confirmed or unconfirmed: the same answer
@@ -120,7 +125,7 @@ function install(app, { auth, supabase, enabled, gotrueUrl, apiKey, jwtSecret, a
       const em = email(req.body?.email);
       if (!EMAIL_RE.test(em) || typeof req.body?.password !== 'string' || !req.body.password) return res.status(400).json({ error: 'invalid_input' });
       if (lockedOut(em) || limited('login', req)) return res.status(429).json({ error: 'rate_limited' });
-      const r = await gotrue('/token', { body: { email: em, password: req.body.password }, query: { grant_type: 'password' } });
+      const r = await gotrue('/token', { body: { email: em, password: req.body.password }, query: { grant_type: 'password' }, clientIp: ip(req) });
       if (!r.ok) {
         if (r.code === 'email_not_confirmed') return res.status(403).json({ error: 'email_not_confirmed' });
         if (r.status === 429 || /rate_limit/.test(r.code || '')) return res.status(429).json({ error: 'rate_limited' });

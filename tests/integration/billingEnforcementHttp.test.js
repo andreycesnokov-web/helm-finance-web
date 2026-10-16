@@ -12,7 +12,7 @@ const { createProdSchemaDatabase } = require('./_prodSchemaDb');
 const { createRealPgSupabase } = require('./_realPgSupabase');
 const { CHAIN, D4, seeder, startServer, openAdmin } = require('./_d4Harness');
 
-const MIGRATIONS = ['20261015033808_cfo_commercial_trial.sql', '20261017090000_billing_management_center.sql', '20261017120000_billing_enforcement.sql'];
+const MIGRATIONS = ['20261015033808_cfo_commercial_trial.sql', '20261017090000_billing_management_center.sql', '20261017120000_billing_enforcement.sql', '20261018090000_billing_plan_matrix.sql'];
 const ADMIN = 9200, OA = 1301, OB = 1302, OC = 1303, OD = 1304, OL = 1305;
 const ALL_OFF = { documents: true, ai: false, import: true, payroll: false, team: false, approvals: false, export: true, integrations: false,
   pulse: true, radar: false, transactions: true, accounts: true, bills: false, cfo_ai: false, ai_accountant: false, tax_compliance: false, accounting_export: false, api: false };
@@ -45,8 +45,10 @@ before(async () => {
 after(async () => { await api?.stop(); try { await supa?.pool?.end() } catch { /* */ } await admin?.end(); await db?.drop?.(); });
 const skip = () => !db;
 
+// Metered limits a test does not care about are explicitly unlimited (publication requires every key: 20261018090000).
+const EXPLICIT = { transactions: null, storage_mb: null, integrations: null, accounts: null, bank_rows: null, mcp: null, ai_accountant: null, ai_extraction: null };
 const terms = (name, features, limits, extra = {}) => ({ action: 'publish', confirm_publish: true, publish: true, name_i18n: { en: name, ru: name, id: name },
-  description_i18n: { en: 't', ru: 't', id: 't' }, price_minor: 1000, currency: 'USD', features, limits, terms_version: 'test-only',
+  description_i18n: { en: 't', ru: 't', id: 't' }, price_minor: 1000, currency: 'USD', features, limits: { ...EXPLICIT, ...limits }, terms_version: 'test-only',
   effective_at: new Date(Date.now() - 60000).toISOString(), approval_status: 'approved', ...extra });
 async function publish(code, t) {
   const cat = (await api.call('/admin/billing/catalog', { user: ADMIN })).body, head = cat.plans.find(p => p.plan === code);
@@ -103,12 +105,17 @@ test('3. direct API bypass attempts are refused (aliases, sub-routes, MCP)', asy
   assert.equal((await billing.mcpGate(supa, OA, bizA, 'get_company_context')).error, 'billing_feature_denied');
   assert.equal((await billing.mcpGate(supa, OA, bizA, 'list_documents')).error, 'billing_feature_denied');
   assert.equal((await billing.mcpGate(supa, OB, bizB, 'unknown_tool')).error, 'billing_feature_denied');
-  const g = await billing.mcpGate(supa, OB, bizB, 'list_documents'); assert.equal(g.error, undefined);
-  const before = (await usage(B)).ai || 0;
+  const mcpBefore = (await usage(B)).mcp || 0;
+  const g = await billing.mcpGate(supa, OB, bizB, 'list_documents'); assert.equal(g.error, undefined); await g.settle(true);
+  assert.equal((await usage(B)).mcp, mcpBefore + 1, 'every MCP tool call counts one mcp request');
+  const before = { x: (await usage(B)).ai_extraction || 0, m: (await usage(B)).mcp || 0, ai: (await usage(B)).ai || 0 };
   const failed = await billing.mcpGate(supa, OB, bizB, 'analyze_invoice'); await failed.settle(false);
-  assert.equal((await usage(B)).ai || 0, before, 'a failed AI tool call is not counted');
+  assert.equal((await usage(B)).ai_extraction || 0, before.x, 'a failed AI tool call is not counted');
+  assert.equal((await usage(B)).mcp || 0, before.m, 'a failed MCP call is not counted');
   const okCall = await billing.mcpGate(supa, OB, bizB, 'analyze_invoice'); await okCall.settle(true);
-  assert.equal((await usage(B)).ai, before + 1);
+  assert.equal((await usage(B)).ai_extraction, before.x + 1, 'AI reading counts on the ai_extraction quota');
+  assert.equal((await usage(B)).mcp, before.m + 1);
+  assert.equal((await usage(B)).ai || 0, before.ai, 'the AI Assistant quota is untouched by document reading');
 });
 
 test('9, 11, 12. transactions: hard limit, failed request returns the quota, retry with the same key is free, races', async (t) => {

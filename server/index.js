@@ -243,6 +243,7 @@ function magicLinkGate(req, res, next) {
 require('./lib/passwordAuth').install(app, {
   auth, supabase, enabled: PASSWORD_AUTH_ENABLED && EMAIL_AUTH_ENABLED, gotrueUrl: process.env.SUPABASE_URL,
   apiKey: process.env.SUPABASE_SECRET_KEY, jwtSecret: JWT_SECRET, appBaseUrl: APP_BASE_URL, rateLimited,
+  forwardClientIp: process.env.AUTH_FORWARD_CLIENT_IP === 'true',
 });
 
 // Resolve the internal user for an email, or create a new email-first user with a
@@ -9636,6 +9637,13 @@ async function getBusinessAccess(userId, businessId) {
       max_users:access.limits.users,max_businesses:access.limits.companies,max_ai_questions_per_month:access.limits.ai}};
     }
   }
+  // Commercial billing OFF: a commercial_v2 company is "billing paused" — never the legacy Free limits.
+  if (!COMMERCIAL_BILLING_ENABLED && business.billing_policy === 'commercial_v2') {
+    const p = await require('./lib/billingPaused').pausedAccess(supabase, business);
+    const a = computeBusinessAccess(business);
+    return { business, membership: { role: m[0].role, status: m[0].status },
+      access: { ...a, policy: 'commercial_paused', effective_plan: p.plan, restricted: false, features: p.features }, limits: p.limits };
+  }
   const access = computeBusinessAccess(business);
   const { data: limits } = await supabase.from('plan_limits').select('*').eq('plan', access.effective_plan).single();
   return { business, membership: { role: m[0].role, status: m[0].status }, access, limits: limits || {} };
@@ -9675,7 +9683,7 @@ async function getCurrentAccess(userId, businessId = null) {
     new Date(a.businesses?.created_at || 0) - new Date(b.businesses?.created_at || 0));
   const m = memberships[0];
   const business = m.businesses;
-  if(COMMERCIAL_BILLING_ENABLED&&business.billing_policy==='commercial_v2'){
+  if(business.billing_policy==='commercial_v2'){ // commercial terms, or "billing paused" when the flag is OFF
    const r=await getBusinessAccess(userId,business.id);
    return {business:r.business,membership:r.membership,accessState:{effectivePlan:r.access.effective_plan,isTrialActive:r.access.trial_status_effective==='active',daysLeft:r.access.daysLeft},limits:r.limits};
   }
@@ -15953,7 +15961,7 @@ app.delete('/api/documents/:id/links/:linkId', auth, async (req, res) => {
 
 // Personal Workspaces, Relationships, FX quotes, Wallet transfers & Funding Bridge.
 // Mounted under /api; shares auth, the service-role client and access helpers.
-require('./lib/commercialBilling').install(app,{auth,requireBusiness,requireAdmin,supabase,enabled:COMMERCIAL_BILLING_ENABLED,allowFixtures:COMMERCIAL_BILLING_FIXTURES});
+require('./lib/commercialBilling').install(app,{auth,requireBusiness,requireAdmin,requireSuperAdmin,supabase,enabled:COMMERCIAL_BILLING_ENABLED,allowFixtures:COMMERCIAL_BILLING_FIXTURES});
 app.use('/api', personalFundingRouter({ supabase, auth, getBusinessAccess, resolveUserDisplayName, TX }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15981,8 +15989,11 @@ require('./mcp').attachMcp(app, {
     commercialToolGate:async(name,args,actor)=>{
       // External API: reads and writes follow the company plan ('api' + the tool's feature; AI tools metered).
       // Own data stays readable and exportable in the app regardless of the plan.
-      if(!COMMERCIAL_BILLING_ENABLED)return null;
-      const biz=await _resolveActiveBusiness(supabase,uid=>findDefaultBusiness(uid),{user:{userId:actor},headers:{},query:{},body:args.company_id?{business_id:args.company_id}:{}});
+      const resolve=()=>_resolveActiveBusiness(supabase,uid=>findDefaultBusiness(uid),{user:{userId:actor},headers:{},query:{},body:args.company_id?{business_id:args.company_id}:{}});
+      // Billing paused (flag OFF): MCP/API costs cannot run unmetered for a commercial company. Legacy: unchanged.
+      if(!COMMERCIAL_BILLING_ENABLED){let paused=null;try{paused=await resolve()}catch{return null}return paused?.business?.billing_policy==='commercial_v2'
+        ?{error:'billing_paused',message:'Commercial billing is paused: MCP / API access is unavailable until it is back. Your data stays available in CFO AI.'}:null;}
+      const biz=await resolve();
       return require('./lib/commercialBilling').mcpGate(supabase,actor,biz,name,COMMERCIAL_BILLING_FIXTURES);
     },
     // identity → company. Read-only: a lookup can never bootstrap a workspace

@@ -19,11 +19,14 @@ const READ = 'GET,HEAD,OPTIONS';
 // Units for metered requests (bounded; the quota RPC rejects anything outside 1..1000 via admission).
 const rowsOf = (req) => { const b = req.body; const rows = Array.isArray(b) ? b : Array.isArray(b?.transactions) ? b.transactions : []; return Math.max(1, rows.length) };
 const mib = (req) => Math.max(1, Math.ceil(Number(req.body?.file_size || 0) / 1048576));
+// Statement rows submitted for review (one large file cannot bypass the plan: rows are counted, not files).
+const statementRows = (req) => Math.max(1, Array.isArray(req.body?.rows) ? req.body.rows.length : 1);
 
 const ROUTES = [
   // ── Always open: identity, account, onboarding, invitations, company creation, billing, admin, recovery ──
   rule('*', '/(?:auth|me|account|support|onboarding|invite|invites|businesses|business-creation|billing|admin|mcp-oauth|bot)(?:/.*)?', OPEN),
   rule('*', '/personal(?:/.*)?', OPEN),                       // Personal workspace has no commercial plan
+  rule(READ, '/public/plans', OPEN),                           // published catalog for the pricing page (no identity)
   rule('*', '/financial-operations(?:/.*)?', OPEN),           // recovery receipts of submitted operations
   rule('*', '/telegram(?:/.*)?', { channel: 'telegram' }),
   rule('POST', '/debts/from-telegram', { channel: 'telegram' }),
@@ -46,7 +49,8 @@ const ROUTES = [
   // ── Accounts ──
   rule('POST', '/wallets/transfer', meter(['accounts'], 'transactions')),
   rule('POST', `/wallets/${ID}/adjust-balance`, meter(['accounts'], 'transactions')),
-  rule('POST', '/wallets(?:/backfill)?', need('accounts')),
+  rule('POST', '/wallets', meter(['accounts'], 'accounts')),   // one active financial account
+  rule('POST', '/wallets/backfill', need('accounts')),
   rule('PUT,DELETE', `/wallets/${ID}`, need('accounts')),
   // ── Invoices / bills (approvals need both) ──
   rule('POST', `/debts/${ID}/pay`, meter(['bills'], 'transactions')),
@@ -62,13 +66,14 @@ const ROUTES = [
   rule('POST', `/bank-imports?/(?:${ID}/)?(?:parse|upload|extract)`, meter(['import'], 'imports')),
   rule('POST', `/bank-imports/${ID}/confirm`, meter(['import'], 'transactions', { units: 'import_rows' })),
   rule('POST', `/bank-import/batches/${ID}/confirm`, meter(['import'], 'transactions', { units: 'import_rows' })),
+  rule('POST', '/bank-import/batches', meter(['import'], 'bank_rows', { units: statementRows })),
   rule('POST,PATCH', '/bank-imports?/.+', need('import')),
   // ── Documents (upload counts documents and storage) ──
   rule('POST', '/documents/upload-init', meter(['documents'], 'documents', { phase: 'init', storage: mib })),
   rule('POST', '/documents/upload-complete', meter(['documents'], 'documents', { phase: 'complete' })),
   // Only routes that always call an LLM are metered as AI. extract may use Vision OCR (flag-gated, only for
   // documents without text) — gated by feature, not metered; see the enforcement report.
-  rule('POST', `/documents/${ID}/identify`, meter(['documents', 'ai'], 'ai', { requireKey: true })),
+  rule('POST', `/documents/${ID}/identify`, meter(['documents', 'ai'], 'ai_extraction', { requireKey: true })),
   rule('POST', `/documents/${ID}/tax-obligation`, need('documents', 'tax_compliance')),
   rule('POST,PATCH,DELETE', '/documents(?:/.*)?', need('documents')),
   rule('POST', '/upload-link/session', need('documents')),
@@ -78,13 +83,14 @@ const ROUTES = [
   // ── Team (other member management is core) ──
   rule('POST', '/team/invite', meter(['team'], 'users', { units: (req) => Number(req.body?.max_uses ?? 1) })),
   rule('*', '/team(?:/.*)?', CORE),
-  // ── CFO AI / AI Accountant (each call is one AI request; replay with the same key is free) ──
+  // ── AI: the AI Assistant (CFO AI) quota is `ai`; AI Accountant and AI document reading have their own quotas.
+  //    Each call is one request; a replay with the same key is free. ──
   rule('POST', '/ai-cfo/ask', meter(['cfo_ai', 'ai'], 'ai', { requireKey: true })),
-  rule('POST', '/accountant/ask', meter(['ai_accountant', 'ai'], 'ai', { requireKey: true })),
-  rule('POST', '/accountant/profile/from-documents', meter(['ai_accountant', 'ai'], 'ai')),
+  rule('POST', '/accountant/ask', meter(['ai_accountant', 'ai'], 'ai_accountant', { requireKey: true })),
+  rule('POST', '/accountant/profile/from-documents', meter(['ai_accountant', 'ai'], 'ai_accountant')),
   rule('POST', '/ai-accountant/documents/(?:classify|[^/]+/reclassify)', need('ai_accountant')), // rule-based intake, no LLM
   rule('PATCH', `/ai-accountant/documents/${ID}/classification`, need('ai_accountant')),
-  rule('POST', '/parse', meter(['ai'], 'ai')),
+  rule('POST', '/parse', meter(['ai'], 'ai_extraction')),
   // ── Tax & compliance: calculations, automation, verification; reporting preparation = accounting export ──
   rule('POST', '/tax-split/(?:suggest|review)', need('tax_compliance')),
   rule('POST', '/accountant/(?:calendar/remind|telegram/test|profile/verify)', need('tax_compliance')),
@@ -113,6 +119,7 @@ const MCP_TOOLS = {
   get_company_context: [], get_financial_summary: [], list_documents: ['documents'], get_missing_documents: ['documents'],
   analyze_invoice: ['ai'], submit_invoice_draft: ['bills'], upload_document: ['documents'], link_document: ['documents'],
 };
-const MCP_METERED = { analyze_invoice: 'ai' };
+// Every MCP tool call counts one `mcp` request; tools that run AI also count their AI quota.
+const MCP_METERED = { analyze_invoice: 'ai_extraction' };
 
-module.exports = { ROUTES, classify, MCP_TOOLS, MCP_METERED, rowsOf, mib };
+module.exports = { ROUTES, classify, MCP_TOOLS, MCP_METERED, rowsOf, mib, statementRows };

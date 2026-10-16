@@ -3,6 +3,8 @@
 // Disposable database: production schema snapshot + release chain + commercial trial migration + D4.
 // The plan TERMS published below are TEST VALUES ONLY, not the owner's commercial limits: the repository
 // ships the three plans as drafts with empty features/limits, and terms are published via the admin catalog.
+// Metered limits a test does not care about are explicitly unlimited (publication requires every key: 20261018090000).
+const EXPLICIT = { transactions: null, storage_mb: null, integrations: null, accounts: null, bank_rows: null, mcp: null, ai_accountant: null, ai_extraction: null };
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
@@ -34,6 +36,7 @@ before(async () => {
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', COMMERCIAL), 'utf8'));
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', CENTER), 'utf8'));
   await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261017120000_billing_enforcement.sql'), 'utf8'));
+  await admin.query(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261018090000_billing_plan_matrix.sql'), 'utf8'));
   seed = seeder(admin);
   for (const u of [ADMIN, OWNER, UNVERIFIED, ACCOUNTANT, OTHER, RACER]) await admin.query('INSERT INTO public.users (id) VALUES ($1) ON CONFLICT DO NOTHING', [u]);
   for (const u of [ADMIN, OWNER, ACCOUNTANT, OTHER, RACER]) await admin.query(`INSERT INTO public.user_email_identities (user_id, email, email_verified_at) VALUES ($1, $2, now())`, [u, `u${u}@test.local`]);
@@ -60,7 +63,7 @@ async function publishTestTerms() {
     const p = cat.body.plans.find(x => x.plan === code);
     const r = await api.call('/admin/billing/catalog/' + code, { method: 'POST', user: ADMIN, body: { request_key: key(), expected_version: Number(p.catalog_version), terms: {
       action: 'version', name_i18n: { en: code, ru: code, id: code }, description_i18n: { en: 'test', ru: 'тест', id: 'uji' }, price_minor: t.price, currency: 'USD',
-      features: t.features, limits: t.limits, terms_version: 'test-only-v1', effective_at: new Date(Date.now() - 60000).toISOString(), approval_status: 'approved', publish: true, confirm_publish: true } } });
+      features: t.features, limits: { ...EXPLICIT, ...t.limits }, terms_version: 'test-only-v1', effective_at: new Date(Date.now() - 60000).toISOString(), approval_status: 'approved', publish: true, confirm_publish: true } } });
     assert.equal(r.status, 200, JSON.stringify(r.body));
   }
 }
@@ -87,7 +90,10 @@ test('enrollment: V2 companies are commercial, existing ones stay legacy; draft 
   assert.deepEqual(s.body.account.catalog, [], 'shipped drafts (empty terms) are not offered');
   assert.equal(s.body.payments_available, false);
   const drafts = (await admin.query(`SELECT v.id FROM public.plan_versions v WHERE v.approval_status='draft'`)).rows;
-  assert.equal(drafts.length, 3);
+  assert.equal(drafts.length, 6, 'seed drafts + owner-value drafts (20261018090000)');
+  // The owner-approved starting values (2026-10-17) are drafts; PENDING keys are unset, so they cannot be published.
+  const owner = Object.fromEntries((await admin.query(`SELECT v.plan, v.limits FROM public.plan_limits p JOIN public.plan_versions v ON v.id=p.draft_version_id WHERE p.plan IN ('starter','control','pro')`)).rows.map((x) => [x.plan, x.limits]));
+  assert.deepEqual(owner, { starter: { users: 2, transactions: 1000, documents: 100, ai: 50 }, control: { users: 5, transactions: 5000, documents: 500, ai: 300 }, pro: { users: 15, transactions: 20000, documents: 2000, ai: 1000 } });
   const r = await command(OWNER, A, 'plan', { request_key: key(), plan_version_id: drafts[0].id, expected_version: 1 });
   assert.equal(r.status, 409); assert.equal(r.body.error, 'billing_plan_not_approved');
   const legacy = await seed.company({ owner: OTHER, name: 'Legacy Co' });
@@ -98,7 +104,8 @@ test('enrollment: V2 companies are commercial, existing ones stay legacy; draft 
   // Catalog administration is platform-only.
   assert.equal((await api.call('/admin/billing/catalog', { user: OWNER })).status, 403);
   // Draft prices match the preliminary catalogue: Starter $59, Control $149, Pro $299.
-  const prices = (await admin.query(`SELECT plan, price_minor, currency FROM public.plan_versions ORDER BY price_minor`)).rows;
+  // Every version of a plan (seed draft and owner-value draft) carries the same price.
+  const prices = (await admin.query(`SELECT DISTINCT plan, price_minor, currency FROM public.plan_versions ORDER BY price_minor`)).rows;
   assert.deepEqual(prices.map(p => [p.plan, Number(p.price_minor), p.currency]), [['starter', 5900, 'USD'], ['control', 14900, 'USD'], ['pro', 29900, 'USD']]);
 });
 
