@@ -8,7 +8,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const { randomUUID } = require('node:crypto');
-const { createIntegratedDatabase, migrations } = require('./_integratedSchemaDb');
+const { migrations } = require('./_integratedSchemaDb');
+const { createProdSchemaDatabase } = require('./_prodSchemaDb');
 const { createRealPgSupabase, createSqlSupabase } = require('./_realPgSupabase');
 const embedded = process.env.HF_EMBEDDED_SQL === '1';
 const mode = embedded ? 'EMBEDDED SQL smoke (no concurrency proof)' : 'REAL PostgreSQL';
@@ -26,7 +27,9 @@ before(async () => {
     for(const m of migrations.filter(m=>!process.env.HF_BASELINE_SERVER || !m.includes('financial_writer_protocol'))) await sql.exec(fs.readFileSync(path.join(root,'migrations',m),'utf8'));
     supa=createSqlSupabase({query:(...a)=>sql.query(...a),end:async()=>{}});
   } else {
-    db=await createIntegratedDatabase('hf_writer_contracts');
+    // The HTTP routes under test call company/bill creation RPCs, so the schema must be the full current chain.
+    db=await createProdSchemaDatabase('hf_writer_contracts',require('./_d4Harness').CHAIN);
+    if(!db)throw Error('Real PostgreSQL required; this suite never skips');
     const { Client }=require('pg'); sql=new Client({connectionString:db.connectionString}); await sql.connect();
     supa=createRealPgSupabase(db.connectionString);
   }
@@ -145,7 +148,10 @@ test(`${mode}: adjustment uses compare-and-set under gate; repeat does not apply
   assert.equal(Number((await sql.query('SELECT fn_wallet_ledger_balance($1) b',[I])).rows[0].b),510);
 });
 test(`${mode}: unchecked settled flag and legacy settle endpoint cannot invent payment`,async()=>{
-  const r=await api('POST','/debts',{type:'payable',counterparty:'Unpaid synthetic',amount:20,currency:'IDR',scope:'business',is_settled:true,settled_at:'2026-10-04',paid_amount:20,status:'paid'});
+  const n0=await rows(),forged={type:'payable',counterparty:'Unpaid synthetic',amount:20,currency:'IDR',scope:'business',request_key:randomUUID()};
+  const f=await api('POST','/debts',{...forged,is_settled:true,settled_at:'2026-10-04',paid_amount:20,status:'paid'});
+  assert.equal(f.status,400,JSON.stringify(f));assert.equal(f.body.error,'bill_invalid_request');assert.equal(await rows(),n0);
+  const r=await api('POST','/debts',forged);
   assert.equal(r.status,200,JSON.stringify(r));const id=r.body.id,n=await rows();
   const d=await state(id);assert.equal(d.is_settled,false);assert.equal(d.settled_at,null);assert.equal(Number(d.paid_amount),0);
   const pretend=await api('PATCH',`/debts/${id}/settle`,{});assert.equal(pretend.status,409);assert.equal(pretend.body.error,'confirmed_payment_required');assert.equal(await rows(),n);assert.deepEqual(await state(id),d);

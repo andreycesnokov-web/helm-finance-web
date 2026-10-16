@@ -29,7 +29,7 @@ let pass = 0, fail = 0;
 const ok = (m, c) => { if (c) { console.log('OK  ' + m); pass++; } else { console.log('XX  ' + m); fail++; } };
 
 async function api(method, path, { biz, body } = {}) {
-  if (method === 'POST' && ['/api/wallets','/api/transactions/batch'].includes(path))
+  if (method === 'POST' && ['/api/wallets','/api/transactions/batch','/api/businesses','/api/debts'].includes(path))
     body = { request_key: require('node:crypto').randomUUID(), ...body };
   const headers = { 'content-type': 'application/json', authorization: 'Bearer ' + token };
   if (biz) headers['x-business-id'] = biz;
