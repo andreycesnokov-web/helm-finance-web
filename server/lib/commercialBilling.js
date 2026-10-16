@@ -1,5 +1,6 @@
 'use strict';
 // Business + Platform/admin. No checkout or paid-period write endpoint is exposed.
+const crypto=require('node:crypto');
 const {computeBusinessAccess}=require('./businessAccess');
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function input(body,header) {
@@ -13,6 +14,7 @@ function errorResponse(res,error) {
  const known={billing_forbidden:403,billing_email_verification_required:403,billing_account_not_enrolled:409,
   billing_command_conflict:409,billing_stale:409,billing_plan_not_found:404,billing_plan_not_approved:409,
   billing_select_plan_first:409,billing_invalid_fields:400,billing_invalid_key:400,billing_invalid_command:400};
+ Object.assign(known,{billing_plan_code_reserved:409,billing_publish_not_confirmed:409,billing_terms_incomplete:400,billing_unknown_feature:400,billing_unknown_limit:400,billing_limit_without_counter:400,billing_feature_not_released:409,billing_plan_archived:409,billing_override_not_enforceable:400,billing_override_overlap:409,billing_override_not_found:404});
  Object.assign(known,{billing_invalid_terms:400,billing_invalid_date:400,billing_reason_required:400,billing_schedule_required:409,billing_grant_overlap:409,billing_grant_not_found:404,billing_legacy_trial_disabled:409});
  if(['23514','22007','22008','22P02','22003'].includes(error?.code))return res.status(400).json({error:'billing_invalid_terms',outcome:'rolled_back',automatic_retry:false});
  const code=Object.keys(known).find(k=>String(error?.message||'').includes(k));
@@ -58,13 +60,88 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
  if(requireAdmin){
  const admin=fn=>async(req,res)=>{res.set({'Cache-Control':'private, no-store',Vary:'Authorization'});try{await fn(req,res)}catch(e){errorResponse(res,e)}};
  app.get('/api/admin/billing/catalog',auth,gate,requireAdmin,admin(async(_req,res)=>{
-  const [p,v]=await Promise.all([supabase.from('plan_limits').select('*').order('plan'),supabase.from('plan_versions').select('*').order('created_at',{ascending:false})]);
-  if(p.error||v.error)throw p.error||v.error;res.json({plans:p.data,versions:v.data,allow_fixtures:allowFixtures});
+  const [p,v,c]=await Promise.all([supabase.from('plan_limits').select('*').order('display_order').order('plan'),supabase.from('plan_versions').select('*').order('created_at',{ascending:false}),supabase.from('billing_catalog_items').select('*').order('kind').order('sort_order')]);
+  if(p.error||v.error||c.error)throw p.error||v.error||c.error;
+  // Rows without versions are legacy plan codes (free/business/founder/enterprise): not part of the commercial catalog.
+  const versioned=new Set(v.data.map(x=>x.plan));res.json({plans:p.data.filter(x=>versioned.has(x.plan)),versions:v.data,catalog_items:c.data,allow_fixtures:allowFixtures});
  }));
  app.post('/api/admin/billing/catalog/:code',auth,gate,requireAdmin,admin(async(req,res)=>{
   const b=req.body||{};if(!UUID.test(b.request_key||'')||!Number.isSafeInteger(b.expected_version)||b.expected_version<0)throw Error('billing_invalid_command');
   const{data,error}=await supabase.rpc('rpc_billing_catalog_command',{p_actor:req.user.userId,p_key:b.request_key,p_code:req.params.code,p_expected:b.expected_version,p_payload:b.terms});
   if(error)throw error;res.json(data);
+ }));
+ // Billing Management Center (Platform admin): read models + preview. Every write still goes through the
+ // CAS/idempotent/audited RPCs above. Customer balances, transactions and documents are never read here.
+ const TERM_FIELDS=['name_i18n','description_i18n','price_minor','price_annual_minor','currency','trial_hours','features','limits','limit_policies','terms_version','effective_at','approval_status'];
+ const NESTED=['features','limits','limit_policies','name_i18n','description_i18n'],NUMERIC=['price_minor','price_annual_minor','trial_hours'];
+ const num=x=>x===null||x===undefined?null:Number(x);
+ const diffTerms=(before,after)=>{const out=[];for(const f of TERM_FIELDS){
+  if(NESTED.includes(f)){const a=before?.[f]||{},b=after?.[f]||{};
+   // A missing feature is an off feature; only real differences are reported.
+   const norm=(o,k)=>f==='features'?o[k]===true:(o[k]??null);
+   for(const k of new Set([...Object.keys(a),...Object.keys(b)]))if(JSON.stringify(norm(a,k))!==JSON.stringify(norm(b,k)))out.push({field:f+'.'+k,before:norm(a,k),after:norm(b,k)});}
+  else if(NUMERIC.includes(f)){const a=num(before?.[f]??(f==='trial_hours'?168:null)),b=num(after?.[f]??(f==='trial_hours'?168:null));if(a!==b)out.push({field:f,before:a,after:b})}
+  // Two moments that have both already passed mean the same thing: effective immediately.
+  else if(f==='effective_at'){const a=before?.[f]??null,b=after?.[f]??null,now=Date.now();if(b!==null&&(a===null||Date.parse(a)!==Date.parse(b))&&!(Date.parse(a)<=now&&Date.parse(b)<=now))out.push({field:f,before:a,after:b})}
+  else{const a=before?.[f]??null,b=after?.[f]??null;if(JSON.stringify(a)!==JSON.stringify(b))out.push({field:f,before:a,after:b})}
+ }return out};
+ app.post('/api/admin/billing/catalog/:code/preview',auth,gate,requireAdmin,admin(async(req,res)=>{
+  const b=req.body||{};if(!Number.isSafeInteger(b.expected_version)||b.expected_version<0||!b.terms||typeof b.terms!=='object'||Array.isArray(b.terms))throw Error('billing_invalid_command');
+  const{data,error}=await supabase.rpc('rpc_billing_catalog_command',{p_actor:req.user.userId,p_key:crypto.randomUUID(),p_code:req.params.code,p_expected:b.expected_version,p_payload:{...b.terms,dry_run:true}});
+  if(error)throw error;res.json({...data,changes:['draft','publish'].includes(data.action)?diffTerms(data.current,b.terms):[]});
+ }));
+ async function adminRows(){
+  const{data,error}=await supabase.rpc('rpc_billing_admin_rows');if(error)throw error;
+  const now=new Date(data.server_now),by=(list,id)=>(list||[]).filter(x=>String(x.business_id)===String(id));
+  return {now,versions:data.versions,rows:data.companies.map(c=>{
+   if(!c.account)return {id:c.id,name:c.name,policy:'legacy',access:computeBusinessAccess(c.business,now)};
+   const s={...c.account,plan_versions:data.versions,grants:by(data.grants,c.id),service_periods:by(data.service_periods,c.id),overrides:by(data.overrides,c.id)};
+   return {id:c.id,name:c.name,policy:c.billing_policy==='commercial_v2'?'commercial_v2':'legacy_overlay',account:c.account,
+    access:computeBusinessAccess(c.business,now,s),overrides:s.overrides};
+  })};
+ }
+ const versionLabel=(versions,id)=>{const v=versions.find(x=>String(x.id)===String(id));return v?{id:v.id,plan:v.plan,version:Number(v.version),name_i18n:v.name_i18n}:null};
+ app.get('/api/admin/billing/subscriptions',auth,gate,requireAdmin,admin(async(_req,res)=>{
+  const{rows,versions}=await adminRows();
+  res.json({subscriptions:rows.map(r=>({id:r.id,name:r.name,policy:r.policy,status:r.policy==='legacy'?'legacy':r.access.subscription_status,
+   source:r.access.effective_access_source,restricted:!!r.access.restricted,effective:versionLabel(versions,r.access.effective_plan_version_id),
+   selected:versionLabel(versions,r.account?.selected_plan_version_id),trial_started_at:r.access.trial_started_at||null,trial_ends_at:r.access.trial_ends_at||null,
+   paid_period_ends_at:r.access.paid_period_ends_at||null,overrides_active:(r.access.overrides_active||[]).length,override_active:!!r.access.override_active,
+   discount_percent:r.access.discount_percent??null,account_version:r.account?Number(r.account.version):null}))});
+ }));
+ app.get('/api/admin/billing/overview',auth,gate,requireAdmin,admin(async(_req,res)=>{
+  const{rows}=await adminRows(),commercial=rows.filter(r=>r.policy==='commercial_v2'),n=f=>commercial.filter(f).length;
+  // MRR needs verified payments; until a provider is connected it is reported as unavailable, never estimated.
+  res.json({payments_connected:false,mrr:null,companies:rows.length,legacy:rows.length-commercial.length,commercial:commercial.length,
+   trialing:n(r=>r.access.subscription_status==='trialing'),active_paid:n(r=>r.access.subscription_active),
+   expired:n(r=>r.access.subscription_status==='expired'),not_started:n(r=>r.access.subscription_status==='not_started'),
+   admin_grants:rows.filter(r=>r.access.override_active).length,overrides:rows.reduce((k,r)=>k+(r.access.overrides_active||[]).length,0)});
+ }));
+ app.get('/api/admin/billing/overrides',auth,gate,requireAdmin,admin(async(_req,res)=>{
+  const{rows,versions}=await adminRows(),out=[];
+  for(const r of rows)for(const o of r.overrides||[]){
+   const base=versions.find(v=>String(v.id)===String(r.access.effective_plan_version_id)),active=(r.access.overrides_active||[]).some(x=>x.id===o.id);
+   out.push({...o,company:{id:r.id,name:r.name},base_plan:versionLabel(versions,r.access.effective_plan_version_id),active,
+    base_value:o.kind==='limit'?(base?.limits?.[o.key]??null):o.kind==='feature'?(base?.features?.[o.key]??null):null,
+    effective_value:o.kind==='discount'?(r.access.discount_percent??null):o.kind==='limit'?(r.access.limits?.[o.key]??null):(r.access.features?.[o.key]??null)});
+  }
+  out.sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));res.json({overrides:out});
+ }));
+ app.get('/api/admin/billing/audit',auth,gate,requireAdmin,admin(async(_req,res)=>{
+  const{data,error}=await supabase.from('billing_admin_commands').select('id,actor_user_id,business_id,action,intent,result,created_at').order('created_at',{ascending:false}).limit(200);
+  if(error)throw error;const ids=[...new Set(data.map(x=>x.business_id).filter(Boolean))];
+  const{data:b,error:e}=ids.length?await supabase.from('businesses').select('id,name').in('id',ids):{data:[],error:null};if(e)throw e;
+  res.json({entries:data.map(x=>({id:x.id,actor_user_id:x.actor_user_id,business_id:x.business_id,company:(b||[]).find(y=>y.id===x.business_id)?.name||null,
+   action:x.action,code:x.intent?.code||null,payload_action:x.intent?.payload?.action||null,reason:x.result?.reason||null,created_at:x.created_at}))});
+ }));
+ app.get('/api/admin/billing/payments',auth,gate,requireAdmin,admin(async(_req,res)=>{
+  const{data,error}=await supabase.from('billing_service_periods').select('id,business_id,plan_version_id,payment_id,payment_verified,environment,starts_at,ends_at,revoked_at').order('starts_at',{ascending:false}).limit(200);
+  if(error)throw error;res.json({provider:null,connected:false,periods:data});
+ }));
+ app.get('/api/admin/billing/settings',auth,gate,requireAdmin,admin(async(_req,res)=>{
+  res.json({payments_connected:false,provider:null,fixtures_allowed:allowFixtures,default_trial_hours:168,quota_period:'calendar_month_utc',
+   failed_requests:'released_on_http_error',lost_responses:'kept_for_reconciliation',default_limit_policy:'hard',seats_policy:'always_hard',
+   expired_access:'read_export_recovery_allowed',legacy_companies:'unchanged'});
  }));
  app.get('/api/admin/billing/companies',auth,gate,requireAdmin,admin(async(_req,res)=>{
   const {data,error}=await supabase.from('businesses').select('id,name,billing_policy').eq('type','business').order('created_at',{ascending:false}).limit(1000);
@@ -76,9 +153,9 @@ function install(app,{auth,requireBusiness,requireAdmin,supabase,enabled=false,a
   // Admin has metadata access; never request wallets, transactions or document contents.
   const{data:a,error:e}=await supabase.from('billing_accounts').select('*').eq('business_id',b.id).maybeSingle();if(e)throw e;
   if(!a)return res.json({policy:'legacy',business:{id:b.id,name:b.name},access:computeBusinessAccess(b),account:{business_id:b.id,version:1,grants:[]},legacy_enrollment:true,usage:[],history:[]});
-  const [v,g,p,u,h]=await Promise.all([supabase.from('plan_versions').select('*'),supabase.from('billing_grants').select('*').eq('business_id',b.id),supabase.from('billing_service_periods').select('*').eq('business_id',b.id),supabase.from('billing_quota_reservations').select('resource,units,state,period_start').eq('business_id',b.id),supabase.from('billing_admin_commands').select('id,action,intent,result,created_at').eq('business_id',b.id).order('created_at',{ascending:false}).limit(30)]);
-  for(const x of [v,g,p,u,h])if(x.error)throw x.error;
-  const s={...a,plan_versions:v.data,grants:g.data,service_periods:p.data};
+  const [v,g,p,u,h,o]=await Promise.all([supabase.from('plan_versions').select('*'),supabase.from('billing_grants').select('*').eq('business_id',b.id),supabase.from('billing_service_periods').select('*').eq('business_id',b.id),supabase.from('billing_quota_reservations').select('resource,units,state,period_start').eq('business_id',b.id),supabase.from('billing_admin_commands').select('id,action,intent,result,created_at').eq('business_id',b.id).order('created_at',{ascending:false}).limit(30),supabase.from('billing_overrides').select('*').eq('business_id',b.id).order('created_at')]);
+  for(const x of [v,g,p,u,h,o])if(x.error)throw x.error;
+  const s={...a,plan_versions:v.data,grants:g.data,service_periods:p.data,overrides:o.data};
   res.json({policy:'commercial_v2',business:{id:b.id,name:b.name},account:s,access:computeBusinessAccess(b,new Date(),s),usage:u.data,history:h.data});
  }));
  app.post('/api/admin/billing/companies/:id/:action',auth,gate,requireAdmin,admin(async(req,res)=>{
@@ -127,7 +204,7 @@ async function admit(supabase,actor,biz,policy,{key=null,allowFixtures=false,int
   const{data,error}=await supabase.rpc('rpc_billing_quota',{p_actor:actor,p_business:biz.business.id,p_key:key,p_resource:policy.resource,p_action:'reserve',p_units:units,p_intent:intent});if(error)throw error;
   if(data?.state==='released'||data?.state==='committed'){const e=Error('billing_reservation_terminal');e.status=409;throw e;}
   if(data?.is_replay){const e=Error('billing_job_in_progress');e.status=409;throw e;}
-  return {key,resource:policy.resource,phase:policy.phase,units};
+  return {key,resource:policy.resource,phase:policy.phase,units,over_limit:data?.over_limit===true};
  }
  return null;
 }
