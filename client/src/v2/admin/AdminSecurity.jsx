@@ -16,6 +16,9 @@ export default function AdminSecurity() {
 
   const adminsApi = useAdminApi('/admin/administrators')
   const auditApi = useAdminApi('/admin/administrators/audit')
+  // The caller's own role comes from /admin/status (the list response carries no current role). Until it loads the
+  // screen shows the read-only view; grant/revoke are enforced server-side (super_admin only) either way.
+  const statusApi = useAdminApi('/admin/status')
 
   const [emailInput, setEmailInput] = useState('')
   const [roleInput, setRoleInput] = useState('platform_admin')
@@ -44,9 +47,12 @@ export default function AdminSecurity() {
   }
 
   const admins = adminsApi.data?.administrators || []
-  const currentRole = adminsApi.data?.current_role || 'platform_admin'
+  const currentRole = statusApi.data?.role || 'platform_admin'
   const isSuperAdmin = currentRole === 'super_admin'
-  const audits = auditApi.data?.audit || []
+  const audits = auditApi.data?.events || []
+  // Internal user ids are never shown: people are named by email (or a dash when none is known).
+  const emailOf = (id) => admins.find((x) => String(x.userId) === String(id))?.email || '—'
+  const actLabel = (code) => { const k = 'admin.actRole.' + code, v = t(k); return v === k ? code : v }
 
   const handleGrant = async (e) => {
     e.preventDefault()
@@ -100,14 +106,12 @@ export default function AdminSecurity() {
       {head}
 
       {errorMsg && (
-        <Card className="v2-card-crit">
-          <p style={{ color: 'var(--text-crit,#990000)', fontWeight: 600 }}>{errorMsg}</p>
-        </Card>
+        <div className="v2-error" role="alert">{errorMsg}</div>
       )}
 
       {successMsg && (
-        <Card className="v2-card-good">
-          <p style={{ color: 'var(--text-good,#007733)', fontWeight: 600 }}>{successMsg}</p>
+        <Card>
+          <p className="v2-pos" role="status" style={{ fontWeight: 600 }}>{successMsg}</p>
         </Card>
       )}
 
@@ -123,49 +127,48 @@ export default function AdminSecurity() {
           <p className="v2-muted">{t('admin.noAdmins')}</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="v2-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table className="v2-table">
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-default,#ccc)' }}>
-                  <th style={{ padding: '8px 12px' }}>{t('admin.email')}</th>
-                  <th style={{ padding: '8px 12px' }}>{t('admin.role')}</th>
-                  <th style={{ padding: '8px 12px' }}>{t('admin.status')}</th>
-                  <th style={{ padding: '8px 12px' }}>{t('admin.assigned')}</th>
-                  <th style={{ padding: '8px 12px' }}>{t('admin.assignedBy')}</th>
-                  {isSuperAdmin && <th style={{ padding: '8px 12px', textAlign: 'right' }}>{t('admin.actions')}</th>}
+                <tr>
+                  <th>{t('admin.email')}</th>
+                  <th>{t('admin.role')}</th>
+                  <th>{t('admin.status')}</th>
+                  <th>{t('admin.assigned')}</th>
+                  <th>{t('admin.assignedBy')}</th>
+                  {isSuperAdmin && <th className="v2-r">{t('admin.actions')}</th>}
                 </tr>
               </thead>
               <tbody>
                 {admins.map((a) => (
-                  <tr key={a.userId} style={{ borderBottom: '1px solid var(--border-subtle,#eee)' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                      {a.email || <span className="v2-muted">ID: {a.userId}</span>}
+                  <tr key={a.userId}>
+                    <td style={{ fontWeight: 600 }}>
+                      {a.email || <span className="v2-muted">—</span>}
                       {a.displayName ? <span className="v2-muted v2-small" style={{ display: 'block' }}>{a.displayName}</span> : null}
                     </td>
-                    <td style={{ padding: '10px 12px' }}>
+                    <td>
                       <Pill tone={a.role === 'super_admin' ? 'good' : 'info'}>
                         {a.role === 'super_admin' ? t('admin.superAdmin') : t('admin.platformAdmin')}
                       </Pill>
                     </td>
-                    <td style={{ padding: '10px 12px' }}>
+                    <td>
                       <Pill tone={a.isActive ? 'good' : 'neutral'}>
                         {a.isActive ? t('admin.active') : t('admin.revoked')}
                       </Pill>
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: 13 }} className="v2-muted">
+                    <td className="v2-muted">
                       {shortDate(a.createdAt, lang)}
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: 13 }} className="v2-muted">
-                      {a.creatorEmail || (a.createdBy ? `ID: ${a.createdBy}` : '—')}
+                    <td className="v2-muted">
+                      {a.creatorEmail || '—'}
                     </td>
                     {isSuperAdmin && (
-                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                      <td className="v2-r">
                         {a.isActive ? (
                           <button
                             type="button"
                             className="v2-btn v2-btn-secondary v2-btn-small"
                             onClick={() => handleRevoke(a)}
                             disabled={busy}
-                            style={{ fontSize: 12, padding: '4px 8px' }}
                           >
                             {t('admin.revoke')}
                           </button>
@@ -184,51 +187,37 @@ export default function AdminSecurity() {
 
       {isSuperAdmin ? (
         <Card title={t('admin.addAdmin')} aside={<span className="v2-muted v2-small">{t('admin.addAdminSub')}</span>}>
-          <form onSubmit={handleGrant} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-            <div style={{ flex: '1 1 240px' }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                {t('admin.email')}
-              </label>
+          <form onSubmit={handleGrant} className="v2-field-row" style={{ alignItems: 'end' }}>
+            <div className="v2-field">
+              <label htmlFor="admin-grant-email" className="v2-field-label">{t('admin.email')}</label>
               <input
+                id="admin-grant-email"
+                className="v2-input"
                 type="email"
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 placeholder="admin@example.com"
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: '1px solid var(--border-default,#ccc)',
-                  background: 'var(--surface-input,#fff)',
-                }}
+                autoComplete="off"
               />
             </div>
-            <div style={{ flex: '0 1 200px' }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                {t('admin.role')}
-              </label>
+            <div className="v2-field">
+              <label htmlFor="admin-grant-role" className="v2-field-label">{t('admin.role')}</label>
               <select
+                id="admin-grant-role"
+                className="v2-select"
                 value={roleInput}
                 onChange={(e) => setRoleInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: '1px solid var(--border-default,#ccc)',
-                  background: 'var(--surface-input,#fff)',
-                }}
               >
                 <option value="platform_admin">{t('admin.platformAdmin')}</option>
                 <option value="super_admin">{t('admin.superAdmin')}</option>
               </select>
             </div>
-            <div>
+            <div className="v2-field">
               <button
                 type="submit"
                 className="v2-btn v2-btn-primary"
                 disabled={busy || !emailInput.trim()}
-                style={{ padding: '8px 16px' }}
               >
                 {busy ? t('admin.granting') : t('admin.grantBtn')}
               </button>
@@ -251,7 +240,7 @@ export default function AdminSecurity() {
             {audits.map((e) => (
               <li key={e.id}>
                 <span>
-                  {shortDate(e.created_at, lang)} · <strong>{e.action}</strong> · ID: {e.entity_id}
+                  {shortDate(e.created_at, lang)} · <strong>{actLabel(e.action)}</strong> · {emailOf(e.entity_id)}
                 </span>
                 <span className="v2-muted v2-small">
                   {e.actor_role} · {e.after_json?.role || ''}

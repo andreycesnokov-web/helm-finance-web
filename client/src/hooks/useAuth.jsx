@@ -50,11 +50,12 @@ export function AuthProvider({ children }) {
     return u
   }
 
-  const logout = () => {
+  // { server: false } = the server already ended the session (e.g. a password reset revoked them all): clear locally only.
+  const logout = ({ server = true } = {}) => {
     // A password session also lives on the server: end it there (best effort; the token is dropped here anyway).
     const current = localStorage.getItem('hf_token')
     try {
-      if (current && JSON.parse(atob(current.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sid)
+      if (server && current && JSON.parse(atob(current.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sid)
         fetch('/api/auth/logout', { method: 'POST', keepalive: true, headers: { Authorization: `Bearer ${current}`, 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {})
     } catch { /* not a JWT: nothing to end on the server */ }
     localStorage.removeItem('hf_token')

@@ -992,6 +992,7 @@ export default {
     },
   },
   txd: {
+    reloadFirst: "Muat ulang transaksi sebelum mengedit.",
     desc: 'Deskripsi',
     date: 'Tanggal',
     sameCcy: 'Hanya rekening dengan mata uang sama',
@@ -1639,6 +1640,7 @@ export default {
     securityLogSub: 'Pemberian, perubahan, dan pencabutan peran', noAdmins: 'Belum ada administrator yang dikonfigurasi.',
     superAdminOnly: 'Hanya super admin yang dapat menetapkan atau mencabut peran administrator.',
     selfRevokeBlocked: 'Anda tidak dapat mencabut peran super admin Anda sendiri jika Anda adalah super admin aktif terakhir.',
+    actRole: { role_bootstrap: 'Super admin pertama (CLI)', role_granted: 'Peran diberikan', role_revoked: 'Peran dicabut' },
     errUserNotFound: 'Pengguna dengan email ini tidak ditemukan', errEmailNotVerified: 'Email belum diverifikasi',
   },
   od: {

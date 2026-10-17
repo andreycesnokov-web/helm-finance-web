@@ -253,7 +253,7 @@ export default function UnreconciledTxDrawer({
         category: draft.category || null,
         expected_version: tx.balance_version,
       }
-      if (tx.balance_version == null) throw new Error('Reload the transaction before editing.')
+      if (tx.balance_version == null) throw new Error(t('txd.reloadFirst'))
       // Linked debt payments and opening balance cannot have wallet or date modified
       if (draft.wallet_id && !isOpening && !linkedDebt) {
         payload.wallet_id = draft.wallet_id

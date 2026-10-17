@@ -992,6 +992,7 @@ export default {
     },
   },
   txd: {
+    reloadFirst: "Обновите операцию перед редактированием.",
     desc: 'Описание',
     date: 'Дата',
     sameCcy: 'Только счета в той же валюте',
@@ -1639,6 +1640,7 @@ export default {
     securityLogSub: 'Назначения, изменения и отзывы ролей', noAdmins: 'Администраторы не настроены.',
     superAdminOnly: 'Только супер-администратор может назначать или отзывать роли.',
     selfRevokeBlocked: 'Нельзя отозвать свою роль, если вы единственный супер-админ.',
+    actRole: { role_bootstrap: 'Первый супер-админ (CLI)', role_granted: 'Роль назначена', role_revoked: 'Роль отозвана' },
     errUserNotFound: 'Пользователь с таким email не найден', errEmailNotVerified: 'Email не подтверждён',
   },
   od: {

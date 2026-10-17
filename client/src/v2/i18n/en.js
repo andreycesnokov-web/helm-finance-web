@@ -992,6 +992,7 @@ export default {
     },
   },
   txd: {
+    reloadFirst: "Reload the transaction before editing.",
     desc: 'Description',
     date: 'Date',
     sameCcy: 'Only accounts in the same currency',
@@ -1639,6 +1640,7 @@ export default {
     securityLogSub: 'Role grants, updates and revocations', noAdmins: 'No administrators configured.',
     superAdminOnly: 'Only super-admins can assign or revoke administrator roles.',
     selfRevokeBlocked: 'You cannot revoke your own super-admin role while you are the last active super-admin.',
+    actRole: { role_bootstrap: 'First super admin (CLI)', role_granted: 'Role granted', role_revoked: 'Role revoked' },
     errUserNotFound: 'User with this email not found', errEmailNotVerified: 'Email is not verified',
   },
   od: {

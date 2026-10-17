@@ -434,7 +434,7 @@ export function ResetPassword() {
     try {
       await passwordReset(link.current, password)
       link.current = ''; setPassword(''); setRepeat('')
-      logout()   // every session of this account was revoked by the reset, this browser's included
+      logout({ server: false })   // the reset revoked every session of this account, this browser's included
       setState('done')
     } catch (x) {
       if (x?.data?.error === 'invalid_or_expired_link') { link.current = ''; setState('bad') } else setErr(pwErr(t, x))

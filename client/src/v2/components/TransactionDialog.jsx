@@ -44,7 +44,7 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], i
       if (f.amount !== '' && Number(f.amount) !== Number(tx.amount_original)) body.amount = Number(f.amount)
     }
     if (!Object.keys(body).length) { onClose(); return }
-    if (tx.balance_version == null) { setErr('Reload the transaction before editing.'); setBusy(false); return }
+    if (tx.balance_version == null) { setErr(t('txd.reloadFirst')); setBusy(false); return }
     body.expected_version = tx.balance_version
     try { await updateTransaction(request, tx.id, body); onSaved?.(); onClose() }
     catch (x) {
