@@ -1,0 +1,20 @@
+Reading additional input from stdin...
+OpenAI Codex v0.160.0
+--------
+workdir: C:\tmp\cfo-review
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 01a14814-c84b-7502-a153-e8de8277c2e8
+--------
+user
+You are an independent reviewer of a release candidate of CFO AI (Express + Supabase/PostgreSQL financial app).
+Read-only review. Do not modify files. Do not run network calls. Repository is the current directory.
+
+Scope: `git diff 1f51422..HEAD` (branch feat/v2-email-password-auth). Main areas:
+1. Email + Password auth via Supabase Auth/GoTrue: server/lib/passwordAuth.js, server/lib/sessionUser.js,
+   migrations/074_supabase_auth_password_link.sql, server/index.js (auth gates, magicLinkGate, emailAuthGate),
+   client/src/hooks/useAuth.jsx, client/src/v2/auth/AuthApp.jsx.

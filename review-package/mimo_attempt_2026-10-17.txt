@@ -1,0 +1,5 @@
+[0m
+> plan · mimo-auto
+[0m
+[91m[1mError: [0mMiMo free API service has ended. Sign in or configure a third-party API.
+mimo exit 0

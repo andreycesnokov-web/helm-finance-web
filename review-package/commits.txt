@@ -1,0 +1,13 @@
+575d9ec fix(billing): plan editor never switches features off or decides limits silently; diff shows effective terms; customer sees every limit
+5f83660 fix(ui): reset screen without a revoked-token logout call, Platform Admin security screen fixes, RU/ID strings
+840d58c test(rehearsal): keep shell scripts LF on every checkout
+b71ae02 docs(release): clean-install runbook, hosted Supabase Auth checklist, AUTH_FORWARD_CLIENT_IP
+69518e0 test(rehearsal): clean-install rehearsal toolkit on a disposable local Supabase-equivalent stack
+69474ec test(install): clean-install artifact and installer safety tests; billing audit and plan matrix docs
+9a7b619 feat(billing): dynamic plan matrix enforcement, Super-Admin plan changes, public catalog, billing-paused mode
+178ac42 feat(install): clean installation of an empty Supabase project + billing plan-matrix schema
+652f3be docs(release): V2 clean-install rehearsal report (NO-GO, 4 open P1)
+9750a51 fix(billing): keyed payment and import-confirm replays are not re-admitted
+97fae11 feat(auth-ui): email + password screens in the v2 sign-in (flagged)
+71aa0a8 feat(auth): email + password sign-in through Supabase Auth (flagged, off by default)
+88c94a3 test(contracts): supply stable keys and the full migration chain in writer contracts
