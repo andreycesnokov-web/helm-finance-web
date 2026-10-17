@@ -1,0 +1,50 @@
+[
+  {
+    "id": "indonesian-taxes-regulations",
+    "name": "Indonesian Taxes & Regulations",
+    "slug": "indonesian-taxes-regulations",
+    "description": "Statutory tax rules, UU HPP, CoreTax PMK 81/2024, PPh 21 TER, PPh 23, PPN, and DJP compliance.",
+    "icon": "scale",
+    "article_count": 3
+  },
+  {
+    "id": "accounting-bookkeeping",
+    "name": "Accounting & Bookkeeping",
+    "slug": "accounting-bookkeeping",
+    "description": "Chart of accounts, reconciliation practices, month-close procedures, and SAK standards for Indonesian PTs.",
+    "icon": "book-open",
+    "article_count": 2
+  },
+  {
+    "id": "cash-flow-financial-management",
+    "name": "Cash Flow & Financial Management",
+    "slug": "cash-flow-financial-management",
+    "description": "Working capital optimization, runway forecasting, AP/AR management, and multi-currency banking.",
+    "icon": "trending-up",
+    "article_count": 2
+  },
+  {
+    "id": "business-operations-indonesia",
+    "name": "Business Operations in Indonesia",
+    "slug": "business-operations-indonesia",
+    "description": "PT PMA establishment, OSS RBA licensing, KBLI compliance, LKPM BKPM reporting, and director governance.",
+    "icon": "building-2",
+    "article_count": 2
+  },
+  {
+    "id": "ai-finance-automation",
+    "name": "AI & Finance Automation",
+    "slug": "ai-finance-automation",
+    "description": "Receipt OCR extraction, conversational CFO intelligence, automated reconciliation, and MCP tool workflows.",
+    "icon": "cpu",
+    "article_count": 2
+  },
+  {
+    "id": "cfo-ai-product-guides",
+    "name": "CFO AI Product Guides",
+    "slug": "cfo-ai-product-guides",
+    "description": "Step-by-step walkthroughs, bank statement imports (BCA/Permata), approval workflows, and multi-company setup.",
+    "icon": "file-text",
+    "article_count": 1
+  }
+]

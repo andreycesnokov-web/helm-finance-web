@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFO AI — Website CMS & Knowledge Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Manrope', sans-serif; background-color: #F8FAFC; color: #003366; }
+    .font-mono-num { font-family: 'JetBrains Mono', monospace; }
+    .admin-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgba(0, 51, 102, 0.04); }
+    .nav-item-active { background-color: #EBF3FC; color: #1565C0; font-weight: 700; border-left: 3px solid #1565C0; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50">
+
+  <!-- TOP APP BAR -->
+  <header class="bg-[#002244] text-white h-16 border-b border-slate-700 flex items-center justify-between px-6 sticky top-0 z-50">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2.5">
+        <svg class="w-7 h-7" viewBox="0 0 200 200" fill="none">
+          <rect width="200" height="200" rx="40" fill="#1565C0"/>
+          <path d="M50 140V60H85C105 60 115 70 115 85C115 100 105 110 85 110H70V140H50ZM70 94H83C93 94 98 89 98 85C98 81 93 76 83 76H70V94Z" fill="#FFFFFF"/>
+        </svg>
+        <span class="font-black text-lg tracking-tight">CFO AI Studio</span>
+      </div>
+      <span class="text-[10px] bg-blue-900/60 text-blue-200 border border-blue-500/40 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+        CMS &bull; admin.cfo-ai.site
+      </span>
+    </div>
+
+    <!-- Active User & Release Indicator -->
+    <div class="flex items-center gap-6">
+      <div id="top-release-badge" class="hidden sm:flex items-center gap-2 text-xs text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 font-mono-num">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        <span id="top-release-version">Active: Loading...</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <div id="top-user-name" class="text-xs font-bold text-white">Alexandre (Owner)</div>
+          <div id="top-user-role" class="text-[10px] font-mono text-blue-300 uppercase">ROLE: OWNER</div>
+        </div>
+        <button onclick="handleLogout()" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- WORKSPACE BODY WITH SIDEBAR -->
+  <div class="flex flex-1 overflow-hidden">
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="w-64 bg-white border-r border-[#E2E8F0] flex flex-col justify-between py-6 shrink-0">
+      <nav class="space-y-1 px-3">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Content Operations</div>
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>📊 Dashboard</span>
+        </button>
+        <button onclick="switchTab('pages')" id="nav-pages" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>📄 Pages &amp; Blocks</span>
+        </button>
+        <button onclick="switchTab('hub')" id="nav-hub" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>📚 Knowledge Hub</span>
+          <span class="text-[10px] font-bold bg-blue-100 text-[#1565C0] px-1.5 py-0.5 rounded">3</span>
+        </button>
+        <button onclick="switchTab('pricing')" id="nav-pricing" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>💰 Pricing &amp; Limits</span>
+          <span id="nav-pricing-badge" class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Sync</span>
+        </button>
+
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mt-6 mb-2">Global &amp; Technical</div>
+        <button onclick="switchTab('translations')" id="nav-translations" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>🌐 16 Locales Studio</span>
+          <span class="text-[10px] font-mono text-slate-400">3/16</span>
+        </button>
+        <button onclick="switchTab('seo')" id="nav-seo" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>🔍 SEO Manager</span>
+        </button>
+        <button onclick="switchTab('navigation')" id="nav-navigation" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>🧭 Menus &amp; Footer</span>
+        </button>
+        <button onclick="switchTab('releases')" id="nav-releases" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>🚀 Publishing &amp; Rollback</span>
+        </button>
+        <button onclick="switchTab('audit')" id="nav-audit" class="w-full text-left px-3 py-2.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between">
+          <span>🛡️ Audit Logs</span>
+        </button>
+      </nav>
+
+      <div class="px-6 pt-4 border-t border-slate-100 text-[11px] text-slate-400 space-y-1">
+        <div>CFO AI Core CMS v1.2.0</div>
+        <div class="text-[#1565C0] font-semibold"><a href="/" target="_blank">View Live Public Site ↗</a></div>
+      </div>
+    </aside>
+
+    <!-- MAIN VIEW AREA -->
+    <main class="flex-1 overflow-y-auto p-8" id="main-content-view">
+      <!-- Content dynamically injected by app.js -->
+      <div class="flex items-center justify-center py-24 text-slate-400 text-xs">
+        Loading CMS Studio Workspace...
+      </div>
+    </main>
+  </div>
+
+  <!-- SCRIPT -->
+  <script src="/admin/app.js"></script>
+</body>
+</html>

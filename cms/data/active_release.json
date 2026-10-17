@@ -1,0 +1,8 @@
+{
+  "release_id": "rel-1792280355818-0201fa7e",
+  "version": "v202610172339",
+  "hash": "0201fa7e",
+  "activated_at": "2026-10-17T23:39:16.430Z",
+  "activated_by": "test-runner",
+  "notes": "Rolled back to v202610172339 (Initial Baseline Release Candidate v1.0.0)"
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "id": "usr-01",
+    "name": "Alexandre (Owner)",
+    "email": "owner@cfo-ai.site",
+    "role": "owner",
+    "avatar": "/assets/avatars/owner.png",
+    "created_at": "2026-10-15T00:00:00Z",
+    "status": "active"
+  },
+  {
+    "id": "usr-02",
+    "name": "Dewi Sartika (Editor)",
+    "email": "editor@cfo-ai.site",
+    "role": "editor",
+    "avatar": "/assets/avatars/editor.png",
+    "created_at": "2026-10-16T00:00:00Z",
+    "status": "active"
+  },
+  {
+    "id": "usr-03",
+    "name": "Budi Santoso (Tax Reviewer)",
+    "email": "reviewer@cfo-ai.site",
+    "role": "reviewer",
+    "avatar": "/assets/avatars/reviewer.png",
+    "created_at": "2026-10-16T00:00:00Z",
+    "status": "active"
+  }
+]

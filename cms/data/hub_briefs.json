@@ -1,0 +1,303 @@
+[
+  {
+    "id": "brief-01",
+    "title": "PT PMA Tax Obligations in Indonesia: Complete 2026 Director's Compliance Guide",
+    "suggested_url": "/blog/pt-pma-tax-compliance-guide-2026",
+    "category": "indonesian-taxes-regulations",
+    "target_audience": "Foreign directors, PT PMA founders, and international finance managers operating in Indonesia.",
+    "search_intent": "Informational & Commercial: understanding statutory corporate tax requirements, withholding rules, and filing deadlines for foreign investment companies.",
+    "proposed_keyword": "PT PMA tax obligations Indonesia 2026",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "UU No. 7/2021 (Harmonisasi Peraturan Perpajakan / UU HPP)",
+      "PMK No. 81/2024 (CoreTax Administration Rules)",
+      "PP No. 55/2022 (Penyesuaian Pengaturan di Bidang Pajak Penghasilan)"
+    ],
+    "relevant_cfo_feature": "Tax & Compliance Radar + Multi-Currency Accounts + AI Accountant",
+    "internal_links": ["/pricing-page.html", "/compliance-page.html", "/blog/pph-21-ter-calculation-rules-indonesia"],
+    "outline": [
+      "1. Introduction: The changing landscape of foreign corporate taxation in Indonesia (2026).",
+      "2. Corporate Income Tax (PPh Badan) rates, brackets, and gross revenue incentives.",
+      "3. Mandatory Withholding Taxes: PPh 21, PPh 23, PPh 4(2), and PPh 26 cross-border royalties/services.",
+      "4. Value Added Tax (PPN 11%) and PKP thresholds for PT PMA trading & service entities.",
+      "5. CoreTax System transition: mandatory 16-digit NPWP and digital tax account unification.",
+      "6. LKPM BKPM Quarterly Investment Reporting deadlines and sanctions.",
+      "7. Checklist: Month-end close calendar for PT PMA finance directors."
+    ]
+  },
+  {
+    "id": "brief-02",
+    "title": "PPh 21 TER Withholding Tax Under PP 58/2023: Formulas, Monthly Brackets & Payroll Reconciliation",
+    "suggested_url": "/blog/pph-21-ter-calculation-rules-indonesia",
+    "category": "indonesian-taxes-regulations",
+    "target_audience": "HR managers, payroll accountants, and Indonesian business owners with permanent and contract staff.",
+    "search_intent": "Procedural & Calculative: how to apply Effective Tax Rates (Tarif Efektif Rata-Rata / TER Categories A, B, C) to monthly payroll.",
+    "proposed_keyword": "PPh 21 TER calculation formula Indonesia PP 58 2023",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "Peraturan Pemerintah (PP) No. 58/2023",
+      "Peraturan Menteri Keuangan (PMK) No. 168/2023",
+      "DJP Official Guidelines on TER Withholding"
+    ],
+    "relevant_cfo_feature": "Payroll Workflows + Indonesian Tax Calendar",
+    "internal_links": ["/platform-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. What is PPh 21 TER and why the old monthly calculation method was overhauled.",
+      "2. The Three TER Categories: Category A, Category B, and Category C based on PTKP status.",
+      "3. Step-by-Step Calculation Formula: Monthly gross compensation multiplied by TER percentage.",
+      "4. The December Month-Close Reconciliation: Calculating total annual tax under Article 17 and deducting prior TER payments.",
+      "5. Handling Bonus, THR (Tunjangan Hari Raya), and Overtime Spikes without under-withholding.",
+      "6. Common payroll audit risks and how automated workflows eliminate manual Excel spreadsheet errors."
+    ]
+  },
+  {
+    "id": "brief-03",
+    "title": "CoreTax PMK 81/2024 Transition: Preparing Bank Feeds, e-Bupot & General Ledgers",
+    "suggested_url": "/blog/coretax-pmk-81-2024-transition-guide",
+    "category": "indonesian-taxes-regulations",
+    "target_audience": "CFOs, head accountants, and managing directors preparing for Indonesia's unified CoreTax platform.",
+    "search_intent": "Technical compliance: technical changes in tax invoicing, e-Bupot unifikasi, and automated data exchange.",
+    "proposed_keyword": "CoreTax Indonesia PMK 81 2024 transition guide",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "PMK No. 81/2024",
+      "Direktorat Jenderal Pajak (DJP) CoreTax Roadmap",
+      "UU No. 7/2021 (UU HPP)"
+    ],
+    "relevant_cfo_feature": "AI Accountant Package Export + Tax Radar",
+    "internal_links": ["/compliance-page.html", "/document-intelligence-page.html"],
+    "outline": [
+      "1. CoreTax System Overview: The digital unification of DJP Online, e-Faktur, e-Bupot, and tax deposits.",
+      "2. Key Structural Changes: 16-digit NIK/NPWP format and centralized Taxpayer Account Management (TAM).",
+      "3. e-Bupot Unifikasi 2.0: Real-time withholding certificates and automated client reconciliation.",
+      "4. Bank Data Matching: Why accurate bank statement reconciliation is mandatory before filing.",
+      "5. Transition Runbook: 5 audit steps your finance team must perform prior to full mandatory cutover.",
+      "6. How CFO AI prepares structured readiness files without human data entry."
+    ]
+  },
+  {
+    "id": "brief-04",
+    "title": "PPN & PKP Thresholds: When Must an Indonesian Business Register as a Taxable Enterprise?",
+    "suggested_url": "/blog/ppn-pkp-threshold-registration-guide",
+    "category": "indonesian-taxes-regulations",
+    "target_audience": "Founders of growing Indonesian PTs approaching the Rp 4.8 Billion annual revenue threshold.",
+    "search_intent": "Decision guidance: legal triggers, voluntary vs. mandatory PKP status, and input VAT credit mechanisms.",
+    "proposed_keyword": "PKP threshold Indonesia Rp 4.8 billion PPN registration",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "PMK No. 197/PMK.03/2013",
+      "UU PPN No. 42/2009 stdtd UU No. 7/2021",
+      "SE DJP on PKP Revocation and Verification"
+    ],
+    "relevant_cfo_feature": "Pulse Cash Dashboard + Invoicing & Receivables (DPP vs. PPN 11% tracking)",
+    "internal_links": ["/platform-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. The Rp 4.8 Billion gross turnover threshold explained.",
+      "2. Advantages and Disadvantages of early voluntary PKP registration for B2B contracts.",
+      "3. PPN 11% invoicing: DPP (Dasar Pengenaan Pajak), Faktur Pajak issuance deadlines, and 3-month claim rules.",
+      "4. Crediting Input VAT (Pajak Masukan) against Output VAT (Pajak Keluaran).",
+      "5. Penalties for failing to register after crossing the threshold during the fiscal year.",
+      "6. Automating DPP and PPN tracking inside modern SaaS invoicing."
+    ]
+  },
+  {
+    "id": "brief-05",
+    "title": "Business Expense Documentation in Indonesia: Proof of Deductibility & 3CV Standards",
+    "suggested_url": "/blog/indonesian-business-expense-deductibility-rules",
+    "category": "accounting-bookkeeping",
+    "target_audience": "Accounting teams, operations managers, and business owners managing daily commercial disbursements.",
+    "search_intent": "Compliance instruction: what receipts, invoices, and vouchers qualify as legitimate 3M deductions under tax audits.",
+    "proposed_keyword": "business expense deductibility Indonesia tax audit proof",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "UU PPh Pasal 6 ayat (1) dan Pasal 9 ayat (1)",
+      "PMK No. 02/PMK.03/2010 (Daftar Nominatif Biaya Promosi)",
+      "SE DJP on Entertainment and Travel Documentation"
+    ],
+    "relevant_cfo_feature": "Document Review Drawer + Telegram Receipt Bot",
+    "internal_links": ["/document-intelligence-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. The 3M Principle: Obtaining, Collecting, and Maintaining income (Mendapatkan, Menagih, Memelihara penghasilan).",
+      "2. Non-Deductible Expenses under Indonesian Tax Law (Pasal 9 UU PPh): Personal expenses, donations, dividends in disguise.",
+      "3. Promotion and Entertainment Costs: Mandatory formal Daftar Nominatif attachments.",
+      "4. Receipt standards: Why credit card thermal slips are insufficient without itemized vendor invoices and NPWP.",
+      "5. Digital voucher retention: Safe cloud archiving and side-by-side ledger matching.",
+      "6. How CFO AI's OCR drawer captures DPP, PPN, vendor NPWP, and matches bank lines automatically."
+    ]
+  },
+  {
+    "id": "brief-06",
+    "title": "Bank Statement Reconciliation for BCA & Permata: Best Practices for High-Volume Operations",
+    "suggested_url": "/blog/bank-statement-reconciliation-bca-permata",
+    "category": "accounting-bookkeeping",
+    "target_audience": "Bookkeepers, controllers, and finance executives processing hundreds of monthly corporate bank transactions.",
+    "search_intent": "Workflow efficiency: resolving common matching discrepancies between KlikBCA Bisnis CSVs and ERP ledgers.",
+    "proposed_keyword": "BCA Giro CSV reconciliation Permata e-statement accounting",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "Indonesian Financial Accounting Standards (SAK ETAP / SAK EP)",
+      "Bank Central Asia (BCA) KlikBCA Bisnis Export Documentation",
+      "Bank Permata e-Statement Specification"
+    ],
+    "relevant_cfo_feature": "Bank Statement Import + Auto-Matching Engine",
+    "internal_links": ["/platform-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. Why manual bank reconciliation causes month-close delays of 10 to 14 days.",
+      "2. Anatomy of a KlikBCA Bisnis CSV: Understanding reference codes, transaction remarks, and RTGS/LLG timing.",
+      "3. Permata e-Statement PDF challenges: OCR parsing vs. structured text extraction.",
+      "4. The 4 common reconciliation bottlenecks: QRIS settlement bundling, payment gateway deductions, bank fees, and cross-currency spreads.",
+      "5. Establishing a daily 3-way matching protocol (Statement Line ↔ Ledger Entry ↔ Supporting Invoice).",
+      "6. Zero-friction reconciliation: How CFO AI ingests 50,000 rows without human spreadsheet manipulation."
+    ]
+  },
+  {
+    "id": "brief-07",
+    "title": "Cash Flow Forecasting for Indonesian SMEs: Surviving 60-Day Payment Terms & Working Capital Crunches",
+    "suggested_url": "/blog/sme-cash-flow-forecasting-indonesia",
+    "category": "cash-flow-financial-management",
+    "target_audience": "Founders, managing directors, and commercial heads in wholesale, agency, and manufacturing sectors.",
+    "search_intent": "Strategic financial control: building dependable 30/60/90-day cash trajectory models that account for invoice delays.",
+    "proposed_keyword": "cash flow forecasting Indonesian SME working capital",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "Bank Indonesia Macroprudential Survey on SME Working Capital",
+      "Indonesian Corporate Finance Benchmarks",
+      "Standard Cash Runway Modeling Methodologies"
+    ],
+    "relevant_cfo_feature": "Radar Cash Trajectory + What-If Scenario Levers",
+    "internal_links": ["/platform-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. The silent killer of profitable Indonesian businesses: Cash flow lag vs. Accrual accounting.",
+      "2. The reality of B2B payment terms in Jakarta and Surabaya: Dealing with contractual TOP 30 turning into 75 days.",
+      "3. Building a 3-Horizon Cash Trajectory: 30-day operational runway, 60-day tax & payroll obligations, 90-day capital reserve.",
+      "4. Modeling Uncertainty: Safety floor thresholds and Bayesian variance cones.",
+      "5. What-if stress testing: Simulating delayed receivables, early vendor settlements, and sudden PPh 25 corporate tax instalments.",
+      "6. Real-time liquidity monitoring with CFO AI Radar."
+    ]
+  },
+  {
+    "id": "brief-08",
+    "title": "Accounts Payable Automation & Dual Authorization: Preventing Internal Fraud in Indonesian Companies",
+    "suggested_url": "/blog/accounts-payable-approval-internal-controls",
+    "category": "cash-flow-financial-management",
+    "target_audience": "Business owners, managing directors, and board members seeking robust internal spend controls.",
+    "search_intent": "Internal controls: designing approval matrices (Manager → Director) to stop unauthorized vendor disbursements.",
+    "proposed_keyword": "accounts payable approval dual authorization internal controls Indonesia",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "COSO Internal Control - Integrated Framework",
+      "Indonesian Criminal Code (KUHP) on Corporate Embezzlement",
+      "Standard Corporate Governance Guidelines for PTs"
+    ],
+    "relevant_cfo_feature": "Bills & Payment Approvals Module",
+    "internal_links": ["/platform-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. Internal payment fraud vulnerabilities in growing companies: Single-point bank token approvals.",
+      "2. The Segregation of Duties (SoD): Separating invoice intake, bill approval, and actual bank transfer execution.",
+      "3. Designing a Tiered Spend Authorization Matrix: Level 1 (Supervisor < Rp 10M), Level 2 (Finance Manager < Rp 50M), Level 3 (Director > Rp 50M).",
+      "4. Digital Audit Trails: Timestamped approval records, IP logging, and verified supporting vouchers.",
+      "5. Vendor Verification: Checking company bank accounts against legal vendor NPWP and SPK agreements.",
+      "6. Enforcing pre-settlement governance through CFO AI's Control and Pro tiers."
+    ]
+  },
+  {
+    "id": "brief-09",
+    "title": "LKPM BKPM Quarterly Reporting: How to Avoid Sanctions & License Revocations for PT PMA",
+    "suggested_url": "/blog/lkpm-bkpm-quarterly-reporting-guide",
+    "category": "business-operations-indonesia",
+    "target_audience": "Directors, legal officers, and corporate secretaries of foreign-owned PT PMAs in Indonesia.",
+    "search_intent": "Regulatory compliance: how to complete the Laporan Kegiatan Penanaman Modal via OSS RBA accurately.",
+    "proposed_keyword": "LKPM reporting OSS RBA PT PMA quarterly deadline",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "Peraturan BKPM No. 5/2021 (Pedoman dan Tata Cara Pengawasan Perizinan Berusaha Berbasis Risiko)",
+      "UU No. 11/2020 stdtd UU No. 6/2023 (UU Cipta Kerja)",
+      "OSS RBA Ministry of Investment Guidelines"
+    ],
+    "relevant_cfo_feature": "Asset Register + Indonesian Compliance Calendar",
+    "internal_links": ["/compliance-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. What is LKPM and why BKPM strictly enforces quarterly submission for PT PMAs with capital > Rp 500 Million.",
+      "2. Reporting Calendar: Exact deadlines for Quarter 1 (April), Quarter 2 (July), Quarter 3 (October), and Quarter 4 (January).",
+      "3. Construction Phase vs. Production/Operational Phase reporting requirements.",
+      "4. Financial Data Alignment: Capital realization, fixed asset acquisitions, operational working capital, and Indonesian employee headcount.",
+      "5. The 3-tier sanction ladder: Warning letters (SP 1, SP 2, SP 3), temporary business suspension, and NIB revocation.",
+      "6. Using CFO AI's asset registers and ledger reports to populate LKPM figures in under 30 minutes."
+    ]
+  },
+  {
+    "id": "brief-10",
+    "title": "Financial Reporting for Indonesian SMEs: Preparing SAK EMKM Compliant Balance Sheets & Income Statements",
+    "suggested_url": "/blog/financial-reporting-sme-sak-emkm-indonesia",
+    "category": "business-operations-indonesia",
+    "target_audience": "Small and medium business owners preparing annual financial statements for banks, investors, and tax authorities.",
+    "search_intent": "Accounting standards: understanding SAK EMKM simplified financial statements for local Indonesian entities.",
+    "proposed_keyword": "financial reporting SME SAK EMKM balance sheet income statement Indonesia",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "Standar Akuntansi Keuangan Entitas Mikro, Kecil, dan Menengah (SAK EMKM) - IAI",
+      "UU No. 20/2008 tentang Usaha Mikro, Kecil, dan Menengah",
+      "DJP Requirements for Annual Tax Return (SPT Tahunan) Financial Attachments"
+    ],
+    "relevant_cfo_feature": "AI Accountant Package Export (Bilingual PDF + CSV)",
+    "internal_links": ["/platform-page.html", "/pricing-page.html"],
+    "outline": [
+      "1. What is SAK EMKM and who is eligible to apply it (Revenue < Rp 50 Billion, Assets < Rp 10 Billion).",
+      "2. The 3 Mandatory Statements: Laporan Posisi Keuangan (Balance Sheet), Laporan Laba Rugi (Income Statement), and Catatan Atas Laporan Keuangan (CALK).",
+      "3. Depreciation methods under SAK EMKM: Straight-line vs. double-declining balance matching tax rules.",
+      "4. Common balance sheet pitfalls: Unreconciled director loan accounts (Utang/Piutang Pemegang Saham) and tax audit red flags.",
+      "5. Preparing audit-ready exports for external Konsultan Pajak and statutory auditors.",
+      "6. One-click bilingual financial exports with CFO AI."
+    ]
+  },
+  {
+    "id": "brief-11",
+    "title": "AI Document Processing in Accounting: How Vision OCR Eliminates 80% of Manual Data Entry",
+    "suggested_url": "/blog/ai-document-processing-ocr-accounting-automation",
+    "category": "ai-finance-automation",
+    "target_audience": "Finance transformation leaders, modern controllers, and tech-forward accounting firms.",
+    "search_intent": "Technology evaluation: how AI vision models extract invoice tables, DPP, PPN, and validate NPWP automatically.",
+    "proposed_keyword": "AI OCR document processing accounting invoice automation Indonesia",
+    "jurisdiction": "ID",
+    "primary_sources": [
+      "Gartner Research on AI-Driven Document Processing in Finance",
+      "IEEE Paper on Multimodal Vision Transformers in Financial Receipt Extraction",
+      "CFO AI Engineering Architecture Whitepaper"
+    ],
+    "relevant_cfo_feature": "Document Review Drawer + Multi-Model OCR Vision Pipeline",
+    "internal_links": ["/document-intelligence-page.html", "/platform-page.html"],
+    "outline": [
+      "1. The manual data entry trap: Why Indonesian finance teams waste 30 hours per week re-typing thermal receipts and invoice PDFs.",
+      "2. Traditional OCR vs. Modern Vision LLMs: Why legacy templates fail on variable Indonesian receipt layouts.",
+      "3. Extracting Structured Tax Metadata: Vendor legal name, 16-digit NPWP, invoice date, DPP, and PPN 11% breakdown.",
+      "4. The Human-in-the-Loop Review Drawer: Why 100% autonomous posting is risky, and how side-by-side verification protects ledger integrity.",
+      "5. Automated Bank Line Matching: Committing verified invoices directly against imported BCA Giro statement lines.",
+      "6. Unit economics: Comparing full-time data entry clerks with CFO AI's automated OCR quota."
+    ]
+  },
+  {
+    "id": "brief-12",
+    "title": "Model Context Protocol (MCP) for Corporate Finance: Connecting Claude & Cursor Directly to Your General Ledger",
+    "suggested_url": "/blog/model-context-protocol-mcp-corporate-finance",
+    "category": "ai-finance-automation",
+    "target_audience": "Technical founders, developers, modern CFOs, and AI-first accounting practitioners.",
+    "search_intent": "Technical walkthrough: using Anthropic's MCP open standard to safely inspect accounts, draft bills, and query cash balances from desktop LLMs.",
+    "proposed_keyword": "Model Context Protocol MCP corporate finance accounting Claude Cursor",
+    "jurisdiction": "Global / ID",
+    "primary_sources": [
+      "Anthropic Model Context Protocol (MCP) Specification",
+      "OpenAPI 3.1 & OAuth 2.0 Security Guidelines",
+      "CFO AI MCP Server Architecture & Permissions Matrix"
+    ],
+    "relevant_cfo_feature": "MCP / API Connector Module (500 to 15,000 monthly calls)",
+    "internal_links": ["/pricing-page.html", "/platform-page.html"],
+    "outline": [
+      "1. What is the Model Context Protocol (MCP) and why it represents the future of corporate software interfaces.",
+      "2. Security and Authorization: How CFO AI implements tokenized access, read/write segregation, and scoped workspace isolation.",
+      "3. Practical Use Cases: Asking Claude Desktop 'What is our 60-day projected cash shortfall?' and getting answers with ledger vouchers cited.",
+      "4. Drafting Receivables and Invoices directly from Cursor or terminal prompts.",
+      "5. Rate limits and unit quotas: Managing 500 (Starter), 3,000 (Control), and 15,000 (Pro) tool calls per month.",
+      "6. Getting started: 3-step setup guide for connecting Claude Desktop to your CFO AI business workspace."
+    ]
+  }
+]

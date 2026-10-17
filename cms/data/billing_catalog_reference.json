@@ -1,0 +1,105 @@
+{
+  "catalog_version": "v2.1-commercial",
+  "verified_at": "2026-10-18T07:20:00Z",
+  "source": "V2_DYNAMIC_PLAN_MATRIX.md / Owner Commercial Spec Reconciled",
+  "currency": "USD",
+  "plans": {
+    "starter": {
+      "price_monthly": 59,
+      "trial_days": 7,
+      "trial_hours": 168,
+      "limits": {
+        "users": 5,
+        "companies": 1,
+        "accounts": 5,
+        "documents": 200,
+        "ai": 50,
+        "imports": 5,
+        "bank_rows": 1000,
+        "transactions": 2000,
+        "ai_accountant": 0,
+        "ai_extraction": 100,
+        "mcp": 500
+      },
+      "features": {
+        "pulse_radar_transactions": true,
+        "bills_documents": true,
+        "ai_cfo": true,
+        "bank_import": true,
+        "team": true,
+        "approvals": false,
+        "payroll": false,
+        "ai_accountant": false,
+        "tax_compliance": "basic",
+        "accounting_export": false,
+        "multi_company": false,
+        "intercompany": false
+      }
+    },
+    "control": {
+      "price_monthly": 149,
+      "recommended": true,
+      "trial_days": 7,
+      "trial_hours": 168,
+      "limits": {
+        "users": 10,
+        "companies": 2,
+        "accounts": 15,
+        "documents": 1000,
+        "ai": 300,
+        "imports": 20,
+        "bank_rows": 10000,
+        "transactions": 10000,
+        "ai_accountant": 50,
+        "ai_extraction": 500,
+        "mcp": 3000
+      },
+      "features": {
+        "pulse_radar_transactions": true,
+        "bills_documents": true,
+        "ai_cfo": true,
+        "bank_import": true,
+        "team": true,
+        "approvals": true,
+        "payroll": true,
+        "ai_accountant": true,
+        "tax_compliance": true,
+        "accounting_export": true,
+        "multi_company": false,
+        "intercompany": false
+      }
+    },
+    "pro": {
+      "price_monthly": 249,
+      "trial_days": 7,
+      "trial_hours": 168,
+      "limits": {
+        "users": 30,
+        "companies": 5,
+        "accounts": 50,
+        "documents": 3000,
+        "ai": 1000,
+        "imports": 100,
+        "bank_rows": 50000,
+        "transactions": 50000,
+        "ai_accountant": 200,
+        "ai_extraction": 1500,
+        "mcp": 15000
+      },
+      "features": {
+        "pulse_radar_transactions": true,
+        "bills_documents": true,
+        "ai_cfo": true,
+        "bank_import": true,
+        "team": true,
+        "approvals": true,
+        "payroll": true,
+        "ai_accountant": true,
+        "tax_compliance": true,
+        "accounting_export": true,
+        "multi_company": true,
+        "intercompany": true
+      }
+    }
+  }
+}

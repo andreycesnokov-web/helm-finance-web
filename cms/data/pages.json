@@ -1,0 +1,150 @@
+[
+  {
+    "slug": "home",
+    "title": "CFO AI — Financial Operating System for Indonesia",
+    "updated_at": "2026-10-18T07:20:00Z",
+    "status": "published",
+    "blocks": [
+      {
+        "id": "hero-block",
+        "type": "hero",
+        "title": "Know your numbers. Control your business.",
+        "badge": "DESIGNED FOR INDONESIA • PT & PT PMA",
+        "subtitle": "Your AI Chief Financial Officer. Real-time cash visibility, document intelligence, automated bank reconciliation, and Indonesian tax compliance — unified in one financial operating system.",
+        "primary_cta_text": "Start Free Trial (7 Days)",
+        "primary_cta_url": "https://app.cfo-ai.site/login",
+        "secondary_cta_text": "Explore Platform Tour",
+        "secondary_cta_url": "/platform",
+        "trial_disclaimer": "No credit card required • Instant company provisioning • Full access for 168 hours",
+        "hero_image": "/assets/product/dashboard-pulse.svg"
+      },
+      {
+        "id": "capabilities-block",
+        "type": "feature_grid",
+        "section_title": "FOUR CORE VALUE PILLARS",
+        "section_heading": "Engineered for Complete Financial Control",
+        "section_subheading": "Eliminate fragmented spreadsheets and disconnects between operations and accounting.",
+        "items": [
+          {
+            "icon": "shield-check",
+            "title": "AI Chief Financial Officer",
+            "description": "Composite health scoring (0-100), automated weekly briefings, and natural language ledger Q&A with voucher citations."
+          },
+          {
+            "icon": "file-search",
+            "title": "Document Intelligence",
+            "description": "Multi-channel intake (Telegram & web upload), AI OCR parsing of vendor names, DPP, and PPN 11% with human verification drawer."
+          },
+          {
+            "icon": "scale",
+            "title": "Regulatory & Tax Intelligence",
+            "description": "Indonesian statutory calendar monitoring, PPh 21 TER, PPh 23, PPN 11%, and CoreTax PMK 81/2024 compliance advisories."
+          },
+          {
+            "icon": "cpu",
+            "title": "Bank Reconciliation & Export",
+            "description": "BCA Giro CSV and Permata e-Statement parsers with one-click downloadable Accountant Readiness Package (ZIP)."
+          }
+        ]
+      },
+      {
+        "id": "product-showcase-1",
+        "type": "product_bento",
+        "section_title": "REAL-TIME VISIBILITY",
+        "section_heading": "Pulse Command Center",
+        "description": "Monitor unified multi-currency liquidity across BCA, Mandiri, Permata, and petty cash floats with real-time runway forecasting.",
+        "image": "/assets/product/dashboard-pulse.svg",
+        "stats": [
+          {
+            "label": "Cash Runway",
+            "value": "162 Days"
+          },
+          {
+            "label": "30-Day Net Flow",
+            "value": "+Rp 148.5M"
+          },
+          {
+            "label": "Reconciliation Status",
+            "value": "100% Balanced"
+          }
+        ]
+      },
+      {
+        "id": "product-showcase-2",
+        "type": "product_bento",
+        "section_title": "PREDICTIVE CASH TRAJECTORY",
+        "section_heading": "Radar Forward Runway",
+        "description": "Step-point cash forecasts over 30, 60, and 90-day horizons with what-if scenario levers simulating delayed receivables and tax installments.",
+        "image": "/assets/product/analytics-radar.svg"
+      },
+      {
+        "id": "pricing-cta-block",
+        "type": "cta_banner",
+        "heading": "Ready to bring complete clarity to your business finances?",
+        "subheading": "Join Indonesian businesses that have streamlined cash visibility, bank reconciliation, and tax readiness.",
+        "cta_text": "Start Free Trial (7 Days)",
+        "cta_url": "https://app.cfo-ai.site/login"
+      }
+    ]
+  },
+  {
+    "slug": "pricing",
+    "title": "Pricing & Subscription Plans — CFO AI",
+    "updated_at": "2026-10-18T07:20:00Z",
+    "status": "published",
+    "blocks": [
+      {
+        "id": "pricing-hero",
+        "type": "hero",
+        "badge": "TRANSPARENT SUBSCRIPTION PRICING",
+        "title": "Simple, Transparent Subscription Pricing",
+        "subtitle": "Designed for Indonesian PT and PT PMA businesses. 7-day free trial on all plans. Zero credit card required at signup."
+      }
+    ]
+  },
+  {
+    "slug": "platform",
+    "title": "Platform Architecture Tour — CFO AI",
+    "updated_at": "2026-10-18T07:20:00Z",
+    "status": "published",
+    "blocks": [
+      {
+        "id": "platform-hero",
+        "type": "hero",
+        "badge": "PLATFORM TOUR",
+        "title": "A Complete Financial Operating System",
+        "subtitle": "Discover how CFO AI replaces fragmented software with a unified, high-integrity financial operations workspace."
+      }
+    ]
+  },
+  {
+    "slug": "document-intelligence",
+    "title": "Document Intelligence & OCR — CFO AI",
+    "updated_at": "2026-10-18T07:20:00Z",
+    "status": "published",
+    "blocks": [
+      {
+        "id": "doc-hero",
+        "type": "hero",
+        "badge": "DOCUMENT INTELLIGENCE",
+        "title": "From Paper Receipt to General Ledger in Seconds",
+        "subtitle": "Eliminate 80% of manual data entry with multimodal vision OCR, human-in-the-loop verification, and automated bank matching."
+      }
+    ]
+  },
+  {
+    "slug": "compliance",
+    "title": "Indonesian Tax & CoreTax Compliance — CFO AI",
+    "updated_at": "2026-10-18T07:20:00Z",
+    "status": "published",
+    "blocks": [
+      {
+        "id": "compliance-hero",
+        "type": "hero",
+        "badge": "STATUTORY RADAR",
+        "title": "Indonesian Tax & CoreTax Radar",
+        "subtitle": "Stay ahead of PPh 21 TER, PPh 23, PPN 11%, and PMK 81/2024 CoreTax transition deadlines with automated calculation worksheets."
+      }
+    ]
+  }
+]

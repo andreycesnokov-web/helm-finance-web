@@ -1,0 +1,130 @@
+[
+  {
+    "code": "en",
+    "name": "English",
+    "nativeName": "English",
+    "status": "published",
+    "isDefault": true,
+    "direction": "ltr"
+  },
+  {
+    "code": "id",
+    "name": "Indonesian",
+    "nativeName": "Bahasa Indonesia",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "ru",
+    "name": "Russian",
+    "nativeName": "Русский",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "fil",
+    "name": "Filipino",
+    "nativeName": "Filipino",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "en-SG",
+    "name": "English (Singapore)",
+    "nativeName": "English (Singapore)",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "th",
+    "name": "Thai",
+    "nativeName": "ไทย",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "vi",
+    "name": "Vietnamese",
+    "nativeName": "Tiếng Việt",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "km",
+    "name": "Khmer",
+    "nativeName": "ភាសាខ្មែរ",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "lo",
+    "name": "Lao",
+    "nativeName": "ພາສາລາວ",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "zh-HK",
+    "name": "Traditional Chinese (Hong Kong)",
+    "nativeName": "繁體中文 (香港)",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "ms",
+    "name": "Malay",
+    "nativeName": "Bahasa Melayu",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "uk",
+    "name": "Ukrainian",
+    "nativeName": "Українська",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "it",
+    "name": "Italian",
+    "nativeName": "Italiano",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "fr",
+    "name": "French",
+    "nativeName": "Français",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "de",
+    "name": "German",
+    "nativeName": "Deutsch",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "es",
+    "name": "Spanish",
+    "nativeName": "Español",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  }
+]

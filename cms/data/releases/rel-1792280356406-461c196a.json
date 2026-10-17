@@ -1,0 +1,1029 @@
+{
+  "release_id": "rel-1792280356406-461c196a",
+  "version": "v202610172339",
+  "hash": "461c196a",
+  "created_at": "2026-10-17T23:39:16.406Z",
+  "author": "test-runner",
+  "notes": "Test Release v2",
+  "pricing_validation": {
+    "isValid": true,
+    "discrepancies": [],
+    "catalogVersion": "v2.1-commercial",
+    "verifiedAt": "2026-10-18T07:20:00Z"
+  },
+  "snapshot": {
+    "pages": [
+      {
+        "slug": "home",
+        "title": "CFO AI — Financial Operating System for Indonesia",
+        "updated_at": "2026-10-17T23:39:16.397Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "hero-block",
+            "type": "hero",
+            "title": "Updated Headline for Testing Rollback",
+            "badge": "DESIGNED FOR INDONESIA • PT & PT PMA",
+            "subtitle": "Your AI Chief Financial Officer. Real-time cash visibility, document intelligence, automated bank reconciliation, and Indonesian tax compliance — unified in one financial operating system.",
+            "primary_cta_text": "Start Free Trial (7 Days)",
+            "primary_cta_url": "https://app.cfo-ai.site/login",
+            "secondary_cta_text": "Explore Platform Tour",
+            "secondary_cta_url": "/platform",
+            "trial_disclaimer": "No credit card required • Instant company provisioning • Full access for 168 hours",
+            "hero_image": "/assets/product/dashboard-pulse.svg"
+          },
+          {
+            "id": "capabilities-block",
+            "type": "feature_grid",
+            "section_title": "FOUR CORE VALUE PILLARS",
+            "section_heading": "Engineered for Complete Financial Control",
+            "section_subheading": "Eliminate fragmented spreadsheets and disconnects between operations and accounting.",
+            "items": [
+              {
+                "icon": "shield-check",
+                "title": "AI Chief Financial Officer",
+                "description": "Composite health scoring (0-100), automated weekly briefings, and natural language ledger Q&A with voucher citations."
+              },
+              {
+                "icon": "file-search",
+                "title": "Document Intelligence",
+                "description": "Multi-channel intake (Telegram & web upload), AI OCR parsing of vendor names, DPP, and PPN 11% with human verification drawer."
+              },
+              {
+                "icon": "scale",
+                "title": "Regulatory & Tax Intelligence",
+                "description": "Indonesian statutory calendar monitoring, PPh 21 TER, PPh 23, PPN 11%, and CoreTax PMK 81/2024 compliance advisories."
+              },
+              {
+                "icon": "cpu",
+                "title": "Bank Reconciliation & Export",
+                "description": "BCA Giro CSV and Permata e-Statement parsers with one-click downloadable Accountant Readiness Package (ZIP)."
+              }
+            ]
+          },
+          {
+            "id": "product-showcase-1",
+            "type": "product_bento",
+            "section_title": "REAL-TIME VISIBILITY",
+            "section_heading": "Pulse Command Center",
+            "description": "Monitor unified multi-currency liquidity across BCA, Mandiri, Permata, and petty cash floats with real-time runway forecasting.",
+            "image": "/assets/product/dashboard-pulse.svg",
+            "stats": [
+              {
+                "label": "Cash Runway",
+                "value": "162 Days"
+              },
+              {
+                "label": "30-Day Net Flow",
+                "value": "+Rp 148.5M"
+              },
+              {
+                "label": "Reconciliation Status",
+                "value": "100% Balanced"
+              }
+            ]
+          },
+          {
+            "id": "product-showcase-2",
+            "type": "product_bento",
+            "section_title": "PREDICTIVE CASH TRAJECTORY",
+            "section_heading": "Radar Forward Runway",
+            "description": "Step-point cash forecasts over 30, 60, and 90-day horizons with what-if scenario levers simulating delayed receivables and tax installments.",
+            "image": "/assets/product/analytics-radar.svg"
+          },
+          {
+            "id": "pricing-cta-block",
+            "type": "cta_banner",
+            "heading": "Ready to bring complete clarity to your business finances?",
+            "subheading": "Join Indonesian businesses that have streamlined cash visibility, bank reconciliation, and tax readiness.",
+            "cta_text": "Start Free Trial (7 Days)",
+            "cta_url": "https://app.cfo-ai.site/login"
+          }
+        ]
+      },
+      {
+        "slug": "pricing",
+        "title": "Pricing & Subscription Plans — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "pricing-hero",
+            "type": "hero",
+            "badge": "TRANSPARENT SUBSCRIPTION PRICING",
+            "title": "Simple, Transparent Subscription Pricing",
+            "subtitle": "Designed for Indonesian PT and PT PMA businesses. 7-day free trial on all plans. Zero credit card required at signup."
+          }
+        ]
+      },
+      {
+        "slug": "platform",
+        "title": "Platform Architecture Tour — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "platform-hero",
+            "type": "hero",
+            "badge": "PLATFORM TOUR",
+            "title": "A Complete Financial Operating System",
+            "subtitle": "Discover how CFO AI replaces fragmented software with a unified, high-integrity financial operations workspace."
+          }
+        ]
+      },
+      {
+        "slug": "document-intelligence",
+        "title": "Document Intelligence & OCR — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "doc-hero",
+            "type": "hero",
+            "badge": "DOCUMENT INTELLIGENCE",
+            "title": "From Paper Receipt to General Ledger in Seconds",
+            "subtitle": "Eliminate 80% of manual data entry with multimodal vision OCR, human-in-the-loop verification, and automated bank matching."
+          }
+        ]
+      },
+      {
+        "slug": "compliance",
+        "title": "Indonesian Tax & CoreTax Compliance — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "compliance-hero",
+            "type": "hero",
+            "badge": "STATUTORY RADAR",
+            "title": "Indonesian Tax & CoreTax Radar",
+            "subtitle": "Stay ahead of PPh 21 TER, PPh 23, PPN 11%, and PMK 81/2024 CoreTax transition deadlines with automated calculation worksheets."
+          }
+        ]
+      }
+    ],
+    "pricing": {
+      "updated_at": "2026-10-17T23:39:16.391Z",
+      "updated_by": "test-runner",
+      "headline": "Simple, Transparent Subscription Pricing",
+      "subheadline": "Designed for Indonesian PT and PT PMA businesses. No hidden setup fees. 7-day free trial on all plans.",
+      "trial_badge": "7-Day Free Trial (Zero Card Required)",
+      "plans": [
+        {
+          "id": "starter",
+          "name": "Starter",
+          "tagline": "Organize Your Finances",
+          "description": "For small businesses that need cash visibility and organized financial records.",
+          "price_monthly": 59,
+          "currency": "USD",
+          "billing_interval": "month",
+          "is_recommended": false,
+          "cta_text": "Start Free Trial (7 Days)",
+          "cta_url": "https://app.cfo-ai.site/login?plan=starter",
+          "capacity_highlights": [
+            {
+              "label": "User Seats",
+              "value": "5 Users"
+            },
+            {
+              "label": "Companies",
+              "value": "1 Company"
+            },
+            {
+              "label": "Monthly Transactions",
+              "value": "2,000 / mo"
+            },
+            {
+              "label": "Document Uploads",
+              "value": "200 / mo"
+            }
+          ],
+          "feature_bullets": [
+            "Pulse real-time cash dashboard",
+            "Transactions, accounts & bills",
+            "Basic AI CFO questions (50/mo)",
+            "Bank statement import (5/mo)",
+            "Basic tax calendar dates"
+          ]
+        },
+        {
+          "id": "control",
+          "name": "Control",
+          "tagline": "Total Operational Control",
+          "description": "For growing businesses needing deeper intelligence, approvals, and tax readiness.",
+          "price_monthly": 149,
+          "currency": "USD",
+          "billing_interval": "month",
+          "is_recommended": true,
+          "badge": "RECOMMENDED • FLAGSHIP",
+          "cta_text": "Start Free Trial (7 Days)",
+          "cta_url": "https://app.cfo-ai.site/login?plan=control",
+          "capacity_highlights": [
+            {
+              "label": "User Seats",
+              "value": "10 Users"
+            },
+            {
+              "label": "Companies",
+              "value": "2 Companies"
+            },
+            {
+              "label": "Monthly Transactions",
+              "value": "10,000 / mo"
+            },
+            {
+              "label": "Document Uploads",
+              "value": "1,000 / mo"
+            }
+          ],
+          "feature_bullets": [
+            "Everything in Starter included",
+            "Financial approvals & staff permissions",
+            "Bank reconciliation (BCA & Permata)",
+            "AI Accountant & monthly close reports",
+            "Indonesian tax calendar & CoreTax updates",
+            "Payroll management workflows"
+          ]
+        },
+        {
+          "id": "pro",
+          "name": "Pro",
+          "tagline": "Multi-Entity & Scaling",
+          "description": "For multi-entity businesses requiring high volume, audit logs, and API access.",
+          "price_monthly": 249,
+          "currency": "USD",
+          "billing_interval": "month",
+          "is_recommended": false,
+          "cta_text": "Start Free Trial (7 Days)",
+          "cta_url": "https://app.cfo-ai.site/login?plan=pro",
+          "capacity_highlights": [
+            {
+              "label": "User Seats",
+              "value": "30 Users"
+            },
+            {
+              "label": "Companies",
+              "value": "5 Companies"
+            },
+            {
+              "label": "Monthly Transactions",
+              "value": "50,000 / mo"
+            },
+            {
+              "label": "Document Uploads",
+              "value": "3,000 / mo"
+            }
+          ],
+          "feature_bullets": [
+            "Everything in Control included",
+            "Group company management (5 entities)",
+            "Intercompany & advanced filing prep",
+            "MCP / API tool calls (15,000/mo)",
+            "Full audit logs & priority queue"
+          ]
+        }
+      ],
+      "usage_limits_table": [
+        {
+          "key": "users",
+          "label": "Users (Active Seats)",
+          "starter": "5",
+          "control": "10",
+          "pro": "30"
+        },
+        {
+          "key": "companies",
+          "label": "Companies (Owned Workspaces)",
+          "starter": "1",
+          "control": "2",
+          "pro": "5"
+        },
+        {
+          "key": "accounts",
+          "label": "Financial Accounts (Wallets)",
+          "starter": "5",
+          "control": "15",
+          "pro": "50"
+        },
+        {
+          "key": "documents",
+          "label": "Documents / Month",
+          "starter": "200",
+          "control": "1,000",
+          "pro": "3,000"
+        },
+        {
+          "key": "ai",
+          "label": "AI CFO Questions / Month",
+          "starter": "50",
+          "control": "300",
+          "pro": "1,000"
+        },
+        {
+          "key": "imports",
+          "label": "Bank Statement Imports / Month",
+          "starter": "5",
+          "control": "20",
+          "pro": "100"
+        },
+        {
+          "key": "bank_rows",
+          "label": "Bank Statement Rows / Month",
+          "starter": "1,000",
+          "control": "10,000",
+          "pro": "50,000"
+        },
+        {
+          "key": "transactions",
+          "label": "Transactions / Period",
+          "starter": "2,000",
+          "control": "10,000",
+          "pro": "50,000"
+        },
+        {
+          "key": "ai_accountant",
+          "label": "AI Accountant Requests / Month",
+          "starter": "0",
+          "control": "50",
+          "pro": "200"
+        },
+        {
+          "key": "ai_extraction",
+          "label": "AI Document Recognition / Month",
+          "starter": "100",
+          "control": "500",
+          "pro": "1,500"
+        },
+        {
+          "key": "mcp",
+          "label": "MCP / API Requests / Month",
+          "starter": "500",
+          "control": "3,000",
+          "pro": "15,000"
+        }
+      ],
+      "feature_availability_table": [
+        {
+          "key": "pulse_radar_transactions",
+          "label": "Pulse, Radar, Transactions, Accounts",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "bills_documents",
+          "label": "Invoices & Bills, Documents",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "ai_cfo",
+          "label": "Basic AI CFO",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "bank_import",
+          "label": "Bank Statement Import",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "team",
+          "label": "Employee Invitations",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "approvals",
+          "label": "Approvals & Spend Authorization",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "payroll",
+          "label": "Payroll Workflows",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "ai_accountant",
+          "label": "AI Accountant Assistant",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "tax_compliance",
+          "label": "Tax & Compliance Monitoring",
+          "starter": "Basic",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "accounting_export",
+          "label": "Reconciliation & Accounting Reports",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "multi_company",
+          "label": "Group Company Management",
+          "starter": "Not Included",
+          "control": "Not Included",
+          "pro": "Included (5 entities)"
+        },
+        {
+          "key": "intercompany",
+          "label": "Intercompany & Advanced Filing Preparation",
+          "starter": "Not Included",
+          "control": "Not Included",
+          "pro": "Included (Pro)"
+        }
+      ],
+      "faqs": [
+        {
+          "question": "How does the 7-day free trial work?",
+          "answer": "You receive full, unrestricted access to your chosen tier for 168 hours (7 days). No credit card is required at signup. At the end of 7 days, your workspace enters read-only mode until a commercial subscription is activated."
+        },
+        {
+          "question": "Can I upgrade or downgrade my tier later?",
+          "answer": "Yes. You can switch between Starter, Control, and Pro at any time from your in-app Billing Center. Upgrades take effect immediately with prorated billing."
+        },
+        {
+          "question": "What happens if I exceed my monthly transaction or OCR limits?",
+          "answer": "We never freeze read access or interrupt core cash visibility. When you approach 80% and 100% of your quota, the system sends an email notification and provides an option to upgrade or purchase additional unit packs."
+        },
+        {
+          "question": "Does CFO AI replace my local Indonesian tax consultant (Konsultan Pajak)?",
+          "answer": "No. CFO AI prepares, structures, and reconciles your general ledger, e-Bupot calculations, and PMK 81/2024 CoreTax schedules. It provides organized readiness exports for your licensed consultant or internal finance team, but does not provide legal tax representation."
+        }
+      ]
+    },
+    "hub_categories": [
+      {
+        "id": "indonesian-taxes-regulations",
+        "name": "Indonesian Taxes & Regulations",
+        "slug": "indonesian-taxes-regulations",
+        "description": "Statutory tax rules, UU HPP, CoreTax PMK 81/2024, PPh 21 TER, PPh 23, PPN, and DJP compliance.",
+        "icon": "scale",
+        "article_count": 3
+      },
+      {
+        "id": "accounting-bookkeeping",
+        "name": "Accounting & Bookkeeping",
+        "slug": "accounting-bookkeeping",
+        "description": "Chart of accounts, reconciliation practices, month-close procedures, and SAK standards for Indonesian PTs.",
+        "icon": "book-open",
+        "article_count": 2
+      },
+      {
+        "id": "cash-flow-financial-management",
+        "name": "Cash Flow & Financial Management",
+        "slug": "cash-flow-financial-management",
+        "description": "Working capital optimization, runway forecasting, AP/AR management, and multi-currency banking.",
+        "icon": "trending-up",
+        "article_count": 2
+      },
+      {
+        "id": "business-operations-indonesia",
+        "name": "Business Operations in Indonesia",
+        "slug": "business-operations-indonesia",
+        "description": "PT PMA establishment, OSS RBA licensing, KBLI compliance, LKPM BKPM reporting, and director governance.",
+        "icon": "building-2",
+        "article_count": 2
+      },
+      {
+        "id": "ai-finance-automation",
+        "name": "AI & Finance Automation",
+        "slug": "ai-finance-automation",
+        "description": "Receipt OCR extraction, conversational CFO intelligence, automated reconciliation, and MCP tool workflows.",
+        "icon": "cpu",
+        "article_count": 2
+      },
+      {
+        "id": "cfo-ai-product-guides",
+        "name": "CFO AI Product Guides",
+        "slug": "cfo-ai-product-guides",
+        "description": "Step-by-step walkthroughs, bank statement imports (BCA/Permata), approval workflows, and multi-company setup.",
+        "icon": "file-text",
+        "article_count": 1
+      }
+    ],
+    "hub_articles": [
+      {
+        "id": "art-01",
+        "slug": "pt-pma-tax-compliance-guide-2026",
+        "category": "indonesian-taxes-regulations",
+        "category_name": "Indonesian Taxes & Regulations",
+        "jurisdiction": "ID",
+        "featured_image": "/assets/blog/pt-pma-tax-guide.svg",
+        "reading_time_minutes": 9,
+        "publication_date": "2026-10-15T08:00:00Z",
+        "last_updated": "2026-10-18T07:00:00Z",
+        "last_legal_review": "2026-10-17T12:00:00Z",
+        "legal_reviewer": "Indonesian Tax Legal Desk (Verified under UU HPP & PMK 81/2024)",
+        "review_status": "published",
+        "author": {
+          "name": "Budi Santoso, SE, Ak, CA",
+          "role": "Senior Tax & Accounting Advisor",
+          "avatar": "/assets/authors/budi-santoso.png"
+        },
+        "tags": [
+          "PT PMA",
+          "Corporate Tax",
+          "PPh 21",
+          "PPN 11%",
+          "CoreTax",
+          "BKPM LKPM"
+        ],
+        "translations": {
+          "en": {
+            "title": "PT PMA Tax Obligations in Indonesia: Complete 2026 Director's Compliance Guide",
+            "excerpt": "A definitive guide for foreign directors and finance leaders navigating Indonesian corporate income tax, withholding rules, PPN 11%, CoreTax transition, and quarterly LKPM filings.",
+            "seo_title": "PT PMA Tax Obligations Indonesia 2026: Director's Compliance Guide | CFO AI",
+            "meta_description": "Comprehensive 2026 guide to Indonesian PT PMA taxation: corporate income tax (PPh Badan), PPh 21 TER, PPh 23, PPN 11%, LKPM reporting, and CoreTax PMK 81/2024 rules.",
+            "canonical_url": "https://cfo-ai.site/en/blog/pt-pma-tax-compliance-guide-2026",
+            "content_markdown": "# PT PMA Tax Obligations in Indonesia: Complete 2026 Director's Compliance Guide\n\nOperating a Foreign Direct Investment Company (**Perseroan Terbatas Penanaman Modal Asing / PT PMA**) in Indonesia offers immense market access across Southeast Asia's largest economy. However, foreign directors frequently discover that Indonesia's corporate tax regime is one of the most rigorously enforced withholding-based systems in the world.\n\nWith the enforcement of the **Tax Harmonization Law (UU No. 7/2021 / UU HPP)** and the transition to the **DJP CoreTax System under PMK No. 81/2024**, foreign-owned enterprises face strict automated data exchange between commercial banks, OSS RBA, and the Directorate General of Taxes (Direktorat Jenderal Pajak / DJP).\n\nThis guide breaks down every core statutory obligation, filing cadence, and documentation standard that foreign directors must maintain in 2026.\n\n---\n\n## 1. Corporate Income Tax (PPh Badan)\n\nThe standard Corporate Income Tax rate in Indonesia is **22%** on taxable net profit (Penghasilan Kena Pajak). \n\n### Key Principles for PT PMA:\n- **No Small Business Lump-Sum:** The 0.5% final gross tax rate (PP 55/2022) available to local micro-enterprises (UMKM) is **strictly not applicable to PT PMAs**. Foreign investment companies must maintain full double-entry accrual bookkeeping under Indonesian Financial Accounting Standards (SAK).\n- **Article 31E Facility:** Companies with gross annual turnover up to Rp 50 Billion receive a **50% discount** on the standard rate (reducing the effective tax to 11%) on the proportion of taxable income derived from turnover up to Rp 4.8 Billion.\n- **Monthly PPh 25 Installments:** Corporate income tax is not paid solely at year-end. Companies must pay monthly advance installments (**PPh Pasal 25**) calculated from the prior year's annual return.\n\n---\n\n## 2. Monthly Withholding Tax Ecosystem (Withholding Obligations)\n\nIn Indonesia, corporate entities act as mandatory withholding agents for the government. If your PT PMA pays a vendor, contractor, landlord, or employee, you are legally obligated to withhold the applicable tax at source, issue an official Withholding Slip (**Bukti Pemotongan / e-Bupot**), and remit the tax to DJP by the statutory deadline.\n\n| Withholding Tax Type | Object of Taxation | Standard Statutory Rate | Filing Deadline | Remittance Deadline |\n| :--- | :--- | :--- | :--- | :--- |\n| **PPh Pasal 21** | Employee salaries, director fees, independent contractors | Progressive Rates / TER (PP 58/2023) | 20th of following month | 10th of following month |\n| **PPh Pasal 23** | Domestic services (consulting, legal, IT, marketing, technical), royalties, dividends | 2% (with NPWP) / 4% (without NPWP) | 20th of following month | 10th of following month |\n| **PPh Pasal 4 ayat (2)** | Office/warehouse rent, land leasing, construction services | 10% Final (Rent) / 1.75% - 4% (Construction) | 20th of following month | 10th of following month |\n| **PPh Pasal 26** | Cross-border payments to foreign entities (management fees, overseas software, interest) | 20% (or reduced Tax Treaty rate with valid DGT-1 form) | 20th of following month | 10th of following month |\n\n> **Critical Compliance Note:** Failure to withhold tax from a vendor invoice does not absolve the PT PMA. Under tax audit, DJP will assess the unpaid withholding tax, plus statutory interest penalties (Tarif Bunga Sanksi Administrasi), directly against the PT PMA.\n\n---\n\n## 3. Value Added Tax (PPN 11%) and PKP Status\n\n- **Threshold:** Any enterprise with gross annual sales exceeding **Rp 4.8 Billion** must register as a Taxable Enterprise (**Pengusaha Kena Pajak / PKP**).\n- **Current PPN Rate:** **11%** (governed under UU HPP).\n- **Faktur Pajak (Electronic Tax Invoices):** Every taxable supply must be backed by an electronic Faktur Pajak generated via e-Faktur or the CoreTax portal within strict timeframes. Failure to issue Faktur Pajak by the 15th of the following month incurs a mandatory 1% penalty on the transaction value.\n- **Input vs. Output Matching:** Companies may credit Input VAT (Pajak Masukan) on business acquisitions against Output VAT (Pajak Keluaran) collected from customers.\n\n---\n\n## 4. Quarterly LKPM Reporting to Ministry of Investment (BKPM)\n\nBeyond tax, PT PMAs are subject to mandatory investment supervision. Under **BKPM Regulation No. 5/2021**, all foreign investment companies must submit the Investment Activity Report (**Laporan Kegiatan Penanaman Modal / LKPM**) electronically via the OSS RBA portal.\n\n### Filing Schedule for Companies with Capital > Rp 500 Million:\n- **Quarter I:** April 1 – 10\n- **Quarter II:** July 1 – 10\n- **Quarter III:** October 1 – 10\n- **Quarter IV:** January 1 – 10\n\n### Reported Financial Data:\n1. Fixed asset additions (machinery, building improvements, office equipment).\n2. Realized working capital expenditures (salaries, raw materials, professional fees).\n3. Indonesian vs. expatriate workforce headcount.\n4. Realization against the mandatory Rp 10 Billion total investment commitment (excluding land and buildings).\n\n*Sanctions:* BKPM issues formal Written Warnings (Surat Peringatan I, II, III). Failure to rectify leads to the immediate freezing and revocation of your Business Identification Number (**NIB**).\n\n---\n\n## 5. CoreTax PMK 81/2024 Readiness for PT PMA Directors\n\nThe implementation of the **CoreTax Administration System (PMK 81/2024)** represents the largest technological leap in Indonesian tax history. CoreTax unifies previously separate portals (DJP Online, e-Billing, e-Faktur, e-Bupot) into a centralized Taxpayer Account Management (TAM) platform.\n\n### Essential Action Checklist:\n1. **16-Digit NPWP Validation:** Ensure that foreign directors have validated their 16-digit Tax Identification Number linked to their KITAS/Passport, and that corporate NPWPs use the new 16-digit format.\n2. **Clean General Ledger Reconciliation:** In CoreTax, banking data submitted by commercial banks (BCA, Mandiri, Permata) is cross-matched against corporate revenue filings in near-real-time. Unreconciled bank inflows will trigger automated inquiries (SP2DK).\n3. **Structured Digital Audit Trail:** Ensure every disbursement has an attached itemized invoice, proof of withholding, and bank payment confirmation.\n\n---\n\n## Statutory Disclaimer\n*This publication is prepared for general informational purposes and operational workflow design. It does not constitute formal legal counsel or statutory audit opinions. Indonesian tax laws and implementing regulations are subject to administrative interpretation. Always verify transactions with your licensed Indonesian Tax Consultant (Konsultan Pajak) or registered Public Accounting Firm (KAP).*"
+          },
+          "id": {
+            "title": "Kewajiban Pajak PT PMA di Indonesia: Panduan Kepatuhan Lengkap Direktur 2026",
+            "excerpt": "Panduan definitif bagi direktur asing dan pimpinan keuangan dalam mengelola PPh Badan, pemotongan pajak, PPN 11%, transisi CoreTax, dan pelaporan LKPM kuartalan.",
+            "seo_title": "Kewajiban Pajak PT PMA Indonesia 2026: Panduan Kepatuhan Direktur | CFO AI",
+            "meta_description": "Panduan komprehensif perpajakan PT PMA 2026: PPh Badan, PPh 21 TER, PPh 23, PPN 11%, pelaporan LKPM BKPM, dan aturan CoreTax PMK 81/2024.",
+            "canonical_url": "https://cfo-ai.site/id/blog/pt-pma-tax-compliance-guide-2026",
+            "content_markdown": "# Kewajiban Pajak PT PMA di Indonesia: Panduan Kepatuhan Lengkap Direktur 2026\n\nMenjalankan Perusahaan Penanaman Modal Asing (**PT PMA**) di Indonesia memberikan peluang pasar yang sangat besar di kawasan Asia Tenggara. Namun, para direktur perusahaan sering kali menyadari bahwa sistem perpajakan Indonesia adalah salah satu rezim pemotongan pajak (*withholding tax*) yang paling ketat penegakannya di dunia.\n\nDengan berlakunya **Undang-Undang Harmonisasi Peraturan Perpajakan (UU No. 7/2021 / UU HPP)** dan masa transisi menuju sistem **CoreTax DJP berdasarkan PMK No. 81/2024**, perusahaan modal asing menghadapi pertukaran data otomatis antara perbankan, OSS RBA, dan Direktorat Jenderal Pajak (DJP).\n\nPanduan ini menguraikan setiap kewajiban hukum utama, jadwal pelaporan, dan standar dokumentasi yang wajib dipatuhi oleh manajemen PT PMA pada tahun 2026.\n\n---\n\n## 1. Pajak Penghasilan Badan (PPh Badan)\n\nTarif umum Pajak Penghasilan Badan di Indonesia adalah **22%** dari Penghasilan Kena Pajak bersih.\n\n### Prinsip Utama untuk PT PMA:\n- **Tidak Berlaku Skema UMKM 0,5%:** Fasilitas PPh Final 0,5% berdasarkan PP 55/2022 untuk usaha mikro **sama sekali tidak berlaku untuk PT PMA**. Perusahaan penanaman modal asing wajib menyelenggarakan pembukuan berpasangan (*double-entry*) berbasis akrual sesuai Standar Akuntansi Keuangan (SAK).\n- **Fasilitas Pasal 31E:** PT PMA dengan peredaran bruto hingga Rp 50 Miliar mendapatkan **diskon tarif 50%** (sehingga tarif efektif menjadi 11%) atas bagian penghasilan kena pajak dari omzet sampai dengan Rp 4,8 Miliar.\n- **Angsuran Bulanan PPh 25:** PPh Badan tidak hanya disetor pada akhir tahun. Perusahaan wajib menyetor angsuran bulanan PPh Pasal 25 yang dihitung dari SPT Tahunan tahun sebelumnya.\n\n---\n\n## 2. Ekosistem Pemotongan Pajak Bulanan (Withholding Tax)\n\nDi Indonesia, badan usaha bertindak sebagai agen pemotong pajak pemerintah. Setiap kali PT PMA membayar tagihan vendor, kontraktor, sewa gedung, atau gaji karyawan, perusahaan wajib memotong pajak di sumber, menerbitkan Bukti Pemotongan (**e-Bupot**), dan menyetorkannya ke kas negara.\n\n| Jenis Pajak Pemotongan | Objek Pajak | Tarif Standar | Batas Waktu Lapor | Batas Waktu Setor |\n| :--- | :--- | :--- | :--- | :--- |\n| **PPh Pasal 21** | Gaji karyawan, upah tenaga ahli, honorarium | Tarif Progresif / TER (PP 58/2023) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n| **PPh Pasal 23** | Jasa teknik, manajemen, konsultasi, sewa aset, dividen | 2% (ber-NPWP) / 4% (tanpa NPWP) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n| **PPh Pasal 4 ayat (2)** | Sewa tanah/bangunan, jasa konstruksi | 10% Final (Sewa) / 1,75% - 4% (Konstruksi) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n| **PPh Pasal 26** | Pembayaran ke entitas luar negeri (manajemen, royalti, bunga) | 20% (atau tarif P3B / Tax Treaty dengan Form DGT-1) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n\n---\n\n## 3. Pajak Pertambahan Nilai (PPN 11%) dan Pengukuhan PKP\n\n- **Ambang Batas PKP:** Perusahaan dengan peredaran bruto melebihi **Rp 4,8 Miliar** dalam satu tahun buku wajib dikukuhkan sebagai Pengusaha Kena Pajak (**PKP**).\n- **Tarif PPN:** **11%** (UU HPP).\n- **Faktur Pajak Elektronik:** Setiap penyerahan Barang/Jasa Kena Pajak wajib disertai Faktur Pajak elektronik (e-Faktur). Keterlambatan penerbitan dikenakan denda administratif 1% dari Dasar Pengenaan Pajak (DPP).\n\n---\n\n## 4. Pelaporan LKPM Kuartalan ke Kementerian Investasi (BKPM)\n\nBerdasarkan **Peraturan BKPM No. 5/2021**, seluruh PT PMA wajib menyampaikan Laporan Kegiatan Penanaman Modal (**LKPM**) secara triwulanan melalui sistem OSS RBA.\n\n### Jadwal Pelaporan Kuartal:\n- **Kuartal I:** 1 – 10 April\n- **Kuartal II:** 1 – 10 Juli\n- **Kuartal III:** 1 – 10 Oktober\n- **Kuartal IV:** 1 – 10 Januari\n\nSanksi ketidakpatuhan meliputi Surat Peringatan I, II, III hingga pencabutan Nomor Induk Berusaha (**NIB**).\n\n---\n\n## Catatan Hukum Resmi\n*Panduan ini disusun untuk tujuan informasi dan persiapan alur kerja operasional. Materi ini bukan merupakan nasihat hukum resmi atau opini audit. Selalu konsultasikan pembukuan dan perpajakan Anda dengan Konsultan Pajak terdaftar atau Kantor Akuntan Publik (KAP).*"
+          },
+          "ru": {
+            "title": "Налоговые обязательства компаний PT PMA в Индонезии: руководство для директоров 2026",
+            "excerpt": "Полное руководство для иностранных директоров и финансовых руководителей: корпоративный налог, налоги у источника, НДС 11%, переход на CoreTax и отчетность LKPM BKPM.",
+            "seo_title": "Налоги PT PMA в Индонезии 2026: Руководство для директоров | CFO AI",
+            "meta_description": "Руководство по налогам компании PT PMA в Индонезии: PPh Badan, удержание PPh 21 TER, PPh 23, НДС 11%, ежеквартальная отчетность LKPM BKPM и система CoreTax PMK 81/2024.",
+            "canonical_url": "https://cfo-ai.site/ru/blog/pt-pma-tax-compliance-guide-2026",
+            "content_markdown": "# Налоговые обязательства компаний PT PMA в Индонезии: руководство для директоров 2026\n\nУправление компанией с иностранными инвестициями (**PT PMA**) в Индонезии открывает доступ к крупнейшей экономике Юго-Восточной Азии. Однако иностранные учредители и директора часто сталкиваются с тем, что налоговая система Индонезии является одной из самых строго контролируемых систем удержания налогов у источника (*withholding tax*).\n\nВ связи с вступлением в силу **Закона о гармонизации налогового законодательства (UU No. 7/2021 / UU HPP)** и переходом на цифровую налоговую платформу **CoreTax (PMK No. 81/2024)**, бизнес в Индонезии находится под прямым автоматическим контролем налоговой службы (DJP) и инвестиционного министерства (BKPM).\n\nВ этом руководстве детально разобраны все обязательства, ставки и график отчетности для директоров PT PMA на 2026 год.\n\n---\n\n## 1. Корпоративный подоходный налог (PPh Badan)\n\nБазовая ставка корпоративного налога на прибыль в Индонезии составляет **22%** от чистой налогооблагаемой прибыли.\n\n### Важные правила для PT PMA:\n- **Упрощенная ставка 0,5% не применяется:** Льготный налог с оборота 0,5% для малого бизнеса (PP 55/2022) **категорически запрещен для компаний PT PMA**. Иностранные предприятия обязаны вести полноценный бухгалтерский учет по методу начисления в соответствии с индонезийскими стандартами SAK.\n- **Льгота по Статье 31E:** Компании с годовой выручкой до 50 млрд индонезийских рупий получают **скидку 50%** на ставку налога (эффективная ставка 11%) на долю прибыли, приходящуюся на оборот до 4,8 млрд IDR.\n- **Ежемесячные авансовые платежи PPh 25:** Налог на прибыль не выплачивается разово в конце года. Компания обязана ежемесячно перечислять авансовые взносы PPh 25, рассчитанные на базе предыдущей годовой декларации.\n\n---\n\n## 2. Налоги у источника выплаты (Withholding Taxes)\n\nВ Индонезии юридические лица являются налоговыми агентами государства. При оплате услуг подрядчиков, аренды или зарплат компания обязана удержать налог, выпустить официальную справку об удержании (**e-Bupot**) и перечислить налог в бюджет.\n\n| Тип налога | Объект налогообложения | Ставка | Срок подачи декларации | Срок уплаты налога |\n| :--- | :--- | :--- | :--- | :--- |\n| **PPh 21** | Заработная плата сотрудников, вознаграждения директоров | Прогрессивная шкала / TER (PP 58/2023) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n| **PPh 23** | Услуги местных компаний (консалтинг, IT, маркетинг, аренда оборудования) | 2% (с NPWP) / 4% (без NPWP) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n| **PPh 4(2)** | Аренда офиса, земли, складов, строительные работы | 10% (Аренда) / 1.75% - 4% (Стройка) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n| **PPh 26** | Выплаты иностранным компаниям (роялти, зарубежное ПО, проценты) | 20% (или сниженная ставка по соглашению об избежании двойного налогообложения с формой DGT-1) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n\n---\n\n## 3. НДС (PPN 11%) и статус PKP\n\n- **Порог обязательной регистрации:** При достижении выручки свыше **4,8 млрд индонезийских рупий** за финансовый год компания обязана зарегистрироваться плательщиком НДС (**PKP**).\n- **Ставка НДС:** **11%**.\n- **Электронные счета-фактуры (Faktur Pajak):** Каждая облагаемая операция должна сопровождаться электронной фактурой, сформированной в государственной системе e-Faktur.\n\n---\n\n## 4. Ежеквартальная отчетность LKPM в BKPM\n\nСогласно **Положению BKPM № 5/2021**, все компании PT PMA обязаны ежеквартально подавать инвестиционный отчет (**LKPM**) через портал OSS RBA.\n\n### Календарь сдачи LKPM:\n- **I квартал:** 1 – 10 апреля\n- **II квартал:** 1 – 10 июля\n- **III квартал:** 1 – 10 октября\n- **IV квартал:** 1 – 10 января\n\nНесоблюдение сроков влечет выдачу предупреждений (SP 1, SP 2, SP 3) и аннулирование лицензии NIB.\n\n---\n\n## Официальная правовая оговорка\n*Данный материал подготовлен исключительно в информационных целях и для организации финансовых процессов. Он не является официальной юридической консультацией или аудиторским заключением. Всегда сверяйте налоговые расчеты с лицензированным индонезийским налоговым консультантом (Konsultan Pajak) или аудиторской компанией (KAP).*"
+          }
+        }
+      },
+      {
+        "id": "art-02",
+        "slug": "pph-21-ter-calculation-rules-indonesia",
+        "category": "indonesian-taxes-regulations",
+        "category_name": "Indonesian Taxes & Regulations",
+        "jurisdiction": "ID",
+        "featured_image": "/assets/blog/pph-21-ter-guide.svg",
+        "reading_time_minutes": 8,
+        "publication_date": "2026-10-16T09:00:00Z",
+        "last_updated": "2026-10-18T07:00:00Z",
+        "last_legal_review": "2026-10-17T14:00:00Z",
+        "legal_reviewer": "Indonesian Payroll & Tax Advisory Panel",
+        "review_status": "published",
+        "author": {
+          "name": "Siti Rahmawati, Ak, BKP",
+          "role": "Payroll & Withholding Tax Specialist",
+          "avatar": "/assets/authors/siti-rahmawati.png"
+        },
+        "tags": [
+          "PPh 21",
+          "TER",
+          "PP 58/2023",
+          "PMK 168/2023",
+          "Payroll",
+          "PTKP"
+        ],
+        "translations": {
+          "en": {
+            "title": "PPh 21 TER Withholding Tax Under PP 58/2023: Formulas, Monthly Brackets & Payroll Reconciliation",
+            "excerpt": "A practical guide to implementing Indonesia's Effective Average Tax Rate (TER) mechanism for monthly employee payroll, bonus adjustments, and December year-end reconciliations.",
+            "seo_title": "PPh 21 TER Calculation Rules Indonesia PP 58/2023 | CFO AI",
+            "meta_description": "Master Indonesia's PPh 21 TER monthly withholding rules under PP 58/2023 and PMK 168/2023. Categories A, B, C brackets, payroll formulas, and December reconciliation steps.",
+            "canonical_url": "https://cfo-ai.site/en/blog/pph-21-ter-calculation-rules-indonesia",
+            "content_markdown": "# PPh 21 TER Withholding Tax Under PP 58/2023: Formulas, Monthly Brackets & Payroll Reconciliation\n\nStarting in 2024 and cemented under **Government Regulation (PP) No. 58/2023** and **Finance Minister Regulation (PMK) No. 168/2023**, Indonesia completely restructured how personal income tax (**PPh Pasal 21**) is withheld from monthly employee compensation.\n\nThe historical method—which required payroll clerks to annualize monthly income, subtract occupational allowances (Biaya Jabatan) and non-taxable income (PTKP), calculate progressive Article 17 brackets, and divide by 12 every single month—has been abolished for months January through November.\n\nIn its place stands the **Tarif Efektif Rata-Rata (TER)** mechanism: a simplified monthly lookup table based on gross earnings, coupled with a mandatory reconciliation in December.\n\n---\n\n## 1. The Three Monthly TER Categories (A, B, C)\n\nThe applicable monthly TER bracket depends strictly on the employee's non-taxable income status (**Penghasilan Tidak Kena Pajak / PTKP**) at the beginning of the tax year:\n\n### Category A\n- **Applicable to:** Single with no dependents (TK/0), Single with 1 dependent (TK/1), or Married with no dependents (K/0).\n- **Brackets:** 44 distinct monthly salary tiers. Gross monthly income up to Rp 5,400,000 incurs **0%** withholding. Above Rp 5.4M, rates start at 0.25% and scale up to 34% for monthly earnings over Rp 1.4 Billion.\n\n### Category B\n- **Applicable to:** TK/2, TK/3, K/1, K/2.\n- **Brackets:** 40 tiers. Zero-tax threshold extends up to Rp 6,200,000 per month (0%).\n\n### Category C\n- **Applicable to:** Married with 3 dependents (K/3).\n- **Brackets:** 41 tiers. Zero-tax threshold extends up to Rp 6,600,000 per month (0%).\n\n---\n\n## 2. Monthly Calculation Formula (January – November)\n\nDuring months 1 through 11, withholding calculation requires only one simple multiplication:\n\n$$\\text{Monthly PPh 21 Withholding} = \\text{Gross Monthly Earnings} \\times \\text{TER Rate (\\%)}$$\n\n### Worked Example:\n- Employee: Senior Developer, status K/1 (Category B).\n- Gross Salary in March: Rp 18,500,000.\n- Lookup in Category B Table: Monthly gross between Rp 17,750,000 and Rp 19,500,000 carries a TER rate of **7%**.\n- Monthly Withholding: $\\text{Rp } 18,500,000 \\times 7\\% = \\mathbf{\\text{Rp } 1,295,000}$.\n\n---\n\n## 3. The December Month-Close Reconciliation\n\nThe monthly TER rate is an *administrative withholding estimate*. It does not replace the permanent annual progressive rates under Article 17 paragraph (1) letter a of the Income Tax Law.\n\nIn December (the final tax period of the year), the employer must perform an annual true-up:\n1. Sum all gross compensation earned from January to December (including base salary, allowances, bonuses, THR, and employer-paid BPJS contributions).\n2. Deduct allowable annual deductions: Biaya Jabatan (5% of gross, max Rp 6,000,000/year), employee BPJS Ketenagakerjaan contributions (JHT 2%, JP 1%), and the employee's annual PTKP.\n3. Compute the **Actual Annual PPh 21** using progressive Article 17 brackets (5% up to Rp 60M, 15% from Rp 60M to Rp 250M, 25% from Rp 250M to Rp 500M, 30% from Rp 500M to Rp 5B, 35% above Rp 5B).\n4. Deduct the total PPh 21 already withheld during January through November.\n5. The difference is the December withholding amount (or refund if over-withheld).\n\n$$\\text{PPh 21 December} = \\text{Total Annual Article 17 Tax} - \\sum_{m=1}^{11} \\text{PPh 21 Paid (TER)}$$\n\n---\n\n## Statutory Disclaimer\n*This article provides operational payroll calculation guidance. It does not replace formal tax consultations. Always verify complex severance, expatriate tax residency, or multi-employer scenarios with a licensed Indonesian tax advisor.*"
+          },
+          "id": {
+            "title": "Perhitungan PPh 21 TER Berdasarkan PP 58/2023: Formula, Tarif Bulanan & Rekonsiliasi Payroll",
+            "excerpt": "Panduan praktis penerapan Tarif Efektif Rata-Rata (TER) PPh Pasal 21 untuk gaji karyawan, tunjangan hari raya (THR), dan rekonsiliasi masa pajak Desember.",
+            "seo_title": "Perhitungan PPh 21 TER PP 58/2023 Indonesia | CFO AI",
+            "meta_description": "Panduan lengkap perhitungan PPh 21 TER berdasarkan PP 58/2023 dan PMK 168/2023. Kategori A, B, C, formula potongan bulanan, dan rekonsiliasi akhir tahun Desember.",
+            "canonical_url": "https://cfo-ai.site/id/blog/pph-21-ter-calculation-rules-indonesia",
+            "content_markdown": "# Perhitungan PPh 21 TER Berdasarkan PP 58/2023: Formula, Tarif Bulanan & Rekonsiliasi Payroll\n\nSejak berlakunya **Peraturan Pemerintah (PP) No. 58/2023** dan **Peraturan Menteri Keuangan (PMK) No. 168/2023**, mekanisme pemotongan Pajak Penghasilan Pasal 21 atas penghasilan karyawan di Indonesia mengalami penyederhanaan yang mendasar.\n\nMetode lama yang mewajibkan perusahaan menghitung estimasi penghasilan neto disetahunkan setiap bulan kini telah dihapus untuk masa pajak Januari sampai dengan November. Sebagai gantinya, pemerintah memberlakukan mekanisme **Tarif Efektif Rata-Rata (TER)** bulanan.\n\n---\n\n## 1. Tiga Kategori TER Bulanan (A, B, dan C)\n\nPenentuan tabel TER yang berlaku didasarkan pada status Penghasilan Tidak Kena Pajak (**PTKP**) karyawan pada awal tahun pajak:\n- **Kategori A:** TK/0, TK/1, K/0 (Batas nihil pajak hingga Rp 5,4 juta per bulan).\n- **Kategori B:** TK/2, TK/3, K/1, K/2 (Batas nihil pajak hingga Rp 6,2 juta per bulan).\n- **Kategori C:** K/3 (Batas nihil pajak hingga Rp 6,6 juta per bulan).\n\n---\n\n## 2. Formula Pemotongan Masa Januari – November\n\n$$\\text{PPh 21 Masa Bulanan} = \\text{Penghasilan Bruto Sebulan} \\times \\text{Tarif TER (\\%)}$$\n\nPerhitungan bulanan menjadi instan dan mengurangi risiko perbedaan kalkulasi manual di bagian HR dan keuangan.\n\n---\n\n## 3. Rekonsiliasi Masa Pajak Desember\n\nPada bulan Desember, perusahaan menghitung kembali total PPh 21 terutang setahun penuh menggunakan tarif progresif Pasal 17 ayat (1) huruf a UU PPh, kemudian dikurangi seluruh pemotongan TER yang telah disetor dari Januari hingga November."
+          },
+          "ru": {
+            "title": "Расчет налога на доходы PPh 21 TER по PP 58/2023: формулы, шкалы и зарплатный учет в Индонезии",
+            "excerpt": "Практическое руководство по расчету подоходного налога сотрудников в Индонезии по новой системе TER: сетки категорий A, B, C, расчет бонусов и сверка в декабре.",
+            "seo_title": "Расчет налога PPh 21 TER Индонезия PP 58/2023 | CFO AI",
+            "meta_description": "Правила расчета налога с зарплат PPh 21 TER в Индонезии по постановлениям PP 58/2023 и PMK 168/2023. Категории ставок A, B, C, учет бонусов и декабрьская сверка.",
+            "canonical_url": "https://cfo-ai.site/ru/blog/pph-21-ter-calculation-rules-indonesia",
+            "content_markdown": "# Расчет налога на доходы PPh 21 TER по PP 58/2023: формулы, шкалы и зарплатный учет в Индонезии\n\nС 2024 года в соответствии с **Постановлением Правительства (PP) № 58/2023** и **Постановлением Минфина (PMK) № 168/2023** Индонезия кардинально обновила порядок удержания подоходного налога с физических лиц (**PPh 21**).\n\nСтарый сложный алгоритм, требовавший ежемесячного приведения зарплаты к годовому эквиваленту и вычета необлагаемого минимума, заменен механизмом **средних эффективных ставок (TER)** для месяцев с января по ноябрь.\n\n---\n\n## 1. Три категории ставок TER (A, B, C)\n\nКатегория зависит от семейного статуса сотрудника (**PTKP**) на 1 января налогового года:\n- **Категория A:** Холост/не замужем без иждивенцев (TK/0, TK/1), женат/замужем без детей (K/0). Необлагаемый порог — до 5,4 млн рупий в месяц (0%).\n- **Категория B:** TK/2, TK/3, K/1, K/2. Необлагаемый порог — до 6,2 млн рупий в месяц (0%).\n- **Категория C:** Женат/замужем с 3 детьми (K/3). Необлагаемый порог — до 6,6 млн рупий в месяц (0%).\n\n---\n\n## 2. Формула ежемесячного удержания (январь – ноябрь)\n\n$$\\text{Удержание PPh 21} = \\text{Грязный доход за месяц (Gross)} \\times \\text{Ставка TER (\\%)}$$\n\nВ декабре работодатель рассчитывает совокупный годовой налог по постоянной прогрессивной шкале Статьи 17 и вычитает суммы, уплаченные по TER за предыдущие 11 месяцев."
+          }
+        }
+      },
+      {
+        "id": "art-03",
+        "slug": "coretax-pmk-81-2024-transition-guide",
+        "category": "indonesian-taxes-regulations",
+        "category_name": "Indonesian Taxes & Regulations",
+        "jurisdiction": "ID",
+        "featured_image": "/assets/blog/coretax-transition-guide.svg",
+        "reading_time_minutes": 10,
+        "publication_date": "2026-10-17T10:00:00Z",
+        "last_updated": "2026-10-18T07:00:00Z",
+        "last_legal_review": "2026-10-17T16:00:00Z",
+        "legal_reviewer": "Indonesian Tax Modernization Research Taskforce",
+        "review_status": "published",
+        "author": {
+          "name": "Budi Santoso, SE, Ak, CA",
+          "role": "Senior Tax & Accounting Advisor",
+          "avatar": "/assets/authors/budi-santoso.png"
+        },
+        "tags": [
+          "CoreTax",
+          "PMK 81/2024",
+          "DJP Online",
+          "e-Bupot",
+          "Tax Compliance",
+          "Bank Data Matching"
+        ],
+        "translations": {
+          "en": {
+            "title": "CoreTax PMK 81/2024 Transition: Preparing Bank Feeds, e-Bupot & General Ledgers",
+            "excerpt": "How Indonesian businesses must adapt their ERPs, bank statement reconciliation, and invoice matching ahead of the mandatory CoreTax system rollout under PMK 81/2024.",
+            "seo_title": "CoreTax Indonesia PMK 81/2024 Transition Guide | CFO AI",
+            "meta_description": "Complete transition runbook for Indonesia's CoreTax platform under PMK 81/2024. Bank statement data matching, 16-digit NPWP, e-Bupot unifikasi, and general ledger preparation.",
+            "canonical_url": "https://cfo-ai.site/en/blog/coretax-pmk-81-2024-transition-guide",
+            "content_markdown": "# CoreTax PMK 81/2024 Transition: Preparing Bank Feeds, e-Bupot & General Ledgers\n\nIndonesia's Directorate General of Taxes (DJP) is executing the most comprehensive digital transformation in its history: the **CoreTax Administration System (Sistem Inti Administrasi Perpajakan / SIAP)**, codified under **Finance Minister Regulation (PMK) No. 81/2024**.\n\nCoreTax is not simply a visual redesign of DJP Online. It represents a unified data architecture where 21 distinct administrative processes—including taxpayer registration, e-Faktur issuance, e-Bupot unifikasi, tax deposits, refund requests, and audit tracking—are consolidated into a real-time **Taxpayer Account Management (TAM)** core.\n\nFor Indonesian business owners and CFOs, CoreTax fundamentally eliminates the buffer between operational accounting and tax enforcement. Under CoreTax, commercial bank feeds, customs declarations, and supplier invoices are continuously reconciled against reported tax filings.\n\n---\n\n## 1. Structural Changes Codified Under PMK 81/2024\n\n### A. Unified 16-Digit Taxpayer Identification\nAll corporate and individual taxpayers are unified under a standard 16-digit format. For Indonesian citizens, this corresponds to the National Identity Number (NIK). For corporate entities and foreign nationals, the legacy 15-digit NPWP is migrated to an updated 16-digit format. Systems issuing invoices or withholding slips with invalid NPWPs are rejected automatically at API boundaries.\n\n### B. Interoperable e-Bupot Unifikasi 2.0\nUnder CoreTax, withholding slips are no longer isolated XML uploads. When Company A withholds PPh 23 on a service fee paid to Company B, the e-Bupot voucher is instantly posted to Company B's Taxpayer Account. Company B can immediately claim the tax credit without manual document exchange or lost physical paper copies.\n\n### C. Automated Bank Data Triangulation\nUnder Law No. 9/2017 and PMK 81/2024, commercial banks in Indonesia (including BCA, Mandiri, BRI, BNI, and Permata) report transaction velocity and account balance snapshots to DJP. In CoreTax, discrepancies between gross bank inflows and reported taxable revenue trigger automated **SP2DK** (Surat Permintaan Penjelasan atas Data dan/atau Keterangan) inquiry letters within weeks, rather than years later during retrospective audits.\n\n---\n\n## 2. The 5-Step CoreTax Preparation Runbook\n\nFinance teams must execute five audit steps before the full mandatory cutover:\n\n1. **Clean General Ledger Reconciliation:** Ensure that every bank transaction in your corporate accounts (BCA Giro, Permata, cash) is tied to a documented invoice or balance transfer. Unreconciled bank lines will be presumed taxable revenue under audit.\n2. **Counterparty NPWP 16-Digit Master Audit:** Run an audit across your active vendor and client databases to ensure all legal entities have recorded valid 16-digit NPWPs and accurate registered business addresses.\n3. **DPP and PPN Separation:** Verify that accounting entries strictly segregate Base Tax Value (DPP) from PPN 11% and withholding taxes, matching the electronic Faktur Pajak.\n4. **Employee PTKP Status Review:** Verify employee marital and dependent declarations (TK/0 through K/3) to ensure monthly PPh 21 TER brackets are applied accurately.\n5. **Standardized Readiness Package Export:** Implement accounting tools capable of generating unified month-close reconciliation archives (CSV and PDF) for instant verification.\n\n---\n\n## 3. How CFO AI Accelerates CoreTax Readiness\n\nCFO AI was engineered from the ground up to support modern Indonesian tax compliance:\n- Automated OCR extracting vendor legal names, 16-digit NPWPs, DPP, and PPN 11%.\n- Direct bank reconciliation matching imported BCA Giro CSVs and Permata PDFs against unpaid bills.\n- One-click downloadable **Accountant Readiness Package (ZIP)** containing clean reconciliation CSVs and bilingual summary reports formatted for immediate compliance review.\n\n---\n\n## Statutory Disclaimer\n*This article is published for technical and administrative preparation purposes. It does not replace advice from a licensed Indonesian tax attorney or registered Konsultan Pajak.*"
+          },
+          "id": {
+            "title": "Transisi CoreTax PMK 81/2024: Mempersiapkan Rekonsiliasi Bank, e-Bupot & Buku Besar",
+            "excerpt": "Langkah strategis perusahaan Indonesia dalam menyesuaikan sistem akuntansi, pembukuan bank, dan pencocokan faktur menjelang pemberlakuan CoreTax DJP PMK 81/2024.",
+            "seo_title": "Panduan Transisi CoreTax PMK 81/2024 Indonesia | CFO AI",
+            "meta_description": "Panduan lengkap transisi CoreTax Indonesia berdasarkan PMK 81/2024. Rekonsiliasi rekening koran, NPWP 16 digit, e-Bupot unifikasi, dan kesiapan buku besar.",
+            "canonical_url": "https://cfo-ai.site/id/blog/coretax-pmk-81-2024-transition-guide",
+            "content_markdown": "# Transisi CoreTax PMK 81/2024: Mempersiapkan Rekonsiliasi Bank, e-Bupot & Buku Besar\n\nDirektorat Jenderal Pajak (DJP) tengah mengimplementasikan transformasi digital terbesar dalam sejarah administrasi perpajakan nasional: **Sistem Inti Administrasi Perpajakan (CoreTax)** yang diatur dalam **Peraturan Menteri Keuangan (PMK) No. 81/2024**.\n\nCoreTax bukan sekadar pembaruan tampilan DJP Online, melainkan penggabungan 21 proses bisnis perpajakan ke dalam satu platform terpadu (**Taxpayer Account Management**).\n\nBagi pemilik bisnis dan direktur keuangan di Indonesia, CoreTax menuntut rekonsiliasi yang jauh lebih akurat antara catatan perbankan operasional dan pelaporan pajak.\n\n---\n\n## Poin-Poin Kunci PMK 81/2024:\n1. **NPWP 16 Digit Terpadu:** Standarisasi nomor identitas perpajakan.\n2. **e-Bupot Unifikasi 2.0:** Integrasi otomatis bukti potong antar wajib pajak.\n3. **Pencocokan Data Rekening Bank:** Rekonsiliasi mutasi rekening koran dengan SPT yang dilaporkan."
+          },
+          "ru": {
+            "title": "Переход на налоговую систему CoreTax PMK 81/2024: банковские выписки, e-Bupot и главная книга",
+            "excerpt": "Как бизнесу в Индонезии подготовить бухгалтерский учет, сверку банковских выписок и счета-фактуры к запуску единой государственной системы CoreTax по PMK 81/2024.",
+            "seo_title": "Переход на CoreTax Индонезия PMK 81/2024 | CFO AI",
+            "meta_description": "Руководство по внедрению CoreTax в Индонезии по постановлению PMK 81/2024. Сверка банковских выписок, 16-значный NPWP, справки e-Bupot и аудит главной книги.",
+            "canonical_url": "https://cfo-ai.site/ru/blog/coretax-pmk-81-2024-transition-guide",
+            "content_markdown": "# Переход на налоговую систему CoreTax PMK 81/2024: банковские выписки, e-Bupot и главная книга\n\nНалоговая служба Индонезии (DJP) реализует крупнейшую цифровую трансформацию в истории страны — запуск **Единой системы налогового администрирования (CoreTax)**, закрепленной в **Постановлении Минфина (PMK) № 81/2024**.\n\nCoreTax объединяет 21 разрозненный налоговый процесс в централизованную систему управления счетами налогоплательщиков (**Taxpayer Account Management**).\n\nВ системе CoreTax данные банковских транзакций напрямую сопоставляются с заявленной налоговой выручкой, что требует от бизнеса ежедневной точности в учете."
+          }
+        }
+      }
+    ],
+    "navigation": {
+      "header": {
+        "logo_text": "CFO AI",
+        "logo_tagline": "Financial Operating System",
+        "links": [
+          {
+            "label": "Platform",
+            "url": "/platform",
+            "is_external": false
+          },
+          {
+            "label": "Document Intelligence",
+            "url": "/document-intelligence",
+            "is_external": false
+          },
+          {
+            "label": "Tax & Compliance",
+            "url": "/compliance",
+            "is_external": false
+          },
+          {
+            "label": "Knowledge Hub",
+            "url": "/blog",
+            "is_external": false
+          },
+          {
+            "label": "Pricing",
+            "url": "/pricing",
+            "is_external": false
+          }
+        ],
+        "login_button": {
+          "label": "Log in",
+          "url": "https://app.cfo-ai.site/login"
+        },
+        "cta_button": {
+          "label": "Start Free Trial",
+          "url": "https://app.cfo-ai.site/login"
+        }
+      },
+      "footer": {
+        "brand_description": "AI-powered financial operating system for businesses operating in Indonesia. Real-time cash visibility, document intelligence, automated bank reconciliation, and regulatory monitoring.",
+        "columns": [
+          {
+            "title": "Platform",
+            "links": [
+              {
+                "label": "Pulse Command Center",
+                "url": "/platform#pulse"
+              },
+              {
+                "label": "Radar Cash Trajectory",
+                "url": "/platform#radar"
+              },
+              {
+                "label": "Document Intelligence",
+                "url": "/document-intelligence"
+              },
+              {
+                "label": "Bank Reconciliation",
+                "url": "/platform#bank-import"
+              },
+              {
+                "label": "Pricing & Plans",
+                "url": "/pricing"
+              }
+            ]
+          },
+          {
+            "title": "Knowledge Hub",
+            "links": [
+              {
+                "label": "All Tax & Business Guides",
+                "url": "/blog"
+              },
+              {
+                "label": "PT PMA Compliance Guide",
+                "url": "/blog/pt-pma-tax-compliance-guide-2026"
+              },
+              {
+                "label": "PPh 21 TER Formulas",
+                "url": "/blog/pph-21-ter-calculation-rules-indonesia"
+              },
+              {
+                "label": "CoreTax PMK 81/2024",
+                "url": "/blog/coretax-pmk-81-2024-transition-guide"
+              }
+            ]
+          },
+          {
+            "title": "Compliance & Security",
+            "links": [
+              {
+                "label": "Indonesian Tax Radar",
+                "url": "/compliance"
+              },
+              {
+                "label": "CoreTax Integration",
+                "url": "/compliance#coretax"
+              },
+              {
+                "label": "Security & Tenant Isolation",
+                "url": "/platform#security"
+              },
+              {
+                "label": "Statutory Disclaimers",
+                "url": "/compliance#disclaimers"
+              }
+            ]
+          },
+          {
+            "title": "Company",
+            "links": [
+              {
+                "label": "Sign In to Application",
+                "url": "https://app.cfo-ai.site/login"
+              },
+              {
+                "label": "7-Day Free Trial",
+                "url": "https://app.cfo-ai.site/login"
+              },
+              {
+                "label": "Status & Uptime",
+                "url": "#"
+              },
+              {
+                "label": "Privacy Policy",
+                "url": "#"
+              }
+            ]
+          }
+        ],
+        "copyright": "© 2026 CFO AI Indonesia. All rights reserved.",
+        "statutory_note": "CFO AI is a financial management and operational accounting preparation software. It does not issue statutory audit opinions or replace a registered Indonesian tax consultant (Konsultan Pajak)."
+      }
+    },
+    "seo": {
+      "site_name": "CFO AI Indonesia",
+      "base_url": "https://cfo-ai.site",
+      "default_title": "CFO AI — Financial Operating System for Indonesia",
+      "default_description": "AI-powered financial management, automated bank statement reconciliation, document intelligence, and Indonesian tax compliance for PT and PT PMA companies.",
+      "default_og_image": "https://cfo-ai.site/assets/product/dashboard-pulse.svg",
+      "twitter_handle": "@cfo_ai_id",
+      "robots_directives": {
+        "allow_all_crawlers": true,
+        "disallow_paths": [
+          "/admin/",
+          "/api/cms/",
+          "/preview/"
+        ],
+        "sitemap_url": "https://cfo-ai.site/sitemap.xml"
+      },
+      "redirects": [
+        {
+          "from": "/signup",
+          "to": "https://app.cfo-ai.site/login",
+          "status": 301
+        },
+        {
+          "from": "/register",
+          "to": "https://app.cfo-ai.site/login",
+          "status": 301
+        },
+        {
+          "from": "/features",
+          "to": "/platform",
+          "status": 301
+        },
+        {
+          "from": "/tax-compliance",
+          "to": "/compliance",
+          "status": 301
+        },
+        {
+          "from": "/ocr",
+          "to": "/document-intelligence",
+          "status": 301
+        },
+        {
+          "from": "/blog/pt-pma-tax-guide-2025",
+          "to": "/blog/pt-pma-tax-compliance-guide-2026",
+          "status": 301
+        }
+      ],
+      "pages_meta": {
+        "home": {
+          "title": "CFO AI — Financial Operating System for Indonesia",
+          "description": "Real-time cash visibility, document OCR, automated bank reconciliation, and Indonesian tax compliance for PT and PT PMA companies.",
+          "canonical": "https://cfo-ai.site/"
+        },
+        "pricing": {
+          "title": "Transparent Subscription Pricing — CFO AI Indonesia",
+          "description": "Simple B2B SaaS pricing ($59, $149, $249/mo) with full usage limits and feature comparison for Indonesian businesses. 7-day free trial.",
+          "canonical": "https://cfo-ai.site/pricing"
+        },
+        "platform": {
+          "title": "Platform Tour & Architecture — CFO AI Indonesia",
+          "description": "Explore CFO AI's core modules: Pulse Cash Command, Radar Forecasts, AI Executive Briefings, and Bank Import Reconciliation.",
+          "canonical": "https://cfo-ai.site/platform"
+        },
+        "document-intelligence": {
+          "title": "Document Intelligence & OCR Verification — CFO AI",
+          "description": "Automated invoice and receipt processing with DPP and PPN 11% extraction, human-in-the-loop review drawer, and bank matching.",
+          "canonical": "https://cfo-ai.site/document-intelligence"
+        },
+        "compliance": {
+          "title": "Indonesian Tax & CoreTax PMK 81/2024 Radar — CFO AI",
+          "description": "Statutory compliance tracking for PPh 21 TER, PPh 23, PPN 11%, and DJP CoreTax transition workflows in Indonesia.",
+          "canonical": "https://cfo-ai.site/compliance"
+        },
+        "hub": {
+          "title": "Knowledge Hub & Tax Guides — CFO AI Indonesia",
+          "description": "Authoritative guides on Indonesian corporate tax compliance, PPh 21 TER calculations, bank reconciliation, and business operations.",
+          "canonical": "https://cfo-ai.site/blog"
+        }
+      }
+    },
+    "locales": [
+      {
+        "code": "en",
+        "name": "English",
+        "nativeName": "English",
+        "status": "published",
+        "isDefault": true,
+        "direction": "ltr"
+      },
+      {
+        "code": "id",
+        "name": "Indonesian",
+        "nativeName": "Bahasa Indonesia",
+        "status": "published",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "ru",
+        "name": "Russian",
+        "nativeName": "Русский",
+        "status": "published",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "fil",
+        "name": "Filipino",
+        "nativeName": "Filipino",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "en-SG",
+        "name": "English (Singapore)",
+        "nativeName": "English (Singapore)",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "th",
+        "name": "Thai",
+        "nativeName": "ไทย",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "vi",
+        "name": "Vietnamese",
+        "nativeName": "Tiếng Việt",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "km",
+        "name": "Khmer",
+        "nativeName": "ភាសាខ្មែរ",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "lo",
+        "name": "Lao",
+        "nativeName": "ພາສາລາວ",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "zh-HK",
+        "name": "Traditional Chinese (Hong Kong)",
+        "nativeName": "繁體中文 (香港)",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "ms",
+        "name": "Malay",
+        "nativeName": "Bahasa Melayu",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "uk",
+        "name": "Ukrainian",
+        "nativeName": "Українська",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "it",
+        "name": "Italian",
+        "nativeName": "Italiano",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "fr",
+        "name": "French",
+        "nativeName": "Français",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "de",
+        "name": "German",
+        "nativeName": "Deutsch",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "es",
+        "name": "Spanish",
+        "nativeName": "Español",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      }
+    ]
+  }
+}

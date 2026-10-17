@@ -1,0 +1,305 @@
+{
+  "updated_at": "2026-10-18T07:20:00Z",
+  "updated_by": "system",
+  "headline": "Simple, Transparent Subscription Pricing",
+  "subheadline": "Designed for Indonesian PT and PT PMA businesses. No hidden setup fees. 7-day free trial on all plans.",
+  "trial_badge": "7-Day Free Trial (Zero Card Required)",
+  "plans": [
+    {
+      "id": "starter",
+      "name": "Starter",
+      "tagline": "Organize Your Finances",
+      "description": "For small businesses that need cash visibility and organized financial records.",
+      "price_monthly": 59,
+      "currency": "USD",
+      "billing_interval": "month",
+      "is_recommended": false,
+      "cta_text": "Start Free Trial (7 Days)",
+      "cta_url": "https://app.cfo-ai.site/login?plan=starter",
+      "capacity_highlights": [
+        {
+          "label": "User Seats",
+          "value": "5 Users"
+        },
+        {
+          "label": "Companies",
+          "value": "1 Company"
+        },
+        {
+          "label": "Monthly Transactions",
+          "value": "2,000 / mo"
+        },
+        {
+          "label": "Document Uploads",
+          "value": "200 / mo"
+        }
+      ],
+      "feature_bullets": [
+        "Pulse real-time cash dashboard",
+        "Transactions, accounts & bills",
+        "Basic AI CFO questions (50/mo)",
+        "Bank statement import (5/mo)",
+        "Basic tax calendar dates"
+      ]
+    },
+    {
+      "id": "control",
+      "name": "Control",
+      "tagline": "Total Operational Control",
+      "description": "For growing businesses needing deeper intelligence, approvals, and tax readiness.",
+      "price_monthly": 149,
+      "currency": "USD",
+      "billing_interval": "month",
+      "is_recommended": true,
+      "badge": "RECOMMENDED • FLAGSHIP",
+      "cta_text": "Start Free Trial (7 Days)",
+      "cta_url": "https://app.cfo-ai.site/login?plan=control",
+      "capacity_highlights": [
+        {
+          "label": "User Seats",
+          "value": "10 Users"
+        },
+        {
+          "label": "Companies",
+          "value": "2 Companies"
+        },
+        {
+          "label": "Monthly Transactions",
+          "value": "10,000 / mo"
+        },
+        {
+          "label": "Document Uploads",
+          "value": "1,000 / mo"
+        }
+      ],
+      "feature_bullets": [
+        "Everything in Starter included",
+        "Financial approvals & staff permissions",
+        "Bank reconciliation (BCA & Permata)",
+        "AI Accountant & monthly close reports",
+        "Indonesian tax calendar & CoreTax updates",
+        "Payroll management workflows"
+      ]
+    },
+    {
+      "id": "pro",
+      "name": "Pro",
+      "tagline": "Multi-Entity & Scaling",
+      "description": "For multi-entity businesses requiring high volume, audit logs, and API access.",
+      "price_monthly": 249,
+      "currency": "USD",
+      "billing_interval": "month",
+      "is_recommended": false,
+      "cta_text": "Start Free Trial (7 Days)",
+      "cta_url": "https://app.cfo-ai.site/login?plan=pro",
+      "capacity_highlights": [
+        {
+          "label": "User Seats",
+          "value": "30 Users"
+        },
+        {
+          "label": "Companies",
+          "value": "5 Companies"
+        },
+        {
+          "label": "Monthly Transactions",
+          "value": "50,000 / mo"
+        },
+        {
+          "label": "Document Uploads",
+          "value": "3,000 / mo"
+        }
+      ],
+      "feature_bullets": [
+        "Everything in Control included",
+        "Group company management (5 entities)",
+        "Intercompany & advanced filing prep",
+        "MCP / API tool calls (15,000/mo)",
+        "Full audit logs & priority queue"
+      ]
+    }
+  ],
+  "usage_limits_table": [
+    {
+      "key": "users",
+      "label": "Users (Active Seats)",
+      "starter": "5",
+      "control": "10",
+      "pro": "30"
+    },
+    {
+      "key": "companies",
+      "label": "Companies (Owned Workspaces)",
+      "starter": "1",
+      "control": "2",
+      "pro": "5"
+    },
+    {
+      "key": "accounts",
+      "label": "Financial Accounts (Wallets)",
+      "starter": "5",
+      "control": "15",
+      "pro": "50"
+    },
+    {
+      "key": "documents",
+      "label": "Documents / Month",
+      "starter": "200",
+      "control": "1,000",
+      "pro": "3,000"
+    },
+    {
+      "key": "ai",
+      "label": "AI CFO Questions / Month",
+      "starter": "50",
+      "control": "300",
+      "pro": "1,000"
+    },
+    {
+      "key": "imports",
+      "label": "Bank Statement Imports / Month",
+      "starter": "5",
+      "control": "20",
+      "pro": "100"
+    },
+    {
+      "key": "bank_rows",
+      "label": "Bank Statement Rows / Month",
+      "starter": "1,000",
+      "control": "10,000",
+      "pro": "50,000"
+    },
+    {
+      "key": "transactions",
+      "label": "Transactions / Period",
+      "starter": "2,000",
+      "control": "10,000",
+      "pro": "50,000"
+    },
+    {
+      "key": "ai_accountant",
+      "label": "AI Accountant Requests / Month",
+      "starter": "0",
+      "control": "50",
+      "pro": "200"
+    },
+    {
+      "key": "ai_extraction",
+      "label": "AI Document Recognition / Month",
+      "starter": "100",
+      "control": "500",
+      "pro": "1,500"
+    },
+    {
+      "key": "mcp",
+      "label": "MCP / API Requests / Month",
+      "starter": "500",
+      "control": "3,000",
+      "pro": "15,000"
+    }
+  ],
+  "feature_availability_table": [
+    {
+      "key": "pulse_radar_transactions",
+      "label": "Pulse, Radar, Transactions, Accounts",
+      "starter": "Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "bills_documents",
+      "label": "Invoices & Bills, Documents",
+      "starter": "Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "ai_cfo",
+      "label": "Basic AI CFO",
+      "starter": "Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "bank_import",
+      "label": "Bank Statement Import",
+      "starter": "Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "team",
+      "label": "Employee Invitations",
+      "starter": "Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "approvals",
+      "label": "Approvals & Spend Authorization",
+      "starter": "Not Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "payroll",
+      "label": "Payroll Workflows",
+      "starter": "Not Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "ai_accountant",
+      "label": "AI Accountant Assistant",
+      "starter": "Not Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "tax_compliance",
+      "label": "Tax & Compliance Monitoring",
+      "starter": "Basic",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "accounting_export",
+      "label": "Reconciliation & Accounting Reports",
+      "starter": "Not Included",
+      "control": "Included",
+      "pro": "Included"
+    },
+    {
+      "key": "multi_company",
+      "label": "Group Company Management",
+      "starter": "Not Included",
+      "control": "Not Included",
+      "pro": "Included (5 entities)"
+    },
+    {
+      "key": "intercompany",
+      "label": "Intercompany & Advanced Filing Preparation",
+      "starter": "Not Included",
+      "control": "Not Included",
+      "pro": "Included (Pro)"
+    }
+  ],
+  "faqs": [
+    {
+      "question": "How does the 7-day free trial work?",
+      "answer": "You receive full, unrestricted access to your chosen tier for 168 hours (7 days). No credit card is required at signup. At the end of 7 days, your workspace enters read-only mode until a commercial subscription is activated."
+    },
+    {
+      "question": "Can I upgrade or downgrade my tier later?",
+      "answer": "Yes. You can switch between Starter, Control, and Pro at any time from your in-app Billing Center. Upgrades take effect immediately with prorated billing."
+    },
+    {
+      "question": "What happens if I exceed my monthly transaction or OCR limits?",
+      "answer": "We never freeze read access or interrupt core cash visibility. When you approach 80% and 100% of your quota, the system sends an email notification and provides an option to upgrade or purchase additional unit packs."
+    },
+    {
+      "question": "Does CFO AI replace my local Indonesian tax consultant (Konsultan Pajak)?",
+      "answer": "No. CFO AI prepares, structures, and reconciles your general ledger, e-Bupot calculations, and PMK 81/2024 CoreTax schedules. It provides organized readiness exports for your licensed consultant or internal finance team, but does not provide legal tax representation."
+    }
+  ]
+}

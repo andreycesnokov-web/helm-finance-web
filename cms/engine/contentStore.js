@@ -1,0 +1,325 @@
+/**
+ * Versioned Content Store & Atomic Release Engine
+ * Manages drafts, revisions, publishing manifests, and instant 1-click rollback.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const PricingGuard = require('./pricingGuard');
+
+class ContentStore {
+  constructor(dataDir) {
+    this.dataDir = dataDir || path.join(__dirname, '../data');
+    this.releasesDir = path.join(this.dataDir, 'releases');
+    this.auditLogPath = path.join(this.dataDir, 'audit_logs.json');
+    this.activeReleasePath = path.join(this.dataDir, 'active_release.json');
+    this.pricingGuard = new PricingGuard(path.join(this.dataDir, 'billing_catalog_reference.json'));
+
+    if (!fs.existsSync(this.releasesDir)) {
+      fs.mkdirSync(this.releasesDir, { recursive: true });
+    }
+
+    this.ensureInitialized();
+  }
+
+  readJson(filename) {
+    const fullPath = path.join(this.dataDir, filename);
+    if (!fs.existsSync(fullPath)) return null;
+    return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+  }
+
+  writeJson(filename, data) {
+    const fullPath = path.join(this.dataDir, filename);
+    fs.writeFileSync(fullPath, JSON.stringify(data, null, 2), 'utf8');
+  }
+
+  ensureInitialized() {
+    if (!fs.existsSync(this.auditLogPath)) {
+      this.writeJson('audit_logs.json', []);
+    }
+
+    if (!fs.existsSync(this.activeReleasePath)) {
+      // Create initial baseline release
+      this.createRelease({
+        author: 'system',
+        notes: 'Initial Baseline Release Candidate v1.0.0',
+        ignorePricingDiscrepancy: true
+      });
+    }
+  }
+
+  logAudit(actor, action, entity, details) {
+    const logs = this.readJson('audit_logs.json') || [];
+    const entry = {
+      id: `aud-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      actor,
+      action,
+      entity,
+      details
+    };
+    logs.unshift(entry);
+    // Keep last 1,000 logs
+    if (logs.length > 1000) logs.pop();
+    this.writeJson('audit_logs.json', logs);
+    return entry;
+  }
+
+  getAuditLogs(limit = 50) {
+    const logs = this.readJson('audit_logs.json') || [];
+    return logs.slice(0, limit);
+  }
+
+  // --- ENTITY GETTERS ---
+
+  getPages() {
+    return this.readJson('pages.json') || [];
+  }
+
+  getPage(slug) {
+    const pages = this.getPages();
+    return pages.find(p => p.slug === slug) || null;
+  }
+
+  getPricing() {
+    return this.readJson('pricing.json') || {};
+  }
+
+  getHubCategories() {
+    return this.readJson('hub_categories.json') || [];
+  }
+
+  getHubArticles() {
+    return this.readJson('hub_articles.json') || [];
+  }
+
+  getHubArticle(slug) {
+    const articles = this.getHubArticles();
+    return articles.find(a => a.slug === slug) || null;
+  }
+
+  getHubBriefs() {
+    return this.readJson('hub_briefs.json') || [];
+  }
+
+  getSeo() {
+    return this.readJson('seo.json') || {};
+  }
+
+  getNavigation() {
+    return this.readJson('navigation.json') || {};
+  }
+
+  getLocales() {
+    return this.readJson('locales.json') || [];
+  }
+
+  getUsers() {
+    return this.readJson('users.json') || [];
+  }
+
+  // --- ENTITY MUTATIONS (DRAFT / EDIT) ---
+
+  updatePage(slug, pageData, user = 'editor') {
+    const pages = this.getPages();
+    const index = pages.findIndex(p => p.slug === slug);
+    if (index === -1) {
+      pageData.slug = slug;
+      pageData.updated_at = new Date().toISOString();
+      pages.push(pageData);
+    } else {
+      pages[index] = { ...pages[index], ...pageData, updated_at: new Date().toISOString() };
+    }
+    this.writeJson('pages.json', pages);
+    this.logAudit(user, 'update_page', `page:${slug}`, { title: pageData.title });
+    return pages[index >= 0 ? index : pages.length - 1];
+  }
+
+  updatePricing(pricingData, user = 'owner') {
+    // Validate against Pricing Guard
+    const validation = this.pricingGuard.validatePricing(pricingData);
+    pricingData.updated_at = new Date().toISOString();
+    pricingData.updated_by = user;
+
+    this.writeJson('pricing.json', pricingData);
+    this.logAudit(user, 'update_pricing', 'pricing', { 
+      isValid: validation.isValid, 
+      discrepancyCount: validation.discrepancies.length 
+    });
+
+    return {
+      pricing: pricingData,
+      validation
+    };
+  }
+
+  saveArticle(articleData, user = 'editor') {
+    const articles = this.getHubArticles();
+    let isNew = false;
+    let targetIndex = articles.findIndex(a => a.id === articleData.id || a.slug === articleData.slug);
+
+    if (targetIndex === -1) {
+      isNew = true;
+      articleData.id = articleData.id || `art-${Date.now()}`;
+      articleData.publication_date = articleData.publication_date || new Date().toISOString();
+      articleData.last_updated = new Date().toISOString();
+      articles.push(articleData);
+      targetIndex = articles.length - 1;
+    } else {
+      articles[targetIndex] = {
+        ...articles[targetIndex],
+        ...articleData,
+        last_updated: new Date().toISOString()
+      };
+    }
+
+    this.writeJson('hub_articles.json', articles);
+    this.logAudit(user, isNew ? 'create_article' : 'update_article', `article:${articles[targetIndex].slug}`, {
+      title: articles[targetIndex].translations?.en?.title || articles[targetIndex].slug,
+      status: articles[targetIndex].review_status
+    });
+
+    return articles[targetIndex];
+  }
+
+  deleteArticle(slug, user = 'owner') {
+    const articles = this.getHubArticles();
+    const filtered = articles.filter(a => a.slug !== slug);
+    if (filtered.length !== articles.length) {
+      this.writeJson('hub_articles.json', filtered);
+      this.logAudit(user, 'delete_article', `article:${slug}`, {});
+      return true;
+    }
+    return false;
+  }
+
+  updateSeo(seoData, user = 'owner') {
+    this.writeJson('seo.json', seoData);
+    this.logAudit(user, 'update_seo', 'seo', {});
+    return seoData;
+  }
+
+  updateNavigation(navData, user = 'owner') {
+    this.writeJson('navigation.json', navData);
+    this.logAudit(user, 'update_navigation', 'navigation', {});
+    return navData;
+  }
+
+  // --- PUBLISHING & ROLLBACK (ATOMIC RELEASES) ---
+
+  getActiveRelease() {
+    return this.readJson('active_release.json');
+  }
+
+  getReleases() {
+    const files = fs.readdirSync(this.releasesDir).filter(f => f.endsWith('.json'));
+    const releases = [];
+    files.forEach(f => {
+      try {
+        const r = JSON.parse(fs.readFileSync(path.join(this.releasesDir, f), 'utf8'));
+        releases.push(r);
+      } catch (err) {
+        console.error(`Error reading release ${f}:`, err);
+      }
+    });
+
+    // Sort descending by timestamp
+    return releases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
+  createRelease({ author = 'owner', notes = 'Commercial Website Release', ignorePricingDiscrepancy = false }) {
+    // 1. Guard check on pricing
+    const pricing = this.getPricing();
+    const pricingValidation = this.pricingGuard.validatePricing(pricing);
+
+    if (!pricingValidation.isValid && !ignorePricingDiscrepancy) {
+      throw new Error(`Atomic publish blocked by Pricing Discrepancy Guard. Discrepancies found: ${pricingValidation.discrepancies.map(d => d.message).join('; ')}`);
+    }
+
+    // 2. Snapshot current state
+    const snapshot = {
+      pages: this.getPages(),
+      pricing: this.getPricing(),
+      hub_categories: this.getHubCategories(),
+      hub_articles: this.getHubArticles(),
+      navigation: this.getNavigation(),
+      seo: this.getSeo(),
+      locales: this.getLocales()
+    };
+
+    const snapshotString = JSON.stringify(snapshot);
+    const hash = crypto.createHash('sha256').update(snapshotString).digest('hex').substring(0, 8);
+    const timestamp = new Date().toISOString();
+    const releaseId = `rel-${Date.now()}-${hash}`;
+
+    const releaseManifest = {
+      release_id: releaseId,
+      version: `v${new Date().toISOString().replace(/\D/g, '').substring(0, 12)}`,
+      hash,
+      created_at: timestamp,
+      author,
+      notes,
+      pricing_validation: pricingValidation,
+      snapshot
+    };
+
+    // 3. Write immutable release manifest
+    const releaseFile = path.join(this.releasesDir, `${releaseId}.json`);
+    fs.writeFileSync(releaseFile, JSON.stringify(releaseManifest, null, 2), 'utf8');
+
+    // 4. Atomically point active release to this new release
+    const activePointer = {
+      release_id: releaseId,
+      version: releaseManifest.version,
+      hash,
+      activated_at: timestamp,
+      activated_by: author,
+      notes
+    };
+    this.writeJson('active_release.json', activePointer);
+
+    this.logAudit(author, 'publish_release', `release:${releaseId}`, { version: releaseManifest.version, hash, notes });
+
+    return releaseManifest;
+  }
+
+  rollbackRelease(targetReleaseId, author = 'owner') {
+    const targetFile = path.join(this.releasesDir, `${targetReleaseId}.json`);
+    if (!fs.existsSync(targetFile)) {
+      throw new Error(`Target release '${targetReleaseId}' does not exist.`);
+    }
+
+    const targetManifest = JSON.parse(fs.readFileSync(targetFile, 'utf8'));
+
+    // Restore snapshot into working data
+    this.writeJson('pages.json', targetManifest.snapshot.pages);
+    this.writeJson('pricing.json', targetManifest.snapshot.pricing);
+    this.writeJson('hub_categories.json', targetManifest.snapshot.hub_categories);
+    this.writeJson('hub_articles.json', targetManifest.snapshot.hub_articles);
+    this.writeJson('navigation.json', targetManifest.snapshot.navigation);
+    this.writeJson('seo.json', targetManifest.snapshot.seo);
+    this.writeJson('locales.json', targetManifest.snapshot.locales);
+
+    // Atomically swap active pointer
+    const timestamp = new Date().toISOString();
+    const activePointer = {
+      release_id: targetManifest.release_id,
+      version: targetManifest.version,
+      hash: targetManifest.hash,
+      activated_at: timestamp,
+      activated_by: author,
+      notes: `Rolled back to ${targetManifest.version} (${targetManifest.notes})`
+    };
+    this.writeJson('active_release.json', activePointer);
+
+    this.logAudit(author, 'rollback_release', `release:${targetReleaseId}`, {
+      version: targetManifest.version,
+      hash: targetManifest.hash
+    });
+
+    return activePointer;
+  }
+}
+
+module.exports = ContentStore;
