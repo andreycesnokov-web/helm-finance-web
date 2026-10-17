@@ -1,11 +1,11 @@
 # CFO AI V2.0 — Production Runbook
 
-**Release candidate branch:** `fix/v2-rc1-claude-security` (local; not pushed, not merged)
+**Release candidate branch:** `integration/cfo-v2-production-ready` (commit `36032d8`)
 **Target Domains:**
 - **Production (Main Domain):** `cfo.helmfinance.com`
 - **Staging:** `staging.cfo.helmfinance.com`
 **Release Tag:** `v2.0.0-rc1` (to be created only at sign-off)
-**Revised by:** Claude (security fix batch), 2026-10-16. Previous revision: Codex / AntiGravity (`a48b761`).
+**Revised by:** AntiGravity IDE (Final Integration & Release), 2026-10-17. Previous revisions: Claude (`1f51422` / `bb20934`), Codex / AntiGravity (`a48b761`).
 
 > This revision replaces the migration, rollback and verification procedures of `a48b761`. The independent review
 > (`V2_CROSS_REVIEW_CLAUDE.md`) proved that the previous pre-flight referenced non-existent objects and led to
