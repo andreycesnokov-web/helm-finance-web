@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFO AI — Official Website V3 Master Review Studio</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Manrope', -apple-system, sans-serif;
+      background-color: #060B14;
+      color: #F8FAFC;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100vh;
+    }
+    .viewport-wrapper {
+      transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s ease;
+      transform-origin: top center;
+    }
+    .mobile-shell {
+      border: 12px solid #1E293B;
+      border-radius: 46px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 2px rgba(255, 255, 255, 0.1);
+      background: #000;
+      position: relative;
+    }
+    .mobile-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 22px;
+      background: #1E293B;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen">
+
+  <!-- TOP APP/SHOWCASE HEADER: SUBTLE DARK NAVY TONAL GRADIENT -->
+  <header class="border-b border-white/10 px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0 z-50 shadow-md" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    
+    <!-- Brand Identity -->
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 flex-shrink-0">
+        <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+          <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+        </svg>
+      </div>
+      <div>
+        <div class="font-extrabold text-sm text-white tracking-wide flex items-center gap-2">
+          <span>CFO AI — Official Website V3</span>
+          <span class="bg-[#3399FF] text-[#001A33] text-[9px] px-2 py-0.5 rounded font-black uppercase">Product-Led Studio</span>
+        </div>
+        <div class="text-[10px] text-white/70">Verified Software Demonstrations • Indonesian PT &amp; PT PMA Ready</div>
+      </div>
+    </div>
+
+    <!-- Page Switcher Tabs -->
+    <div class="flex items-center bg-[#001226]/80 p-1 rounded-xl border border-white/10 text-xs backdrop-blur-sm">
+      <span class="text-white/40 text-[9px] uppercase font-bold px-2">Page:</span>
+      <button onclick="setPage('homepage')" id="tab-home" class="px-2.5 py-1 rounded-lg font-bold text-white bg-[#1565C0] shadow transition-all">
+        Home
+      </button>
+      <button onclick="setPage('platform')" id="tab-plat" class="px-2.5 py-1 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Platform
+      </button>
+      <button onclick="setPage('documents')" id="tab-docs" class="px-2.5 py-1 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Documents
+      </button>
+      <button onclick="setPage('compliance')" id="tab-comp" class="px-2.5 py-1 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Compliance
+      </button>
+      <button onclick="setPage('pricing')" id="tab-pric" class="px-2.5 py-1 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Pricing
+      </button>
+      <button onclick="setPage('mobileview')" id="tab-mobview" class="px-2.5 py-1 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Mobile Standalone
+      </button>
+    </div>
+
+    <!-- Responsive Viewport Presets -->
+    <div class="flex items-center bg-[#001226]/80 p-1 rounded-xl border border-white/10 text-xs backdrop-blur-sm">
+      <button onclick="setViewport(1440, null, 'desktop-1440')" id="vp-1440" class="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-[#1565C0] shadow transition-all">
+        1440px
+      </button>
+      <button onclick="setViewport(1280, null, 'laptop-1280')" id="vp-1280" class="px-2.5 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        1280px
+      </button>
+      <button onclick="setViewport(1024, null, 'tablet-h-1024')" id="vp-1024" class="px-2.5 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        1024px
+      </button>
+      <button onclick="setViewport(768, null, 'tablet-v-768')" id="vp-768" class="px-2.5 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        768px
+      </button>
+      <button onclick="setViewport(390, 844, 'mobile-390')" id="vp-390" class="px-2.5 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        390px
+      </button>
+      <button onclick="setViewport(360, 780, 'mobile-360')" id="vp-360" class="px-2.5 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        360px
+      </button>
+      <button onclick="toggleAuditReport()" id="vp-audit" class="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 hover:text-white transition-all flex items-center gap-1">
+        <span>QA Report</span>
+      </button>
+    </div>
+
+    <!-- Dimension Pill & Open Standalone -->
+    <div class="hidden lg:flex items-center gap-3">
+      <div id="dim-pill" class="text-[10px] font-mono bg-white/10 px-2 py-1 rounded text-white/80">
+        1440 × 100%
+      </div>
+      <a id="btn-standalone" href="concept-b-plus-desktop.html" target="_blank" class="text-xs font-bold text-white/90 hover:text-white bg-white/10 px-3 py-1 rounded-lg border border-white/10 transition-colors flex items-center gap-1">
+        <span>Open Standalone</span>
+        <span class="text-[10px]">↗</span>
+      </a>
+    </div>
+
+  </header>
+
+  <!-- MAIN CANVAS AREA -->
+  <main class="flex-1 relative overflow-auto bg-[#060B14] flex flex-col items-center justify-start p-4">
+
+    <!-- IFRAME VIEWPORT CONTAINER -->
+    <div id="viewport-box" class="viewport-wrapper w-full h-full max-w-[1440px] flex flex-col items-center justify-start">
+      <div id="frame-card" class="w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-white">
+        <iframe id="main-iframe" src="concept-b-plus-desktop.html" class="w-full h-full border-0"></iframe>
+      </div>
+    </div>
+
+    <!-- AUDIT REPORT MODAL / PANEL -->
+    <div id="audit-panel" class="hidden w-full h-full max-w-5xl bg-white text-[#003366] rounded-2xl p-8 overflow-y-auto shadow-2xl border border-slate-300">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
+        <div>
+          <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider block">VERIFICATION ARTIFACT</span>
+          <h2 class="text-2xl font-black text-[#003366] mt-0.5">CFO AI Website V3 — Master QA &amp; Audit Report</h2>
+        </div>
+        <button onclick="toggleAuditReport()" class="px-4 py-2 rounded-xl bg-[#003366] text-white text-xs font-bold hover:bg-[#002244]">
+          ← Back to Live Preview
+        </button>
+      </div>
+
+      <div class="space-y-6 text-sm">
+        
+        <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">1. Product-Led Transformation (Section 4 &amp; 5)</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Verified Passed</span>
+          </div>
+          <p class="text-xs text-slate-700 leading-relaxed">
+            Replaced generic claims and abstract graphics with authentic high-resolution vector representations of the actual software:
+            <strong>Pulse Command Center</strong> (Rp 3,12B cash across 4 accounts, 162-day runway, 6-month historical margin chart),
+            <strong>Radar Analytics</strong> (30-day dynamic cash trajectory, interactive what-if scenarios for collecting receivables and delaying capex),
+            <strong>AI CFO Brief</strong> (84/100 Health Score, natural language founder Q&amp;A referencing verified ledger records),
+            and <strong>Document Review Drawer</strong> (DPP Rp 42M, PPN 11% Rp 4,62M, side-by-side human bank match).
+          </p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">2. Indonesian Regulatory Preparedness (Section 7)</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Verified Passed</span>
+          </div>
+          <p class="text-xs text-slate-700 leading-relaxed">
+            Integrated <strong>PMK 81/2024 CoreTax schedule</strong>, 16-digit NPWP verification checkpoints, monthly withholding calendars (PPh 21 TER, PPh 23, PPN), and quarterly BKPM LKPM investment report reminders tailored specifically for Indonesian PT and PT PMA companies.
+          </p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">3. Codebase-Verified Trial Terms &amp; Channel Statuses</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Verified Passed</span>
+          </div>
+          <p class="text-xs text-slate-700 leading-relaxed">
+            Audited against <code>server/index.js</code> and <code>client/src/pages/EmailLogin.jsx</code>: Confirmed 168-hour (7 days) free trial with <strong>zero credit card required</strong> at signup. Integration channels marked with transparent release statuses: Direct Upload (AVAILABLE), Telegram (BETA PILOT), Claude (AVAILABLE), ChatGPT (COMING SOON), WhatsApp (COMING SOON).
+          </p>
+        </div>
+
+        <div class="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">4. Brand Invariants &amp; Zero Emojis</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Verified Passed</span>
+          </div>
+          <p class="text-xs text-slate-700 leading-relaxed">
+            Preserved authentic CFO AI SVG branding with geometric watermarks, restored corporate 4-column footer with subtle navy gradient (<code>linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%)</code>), and replaced all informal emojis with crisp Lucide outline SVGs.
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let activePage = 'homepage';
+    let currentVpWidth = 1440;
+    let currentVpHeight = null;
+    let isAuditActive = false;
+
+    const pages = {
+      homepage: { url: 'index.html', label: 'Homepage' },
+      platform: { url: 'platform-page.html', label: 'Platform Architecture' },
+      documents: { url: 'document-intelligence-page.html', label: 'Document Intelligence' },
+      compliance: { url: 'compliance-page.html', label: 'Compliance & Tax Radar' },
+      pricing: { url: 'pricing-page.html', label: 'Pricing & Plans' },
+      mobileview: { url: 'concept-b-plus-mobile.html', label: 'Mobile Standalone (390px)' }
+    };
+
+    function setPage(key) {
+      activePage = key;
+      const config = pages[key];
+      
+      const tabMap = { homepage: 'home', platform: 'plat', documents: 'docs', compliance: 'comp', pricing: 'pric', mobileview: 'mobview' };
+      Object.keys(tabMap).forEach(k => {
+        document.getElementById('tab-' + tabMap[k]).className = "px-2.5 py-1 rounded-lg font-bold text-white/70 hover:text-white transition-all";
+      });
+      document.getElementById('tab-' + tabMap[key]).className = "px-2.5 py-1 rounded-lg font-bold text-white bg-[#1565C0] shadow transition-all";
+
+      document.getElementById('main-iframe').src = config.url;
+      document.getElementById('btn-standalone').href = config.url;
+      
+      if (isAuditActive) {
+        toggleAuditReport();
+      }
+    }
+
+    function setViewport(w, h, btnId) {
+      currentVpWidth = w;
+      currentVpHeight = h;
+
+      const vpBtns = ['vp-1440', 'vp-1280', 'vp-1024', 'vp-768', 'vp-390', 'vp-360'];
+      vpBtns.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = "px-2.5 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all";
+      });
+      const activeEl = document.getElementById(btnId);
+      if (activeEl) activeEl.className = "px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-[#1565C0] shadow transition-all";
+
+      const box = document.getElementById('viewport-box');
+      const card = document.getElementById('frame-card');
+
+      box.style.maxWidth = w + 'px';
+      if (w <= 390) {
+        box.className = "viewport-wrapper w-full h-full max-w-[390px] flex flex-col items-center justify-center p-2";
+        card.className = "mobile-shell w-[390px] h-[844px] max-h-[calc(100vh-100px)]";
+      } else {
+        box.className = "viewport-wrapper w-full h-full max-w-[" + w + "px] flex flex-col items-center justify-start";
+        card.className = "w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-white";
+      }
+
+      document.getElementById('dim-pill').innerText = w + (h ? ' × ' + h : ' × auto');
+
+      if (isAuditActive) {
+        toggleAuditReport();
+      }
+    }
+
+    function toggleAuditReport() {
+      const box = document.getElementById('viewport-box');
+      const panel = document.getElementById('audit-panel');
+      const btn = document.getElementById('vp-audit');
+
+      if (isAuditActive) {
+        panel.classList.add('hidden');
+        box.classList.remove('hidden');
+        btn.className = "px-2.5 py-1 rounded-lg text-xs font-bold text-amber-300 hover:text-white transition-all flex items-center gap-1";
+        isAuditActive = false;
+      } else {
+        box.classList.add('hidden');
+        panel.classList.remove('hidden');
+        btn.className = "px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-amber-600 shadow transition-all flex items-center gap-1";
+        isAuditActive = true;
+      }
+    }
+  </script>
+
+</body>
+</html>

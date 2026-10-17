@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFO AI — Concept B++ Design Studio & Conversion Showcase</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Manrope', -apple-system, sans-serif;
+      background-color: #0A0F1D;
+      color: #F8FAFC;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100vh;
+    }
+    .preview-frame {
+      border: none;
+      background: #FFFFFF;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .mobile-shell {
+      width: 390px;
+      height: 844px;
+      max-height: calc(100vh - 120px);
+      border: 12px solid #1E293B;
+      border-radius: 46px;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.1);
+      background: #000;
+      position: relative;
+    }
+    .mobile-notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 24px;
+      background: #1E293B;
+      border-bottom-left-radius: 14px;
+      border-bottom-right-radius: 14px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen">
+
+  <!-- TOP APP/SHOWCASE HEADER: SUBTLE DARK NAVY TONAL GRADIENT -->
+  <header class="border-b border-white/10 px-5 py-3 flex items-center justify-between flex-shrink-0 z-50 shadow-md" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="flex items-center gap-3.5">
+      <!-- Authentic CFO AI SVG Symbol -->
+      <div class="w-8 h-8 flex-shrink-0">
+        <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+          <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+        </svg>
+      </div>
+      <div>
+        <div class="font-extrabold text-sm text-white tracking-wide flex items-center gap-2">
+          <span>CFO AI — Master Design Showcase</span>
+          <span class="bg-[#3399FF] text-[#001A33] text-[10px] px-2 py-0.5 rounded font-black uppercase">Final Refinement</span>
+        </div>
+        <div class="text-[11px] text-white/70">Official Marketing Website Design • Built for Indonesian Businesses</div>
+      </div>
+    </div>
+
+    <!-- Page Switcher -->
+    <div class="flex items-center bg-[#001226]/80 p-1 rounded-xl border border-white/10 text-xs backdrop-blur-sm">
+      <span class="text-white/50 text-[10px] uppercase font-bold px-2">Page:</span>
+      <button onclick="setPage('homepage')" id="page-home" class="px-3 py-1.5 rounded-lg font-bold text-white bg-[#1565C0] shadow transition-all">
+        Homepage
+      </button>
+      <button onclick="setPage('platform')" id="page-plat" class="px-3 py-1.5 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Platform
+      </button>
+      <button onclick="setPage('documents')" id="page-docs" class="px-3 py-1.5 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Documents
+      </button>
+      <button onclick="setPage('compliance')" id="page-comp" class="px-3 py-1.5 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Compliance
+      </button>
+      <button onclick="setPage('pricing')" id="page-pric" class="px-3 py-1.5 rounded-lg font-bold text-white/70 hover:text-white transition-all">
+        Pricing
+      </button>
+    </div>
+
+    <!-- View Mode Switcher with Clean SVG Icons -->
+    <div class="flex items-center bg-[#001226]/80 p-1 rounded-xl border border-white/10 backdrop-blur-sm">
+      <button onclick="setViewMode('desktop')" id="btn-desktop" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#1565C0] shadow transition-all flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3"/></svg>
+        <span>Desktop (1440px)</span>
+      </button>
+      <button onclick="setViewMode('mobile')" id="btn-mobile" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/></svg>
+        <span>Mobile (390px)</span>
+      </button>
+      <button onclick="setViewMode('dual')" id="btn-dual" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 002.25-2.25V5.25a2.25 2.25 0 00-2.25-2.25H6.75A2.25 2.25 0 004.5 5.25v13.5a2.25 2.25 0 002.25 2.25z"/></svg>
+        <span>Dual Responsive</span>
+      </button>
+      <button onclick="setViewMode('audit')" id="btn-audit" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>Audit Report</span>
+      </button>
+    </div>
+
+    <!-- Standalone Link Action -->
+    <div class="hidden md:flex items-center gap-3">
+      <a id="btn-open-standalone" href="concept-b-plus-desktop.html" target="_blank" class="text-xs font-bold text-white/90 hover:text-white bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 transition-colors flex items-center gap-1">
+        <span>Open Standalone</span>
+        <span class="text-[10px]">↗</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- MAIN CANVAS AREA -->
+  <main class="flex-1 relative overflow-hidden bg-[#0A0F1D] flex items-center justify-center p-3">
+
+    <!-- 1. DESKTOP VIEW CONTAINER (Default) -->
+    <div id="container-desktop" class="w-full h-full flex flex-col items-center justify-center">
+      <div class="w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-white">
+        <iframe id="iframe-desktop" src="concept-b-plus-desktop.html" class="w-full h-full border-0"></iframe>
+      </div>
+    </div>
+
+    <!-- 2. MOBILE VIEW CONTAINER (Phone Shell) -->
+    <div id="container-mobile" class="hidden w-full h-full flex items-center justify-center p-4">
+      <div class="mobile-shell">
+        <div class="mobile-notch">
+          <div class="w-3 h-3 rounded-full bg-black/60 mr-2"></div>
+          <div class="w-2 h-2 rounded-full bg-black/40"></div>
+        </div>
+        <iframe id="iframe-mobile" src="concept-b-plus-mobile.html" class="w-full h-full border-0 pt-3"></iframe>
+      </div>
+    </div>
+
+    <!-- 3. DUAL RESPONSIVE VIEW CONTAINER (Side-by-Side) -->
+    <div id="container-dual" class="hidden w-full h-full grid grid-cols-12 gap-4">
+      <div class="col-span-8 flex flex-col h-full bg-[#001A33] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+        <div class="bg-[#002244] px-4 py-2 border-b border-white/10 flex items-center justify-between text-xs text-white">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#3399FF]"></span>
+            <span class="font-extrabold uppercase tracking-wider text-[11px]" id="label-dual-desktop">Concept B++ Desktop (1440px Canvas)</span>
+          </div>
+          <a id="link-dual-desktop" href="concept-b-plus-desktop.html" target="_blank" class="text-[11px] text-[#3399FF] hover:underline font-bold">Open Standalone ↗</a>
+        </div>
+        <div class="flex-1 w-full bg-white overflow-hidden relative">
+          <iframe id="iframe-dual-desktop" src="concept-b-plus-desktop.html" class="w-full h-full border-0"></iframe>
+        </div>
+      </div>
+
+      <div class="col-span-4 flex flex-col h-full bg-[#001A33] rounded-2xl border border-white/10 overflow-hidden shadow-2xl items-center justify-center p-3">
+        <div class="w-full bg-[#002244] px-4 py-2 border-b border-white/10 flex items-center justify-between text-xs text-white mb-2 rounded-t-xl">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#1565C0]"></span>
+            <span class="font-extrabold uppercase tracking-wider text-[11px]">Mobile (390px Viewport)</span>
+          </div>
+          <a id="link-dual-mobile" href="concept-b-plus-mobile.html" target="_blank" class="text-[11px] text-[#3399FF] hover:underline font-bold">Open Standalone ↗</a>
+        </div>
+        <div class="mobile-shell !h-[calc(100vh-180px)] !max-h-full">
+          <iframe id="iframe-dual-mobile" src="concept-b-plus-mobile.html" class="w-full h-full border-0 pt-2"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. OPTIMIZATION & VERIFICATION REPORT -->
+    <div id="container-audit" class="hidden w-full h-full max-w-5xl bg-white text-[#003366] rounded-2xl p-8 overflow-y-auto shadow-2xl border border-slate-300">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
+        <div>
+          <h2 class="text-2xl font-black text-[#003366]">Concept B++ Conversion & Verification Report</h2>
+          <p class="text-xs text-[#5A6E82]">Comprehensive Resolution of Conversion Directives & Product Accuracy</p>
+        </div>
+        <button onclick="setViewMode('desktop')" class="px-4 py-2 rounded-xl bg-[#003366] text-white text-xs font-bold hover:bg-[#002244]">
+          ← Back to Desktop View
+        </button>
+      </div>
+
+      <div class="space-y-6 text-sm">
+        
+        <!-- Point 1: Subtle Dark Navy Tonal Gradient Bar -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">1. Subtle Dark Navy Tonal Gradient Bar (Eliminated Bright Blue Bar)</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Final Approved</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Per owner's explicit directive, removed the full-width bright electric blue announcement bar and flat navy surfaces. Implemented subtle dark navy tonal gradient (<code>linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%)</code>), high-contrast white text, electric blue pill tag, and official domain links across all pages.
+          </p>
+        </div>
+
+        <!-- Point 2: Authentic Integration Logos -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">2. Authentic Vector Integration Logos (No Emojis)</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Implemented</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Integrated official vector SVGs: Direct Upload (clean Lucide file upload vector), Telegram (official paper airplane circle), Claude (official Anthropic spark icon), ChatGPT (official OpenAI emblem), and WhatsApp (official speech bubble). Correct brand colors and proportional geometry preserved.
+          </p>
+        </div>
+
+        <!-- Point 3: Marketing Strategy & Plain English -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">3. Outcome-Focused Marketing & Elimination of Technical Jargon</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Implemented</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Eliminated developer terms (MCP, OAuth, SHA-256, RPC, Tenant isolation) from the primary marketing copy. Adopted customer-centric phrasing: <em>"Less paperwork. Clearer finances. Smarter business decisions."</em>
+          </p>
+        </div>
+
+        <!-- Point 4: Hero Conversion -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">4. Hero Conversion & Verified Billing Flow</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Verified & Implemented</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Hero dashboard focuses on business metrics (Available Cash: Rp 3,12B, Receivables: Rp 450M, Obligations: Rp 192M, Documents Awaiting Review: 5 New). CTAs updated to <strong>"Start Free — 7 Days"</strong>. Codebase audit of <code>server/index.js</code> and <code>client/src/pages/EmailLogin.jsx</code> confirmed <strong>no credit card is required</strong> at trial signup.
+          </p>
+        </div>
+
+        <!-- Point 5: Customer Problems Section -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">5. New Section: Business Owner's Problems</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Implemented</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Structured 4 problem cards: <em>Your Financial Information Is Everywhere</em>, <em>You're Always Chasing Documents</em>, <em>You Don't Have a Clear Financial Picture</em>, and <em>Regulations Keep Changing</em>, concluding with <strong>"CFO AI brings it all together."</strong>
+          </p>
+        </div>
+
+        <!-- Point 6: Pricing Outcomes First -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">6. Pricing: Selling Outcomes, Not Just Quotas</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Implemented</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Starter ($59), Control ($149 - Most Popular), and Pro ($299) lead with 3 tangible business benefits on each card. The comprehensive technical comparison table is positioned gracefully below the cards.
+          </p>
+        </div>
+
+        <!-- Point 7: Restored Professional 4-Column Dark Footer -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">7. Restored Professional 4-Column Footer Across All Pages</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Final Approved</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Restored the full corporate 4-column footer on Desktop, Mobile, Platform, Document Intelligence, Compliance, and Pricing. Features subtle dark navy gradient (<code>linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%)</code>), subtle translucent watermark, complete Brand, Product, Company, Legal, and Account link columns, and official statutory disclaimers.
+          </p>
+        </div>
+
+        <!-- Point 8: Tightened Hero Whitespace & 10-Second Clarity -->
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-base text-[#003366]">8. Tightened Hero Whitespace & 10-Second Value Clarity</h3>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Final Approved</span>
+          </div>
+          <p class="text-xs text-slate-600 mb-2">
+            Hero padding optimized (<code>pt-10 pb-14</code>) ensuring headline, value proposition, CTAs, and interactive financial dashboard are visible above the fold on standard 1440x900 desktop screens without excessive scrolling.
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let currentPage = 'homepage';
+    let currentMode = 'desktop';
+
+    const pageUrls = {
+      homepage: { desktop: 'concept-b-plus-desktop.html', mobile: 'concept-b-plus-mobile.html', label: 'Homepage' },
+      platform: { desktop: 'platform-page.html', mobile: 'platform-page.html', label: 'Platform Architecture' },
+      documents: { desktop: 'document-intelligence-page.html', mobile: 'document-intelligence-page.html', label: 'Document Intelligence' },
+      compliance: { desktop: 'compliance-page.html', mobile: 'compliance-page.html', label: 'Compliance & Tax Radar' },
+      pricing: { desktop: 'pricing-page.html', mobile: 'pricing-page.html', label: 'Pricing & Plans' }
+    };
+
+    function setPage(pageKey) {
+      currentPage = pageKey;
+      const config = pageUrls[pageKey];
+
+      ['home', 'plat', 'docs', 'comp', 'pric'].forEach(id => {
+        document.getElementById('page-' + id).className = "px-3 py-1.5 rounded-lg font-bold text-white/70 hover:text-white transition-all";
+      });
+      const activeMap = { homepage: 'home', platform: 'plat', documents: 'docs', compliance: 'comp', pricing: 'pric' };
+      document.getElementById('page-' + activeMap[pageKey]).className = "px-3 py-1.5 rounded-lg font-bold text-white bg-[#1565C0] shadow transition-all";
+
+      document.getElementById('iframe-desktop').src = config.desktop;
+      document.getElementById('iframe-mobile').src = config.mobile;
+      document.getElementById('iframe-dual-desktop').src = config.desktop;
+      document.getElementById('iframe-dual-mobile').src = config.mobile;
+
+      document.getElementById('btn-open-standalone').href = config.desktop;
+      document.getElementById('link-dual-desktop').href = config.desktop;
+      document.getElementById('link-dual-mobile').href = config.mobile;
+      document.getElementById('label-dual-desktop').innerText = config.label + ' (1440px)';
+    }
+
+    function setViewMode(mode) {
+      currentMode = mode;
+      const containerDesktop = document.getElementById('container-desktop');
+      const containerMobile = document.getElementById('container-mobile');
+      const containerDual = document.getElementById('container-dual');
+      const containerAudit = document.getElementById('container-audit');
+
+      const btnDesktop = document.getElementById('btn-desktop');
+      const btnMobile = document.getElementById('btn-mobile');
+      const btnDual = document.getElementById('btn-dual');
+      const btnAudit = document.getElementById('btn-audit');
+
+      containerDesktop.classList.add('hidden');
+      containerMobile.classList.add('hidden');
+      containerDual.classList.add('hidden');
+      containerAudit.classList.add('hidden');
+
+      [btnDesktop, btnMobile, btnDual, btnAudit].forEach(btn => {
+        btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all flex items-center gap-1.5";
+      });
+
+      const activeBtnClass = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#1565C0] shadow transition-all flex items-center gap-1.5";
+
+      if (mode === 'desktop') {
+        containerDesktop.classList.remove('hidden');
+        btnDesktop.className = activeBtnClass;
+      } else if (mode === 'mobile') {
+        containerMobile.classList.remove('hidden');
+        btnMobile.className = activeBtnClass;
+      } else if (mode === 'dual') {
+        containerDual.classList.remove('hidden');
+        btnDual.className = activeBtnClass;
+      } else if (mode === 'audit') {
+        containerAudit.classList.remove('hidden');
+        btnAudit.className = activeBtnClass;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%" style="background:#0F172A; font-family:'Manrope',-apple-system,BlinkMacSystemFont,sans-serif;">
+  <defs>
+    <linearGradient id="chartLineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3399FF" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#3399FF" stop-opacity="0.0"/>
+    </linearGradient>
+    <filter id="radarShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- WINDOW CONTAINER -->
+  <rect x="10" y="10" width="1180" height="660" rx="16" fill="#FFFFFF" stroke="#334155" stroke-width="1" filter="url(#radarShadow)"/>
+
+  <!-- TOP HEADER -->
+  <rect x="10" y="10" width="1180" height="56" rx="16" fill="#F8FAFC"/>
+  <rect x="10" y="50" width="1180" height="16" fill="#F8FAFC"/>
+  <line x1="10" y1="66" x2="1190" y2="66" stroke="#E2E8F0" stroke-width="1"/>
+
+  <g transform="translate(32, 26)">
+    <text x="0" y="16" font-size="14" font-weight="900" fill="#003366">Radar — 30-Day Cash Trajectory &amp; What-If Simulation</text>
+    <text x="440" y="16" font-size="12" font-weight="500" fill="#64748B">Horizon: 16 Mar 2026 – 15 Apr 2026</text>
+  </g>
+
+  <!-- Horizon Controls -->
+  <g transform="translate(940, 20)">
+    <rect x="0" y="0" width="210" height="32" rx="8" fill="#E2E8F0"/>
+    <rect x="2" y="2" width="66" height="28" rx="6" fill="#003366"/>
+    <text x="18" y="20" font-size="11" font-weight="800" fill="#FFFFFF">30 Days</text>
+    <text x="86" y="20" font-size="11" font-weight="600" fill="#64748B">60 Days</text>
+    <text x="156" y="20" font-size="11" font-weight="600" fill="#64748B">90 Days</text>
+  </g>
+
+  <!-- WHAT-IF SCENARIO CHIPS -->
+  <g transform="translate(32, 86)">
+    <text x="0" y="18" font-size="12" font-weight="800" fill="#003366">SIMULATION SCENARIOS:</text>
+    
+    <!-- Chip 1: Base Case -->
+    <rect x="160" y="0" width="120" height="28" rx="14" fill="#003366"/>
+    <text x="180" y="18" font-size="11" font-weight="700" fill="#FFFFFF">Baseline Trajectory</text>
+
+    <!-- Chip 2: Collect Overdue Receivables -->
+    <rect x="290" y="0" width="220" height="28" rx="14" fill="#EFF6FF" stroke="#3399FF"/>
+    <circle cx="304" cy="14" r="4" fill="#3399FF"/>
+    <text x="316" y="18" font-size="11" font-weight="700" fill="#1E40AF">+ Collect Overdue (Rp 125M)</text>
+
+    <!-- Chip 3: Delay Non-Essential Capex -->
+    <rect x="520" y="0" width="210" height="28" rx="14" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <text x="536" y="18" font-size="11" font-weight="600" fill="#475569">+ Delay Capex (Rp 48,2M)</text>
+
+    <text x="760" y="18" font-size="11" font-style="italic" fill="#64748B">Simulations project cash without modifying ledger records</text>
+  </g>
+
+  <!-- CHART AREA (Height: 260) -->
+  <g transform="translate(32, 136)">
+    <rect x="0" y="0" width="1136" height="260" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+    
+    <!-- Y-Axis Lines & Labels -->
+    <line x1="60" y1="30" x2="1110" y2="30" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="14" y="34" font-size="10" font-weight="600" fill="#94A3B8" font-family="'JetBrains Mono', monospace">3.4B</text>
+
+    <line x1="60" y1="90" x2="1110" y2="90" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="14" y="94" font-size="10" font-weight="600" fill="#94A3B8" font-family="'JetBrains Mono', monospace">3.1B</text>
+
+    <line x1="60" y1="150" x2="1110" y2="150" stroke="#E2E8F0" stroke-width="1"/>
+    <text x="14" y="154" font-size="10" font-weight="600" fill="#94A3B8" font-family="'JetBrains Mono', monospace">2.8B</text>
+
+    <!-- Floor Threshold Line (Min Cash: 500M / Critical Safety: 2.5B) -->
+    <line x1="60" y1="210" x2="1110" y2="210" stroke="#F87171" stroke-width="1.5" stroke-dasharray="4,4"/>
+    <text x="14" y="214" font-size="10" font-weight="700" fill="#EF4444" font-family="'JetBrains Mono', monospace">Safety</text>
+
+    <!-- Soft Confidence Band (Best-to-Worst Range) -->
+    <path d="M 60,82 L 150,82 L 150,62 L 420,62 L 420,108 L 650,108 L 650,118 L 880,118 L 880,50 L 1110,50 L 1110,165 L 880,165 L 880,160 L 650,160 L 650,148 L 420,148 L 420,112 L 150,112 L 150,98 L 60,98 Z" fill="#3399FF" fill-opacity="0.12"/>
+
+    <!-- Base Expected Step Line (Solid Navy/Blue #1565C0) -->
+    <path d="M 60,90 L 150,90 L 150,75 L 230,75 L 230,77 L 420,77 L 420,125 L 650,125 L 650,138 L 880,138 L 880,68 L 1110,68" fill="none" stroke="#1565C0" stroke-width="2.8"/>
+
+    <!-- Worst Case Step Line (Dashed Warning Line #F59E0B) -->
+    <path d="M 60,90 L 150,90 L 150,90 L 230,90 L 230,93 L 420,93 L 420,142 L 650,142 L 650,158 L 880,158 L 880,145 L 1110,145" fill="none" stroke="#D97706" stroke-width="2" stroke-dasharray="5,4"/>
+
+    <!-- Milestone Flag Markers on Line -->
+    <circle cx="150" cy="75" r="5" fill="#10B981" stroke="#FFFFFF" stroke-width="2"/>
+    <rect x="105" y="40" width="105" height="24" rx="4" fill="#ECFDF5" stroke="#A7F3D0"/>
+    <text x="114" y="56" font-size="10" font-weight="700" fill="#065F46">+Rp 85M Retainer</text>
+
+    <circle cx="420" cy="125" r="5" fill="#EF4444" stroke="#FFFFFF" stroke-width="2"/>
+    <rect x="360" y="136" width="125" height="24" rx="4" fill="#FEF2F2" stroke="#FECACA"/>
+    <text x="370" y="152" font-size="10" font-weight="700" fill="#991B1B">-Rp 185M Payroll Batch</text>
+
+    <circle cx="650" cy="138" r="5" fill="#D97706" stroke="#FFFFFF" stroke-width="2"/>
+    <rect x="600" y="98" width="105" height="24" rx="4" fill="#FFFBEB" stroke="#FDE68A"/>
+    <text x="610" y="114" font-size="10" font-weight="700" fill="#92400E">-Rp 32,1M PPN Tax</text>
+
+    <!-- X-Axis Date Ticks -->
+    <text x="60" y="240" font-size="11" font-weight="600" fill="#64748B">16 Mar</text>
+    <text x="280" y="240" font-size="11" font-weight="600" fill="#64748B">23 Mar</text>
+    <text x="580" y="240" font-size="11" font-weight="600" fill="#64748B">30 Mar</text>
+    <text x="880" y="240" font-size="11" font-weight="600" fill="#64748B">06 Apr</text>
+    <text x="1080" y="240" font-size="11" font-weight="600" fill="#64748B">15 Apr</text>
+  </g>
+
+  <!-- LOWER TABLE: UPCOMING CASH MILESTONES (Height: 220) -->
+  <g transform="translate(32, 416)">
+    <rect x="0" y="0" width="1136" height="234" rx="12" fill="#FFFFFF" stroke="#E2E8F0"/>
+    
+    <!-- Table Header -->
+    <rect x="0" y="0" width="1136" height="38" rx="12" fill="#F8FAFC"/>
+    <line x1="0" y1="38" x2="1136" y2="38" stroke="#E2E8F0"/>
+    <text x="20" y="24" font-size="11" font-weight="800" fill="#475569">DATE</text>
+    <text x="120" y="24" font-size="11" font-weight="800" fill="#475569">DESCRIPTION / COUNTERPARTY</text>
+    <text x="480" y="24" font-size="11" font-weight="800" fill="#475569">STATUS TAG</text>
+    <text x="680" y="24" font-size="11" font-weight="800" fill="#475569">CASH IMPACT</text>
+    <text x="880" y="24" font-size="11" font-weight="800" fill="#475569">PROJECTED CASH AFTER</text>
+
+    <!-- Row 1: Client Retainer Inflow -->
+    <g transform="translate(0, 42)">
+      <text x="20" y="26" font-size="12" font-weight="700" fill="#1E293B">18 Mar</text>
+      <text x="120" y="26" font-size="12" font-weight="800" fill="#003366">PT Astra Mega Digital — Annual Retainer Fee</text>
+      <rect x="480" y="10" width="94" height="22" rx="4" fill="#ECFDF5"/>
+      <text x="494" y="25" font-size="11" font-weight="800" fill="#065F46">EXPECTED</text>
+      <text x="680" y="26" font-size="13" font-weight="800" fill="#10B981" font-family="'JetBrains Mono', monospace">+Rp 85.000.000</text>
+      <text x="880" y="26" font-size="13" font-weight="700" fill="#1E293B" font-family="'JetBrains Mono', monospace">Rp 3.205.450.000</text>
+      <line x1="20" y1="42" x2="1116" y2="42" stroke="#F1F5F9"/>
+    </g>
+
+    <!-- Row 2: PPh 23 Tax Withholding -->
+    <g transform="translate(0, 86)">
+      <text x="20" y="26" font-size="12" font-weight="700" fill="#1E293B">20 Mar</text>
+      <text x="120" y="26" font-size="12" font-weight="800" fill="#003366">PPh 23 Jasa Teknik — DJP / Kemenkeu Billing</text>
+      <rect x="480" y="10" width="102" height="22" rx="4" fill="#FFFBEB"/>
+      <text x="494" y="25" font-size="11" font-weight="800" fill="#92400E">SCHEDULED</text>
+      <text x="680" y="26" font-size="13" font-weight="800" fill="#991B1B" font-family="'JetBrains Mono', monospace">-Rp 6.400.000</text>
+      <text x="880" y="26" font-size="13" font-weight="700" fill="#1E293B" font-family="'JetBrains Mono', monospace">Rp 3.199.050.000</text>
+      <line x1="20" y1="42" x2="1116" y2="42" stroke="#F1F5F9"/>
+    </g>
+
+    <!-- Row 3: Monthly Payroll Salary -->
+    <g transform="translate(0, 130)">
+      <text x="20" y="26" font-size="12" font-weight="700" fill="#1E293B">25 Mar</text>
+      <text x="120" y="26" font-size="12" font-weight="800" fill="#003366">Payroll Batch — 28 Employees (BCA Payroll Giro)</text>
+      <rect x="480" y="10" width="102" height="22" rx="4" fill="#FFFBEB"/>
+      <text x="494" y="25" font-size="11" font-weight="800" fill="#92400E">SCHEDULED</text>
+      <text x="680" y="26" font-size="13" font-weight="800" fill="#991B1B" font-family="'JetBrains Mono', monospace">-Rp 185.000.000</text>
+      <text x="880" y="26" font-size="13" font-weight="700" fill="#1E293B" font-family="'JetBrains Mono', monospace">Rp 3.014.050.000</text>
+      <line x1="20" y1="42" x2="1116" y2="42" stroke="#F1F5F9"/>
+    </g>
+
+    <!-- Row 4: PPN Monthly Return Filing -->
+    <g transform="translate(0, 174)">
+      <text x="20" y="26" font-size="12" font-weight="700" fill="#1E293B">31 Mar</text>
+      <text x="120" y="26" font-size="12" font-weight="800" fill="#003366">PPN Kurang Bayar Masa Februari — CoreTax Portal</text>
+      <rect x="480" y="10" width="94" height="22" rx="4" fill="#FEF2F2"/>
+      <text x="494" y="25" font-size="11" font-weight="800" fill="#991B1B">DEADLINE</text>
+      <text x="680" y="26" font-size="13" font-weight="800" fill="#991B1B" font-family="'JetBrains Mono', monospace">-Rp 32.100.000</text>
+      <text x="880" y="26" font-size="13" font-weight="700" fill="#1E293B" font-family="'JetBrains Mono', monospace">Rp 2.981.950.000</text>
+    </g>
+  </g>
+</svg>

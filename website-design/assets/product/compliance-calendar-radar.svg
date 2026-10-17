@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" width="100%" height="100%" style="background:#0F172A; font-family:'Manrope',-apple-system,BlinkMacSystemFont,sans-serif;">
+  <defs>
+    <filter id="compShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- WINDOW CONTAINER -->
+  <rect x="10" y="10" width="1180" height="660" rx="16" fill="#FFFFFF" stroke="#334155" stroke-width="1" filter="url(#compShadow)"/>
+
+  <!-- TOP HEADER -->
+  <rect x="10" y="10" width="1180" height="56" rx="16" fill="#F8FAFC"/>
+  <rect x="10" y="50" width="1180" height="16" fill="#F8FAFC"/>
+  <line x1="10" y1="66" x2="1190" y2="66" stroke="#E2E8F0" stroke-width="1"/>
+
+  <g transform="translate(32, 26)">
+    <text x="0" y="16" font-size="14" font-weight="900" fill="#003366">Indonesian Regulatory Radar &amp; Tax Compliance Calendar</text>
+    <text x="490" y="16" font-size="12" font-weight="500" fill="#64748B">Active Statutes: 66 Decrees • DJP CoreTax PMK 81/2024 Schedule</text>
+  </g>
+
+  <!-- PT PMA STATUS BADGE -->
+  <g transform="translate(980, 20)">
+    <rect x="0" y="0" width="170" height="30" rx="15" fill="#ECFDF5" stroke="#A7F3D0"/>
+    <text x="14" y="19" font-size="11" font-weight="800" fill="#065F46">Entity: PT PMA Indonesia</text>
+  </g>
+
+  <!-- TOP 3 REGULATORY METRIC CARDS -->
+  <g transform="translate(32, 86)">
+    
+    <!-- Card 1: CoreTax Transition -->
+    <rect x="0" y="0" width="365" height="110" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <g transform="translate(20, 18)">
+      <rect x="0" y="0" width="124" height="20" rx="4" fill="#DBEAFE"/>
+      <text x="8" y="14" font-size="10" font-weight="800" fill="#1E40AF">PMK 81/2024 RADAR</text>
+      <text x="0" y="44" font-size="16" font-weight="900" fill="#003366">DJP CoreTax Transition</text>
+      <text x="0" y="66" font-size="11" font-weight="600" fill="#475569">Status: Parallel Testing &amp; XML Export Ready</text>
+      <text x="0" y="82" font-size="10" font-weight="700" fill="#2563EB">Bupot Unifikasi &amp; e-Faktur 4.0 Prepared</text>
+    </g>
+
+    <!-- Card 2: Upcoming Tax Deadline -->
+    <g transform="translate(385, 0)">
+      <rect x="0" y="0" width="365" height="110" rx="12" fill="#FFFBEB" stroke="#FDE68A"/>
+      <g transform="translate(20, 18)">
+        <rect x="0" y="0" width="130" height="20" rx="4" fill="#FEF3C7"/>
+        <text x="8" y="14" font-size="10" font-weight="800" fill="#92400E">NEXT STATUTORY DUE</text>
+        <text x="0" y="44" font-size="16" font-weight="900" fill="#92400E">PPh 21 Payroll Withholding</text>
+        <text x="0" y="66" font-size="11" font-weight="600" fill="#78350F">Due: 10 April 2026 • 24 Days Remaining</text>
+        <text x="0" y="82" font-size="11" font-weight="800" fill="#B45309" font-family="'JetBrains Mono', monospace">Est. Liability: Rp 14.850.000 (TER Active)</text>
+      </g>
+    </g>
+
+    <!-- Card 3: Licensing & KBLI -->
+    <g transform="translate(770, 0)">
+      <rect x="0" y="0" width="366" height="110" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <g transform="translate(20, 18)">
+        <rect x="0" y="0" width="110" height="20" rx="4" fill="#F1F5F9"/>
+        <text x="8" y="14" font-size="10" font-weight="800" fill="#475569">BKPM / OSS RADAR</text>
+        <text x="0" y="44" font-size="16" font-weight="900" fill="#003366">LKPM Investment Report</text>
+        <text x="0" y="66" font-size="11" font-weight="600" fill="#475569">KBLI 62019 (Software Publishing)</text>
+        <text x="0" y="82" font-size="10" font-weight="700" fill="#059669">Q1 Report Window: 01 – 10 April 2026</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- LOWER SECTION: COMPLIANCE CALENDAR & SUMMARY (Height: 430) -->
+  <g transform="translate(32, 214)">
+    <rect x="0" y="0" width="1136" height="426" rx="14" fill="#FFFFFF" stroke="#E2E8F0"/>
+    
+    <!-- Table Header -->
+    <rect x="0" y="0" width="1136" height="44" rx="14" fill="#FAFAFA"/>
+    <line x1="0" y1="44" x2="1136" y2="44" stroke="#E2E8F0"/>
+    <text x="24" y="28" font-size="12" font-weight="800" fill="#475569">DUE DATE</text>
+    <text x="140" y="28" font-size="12" font-weight="800" fill="#475569">REGULATORY OBLIGATION / STATUTE</text>
+    <text x="560" y="28" font-size="12" font-weight="800" fill="#475569">APPLICABLE RATE / METHOD</text>
+    <text x="780" y="28" font-size="12" font-weight="800" fill="#475569">ESTIMATED LIABILITY</text>
+    <text x="980" y="28" font-size="12" font-weight="800" fill="#475569">STAGE / STATUS</text>
+
+    <!-- Obligation 1: PPh 21 -->
+    <g transform="translate(0, 48)">
+      <text x="24" y="32" font-size="13" font-weight="700" fill="#1E293B">10 Apr 2026</text>
+      <g transform="translate(140, 14)">
+        <text x="0" y="16" font-size="13" font-weight="800" fill="#003366">PPh Pasal 21 Masa Maret</text>
+        <text x="0" y="32" font-size="11" font-weight="500" fill="#64748B">Monthly employee wage withholding tax • DJP e-Bupot 21/26</text>
+      </g>
+      <text x="560" y="32" font-size="12" font-weight="600" fill="#334155">PP 58/2023 TER (Kat A, B, C)</text>
+      <text x="780" y="32" font-size="13" font-weight="800" fill="#003366" font-family="'JetBrains Mono', monospace">Rp 14.850.000</text>
+      <rect x="980" y="16" width="94" height="24" rx="6" fill="#DBEAFE"/>
+      <text x="996" y="32" font-size="11" font-weight="800" fill="#1E40AF">CALCULATED</text>
+      <line x1="20" y1="56" x2="1116" y2="56" stroke="#F1F5F9"/>
+    </g>
+
+    <!-- Obligation 2: PPh 23 -->
+    <g transform="translate(0, 110)">
+      <text x="24" y="32" font-size="13" font-weight="700" fill="#1E293B">20 Apr 2026</text>
+      <g transform="translate(140, 14)">
+        <text x="0" y="16" font-size="13" font-weight="800" fill="#003366">PPh Pasal 23 Jasa Teknik &amp; Konsultan</text>
+        <text x="0" y="32" font-size="11" font-weight="500" fill="#64748B">Third-party service withholding on PT Mitra Telematika invoice</text>
+      </g>
+      <text x="560" y="32" font-size="12" font-weight="600" fill="#334155">2.0% DPP (Without NPWP 4%)</text>
+      <text x="780" y="32" font-size="13" font-weight="800" fill="#003366" font-family="'JetBrains Mono', monospace">Rp 6.400.000</text>
+      <rect x="980" y="16" width="94" height="24" rx="6" fill="#ECFDF5"/>
+      <text x="1006" y="32" font-size="11" font-weight="800" fill="#065F46">PREPARED</text>
+      <line x1="20" y1="56" x2="1116" y2="56" stroke="#F1F5F9"/>
+    </g>
+
+    <!-- Obligation 3: PPN Monthly Return -->
+    <g transform="translate(0, 172)">
+      <text x="24" y="32" font-size="13" font-weight="700" fill="#1E293B">30 Apr 2026</text>
+      <g transform="translate(140, 14)">
+        <text x="0" y="16" font-size="13" font-weight="800" fill="#003366">SPT Masa PPN (Pajak Pertambahan Nilai)</text>
+        <text x="0" y="32" font-size="11" font-weight="500" fill="#64748B">Keluaran vs Masukan offset • CoreTax Portal filing</text>
+      </g>
+      <text x="560" y="32" font-size="12" font-weight="600" fill="#334155">11% UU HPP (Net Offset)</text>
+      <text x="780" y="32" font-size="13" font-weight="800" fill="#003366" font-family="'JetBrains Mono', monospace">Rp 32.100.000</text>
+      <rect x="980" y="16" width="94" height="24" rx="6" fill="#F1F5F9"/>
+      <text x="1010" y="32" font-size="11" font-weight="800" fill="#475569">PENDING</text>
+      <line x1="20" y1="56" x2="1116" y2="56" stroke="#F1F5F9"/>
+    </g>
+
+    <!-- Obligation 4: BKPM LKPM Quarterly -->
+    <g transform="translate(0, 234)">
+      <text x="24" y="32" font-size="13" font-weight="700" fill="#1E293B">10 Apr 2026</text>
+      <g transform="translate(140, 14)">
+        <text x="0" y="16" font-size="13" font-weight="800" fill="#003366">LKPM BKPM Triwulan I (Q1 2026)</text>
+        <text x="0" y="32" font-size="11" font-weight="500" fill="#64748B">Capital investment &amp; employee headcount reporting for PT PMA</text>
+      </g>
+      <text x="560" y="32" font-size="12" font-weight="600" fill="#334155">Perka BKPM No. 5/2021</text>
+      <text x="780" y="32" font-size="13" font-weight="800" fill="#64748B" font-family="'JetBrains Mono', monospace">Non-Financial</text>
+      <rect x="980" y="16" width="94" height="24" rx="6" fill="#FEF3C7"/>
+      <text x="1006" y="32" font-size="11" font-weight="800" fill="#92400E">DUE SOON</text>
+      <line x1="20" y1="56" x2="1116" y2="56" stroke="#F1F5F9"/>
+    </g>
+
+    <!-- Statutory Bottom Notice -->
+    <g transform="translate(24, 340)">
+      <rect x="0" y="0" width="1088" height="60" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="16" y="24" font-size="11" font-weight="800" fill="#003366">STATUTORY BOUNDARY &amp; PROFESSIONAL PREPARATION:</text>
+      <text x="16" y="44" font-size="11" font-weight="500" fill="#475569">
+        CFO AI automatically compiles tax calculation worksheets, verifies invoice withholding rates, and formats e-Bupot and CoreTax data. Official return submissions and regulated certifications remain the responsibility of certified Konsultan Pajak or company directors.
+      </text>
+    </g>
+  </g>
+</svg>

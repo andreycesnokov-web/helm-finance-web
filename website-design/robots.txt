@@ -1,0 +1,7 @@
+# CFO AI Indonesia — Official Marketing Website
+# https://cfo-ai.site
+
+User-agent: *
+Allow: /
+
+Sitemap: https://cfo-ai.site/sitemap.xml

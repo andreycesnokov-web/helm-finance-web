@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing & Plans — CFO AI Indonesia</title>
+  <meta name="description" content="Transparent pricing for Indonesian businesses. 7-day free trial on Starter, Control, or Pro. No credit card required.">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-navy: #003366;
+      --brand-navy-dark: #001A33;
+      --brand-electric-blue: #3399FF;
+      --brand-electric-blue-ink: #1565C0;
+      --surface-page: #F8FAFC;
+      --surface-card: #FFFFFF;
+      --text-primary: #003366;
+      --text-secondary: #334155;
+      --text-muted: #5A6E82;
+      --font-display: 'Archivo Black', 'Manrope', sans-serif;
+      --font-ui: 'Manrope', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body {
+      font-family: var(--font-ui);
+      background-color: var(--surface-page);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .font-mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums; }
+    .cfo-watermark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.035;
+    }
+    .cfo-watermark-dark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.055;
+    }
+    .bento-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px -2px rgba(0, 51, 102, 0.05);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .bento-card:hover {
+      border-color: #3399FF;
+      box-shadow: 0 16px 36px -4px rgba(51, 153, 255, 0.14);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="selection:bg-blue-100 selection:text-[#003366]">
+
+  <!-- TOP ANNOUNCEMENT BAR: SUBTLE DARK NAVY TONAL GRADIENT -->
+  <aside aria-label="Official release announcement" class="text-white text-xs py-2 px-4 sm:px-8 font-medium border-b border-white/10 relative z-50 shadow-sm" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+      <div class="flex items-center gap-2.5">
+        <span class="bg-[#3399FF] text-[#001A33] font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">TRANSPARENT PRICING</span>
+        <span class="font-semibold text-white/95">Try Any Plan Free for 7 Days • No Credit Card Required</span>
+      </div>
+      <div class="flex items-center gap-4 text-[11px] text-white/75 font-medium">
+        <span class="hidden md:inline">Marketing: https://cfo-ai.site</span>
+        <span class="text-white/30 hidden md:inline">•</span>
+        <span class="font-mono text-white font-bold">App: https://app.cfo-ai.site</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STICKY HEADER NAVIGATION (RESPONSIVE, ZERO CLIPPING AT 1440px & 1280px) -->
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Authentic CFO AI Logo -->
+      <a href="index.html" class="flex items-center gap-3.5 flex-shrink-0 group">
+        <div class="w-10 h-10 flex-shrink-0">
+          <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-sm group-hover:scale-105 transition-transform" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#003366" fill-rule="evenodd"/>
+            <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-xl tracking-tight text-[#003366] leading-none">CFO AI</span>
+            <span class="bg-[#ECFDF5] text-[#0F7A52] text-[10px] font-extrabold px-1.5 py-0.2 rounded border border-[#0F7A52]/20">INDONESIA</span>
+          </div>
+          <span class="text-[10px] tracking-wider uppercase font-bold text-[#5A6E82] mt-0.5">Pricing</span>
+        </div>
+      </a>
+
+      <!-- Navigation Links (Zero wrapping at 1280px) -->
+      <nav class="hidden lg:flex items-center space-x-5 xl:space-x-7 text-sm font-semibold text-[#334155] whitespace-nowrap">
+        <a href="index.html" class="hover:text-[#1565C0] transition-colors">Home</a>
+        <a href="platform-page.html" class="hover:text-[#1565C0] transition-colors">Platform</a>
+        <a href="document-intelligence-page.html" class="hover:text-[#1565C0] transition-colors">Documents</a>
+        <a href="compliance-page.html" class="hover:text-[#1565C0] transition-colors">Compliance</a>
+        <a href="pricing-page.html" class="text-[#1565C0] font-bold border-b-2 border-[#1565C0] pb-1">Pricing</a>
+        <a href="#faq" class="hover:text-[#1565C0] transition-colors">FAQ</a>
+      </nav>
+
+      <!-- Action Buttons -->
+      <div class="hidden sm:flex items-center gap-3.5 flex-shrink-0">
+        <a href="https://app.cfo-ai.site/login" class="text-sm font-bold text-[#003366] hover:text-[#1565C0] transition-colors px-3 py-2 whitespace-nowrap">
+          Log In
+        </a>
+        <a href="https://app.cfo-ai.site/login" class="text-sm font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-5 py-2.5 rounded-[10px] shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>Start Free — 7 Days</span>
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </a>
+      </div>
+
+      <!-- Mobile Menu Hamburger Button -->
+      <button onclick="toggleMobileNav()" class="lg:hidden p-2 rounded-lg text-[#003366] hover:bg-slate-100 focus:outline-none" aria-label="Toggle Navigation">
+        <svg id="nav-open-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg id="nav-close-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+
+    </div>
+
+    <!-- Responsive Mobile Navigation Drawer -->
+    <div id="mobile-nav-drawer" class="hidden lg:hidden bg-white border-b border-[#E2E8F0] px-6 py-5 space-y-3.5 shadow-xl">
+      <a href="index.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Home</a>
+      <a href="platform-page.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Platform Architecture</a>
+      <a href="document-intelligence-page.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Document Intake &amp; OCR</a>
+      <a href="compliance-page.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Compliance &amp; Tax Radar</a>
+      <a href="pricing-page.html" class="block py-2 font-bold text-sm text-[#1565C0]">Pricing &amp; Plans</a>
+      <a href="#faq" onclick="toggleMobileNav()" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Billing FAQ</a>
+      <div class="pt-4 border-t border-[#E2E8F0] flex flex-col gap-2.5">
+        <a href="https://app.cfo-ai.site/login" class="block w-full text-center font-bold text-sm border border-[#CBD5E1] text-[#003366] py-2.5 rounded-xl">
+          Log In
+        </a>
+        <a href="https://app.cfo-ai.site/login" class="block w-full text-center font-bold text-sm bg-[#1565C0] text-white py-3 rounded-xl shadow-md">
+          Start Free — 7 Days ($0)
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. PRICING HERO SECTION (SOFT ICE-BLUE BACKGROUND #E5F1FD to #F5F9FE) -->
+  <section class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden border-b border-[#E2E8F0]" style="background: linear-gradient(180deg, #E5F1FD 0%, #F5F9FE 100%);">
+    
+    <svg viewBox="0 0 200 200" class="cfo-watermark -top-20 -right-20 w-[600px] h-[600px] text-[#003366]">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#3399FF]/40 text-xs font-black text-[#003366] mb-5 shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-[#3399FF]"></span>
+        <span>CLEAR OUTCOMES • TRANSPARENT SUBSCRIPTION PRICING</span>
+      </div>
+
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-[#003366] tracking-tight leading-[1.1] mb-5">
+        Try CFO AI Free for 7 Days.<br/>
+        <span class="text-[#1565C0]">Then Choose Your Level of Control.</span>
+      </h1>
+
+      <p class="text-base sm:text-lg text-[#334155] max-w-2xl mx-auto leading-relaxed mb-6">
+        Full 168 hours of trial access on any plan. Set up your Indonesian entity (PT or PT PMA), explore multi-currency accounts, and import bank statements with zero risk.
+      </p>
+
+      <div class="inline-flex flex-wrap items-center justify-center gap-3 bg-emerald-50 text-emerald-800 text-xs font-bold px-4 py-2.5 rounded-full border border-emerald-200">
+        <span>✓ No credit card required to start</span>
+        <span>•</span>
+        <span>✓ 1-click cancellation anytime</span>
+        <span>•</span>
+        <span>✓ Full access to selected plan</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. THREE SUBSCRIPTION TIERS CARDS -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto -mt-6 relative z-20">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch mb-20">
+      
+      <!-- Tier 1: STARTER ($59) -->
+      <div class="bento-card p-8 flex flex-col justify-between bg-white">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold text-[#5A6E82] uppercase tracking-wider block">STARTER</span>
+            <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">7-Day Free Trial</span>
+          </div>
+          <h3 class="text-2xl font-black text-[#003366] mb-1">Organize Your Finances</h3>
+          <p class="text-xs text-[#5A6E82] mb-6">For small businesses that need cash visibility and organized financial records.</p>
+          
+          <div class="flex items-baseline gap-1 mb-6">
+            <span class="text-4xl font-black text-[#003366] font-mono-num">$59</span>
+            <span class="text-xs text-[#5A6E82]">/ month (USD)</span>
+          </div>
+
+          <!-- Capacity Highlights -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-[#003366] font-semibold mb-6 space-y-1.5">
+            <div class="flex justify-between"><span>User Seats:</span><span class="font-bold text-[#003366]">5 Users</span></div>
+            <div class="flex justify-between"><span>Companies:</span><span class="font-bold text-[#003366]">1 Company</span></div>
+            <div class="flex justify-between"><span>Monthly Transactions:</span><span class="font-mono text-[#003366]">2,000 / mo</span></div>
+            <div class="flex justify-between"><span>Document Uploads:</span><span class="font-mono text-[#003366]">200 / mo</span></div>
+          </div>
+
+          <!-- Key Features -->
+          <div class="space-y-2.5 text-xs text-[#334155] border-t border-slate-100 pt-6">
+            <div class="font-bold text-[#003366] flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Pulse real-time cash dashboard</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Transactions, accounts &amp; bills</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Basic AI CFO questions (50/mo)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Bank statement import (5/mo)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Basic tax calendar dates</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-100">
+          <a href="https://app.cfo-ai.site/login?plan=starter" class="block w-full text-center text-xs font-bold py-3.5 bg-slate-100 hover:bg-slate-200 text-[#003366] rounded-xl transition-all">
+            Start Free Trial (7 Days)
+          </a>
+        </div>
+      </div>
+
+      <!-- Tier 2: CONTROL ($149) - RECOMMENDED / FLAGSHIP -->
+      <div class="bento-card p-8 flex flex-col justify-between bg-white border-2 border-[#1565C0] relative shadow-2xl scale-105 z-10">
+        <div class="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-[#1565C0] text-white text-[10px] font-black uppercase tracking-wider px-4 py-1 rounded-full shadow-md">
+          RECOMMENDED • FLAGSHIP
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-black text-[#1565C0] uppercase tracking-wider block">CONTROL</span>
+            <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">7-Day Free Trial</span>
+          </div>
+          <h3 class="text-2xl font-black text-[#003366] mb-1">Total Operational Control</h3>
+          <p class="text-xs text-[#5A6E82] mb-6">For growing businesses needing deeper intelligence, approvals, and tax readiness.</p>
+          
+          <div class="flex items-baseline gap-1 mb-6">
+            <span class="text-4xl font-black text-[#003366] font-mono-num">$149</span>
+            <span class="text-xs text-[#5A6E82]">/ month (USD)</span>
+          </div>
+
+          <!-- Capacity Highlights -->
+          <div class="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-[#003366] font-semibold mb-6 space-y-1.5">
+            <div class="flex justify-between"><span>User Seats:</span><span class="font-bold text-[#1565C0]">10 Users</span></div>
+            <div class="flex justify-between"><span>Companies:</span><span class="font-bold text-[#1565C0]">2 Companies</span></div>
+            <div class="flex justify-between"><span>Monthly Transactions:</span><span class="font-mono text-[#1565C0]">10,000 / mo</span></div>
+            <div class="flex justify-between"><span>Document Uploads:</span><span class="font-mono text-[#1565C0]">1,000 / mo</span></div>
+          </div>
+
+          <!-- Key Features -->
+          <div class="space-y-2.5 text-xs text-[#334155] border-t border-slate-100 pt-6">
+            <div class="font-black text-[#1565C0] flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Everything in Starter included</span>
+            </div>
+            <div class="flex items-center gap-2 font-bold text-[#003366]">
+              <span class="text-emerald-700">✓</span><span>Financial approvals &amp; staff permissions</span>
+            </div>
+            <div class="flex items-center gap-2 font-bold text-[#003366]">
+              <span class="text-emerald-700">✓</span><span>Bank reconciliation (BCA &amp; Permata)</span>
+            </div>
+            <div class="flex items-center gap-2 font-bold text-[#003366]">
+              <span class="text-emerald-700">✓</span><span>AI Accountant &amp; monthly close reports</span>
+            </div>
+            <div class="flex items-center gap-2 font-bold text-[#003366]">
+              <span class="text-emerald-700">✓</span><span>Indonesian tax calendar &amp; CoreTax updates</span>
+            </div>
+            <div class="flex items-center gap-2 font-bold text-[#003366]">
+              <span class="text-emerald-700">✓</span><span>Payroll management workflows</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-100">
+          <a href="https://app.cfo-ai.site/login?plan=control" class="block w-full text-center text-xs font-bold py-3.5 bg-[#1565C0] hover:bg-[#10529C] text-white rounded-xl shadow-md transition-all">
+            Start Free Trial (7 Days) →
+          </a>
+        </div>
+      </div>
+
+      <!-- Tier 3: PRO ($249) -->
+      <div class="bento-card p-8 flex flex-col justify-between bg-white">
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-bold text-[#5A6E82] uppercase tracking-wider block">PRO</span>
+            <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">7-Day Free Trial</span>
+          </div>
+          <h3 class="text-2xl font-black text-[#003366] mb-1">Multi-Entity &amp; Scaling</h3>
+          <p class="text-xs text-[#5A6E82] mb-6">For multi-entity businesses requiring high volume, audit logs, and API access.</p>
+          
+          <div class="flex items-baseline gap-1 mb-6">
+            <span class="text-4xl font-black text-[#003366] font-mono-num">$249</span>
+            <span class="text-xs text-[#5A6E82]">/ month (USD)</span>
+          </div>
+
+          <!-- Capacity Highlights -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-[#003366] font-semibold mb-6 space-y-1.5">
+            <div class="flex justify-between"><span>User Seats:</span><span class="font-bold text-[#003366]">30 Users</span></div>
+            <div class="flex justify-between"><span>Companies:</span><span class="font-bold text-[#003366]">5 Companies</span></div>
+            <div class="flex justify-between"><span>Monthly Transactions:</span><span class="font-mono text-[#003366]">50,000 / mo</span></div>
+            <div class="flex justify-between"><span>Document Uploads:</span><span class="font-mono text-[#003366]">3,000 / mo</span></div>
+          </div>
+
+          <!-- Key Features -->
+          <div class="space-y-2.5 text-xs text-[#334155] border-t border-slate-100 pt-6">
+            <div class="font-bold text-[#003366] flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Everything in Control included</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Group company management (5 entities)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Intercompany &amp; advanced filing prep</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>MCP / API tool calls (15,000/mo)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-700">✓</span><span>Full audit logs &amp; priority queue</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-100">
+          <a href="https://app.cfo-ai.site/login?plan=pro" class="block w-full text-center text-xs font-bold py-3.5 bg-slate-100 hover:bg-slate-200 text-[#003366] rounded-xl transition-all">
+            Start Free Trial (7 Days)
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 3. MANDATORY TABLE 1: FULL USAGE LIMITS COMPARISON -->
+    <div class="bento-card p-6 bg-slate-50 border border-slate-200 max-w-5xl mx-auto mb-14">
+      <div class="text-center mb-6">
+        <span class="text-[11px] font-bold text-[#1565C0] uppercase tracking-wider block">RESOURCE MATRIX</span>
+        <h3 class="font-black text-xl text-[#003366] mt-0.5">Full Usage Limits Comparison</h3>
+        <p class="text-xs text-[#5A6E82]">Commercial resource allowances across Starter, Control, and Pro plans.</p>
+      </div>
+
+      <div class="overflow-x-auto text-xs">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-300 font-bold text-[#003366] bg-white">
+              <th class="p-3.5">Usage Limit</th>
+              <th class="p-3.5 text-center">Starter ($59)</th>
+              <th class="p-3.5 text-center bg-blue-50/80 font-bold text-[#1565C0] border-x border-blue-200">Control ($149)</th>
+              <th class="p-3.5 text-center">Pro ($249)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 text-[#334155]">
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Users (Active Seats)</td>
+              <td class="p-3 text-center font-mono">5</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">10</td>
+              <td class="p-3 text-center font-mono">30</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Companies (Owned Workspaces)</td>
+              <td class="p-3 text-center font-mono">1</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">2</td>
+              <td class="p-3 text-center font-mono">5</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Financial Accounts (Wallets)</td>
+              <td class="p-3 text-center font-mono">5</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">15</td>
+              <td class="p-3 text-center font-mono">50</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Documents / Month</td>
+              <td class="p-3 text-center font-mono">200</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">1,000</td>
+              <td class="p-3 text-center font-mono">3,000</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">AI CFO Questions / Month</td>
+              <td class="p-3 text-center font-mono">50</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">300</td>
+              <td class="p-3 text-center font-mono">1,000</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Bank Statement Imports / Month</td>
+              <td class="p-3 text-center font-mono">5</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">20</td>
+              <td class="p-3 text-center font-mono">100</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Bank Statement Rows / Month</td>
+              <td class="p-3 text-center font-mono">1,000</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">10,000</td>
+              <td class="p-3 text-center font-mono">50,000</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Transactions / Period</td>
+              <td class="p-3 text-center font-mono">2,000</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">10,000</td>
+              <td class="p-3 text-center font-mono">50,000</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">AI Accountant Requests / Month</td>
+              <td class="p-3 text-center text-slate-400 font-mono">0</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">50</td>
+              <td class="p-3 text-center font-mono">200</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">AI Document Recognition / Month</td>
+              <td class="p-3 text-center font-mono">100</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">500</td>
+              <td class="p-3 text-center font-mono">1,500</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">MCP / API Requests / Month</td>
+              <td class="p-3 text-center font-mono">500</td>
+              <td class="p-3 text-center bg-blue-50/40 font-mono font-bold text-[#1565C0] border-x border-blue-200">3,000</td>
+              <td class="p-3 text-center font-mono">15,000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 4. MANDATORY TABLE 2: FULL FEATURE AVAILABILITY COMPARISON -->
+    <div class="bento-card p-6 bg-slate-50 border border-slate-200 max-w-5xl mx-auto mb-20">
+      <div class="text-center mb-6">
+        <span class="text-[11px] font-bold text-[#1565C0] uppercase tracking-wider block">FEATURE AVAILABILITY</span>
+        <h3 class="font-black text-xl text-[#003366] mt-0.5">Full Feature Availability Comparison</h3>
+        <p class="text-xs text-[#5A6E82]">Module accessibility verified against CFO AI application entitlements.</p>
+      </div>
+
+      <div class="overflow-x-auto text-xs">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-300 font-bold text-[#003366] bg-white">
+              <th class="p-3.5">Feature</th>
+              <th class="p-3.5 text-center">Starter ($59)</th>
+              <th class="p-3.5 text-center bg-blue-50/80 font-bold text-[#1565C0] border-x border-blue-200">Control ($149)</th>
+              <th class="p-3.5 text-center">Pro ($249)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 text-[#334155]">
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Pulse, Radar, Transactions, Accounts</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Invoices &amp; Bills, Documents</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Basic AI CFO</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Bank Statement Import</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Employee Invitations</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Approvals &amp; Spend Authorization</td>
+              <td class="p-3 text-center text-slate-400">Not Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Payroll Workflows</td>
+              <td class="p-3 text-center text-slate-400">Not Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">AI Accountant Assistant</td>
+              <td class="p-3 text-center text-slate-400">Not Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Tax &amp; Compliance Monitoring</td>
+              <td class="p-3 text-center font-semibold text-slate-700">Basic</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Reconciliation &amp; Accounting Reports</td>
+              <td class="p-3 text-center text-slate-400">Not Included</td>
+              <td class="p-3 text-center bg-blue-50/40 font-bold text-emerald-700 border-x border-blue-200">Included</td>
+              <td class="p-3 text-center font-bold text-emerald-700">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Group Company Management</td>
+              <td class="p-3 text-center text-slate-400">Not Included</td>
+              <td class="p-3 text-center bg-blue-50/40 text-slate-400 border-x border-blue-200">Not Included</td>
+              <td class="p-3 text-center font-bold text-[#1565C0]">Included</td>
+            </tr>
+            <tr class="hover:bg-white/60">
+              <td class="p-3 font-semibold text-[#003366]">Intercompany &amp; Advanced Filing Preparation</td>
+              <td class="p-3 text-center text-slate-400">Not Included</td>
+              <td class="p-3 text-center bg-blue-50/40 text-slate-400 border-x border-blue-200">Not Included</td>
+              <td class="p-3 text-center font-bold text-[#1565C0]">Included (Pro)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 5. FREQUENTLY ASKED QUESTIONS ABOUT PRICING & LIMITS -->
+    <div id="faq" class="max-w-4xl mx-auto">
+      <div class="text-center mb-12">
+        <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">QUESTIONS ABOUT BILLING &amp; TRIALS</span>
+        <h3 class="text-2xl sm:text-3xl font-black text-[#003366] mt-1 mb-2">Common Questions About Pricing &amp; Limits</h3>
+        <p class="text-xs text-[#5A6E82]">Everything you need to know before getting started.</p>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <details class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm" open>
+          <summary class="font-bold text-sm text-[#003366] cursor-pointer">Which plan is right for my company?</summary>
+          <p class="text-slate-600 mt-2 leading-relaxed pt-2 border-t border-slate-100">
+            If you operate a single PT or PT PMA with up to 5 team members and need cash visibility, <strong>Starter ($59)</strong> is ideal. If you require multi-step spend approvals, automated BCA and Permata bank statement reconciliation, employee receipt workflows via Telegram, and full Indonesian tax calendar tracking, <strong>Control ($149)</strong> is our flagship and recommended tier. For growing enterprises managing multiple companies (up to 5 entities) with high transaction volumes and external API integrations, select <strong>Pro ($249)</strong>.
+          </p>
+        </details>
+
+        <details class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+          <summary class="font-bold text-sm text-[#003366] cursor-pointer">What happens when my 7-day free trial ends?</summary>
+          <p class="text-slate-600 mt-2 leading-relaxed pt-2 border-t border-slate-100">
+            Because we do not require a credit card at signup, your card will never be billed automatically. At the end of the 168-hour trial window, you can choose to activate your monthly subscription to continue logging new entries, or export your reconciled data with zero penalty.
+          </p>
+        </details>
+
+        <details class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+          <summary class="font-bold text-sm text-[#003366] cursor-pointer">What happens if my company reaches its monthly usage limits?</summary>
+          <p class="text-slate-600 mt-2 leading-relaxed pt-2 border-t border-slate-100">
+            If your transaction volume or document upload count approaches your plan limit, company administrators receive a proactive notification. Your existing financial records, dashboards, and export tools remain fully accessible. You can upgrade to a higher plan anytime to immediately restore capacity.
+          </p>
+        </details>
+
+        <details class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+          <summary class="font-bold text-sm text-[#003366] cursor-pointer">Can I upgrade, downgrade, or cancel my plan at any time?</summary>
+          <p class="text-slate-600 mt-2 leading-relaxed pt-2 border-t border-slate-100">
+            Yes. You can switch between Starter, Control, and Pro directly from your company billing settings at any time. When upgrading, new capacity takes effect immediately. When canceling, your access continues through the end of the paid billing period.
+          </p>
+        </details>
+
+        <details class="p-4 rounded-xl border border-slate-200 bg-white shadow-sm">
+          <summary class="font-bold text-sm text-[#003366] cursor-pointer">Does my external accountant require a separate paid user seat?</summary>
+          <p class="text-slate-600 mt-2 leading-relaxed pt-2 border-t border-slate-100">
+            No. You can either invite your accountant to your workspace within your included seat allowance (5, 10, or 30 seats), or generate 1-click monthly export packages (CSV, trial balance, and organized receipt attachments) and email them without extra cost.
+          </p>
+        </details>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- 6. FINAL HIGH-CONVERSION CTA STRIP -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50 text-center border-t border-[#E2E8F0]">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-black text-[#003366] mb-3">
+        Take Control of Your Company's Finances Today
+      </h2>
+      <p class="text-base text-[#5A6E82] mb-8 max-w-2xl mx-auto">
+        Join Indonesian business owners spending less time on paperwork. Start your 7-day free trial on any plan.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+        <a href="https://app.cfo-ai.site/login" class="text-base font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Start Free — 7 Days ($0)</span>
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </a>
+      </div>
+      <div class="text-xs text-[#5A6E82]">
+        No credit card required • 1-minute setup • Built for Indonesian PT &amp; PT PMA
+      </div>
+    </div>
+  </section>
+
+  <!-- RESTORED PROFESSIONAL 4-COLUMN FOOTER -->
+  <footer class="text-white/70 py-16 px-4 sm:px-6 lg:px-8 border-t border-white/10 relative overflow-hidden" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    
+    <!-- Subtle Brand Watermark in Footer -->
+    <svg viewBox="0 0 200 200" class="cfo-watermark-dark -bottom-16 -right-16 w-80 h-80 text-white/5 pointer-events-none absolute select-none">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-7xl mx-auto relative z-10">
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-8 lg:gap-12 mb-12">
+        
+        <!-- Brand & Description (Col span 2) -->
+        <div class="col-span-2">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 flex-shrink-0">
+              <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+                <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+              </svg>
+            </div>
+            <div class="flex flex-col">
+              <span class="font-extrabold text-white text-lg tracking-tight leading-none">CFO AI</span>
+              <span class="text-[10px] tracking-wider uppercase font-semibold text-[#3399FF] mt-0.5">Indonesia</span>
+            </div>
+          </div>
+          <p class="text-xs text-white/60 leading-relaxed max-w-sm mb-4">
+            CFO AI — Intelligent Financial Management for Indonesian Businesses. Connected document intelligence, automated accounting preparation, and Indonesian regulatory monitoring.
+          </p>
+          <div class="text-[11px] text-white/40 space-y-1">
+            <div>Marketing: <span class="text-white/60">https://cfo-ai.site</span></div>
+            <div>Application: <span class="text-white/60">https://app.cfo-ai.site</span></div>
+          </div>
+        </div>
+
+        <!-- Col 1: Product -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Product</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="platform-page.html" class="hover:text-white transition-colors">Platform</a></li>
+            <li><a href="index.html#ai-cfo" class="hover:text-white transition-colors">AI CFO</a></li>
+            <li><a href="index.html#ai-accountant" class="hover:text-white transition-colors">AI Accountant</a></li>
+            <li><a href="document-intelligence-page.html" class="hover:text-white transition-colors">Document Intelligence</a></li>
+            <li><a href="compliance-page.html" class="hover:text-white transition-colors">Compliance</a></li>
+            <li><a href="pricing-page.html" class="text-white font-semibold">Pricing</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 2: Company -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Company</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="index.html" class="hover:text-white transition-colors">About CFO AI</a></li>
+            <li><a href="mailto:support@cfo-ai.site" class="hover:text-white transition-colors">Contact Support</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 3: Legal -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Legal</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="index.html#privacy" class="hover:text-white transition-colors">Privacy Policy</a></li>
+            <li><a href="index.html#terms" class="hover:text-white transition-colors">Terms of Service</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 4: Account -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Account</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="https://app.cfo-ai.site/login" class="hover:text-white transition-colors">Log In</a></li>
+            <li><a href="https://app.cfo-ai.site/login" class="hover:text-white transition-colors font-semibold text-[#3399FF]">Start Free Trial</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Footer Bottom Separator & Copyright & Disclaimer -->
+      <div class="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-[11px] text-white/50">
+        <div>Copyright &copy; 2026 CFO AI. All rights reserved.</div>
+        <div class="text-center md:text-right max-w-xl">
+          CFO AI assists with financial management and accounting preparation. It does not provide statutory audits, legal advice, or direct tax filing with government portals.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Responsive Mobile Navigation Script -->
+  <script>
+    function toggleMobileNav() {
+      const drawer = document.getElementById('mobile-nav-drawer');
+      const openIcon = document.getElementById('nav-open-icon');
+      const closeIcon = document.getElementById('nav-close-icon');
+      if (drawer.classList.contains('hidden')) {
+        drawer.classList.remove('hidden');
+        openIcon.classList.add('hidden');
+        closeIcon.classList.remove('hidden');
+      } else {
+        drawer.classList.add('hidden');
+        openIcon.classList.remove('hidden');
+        closeIcon.classList.add('hidden');
+      }
+    }
+  </script>
+
+</body>
+</html>

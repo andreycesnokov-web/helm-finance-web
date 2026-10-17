@@ -1,0 +1,291 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="100%" height="100%" style="background:#0F172A; font-family:'Manrope',-apple-system,BlinkMacSystemFont,sans-serif;">
+  <defs>
+    <linearGradient id="bgPulse" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B"/>
+      <stop offset="100%" stop-color="#1C2541"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F8FAFC"/>
+    </linearGradient>
+    <linearGradient id="heroGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#001A33"/>
+      <stop offset="50%" stop-color="#00264D"/>
+      <stop offset="100%" stop-color="#003366"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- WINDOW CONTAINER -->
+  <rect x="10" y="10" width="1180" height="740" rx="16" fill="#F1F5F9" stroke="#334155" stroke-width="1" filter="url(#shadow)"/>
+
+  <!-- APP HEADER BAR -->
+  <rect x="10" y="10" width="1180" height="56" rx="16" fill="#FFFFFF"/>
+  <rect x="10" y="50" width="1180" height="16" fill="#FFFFFF"/>
+  <line x1="10" y1="66" x2="1190" y2="66" stroke="#E2E8F0" stroke-width="1"/>
+
+  <!-- Window controls -->
+  <circle cx="34" cy="38" r="6" fill="#EF4444"/>
+  <circle cx="54" cy="38" r="6" fill="#F59E0B"/>
+  <circle cx="74" cy="38" r="6" fill="#10B981"/>
+
+  <!-- Logo & Workspace Selector -->
+  <g transform="translate(110, 24)">
+    <rect x="0" y="0" width="28" height="28" rx="6" fill="#003366"/>
+    <circle cx="14" cy="14" r="5" fill="#3399FF"/>
+    <text x="36" y="19" font-size="14" font-weight="800" fill="#003366">CFO AI</text>
+    <rect x="96" y="2" width="1" height="24" fill="#CBD5E1"/>
+    <rect x="108" y="2" width="220" height="25" rx="6" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <circle cx="122" cy="14" r="4" fill="#10B981"/>
+    <text x="134" y="18" font-size="12" font-weight="700" fill="#1E293B">PT Solusi Digital Nusantara</text>
+    <text x="296" y="18" font-size="10" fill="#64748B">▼</text>
+  </g>
+
+  <!-- Top Right Navigation -->
+  <g transform="translate(860, 24)">
+    <rect x="0" y="0" width="80" height="28" rx="6" fill="#ECFDF5" stroke="#A7F3D0"/>
+    <circle cx="12" cy="14" r="3" fill="#10B981"/>
+    <text x="22" y="18" font-size="11" font-weight="700" fill="#065F46">HEALTHY</text>
+    
+    <rect x="92" y="0" width="120" height="28" rx="6" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="104" y="18" font-size="11" font-weight="600" fill="#475569">Masa: Mar 2026</text>
+    <text x="196" y="18" font-size="10" fill="#64748B">▼</text>
+    
+    <circle cx="230" cy="14" r="14" fill="#F1F5F9"/>
+    <g transform="translate(222, 6)">
+      <path d="M12 4A4 4 0 0 0 4 4c0 4.67-2 6-2 6h16s-2-1.33-2-6" stroke="#475569" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M9.5 13.5a1.5 1.5 0 0 0 3 0" stroke="#475569" stroke-width="1.4" fill="none"/>
+    </g>
+  </g>
+
+  <!-- SUB-HEADER / TAB NAVIGATION -->
+  <g transform="translate(30, 84)">
+    <text x="0" y="20" font-size="20" font-weight="900" fill="#003366">Pulse Command Center</text>
+    <text x="260" y="20" font-size="13" font-weight="500" fill="#64748B">Last reconciled today at 14:30 WIB • Bank Central Asia &amp; Permata</text>
+
+    <!-- Right Mode Pills -->
+    <rect x="940" y="0" width="200" height="32" rx="8" fill="#E2E8F0"/>
+    <rect x="942" y="2" width="96" height="28" rx="6" fill="#FFFFFF"/>
+    <text x="962" y="20" font-size="12" font-weight="700" fill="#003366">Cash View</text>
+    <text x="1058" y="20" font-size="12" font-weight="600" fill="#64748B">Accrual View</text>
+  </g>
+
+  <!-- MAIN HERO CASH BANNER (Subtle Navy Tonal Gradient) -->
+  <g transform="translate(30, 126)">
+    <rect x="0" y="0" width="1140" height="154" rx="16" fill="url(#heroGrad)" stroke="#1E3A8A" stroke-width="1"/>
+    
+    <!-- Translucent Watermark in Hero -->
+    <path d="M 1040,140 L 1100,80 L 1140,120 Z" fill="#3399FF" opacity="0.08"/>
+    <circle cx="1100" cy="40" r="60" fill="#FFFFFF" opacity="0.03"/>
+
+    <!-- Left: Cash Now Big Metric -->
+    <g transform="translate(32, 24)">
+      <rect x="0" y="0" width="104" height="22" rx="4" fill="#3399FF" fill-opacity="0.2"/>
+      <text x="8" y="15" font-size="11" font-weight="800" fill="#3399FF" letter-spacing="0.5">AVAILABLE CASH</text>
+      
+      <text x="0" y="58" font-size="34" font-weight="900" fill="#FFFFFF" font-family="'JetBrains Mono', monospace">Rp 3.120.450.000</text>
+      
+      <g transform="translate(0, 78)">
+        <text x="0" y="16" font-size="12" font-weight="600" fill="#93C5FD">↑ 8.4% vs last month</text>
+        <text x="130" y="16" font-size="12" fill="#60A5FA">•</text>
+        <text x="145" y="16" font-size="12" font-weight="500" fill="#E2E8F0">4 Reconciled Accounts (BCA Giro, Permata Escrow, Mandiri, Cash)</text>
+      </g>
+    </g>
+
+    <!-- Right: 2 Key Metric Cells (Runway & Net 30 Days) -->
+    <g transform="translate(720, 20)">
+      <!-- Runway Cell -->
+      <rect x="0" y="0" width="186" height="114" rx="12" fill="#001830" fill-opacity="0.6" stroke="#1E40AF" stroke-opacity="0.4"/>
+      <text x="16" y="24" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="0.5">CASH RUNWAY</text>
+      <text x="16" y="56" font-size="24" font-weight="900" fill="#10B981" font-family="'JetBrains Mono', monospace">162 Days</text>
+      <!-- Progress Bar -->
+      <rect x="16" y="68" width="154" height="6" rx="3" fill="#1E293B"/>
+      <rect x="16" y="68" width="154" height="6" rx="3" fill="#10B981"/>
+      <text x="16" y="94" font-size="10" font-weight="600" fill="#94A3B8">Target: 60d • Floor: Rp 500M</text>
+
+      <!-- Net 30 Days Cell -->
+      <rect x="202" y="0" width="186" height="114" rx="12" fill="#001830" fill-opacity="0.6" stroke="#1E40AF" stroke-opacity="0.4"/>
+      <text x="218" y="24" font-size="11" font-weight="700" fill="#94A3B8" letter-spacing="0.5">NET 30-DAY FLOW</text>
+      <text x="218" y="56" font-size="24" font-weight="900" fill="#38BDF8" font-family="'JetBrains Mono', monospace">+Rp 412,8M</text>
+      <text x="218" y="78" font-size="11" font-weight="500" fill="#CBD5E1">In: Rp 980,0M</text>
+      <text x="218" y="96" font-size="11" font-weight="500" fill="#94A3B8">Out: Rp 567,2M</text>
+    </g>
+  </g>
+
+  <!-- LOWER TWO COLUMNS: ACTIONS & 6-MONTH CHART -->
+  <g transform="translate(30, 300)">
+    
+    <!-- LEFT COLUMN: DECISIONS & NEEDS ATTENTION (Width: 420) -->
+    <rect x="0" y="0" width="440" height="420" rx="14" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <rect x="0" y="0" width="440" height="48" rx="14" fill="#FAFAFA"/>
+    <line x1="0" y1="48" x2="440" y2="48" stroke="#E2E8F0"/>
+    <text x="20" y="30" font-size="14" font-weight="800" fill="#003366">Action Required</text>
+    <rect x="360" y="14" width="60" height="20" rx="10" fill="#FEF3C7"/>
+    <text x="372" y="28" font-size="11" font-weight="800" fill="#B45309">3 PENDING</text>
+
+    <!-- Decision Item 1: Approve Bill -->
+    <g transform="translate(16, 62)">
+      <rect x="0" y="0" width="408" height="74" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <rect x="12" y="16" width="36" height="36" rx="8" fill="#EFF6FF"/>
+      <g transform="translate(22, 25)">
+        <path d="M9 1H3a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V5z" stroke="#2563EB" stroke-width="1.6" fill="none"/>
+        <polyline points="9 1 9 5 14 5" stroke="#2563EB" stroke-width="1.6" fill="none"/>
+        <line x1="11" y1="9" x2="5" y2="9" stroke="#2563EB" stroke-width="1.6"/>
+        <line x1="11" y1="12" x2="5" y2="12" stroke="#2563EB" stroke-width="1.6"/>
+      </g>
+      <text x="58" y="28" font-size="12" font-weight="800" fill="#003366">Approve Cloud Hosting Invoice</text>
+      <text x="58" y="46" font-size="11" font-weight="500" fill="#64748B">PT Cloud Hosting Asia • Due in 3 days</text>
+      <text x="58" y="62" font-size="10" font-weight="600" fill="#2563EB">Telegram submission by Dev Lead</text>
+      <text x="310" y="32" font-size="13" font-weight="800" fill="#003366" font-family="'JetBrains Mono', monospace">Rp 48,2M</text>
+      <rect x="334" y="44" width="62" height="22" rx="6" fill="#1565C0"/>
+      <text x="346" y="58" font-size="10" font-weight="700" fill="#FFFFFF">Approve</text>
+    </g>
+
+    <!-- Decision Item 2: Overdue Receivable -->
+    <g transform="translate(16, 146)">
+      <rect x="0" y="0" width="408" height="74" rx="10" fill="#FEF2F2" stroke="#FEE2E2"/>
+      <rect x="12" y="16" width="36" height="36" rx="8" fill="#FEE2E2"/>
+      <g transform="translate(22, 25)">
+        <path d="M8 2 1 15h14L8 2z" stroke="#DC2626" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+        <line x1="8" y1="6" x2="8" y2="10" stroke="#DC2626" stroke-width="1.6"/>
+        <circle cx="8" cy="12.5" r="0.8" fill="#DC2626"/>
+      </g>
+      <text x="58" y="28" font-size="12" font-weight="800" fill="#991B1B">Overdue Client Payment</text>
+      <text x="58" y="46" font-size="11" font-weight="500" fill="#7F1D1D">PT Retail Mandiri Perkasa • 4 days late</text>
+      <text x="58" y="62" font-size="10" font-weight="600" fill="#DC2626">Invoice #INV-2026-088</text>
+      <text x="302" y="32" font-size="13" font-weight="800" fill="#991B1B" font-family="'JetBrains Mono', monospace">Rp 125,0M</text>
+      <rect x="334" y="44" width="62" height="22" rx="6" fill="#DC2626"/>
+      <text x="345" y="58" font-size="10" font-weight="700" fill="#FFFFFF">Remind</text>
+    </g>
+
+    <!-- Decision Item 3: Tax Withholding PPh 21 -->
+    <g transform="translate(16, 230)">
+      <rect x="0" y="0" width="408" height="74" rx="10" fill="#FFFBEB" stroke="#FEF3C7"/>
+      <rect x="12" y="16" width="36" height="36" rx="8" fill="#FEF3C7"/>
+      <g transform="translate(22, 25)">
+        <line x1="2" y1="15" x2="14" y2="15" stroke="#D97706" stroke-width="1.6"/>
+        <line x1="4" y1="12" x2="4" y2="7" stroke="#D97706" stroke-width="1.6"/>
+        <line x1="7" y1="12" x2="7" y2="7" stroke="#D97706" stroke-width="1.6"/>
+        <line x1="10" y1="12" x2="10" y2="7" stroke="#D97706" stroke-width="1.6"/>
+        <line x1="13" y1="12" x2="13" y2="7" stroke="#D97706" stroke-width="1.6"/>
+        <polygon points="8 2 15 5 1 5" stroke="#D97706" stroke-width="1.6" fill="none"/>
+      </g>
+      <text x="58" y="28" font-size="12" font-weight="800" fill="#92400E">PPh 21 Payroll Withholding</text>
+      <text x="58" y="46" font-size="11" font-weight="500" fill="#78350F">February Payroll Masa • Due 10 March</text>
+      <text x="58" y="62" font-size="10" font-weight="600" fill="#D97706">TER Calculated • Ready for export</text>
+      <text x="310" y="32" font-size="13" font-weight="800" fill="#92400E" font-family="'JetBrains Mono', monospace">Rp 14,8M</text>
+      <rect x="334" y="44" width="62" height="22" rx="6" fill="#D97706"/>
+      <text x="345" y="58" font-size="10" font-weight="700" fill="#FFFFFF">Prepare</text>
+    </g>
+
+    <!-- Bank Import Status Strip -->
+    <g transform="translate(16, 318)">
+      <rect x="0" y="0" width="408" height="84" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+      <text x="14" y="22" font-size="11" font-weight="800" fill="#003366">BANK RECONCILIATION RADAR</text>
+      <text x="14" y="44" font-size="11" font-weight="600" fill="#334155">BCA Giro IDR (827-019-2811):</text>
+      <text x="240" y="44" font-size="11" font-weight="800" fill="#10B981">✓ 100% Matched (248 tx)</text>
+      
+      <text x="14" y="66" font-size="11" font-weight="600" fill="#334155">Bank Permata Escrow (012-991):</text>
+      <text x="240" y="66" font-size="11" font-weight="800" fill="#10B981">✓ Verified (12 tx)</text>
+    </g>
+
+    <!-- RIGHT COLUMN: 6-MONTH FINANCIAL TREND CHART (Width: 676) -->
+    <g transform="translate(460, 0)">
+      <rect x="0" y="0" width="680" height="420" rx="14" fill="#FFFFFF" stroke="#E2E8F0"/>
+      <rect x="0" y="0" width="680" height="48" rx="14" fill="#FAFAFA"/>
+      <line x1="0" y1="48" x2="680" y2="48" stroke="#E2E8F0"/>
+      
+      <text x="24" y="30" font-size="14" font-weight="800" fill="#003366">Revenue vs Expenses — Last 6 Months</text>
+      
+      <!-- Legends -->
+      <rect x="360" y="20" width="12" height="12" rx="3" fill="#1565C0"/>
+      <text x="378" y="30" font-size="11" font-weight="600" fill="#475569">Revenue</text>
+      
+      <rect x="440" y="20" width="12" height="12" rx="3" fill="#94A3B8"/>
+      <text x="458" y="30" font-size="11" font-weight="600" fill="#475569">Expenses</text>
+
+      <rect x="526" y="20" width="12" height="12" rx="3" fill="#10B981"/>
+      <text x="544" y="30" font-size="11" font-weight="600" fill="#475569">Net Flow</text>
+
+      <!-- SVG BAR CHART CANVAS -->
+      <g transform="translate(30, 80)">
+        
+        <!-- Y-Axis Guides -->
+        <line x1="40" y1="20" x2="620" y2="20" stroke="#F1F5F9" stroke-width="1"/>
+        <text x="0" y="24" font-size="10" font-weight="600" fill="#94A3B8" font-family="'JetBrains Mono', monospace">1.2B</text>
+
+        <line x1="40" y1="80" x2="620" y2="80" stroke="#F1F5F9" stroke-width="1"/>
+        <text x="0" y="84" font-size="10" font-weight="600" fill="#94A3B8" font-family="'JetBrains Mono', monospace">800M</text>
+
+        <line x1="40" y1="140" x2="620" y2="140" stroke="#F1F5F9" stroke-width="1"/>
+        <text x="0" y="144" font-size="10" font-weight="600" fill="#94A3B8" font-family="'JetBrains Mono', monospace">400M</text>
+
+        <line x1="40" y1="200" x2="620" y2="200" stroke="#E2E8F0" stroke-width="1.5"/>
+        <text x="20" y="204" font-size="10" font-weight="700" fill="#64748B" font-family="'JetBrains Mono', monospace">0</text>
+
+        <!-- 6 MONTH BARS: Oct 2025 - Mar 2026 -->
+        <!-- Month 1: Oct 2025 (Rev: 720M, Exp: 510M, Net: +210M) -->
+        <g transform="translate(60, 0)">
+          <rect x="0" y="92" width="22" height="108" rx="4" fill="#1565C0"/>
+          <rect x="26" y="123" width="22" height="77" rx="4" fill="#94A3B8"/>
+          <circle cx="24" cy="168" r="4" fill="#10B981"/>
+          <text x="12" y="222" font-size="11" font-weight="600" fill="#64748B">Oct</text>
+        </g>
+
+        <!-- Month 2: Nov 2025 (Rev: 780M, Exp: 530M, Net: +250M) -->
+        <g transform="translate(150, 0)">
+          <rect x="0" y="83" width="22" height="117" rx="4" fill="#1565C0"/>
+          <rect x="26" y="120" width="22" height="80" rx="4" fill="#94A3B8"/>
+          <circle cx="24" cy="162" r="4" fill="#10B981"/>
+          <text x="12" y="222" font-size="11" font-weight="600" fill="#64748B">Nov</text>
+        </g>
+
+        <!-- Month 3: Dec 2025 (Rev: 950M, Exp: 640M, Net: +310M) -->
+        <g transform="translate(240, 0)">
+          <rect x="0" y="57" width="22" height="143" rx="4" fill="#1565C0"/>
+          <rect x="26" y="104" width="22" height="96" rx="4" fill="#94A3B8"/>
+          <circle cx="24" cy="153" r="4" fill="#10B981"/>
+          <text x="12" y="222" font-size="11" font-weight="600" fill="#64748B">Dec</text>
+        </g>
+
+        <!-- Month 4: Jan 2026 (Rev: 840M, Exp: 580M, Net: +260M) -->
+        <g transform="translate(330, 0)">
+          <rect x="0" y="74" width="22" height="126" rx="4" fill="#1565C0"/>
+          <rect x="26" y="113" width="22" height="87" rx="4" fill="#94A3B8"/>
+          <circle cx="24" cy="161" r="4" fill="#10B981"/>
+          <text x="12" y="222" font-size="11" font-weight="600" fill="#64748B">Jan</text>
+        </g>
+
+        <!-- Month 5: Feb 2026 (Rev: 890M, Exp: 540M, Net: +350M) -->
+        <g transform="translate(420, 0)">
+          <rect x="0" y="66" width="22" height="134" rx="4" fill="#1565C0"/>
+          <rect x="26" y="119" width="22" height="81" rx="4" fill="#94A3B8"/>
+          <circle cx="24" cy="147" r="4" fill="#10B981"/>
+          <text x="12" y="222" font-size="11" font-weight="600" fill="#64748B">Feb</text>
+        </g>
+
+        <!-- Month 6: Mar 2026 (Rev: 980M, Exp: 567M, Net: +413M - MTD) -->
+        <g transform="translate(510, 0)">
+          <rect x="0" y="53" width="22" height="147" rx="4" fill="#3399FF"/>
+          <rect x="26" y="115" width="22" height="85" rx="4" fill="#64748B"/>
+          <circle cx="24" cy="138" r="5" fill="#10B981" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="12" y="222" font-size="11" font-weight="800" fill="#003366">Mar (MTD)</text>
+        </g>
+
+        <!-- Net Flow Line Connector -->
+        <polyline points="84,168 174,162 264,153 354,161 444,147 534,138" fill="none" stroke="#10B981" stroke-width="2.5" stroke-dasharray="3,3"/>
+      </g>
+
+      <!-- Bottom Disclaimer / Provenance Note -->
+      <g transform="translate(24, 340)">
+        <rect x="0" y="0" width="632" height="36" rx="8" fill="#F8FAFC" stroke="#E2E8F0"/>
+        <text x="14" y="22" font-size="11" font-weight="600" fill="#475569">
+          <tspan font-weight="800" fill="#003366">Illustrative Demo Data</tspan> • Reconciled from Verified Ledger Records • Real-time P&amp;L Matching
+        </text>
+      </g>
+    </g>
+
+  </g>
+</svg>

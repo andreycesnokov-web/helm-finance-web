@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regulatory Intelligence & Compliance — CFO AI Indonesia</title>
+  <meta name="description" content="Stay ahead of Indonesian tax updates, PMK 81/2024 CoreTax transitions, KBLI monitoring, and OSS licensing obligations.">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-navy: #003366;
+      --brand-navy-dark: #001A33;
+      --brand-electric-blue: #3399FF;
+      --brand-electric-blue-ink: #1565C0;
+      --surface-page: #F8FAFC;
+      --surface-card: #FFFFFF;
+      --text-primary: #003366;
+      --text-secondary: #334155;
+      --text-muted: #5A6E82;
+      --font-display: 'Archivo Black', 'Manrope', sans-serif;
+      --font-ui: 'Manrope', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body {
+      font-family: var(--font-ui);
+      background-color: var(--surface-page);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .font-mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums; }
+    .cfo-watermark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.035;
+    }
+    .cfo-watermark-dark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.055;
+    }
+    .bento-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px -2px rgba(0, 51, 102, 0.05);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .bento-card:hover {
+      border-color: #3399FF;
+      box-shadow: 0 16px 36px -4px rgba(51, 153, 255, 0.14);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="selection:bg-blue-100 selection:text-[#003366]">
+
+  <!-- TOP ANNOUNCEMENT BAR: SUBTLE DARK NAVY TONAL GRADIENT -->
+  <aside aria-label="Official release announcement" class="text-white text-xs py-2 px-4 sm:px-8 font-medium border-b border-white/10 relative z-50 shadow-sm" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+      <div class="flex items-center gap-2.5">
+        <span class="bg-[#3399FF] text-[#001A33] font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">REGULATORY INTELLIGENCE</span>
+        <span class="font-semibold text-white/95">Stay Informed When Indonesian Business Regulations Change.</span>
+      </div>
+      <div class="flex items-center gap-4 text-[11px] text-white/75 font-medium">
+        <span class="hidden md:inline">Marketing: https://cfo-ai.site</span>
+        <span class="text-white/30 hidden md:inline">•</span>
+        <span class="font-mono text-white font-bold">App: https://app.cfo-ai.site</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STICKY HEADER NAVIGATION -->
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Authentic CFO AI Logo -->
+      <a href="index.html" class="flex items-center gap-3.5 flex-shrink-0 group">
+        <div class="w-10 h-10 flex-shrink-0">
+          <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-sm group-hover:scale-105 transition-transform" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#003366" fill-rule="evenodd"/>
+            <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-xl tracking-tight text-[#003366] leading-none">CFO AI</span>
+            <span class="bg-[#ECFDF5] text-[#0F7A52] text-[10px] font-extrabold px-1.5 py-0.2 rounded border border-[#0F7A52]/20">INDONESIA</span>
+          </div>
+          <span class="text-[10px] tracking-wider uppercase font-bold text-[#5A6E82] mt-0.5">Compliance</span>
+        </div>
+      </a>
+
+      <!-- Navigation Links -->
+      <nav class="hidden lg:flex items-center space-x-5 xl:space-x-7 text-sm font-semibold text-[#334155] whitespace-nowrap">
+        <a href="index.html" class="hover:text-[#1565C0] transition-colors">Home</a>
+        <a href="platform-page.html" class="hover:text-[#1565C0] transition-colors">Platform</a>
+        <a href="document-intelligence-page.html" class="hover:text-[#1565C0] transition-colors">Documents</a>
+        <a href="compliance-page.html" class="text-[#1565C0] font-bold border-b-2 border-[#1565C0] pb-1">Compliance</a>
+        <a href="pricing-page.html" class="hover:text-[#1565C0] transition-colors">Pricing</a>
+      </nav>
+
+      <!-- Action Buttons -->
+      <div class="hidden sm:flex items-center gap-3.5 flex-shrink-0">
+        <a href="https://app.cfo-ai.site/login" class="text-sm font-bold text-[#003366] hover:text-[#1565C0] transition-colors px-3 py-2 whitespace-nowrap">
+          Log In
+        </a>
+        <a href="https://app.cfo-ai.site/login" class="text-sm font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-5 py-2.5 rounded-[10px] shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>Start Free — 7 Days</span>
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </a>
+      </div>
+
+      <!-- Mobile Menu Hamburger Button -->
+      <button onclick="toggleMobileNav()" class="lg:hidden p-2 rounded-lg text-[#003366] hover:bg-slate-100 focus:outline-none" aria-label="Toggle Navigation">
+        <svg id="nav-open-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg id="nav-close-icon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+
+    </div>
+
+    <!-- Responsive Mobile Navigation Drawer -->
+    <div id="mobile-nav-drawer" class="hidden lg:hidden bg-white border-b border-[#E2E8F0] px-6 py-5 space-y-3.5 shadow-xl">
+      <a href="index.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Home</a>
+      <a href="platform-page.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Platform Architecture</a>
+      <a href="document-intelligence-page.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Document Intake &amp; OCR</a>
+      <a href="compliance-page.html" class="block py-2 font-bold text-sm text-[#1565C0]">Compliance &amp; Tax Radar</a>
+      <a href="pricing-page.html" class="block py-2 font-bold text-sm text-[#003366] hover:text-[#1565C0]">Pricing &amp; Plans</a>
+      <div class="pt-4 border-t border-[#E2E8F0] flex flex-col gap-2.5">
+        <a href="https://app.cfo-ai.site/login" class="block w-full text-center font-bold text-sm border border-[#CBD5E1] text-[#003366] py-2.5 rounded-xl">
+          Log In
+        </a>
+        <a href="https://app.cfo-ai.site/login" class="block w-full text-center font-bold text-sm bg-[#1565C0] text-white py-3 rounded-xl shadow-md">
+          Start Free — 7 Days ($0)
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. COMPACT HERO SECTION -->
+  <section class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F8FAFC] relative overflow-hidden border-b border-[#E2E8F0]">
+    
+    <svg viewBox="0 0 200 200" class="cfo-watermark -top-20 -right-20 w-[600px] h-[600px] text-[#003366]">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#3399FF]/40 text-xs font-black text-[#003366] mb-5 shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-[#3399FF]"></span>
+        <span>INDONESIAN STATUTORY AWARENESS</span>
+      </div>
+
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-[#003366] tracking-tight leading-[1.1] mb-5">
+        Stay Informed.<br/>
+        <span class="text-[#1565C0]">Stay Prepared.</span>
+      </h1>
+
+      <p class="text-base sm:text-lg text-[#334155] max-w-3xl mx-auto leading-relaxed mb-8">
+        Understand relevant developments in Indonesian tax administration, PMK 81/2024 CoreTax schedules, KBLI requirements, and OSS licensing obligations in plain English without getting buried in legal jargon.
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+        <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto text-base font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Start Free — 7 Days</span>
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </a>
+        <a href="#compliance-demo" class="w-full sm:w-auto text-base font-bold text-[#003366] bg-white border border-[#CBD5E1] hover:border-[#1565C0] px-8 py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+          <span>View Tax Calendar Demo</span>
+          <span>↓</span>
+        </a>
+      </div>
+
+      <div class="text-xs text-[#5A6E82] font-semibold flex items-center justify-center gap-2">
+        <span>PMK 81/2024 CoreTax Active</span>
+        <span>•</span>
+        <span>16-Digit NPWP Verification</span>
+        <span>•</span>
+        <span class="text-emerald-700 font-bold">PT PMA LKPM Ready</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. CORE SOFTWARE DEMONSTRATION: COMPLIANCE CALENDAR & RADAR -->
+  <section id="compliance-demo" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20">
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">REGULATORY RADAR DEMONSTRATION</span>
+      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+        Your Proactive Indonesian Compliance Calendar
+      </h2>
+      <p class="text-base text-[#5A6E82]">
+        See upcoming tax deposit cutoffs, CoreTax transition milestones, and BKPM reporting dates in one interactive schedule.
+      </p>
+    </div>
+
+    <!-- Authentic Software Render: Compliance Calendar SVG -->
+    <div class="bento-card p-2 sm:p-4 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden mb-12">
+      <div class="w-full rounded-xl overflow-hidden border border-slate-200 bg-[#0F172A]">
+        <img src="assets/product/compliance-calendar-radar.svg" alt="CFO AI Indonesian Tax Calendar and CoreTax Compliance Schedule" class="w-full h-auto block select-none" loading="eager" />
+      </div>
+      <div class="px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+        <span class="font-bold text-[#003366]">Regulatory Radar: PMK 81/2024 CoreTax Transition Schedule &amp; Tax Obligations</span>
+        <span class="text-purple-700 font-bold">● Informational Tracking • PT PMA Context</span>
+      </div>
+    </div>
+
+    <!-- 3 Context Cards for Indonesian Entities -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-sm mb-4 border border-purple-100">
+          01
+        </div>
+        <h3 class="font-black text-base text-[#003366] mb-2">CoreTax &amp; 16-Digit NPWP</h3>
+        <p class="text-xs text-[#5A6E82] leading-relaxed">
+          Ministry of Finance decree PMK 81/2024 mandates unified withholding procedures. CFO AI verifies that all vendor records contain valid 16-digit NPWPs to avoid tax invoice rejections.
+        </p>
+      </div>
+
+      <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-[#1565C0] flex items-center justify-center font-bold text-sm mb-4 border border-blue-100">
+          02
+        </div>
+        <h3 class="font-black text-base text-[#003366] mb-2">Monthly Tax Withholding Deadlines</h3>
+        <p class="text-xs text-[#5A6E82] leading-relaxed">
+          Stay on schedule for PPh 21 TER employee payroll deposits (10th/15th), PPh 23 service provider withholdings (20th), and monthly PPN reporting cycles (end of month).
+        </p>
+      </div>
+
+      <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-sm mb-4 border border-emerald-100">
+          03
+        </div>
+        <h3 class="font-black text-base text-[#003366] mb-2">BKPM LKPM Investment Reports</h3>
+        <p class="text-xs text-[#5A6E82] leading-relaxed">
+          Foreign-owned PT PMA companies must submit quarterly investment realization activity reports via OSS RBA. CFO AI reminds founders ahead of cutoffs to prevent administrative sanctions.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3. WHAT CFO AI DOES VS DOES NOT DO (STATUTORY BOUNDARY) -->
+  <section class="py-24 px-4 sm:px-6 lg:px-8 bg-white border-y border-[#E2E8F0]">
+    <div class="max-w-5xl mx-auto">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">TRANSPARENT BOUNDARIES</span>
+        <h2 class="text-3xl sm:text-4xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+          Clear Division of Responsibility
+        </h2>
+        <p class="text-base text-[#5A6E82]">
+          CFO AI is intelligent software designed to prepare your records and keep you informed. We do not replace certified human accountants or licensed tax consultants.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch mb-12">
+        
+        <!-- What CFO AI DOES -->
+        <div class="p-8 rounded-2xl bg-[#ECFDF5]/50 border-2 border-emerald-300 flex flex-col justify-between">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-black text-xs uppercase mb-4">
+              <span>✓ WHAT CFO AI DOES</span>
+            </div>
+            <h3 class="text-xl font-black text-[#003366] mb-4">Software Workflows &amp; Preparation</h3>
+            <ul class="space-y-3.5 text-xs text-[#334155]">
+              <li class="flex items-start gap-2.5">
+                <span class="text-emerald-700 font-black text-sm">✓</span>
+                <span><strong>Monitors Indonesian Tax Changes:</strong> Summarizes Kemenkeu &amp; DJP regulations in clear plain English.</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-emerald-700 font-black text-sm">✓</span>
+                <span><strong>Automated Tax Calendar:</strong> Tracks upcoming deadlines for PPh 21 TER, PPh 23, PPN, and LKPM.</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-emerald-700 font-black text-sm">✓</span>
+                <span><strong>16-Digit NPWP Check:</strong> Flags missing or outdated vendor tax IDs before billing schedules.</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-emerald-700 font-black text-sm">✓</span>
+                <span><strong>Organized Handoff Packages:</strong> Exports verified transaction files and attached receipts for your accountant.</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-emerald-700 font-black text-sm">✓</span>
+                <span><strong>Reconciled Bank Lines:</strong> Matches bank statements from BCA and Permata with supporting documents.</span>
+              </li>
+            </ul>
+          </div>
+          <div class="mt-6 pt-4 border-t border-emerald-200 text-[11px] font-bold text-emerald-800">
+            Saves dozens of hours in manual preparation every month
+          </div>
+        </div>
+
+        <!-- What CFO AI DOES NOT DO -->
+        <div class="p-8 rounded-2xl bg-slate-50 border-2 border-slate-300 flex flex-col justify-between">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200 text-slate-800 font-black text-xs uppercase mb-4">
+              <span>✕ WHAT CFO AI DOES NOT DO</span>
+            </div>
+            <h3 class="text-xl font-black text-[#003366] mb-4">Regulated Professional Services</h3>
+            <ul class="space-y-3.5 text-xs text-[#5A6E82]">
+              <li class="flex items-start gap-2.5">
+                <span class="text-red-500 font-black text-sm">✕</span>
+                <span><strong>No Licensed Tax Advice:</strong> We do not replace certified Indonesian tax advisors (<em>Konsultan Pajak</em>).</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-red-500 font-black text-sm">✕</span>
+                <span><strong>No Automatic Tax Filing:</strong> We do not submit official SPT Masa or SPT Tahunan returns to DJP Online.</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-red-500 font-black text-sm">✕</span>
+                <span><strong>No Statutory Audit Opinion:</strong> We do not issue signed audit statements or certified public accountant opinions.</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-red-500 font-black text-sm">✕</span>
+                <span><strong>No Corporate Legal Counsel:</strong> Regulatory alerts are informational and do not constitute formal legal counsel.</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <span class="text-red-500 font-black text-sm">✕</span>
+                <span><strong>No Tax Portal Proxy:</strong> We do not act as your legal proxy before Indonesian revenue authorities.</span>
+              </li>
+            </ul>
+          </div>
+          <div class="mt-6 pt-4 border-t border-slate-200 text-[11px] font-semibold text-slate-600">
+            Work with your certified accountant or consult our verified advisory partners
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Legal Disclaimer Banner -->
+      <div class="p-5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed text-center">
+        <strong>Statutory Notice:</strong> CFO AI is a software operating system built to streamline financial workflows. All official tax determinations and statutory submissions must be reviewed and submitted by licensed professionals in accordance with Indonesian law.
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 4. CTA STRIP -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50 text-center border-t border-[#E2E8F0]">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-black text-[#003366] mb-3">
+        Stay Ahead of Indonesian Regulatory Obligations
+      </h2>
+      <p class="text-base text-[#5A6E82] mb-8 max-w-2xl mx-auto">
+        Join Indonesian founders who never miss a tax cutoff or CoreTax update. Start your 7-day free trial on any plan.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+        <a href="https://app.cfo-ai.site/login" class="text-base font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Start Free — 7 Days</span>
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </a>
+      </div>
+      <div class="text-xs text-[#5A6E82]">
+        No credit card required • Instant compliance calendar access • PT &amp; PT PMA Ready
+      </div>
+    </div>
+  </section>
+
+  <!-- RESTORED PROFESSIONAL 4-COLUMN FOOTER -->
+  <footer class="text-white/70 py-16 px-4 sm:px-6 lg:px-8 border-t border-white/10 relative overflow-hidden" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    
+    <!-- Subtle Brand Watermark in Footer -->
+    <svg viewBox="0 0 200 200" class="cfo-watermark-dark -bottom-16 -right-16 w-80 h-80 text-white/5 pointer-events-none absolute select-none">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-7xl mx-auto relative z-10">
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-8 lg:gap-12 mb-12">
+        
+        <!-- Brand & Description (Col span 2) -->
+        <div class="col-span-2">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 flex-shrink-0">
+              <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+                <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+              </svg>
+            </div>
+            <div class="flex flex-col">
+              <span class="font-extrabold text-white text-lg tracking-tight leading-none">CFO AI</span>
+              <span class="text-[10px] tracking-wider uppercase font-semibold text-[#3399FF] mt-0.5">Indonesia</span>
+            </div>
+          </div>
+          <p class="text-xs text-white/60 leading-relaxed max-w-sm mb-4">
+            CFO AI — Intelligent Financial Management for Indonesian Businesses. Connected document intelligence, automated accounting preparation, and Indonesian regulatory monitoring.
+          </p>
+          <div class="text-[11px] text-white/40 space-y-1">
+            <div>Marketing: <span class="text-white/60">https://cfo-ai.site</span></div>
+            <div>Application: <span class="text-white/60">https://app.cfo-ai.site</span></div>
+          </div>
+        </div>
+
+        <!-- Col 1: Product -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Product</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="platform-page.html" class="hover:text-white transition-colors">Platform</a></li>
+            <li><a href="index.html#ai-cfo" class="hover:text-white transition-colors">AI CFO</a></li>
+            <li><a href="index.html#ai-accountant" class="hover:text-white transition-colors">AI Accountant</a></li>
+            <li><a href="document-intelligence-page.html" class="hover:text-white transition-colors">Documents</a></li>
+            <li><a href="compliance-page.html" class="text-white font-semibold">Compliance</a></li>
+            <li><a href="pricing-page.html" class="hover:text-white transition-colors">Pricing</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 2: Company -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Company</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="#about" class="hover:text-white transition-colors">About</a></li>
+            <li><a href="#contact" class="hover:text-white transition-colors">Contact</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 3: Legal -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Legal</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="#privacy" class="hover:text-white transition-colors">Privacy Policy</a></li>
+            <li><a href="#terms" class="hover:text-white transition-colors">Terms of Service</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 4: Account -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Account</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="https://app.cfo-ai.site/login" class="hover:text-white transition-colors">Log In</a></li>
+            <li><a href="https://app.cfo-ai.site/login" class="hover:text-white transition-colors font-semibold text-[#3399FF]">Start Free Trial</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Footer Bottom Separator & Copyright & Disclaimer -->
+      <div class="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-[11px] text-white/50">
+        <div>Copyright © 2026 CFO AI. All rights reserved.</div>
+        <div class="text-center md:text-right max-w-xl">
+          CFO AI assists with financial management and accounting preparation. It does not provide statutory audits, legal advice, or direct tax filing with government portals.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Responsive Mobile Navigation Script -->
+  <script>
+    function toggleMobileNav() {
+      const drawer = document.getElementById('mobile-nav-drawer');
+      const openIcon = document.getElementById('nav-open-icon');
+      const closeIcon = document.getElementById('nav-close-icon');
+      if (drawer.classList.contains('hidden')) {
+        drawer.classList.remove('hidden');
+        openIcon.classList.add('hidden');
+        closeIcon.classList.remove('hidden');
+      } else {
+        drawer.classList.add('hidden');
+        openIcon.classList.remove('hidden');
+        closeIcon.classList.add('hidden');
+      }
+    }
+  </script>
+
+</body>
+</html>
