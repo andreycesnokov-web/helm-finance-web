@@ -5,7 +5,7 @@
 //
 //   open     — never gated by plan or by expiry: identity, account, billing, recovery, Personal, and
 //              reading or exporting the company's OWN data (own-data reads stay available after expiry).
-//   channel  — a channel with its own commercial gate (Telegram: telegramPaidGate refuses commercial_v2).
+//   channel  — a channel with its own commercial gate (Telegram: telegramPaidGate verifies commercial_v2 entitlement).
 //   features — the plan must include every listed feature; [] = any active plan (core company settings).
 //   resource — metered through rpc_billing_quota (reserve → commit on success / release on failure).
 const ID = '[^/]+';
