@@ -9,7 +9,9 @@ import {useLang} from '../i18n'
 import {billingCopy} from '../lib/billingCopy'
 import {priceLabel} from '../lib/billingMoney'
 import {PageHead,Card,Btn,Pill,Skeleton,ErrorBox} from '../ui'
-const FEATURES=['documents','ai','import','payroll','team','approvals','export','integrations'],LIMITS=['users','companies','documents','ai','imports'];
+const FEATURES=['documents','ai','import','payroll','team','approvals','export','integrations'],LIMITS=['users','transactions','documents','ai','companies','accounts','imports','bank_rows','ai_extraction','ai_accountant','mcp','storage_mb'];
+// A limit value: null = unlimited, 0 = not included, otherwise the number (absent keys are not shown).
+const limitValue=(v,c)=>v===null?c.unlimited:v===0?c.notIncluded:v;
 const TONE={trialing:'good',active:'good',expired:'warn',pending_payment:'warn',not_started:'neutral'};
 // Display only: the server snapshot decides access. The countdown re-reads the server when it reaches zero.
 const planName=(v,lang)=>v?(v.name_i18n?.[lang]||v.name_i18n?.en||v.plan):'—';
@@ -66,7 +68,7 @@ export default function Billing(){
    {a.override_active&&<><dt>{c.grantUntil}</dt><dd>{fmt(a.override_ends_at)}</dd></>}
    {a.subscription_active&&<><dt>{c.paid}</dt><dd>{fmt(a.paid_period_ends_at)}</dd></>}</dl>
   {a.restricted&&s.trial_started_at&&<p>{c.restricted}</p>}
-  {!a.restricted&&<><h2 className="v2-h2">{c.usage}</h2><ul>{LIMITS.map(k=><li key={k}>{c[k]}: {s.usage?.[k]||0} / {a.limits?.[k]===null?c.unlimited:a.limits?.[k]??'—'}</li>)}</ul></>}
+  {!a.restricted&&<><h2 className="v2-h2">{c.usage}</h2><ul>{LIMITS.filter(k=>a.limits&&k in a.limits).map(k=><li key={k}>{c.lim[k]}: {s.usage?.[k]||0} / {limitValue(a.limits[k],c)}</li>)}</ul></>}
  </>}{!d.can_manage&&<p>{c.member}</p>}</Card>
  {error&&<p role="alert" className="v2-inline-err">{error}</p>}
  {pending&&<Card><p>{c.pending}</p><button className="v2-btn v2-btn-secondary" disabled={busy} onClick={check}>{c.check}</button><button className="v2-btn v2-btn-secondary" disabled={busy} onClick={()=>command(pending.path,pending.body,true)}>{c.retry}</button></Card>}
@@ -75,7 +77,7 @@ export default function Billing(){
   <p className="v2-h2">{priceLabel(p.price_minor,p.currency,lang)} / {lang==='ru'?'месяц':lang==='id'?'bulan':'month'}</p>
   {p.approval_status==='staging_fixture'&&<p className="v2-banner v2-tone-warn">{c.fixture}</p>}
   <ul className="v2-billing-features">{FEATURES.map(k=><li key={k} className={p.features?.[k]?'':'v2-billing-off'} aria-label={(c[k]||k)+': '+(p.features?.[k]?c.included:c.notIncluded)}><span aria-hidden="true">{p.features?.[k]?'✓':'—'}</span> {c[k]||k}</li>)}</ul>
-  <ul>{LIMITS.filter(k=>k in (p.limits||{})).map(k=><li key={k}>{c[k]||k}: {p.limits[k]===null?c.unlimited:p.limits[k]}</li>)}</ul>
+  <ul>{LIMITS.filter(k=>k in (p.limits||{})).map(k=><li key={k}>{c.lim[k]}: {limitValue(p.limits[k],c)}</li>)}</ul>
   {d.can_manage&&<button className="v2-btn v2-btn-secondary" disabled={busy||!!pending||mine} onClick={()=>command('/billing/plan',{request_key:crypto.randomUUID(),plan_version_id:p.id,expected_version:s.version})}>{mine?c.selected:s.trial_started_at?c.change:c.select}</button>}
  </Card>})}</div>{plans.length>0&&<p className="v2-billing-note">{c.payLater}</p>}{d.can_manage&&!s.trial_started_at&&s.selected_plan_version_id&&<button className="v2-btn v2-btn-primary" disabled={busy||!!pending} onClick={()=>command('/billing/trial')}>{c.start}</button>}</>}
  <Btn to="/business/pulse">{c.back}</Btn></div>

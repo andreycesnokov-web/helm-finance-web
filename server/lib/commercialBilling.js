@@ -91,10 +91,12 @@ function install(app,{auth,requireBusiness,requireAdmin,requireSuperAdmin,supaba
  const TERM_FIELDS=['name_i18n','description_i18n','price_minor','price_annual_minor','currency','trial_hours','features','limits','limit_policies','terms_version','effective_at','approval_status'];
  const NESTED=['features','limits','limit_policies','name_i18n','description_i18n'],NUMERIC=['price_minor','price_annual_minor','trial_hours'];
  const num=x=>x===null||x===undefined?null:Number(x);
- const diffTerms=(before,after)=>{const out=[];for(const f of TERM_FIELDS){
+ // Features compare by their EFFECTIVE value, as billing_effective_terms applies them (billing_feature_defaults):
+ // 'always' features are on whatever is stored; a missing key is on only for absent_allows features, otherwise off.
+ const diffTerms=(before,after,defaults={absent:{},always:{}})=>{const out=[];for(const f of TERM_FIELDS){
   if(NESTED.includes(f)){const a=before?.[f]||{},b=after?.[f]||{};
-   // A missing feature is an off feature; only real differences are reported.
-   const norm=(o,k)=>f==='features'?o[k]===true:(o[k]??null);
+   const feature=(o,k)=>defaults.always[k]===true?true:Object.prototype.hasOwnProperty.call(o,k)?o[k]===true:defaults.absent[k]===true;
+   const norm=(o,k)=>f==='features'?feature(o,k):(o[k]??null);
    for(const k of new Set([...Object.keys(a),...Object.keys(b)]))if(JSON.stringify(norm(a,k))!==JSON.stringify(norm(b,k)))out.push({field:f+'.'+k,before:norm(a,k),after:norm(b,k)});}
   else if(NUMERIC.includes(f)){const a=num(before?.[f]??(f==='trial_hours'?168:null)),b=num(after?.[f]??(f==='trial_hours'?168:null));if(a!==b)out.push({field:f,before:a,after:b})}
   // Two moments that have both already passed mean the same thing: effective immediately.
@@ -120,7 +122,10 @@ function install(app,{auth,requireBusiness,requireAdmin,requireSuperAdmin,supaba
    const byId=new Map((bs||[]).map(x=>[x.id,x]));
    affected=list.map(x=>({business_id:x.business_id,name:byId.get(x.business_id)?.name||null,business_code:byId.get(x.business_id)?.business_code||null,trial_ends_at:x.trial_ends_at}));
   }catch{affected=null}   // the list is informational; it never blocks a preview
-  res.json({...data,affected,changes:['draft','publish'].includes(data.action)?diffTerms(data.current,b.terms):[]});
+  const defaults={absent:{},always:{}};
+  try{const{data:fi,error:fe}=await supabase.from('billing_catalog_items').select('key,absent_allows,enforcement').eq('kind','feature');if(fe)throw fe;
+   for(const x of fi||[]){if(x.absent_allows)defaults.absent[x.key]=true;if(x.enforcement==='always')defaults.always[x.key]=true}}catch{/* stored values only */}
+  res.json({...data,affected,changes:['draft','publish'].includes(data.action)?diffTerms(data.current,b.terms,defaults):[]});
  }));
  async function adminRows(){
   const{data,error}=await supabase.rpc('rpc_billing_admin_rows');if(error)throw error;

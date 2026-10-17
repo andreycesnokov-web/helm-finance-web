@@ -11,9 +11,14 @@ const editableLimit=i=>i.required||!!i.counter;
 function formFrom(v,head,items){
  const features={},limits={},policies={};
  // 'always' items belong to every plan; not-released modules cannot be sold.
- for(const i of items.filter(i=>i.kind==='feature'))features[i.key]=i.enforcement==='always'?true:i.module_status==='not_released'?false:v?.features?.[i.key]===true;
+ // Start from the EFFECTIVE value, as the server applies it: a key missing from the stored version is on for
+ // absent_allows features (writing it out as false would silently switch the feature off for new subscribers).
+ for(const i of items.filter(i=>i.kind==='feature')){const stored=v?.features&&Object.prototype.hasOwnProperty.call(v.features,i.key);
+  features[i.key]=i.enforcement==='always'?true:i.module_status==='not_released'?false:stored?v.features[i.key]===true:i.absent_allows===true}
  for(const i of items.filter(i=>i.kind==='limit'&&editableLimit(i))){const x=v?.limits?.[i.key];
-  limits[i.key]=x===undefined?{mode:'unavailable',n:''}:x===null?{mode:'unlimited',n:''}:x===0?{mode:'unavailable',n:''}:{mode:'number',n:String(x)};
+  // A key missing from the stored version is UNDECIDED (PENDING APPROVAL), never 'not available': it stays missing,
+  // so the server refuses publication (billing_terms_incomplete) until someone decides it.
+  limits[i.key]=x===undefined?{mode:'undecided',n:''}:x===null?{mode:'unlimited',n:''}:x===0?{mode:'unavailable',n:''}:{mode:'number',n:String(x)};
   policies[i.key]=v?.limit_policies?.[i.key]==='soft'?'soft':'hard';}
  const cur=v?.currency||'USD';
  return {name_i18n:{en:'',ru:'',id:'',...(v?.name_i18n||{})},description_i18n:{en:'',ru:'',id:'',...(v?.description_i18n||{})},currency:cur,
@@ -25,7 +30,7 @@ function termsFrom(f,items,status){
  const price=inputToMinor(f.price_input,f.currency),annual=f.annual_input===''?null:inputToMinor(f.annual_input,f.currency);
  if(price===null||(f.annual_input!==''&&annual===null))return null;
  const limits={},limit_policies={};
- for(const [k,l] of Object.entries(f.limits)){limits[k]=l.mode==='unlimited'?null:l.mode==='unavailable'?0:Number(l.n);if(l.mode==='number'&&!/^\d+$/.test(l.n))return null;
+ for(const [k,l] of Object.entries(f.limits)){if(l.mode==='undecided')continue;limits[k]=l.mode==='unlimited'?null:l.mode==='unavailable'?0:Number(l.n);if(l.mode==='number'&&!/^\d+$/.test(l.n))return null;
   const item=items.find(i=>i.kind==='limit'&&i.key===k);if(item?.counter&&f.policies[k]==='soft')limit_policies[k]='soft';}
  return {name_i18n:f.name_i18n,description_i18n:f.description_i18n,price_minor:price,price_annual_minor:annual,currency:f.currency,trial_hours:Number(f.trial_hours),
   features:f.features,limits,limit_policies,terms_version:f.terms_version,effective_at:f.effective_at,approval_status:status,...(status==='staging_fixture'?{fixture_label:f.fixture_label}:{})};
@@ -63,7 +68,7 @@ function Editor({data,code,c,lang,cmd,reload,isNew}){
    <fieldset className="v2-bc-list"><legend>{c.limits}</legend>{items.filter(i=>i.kind==='limit').map(i=>{const l=f.limits[i.key];
     if(!editableLimit(i))return <div key={i.key} className="v2-bc-item v2-billing-off"><span>{label(i.label_i18n,lang)}</span>{enforcementPill(i,c)}</div>;
     return <div key={i.key} className="v2-bc-limit"><span className="v2-bc-limit-name">{label(i.label_i18n,lang)} {enforcementPill(i,c)}</span>
-     <select aria-label={label(i.label_i18n,lang)} value={l.mode} onChange={e=>set('limits',{...f.limits,[i.key]:{...l,mode:e.target.value}})}><option value="number">{c.number}</option><option value="unlimited">{c.unlimited}</option><option value="unavailable">{c.unavailable}</option></select>
+     <select aria-label={label(i.label_i18n,lang)} value={l.mode} onChange={e=>set('limits',{...f.limits,[i.key]:{...l,mode:e.target.value}})}>{l.mode==='undecided'&&<option value="undecided">{c.undecided}</option>}<option value="number">{c.number}</option><option value="unlimited">{c.unlimited}</option><option value="unavailable">{c.unavailable}</option></select>
      {l.mode==='number'&&<input type="number" min="0" step="1" aria-label={c.number} value={l.n} onChange={e=>set('limits',{...f.limits,[i.key]:{...l,n:e.target.value}})}/>}
      {i.counter&&i.key!=='users'&&<select aria-label={c.policy} value={f.policies[i.key]} onChange={e=>set('policies',{...f.policies,[i.key]:e.target.value})}><option value="hard">{c.hard}</option><option value="soft">{c.soft}</option></select>}
     </div>})}</fieldset>

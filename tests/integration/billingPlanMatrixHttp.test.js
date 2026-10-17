@@ -90,6 +90,12 @@ test('only a Platform SUPER admin may change or publish plans; a platform admin 
   const pv = await api.call('/admin/billing/catalog/starter/preview', { method: 'POST', user: STAFF, body: { expected_version: Number(h.catalog_version),
     terms: { action: 'publish', ...termsFrom((await draftOf('starter')).v, { limits: { users: 3, transactions: 1000, documents: 100, ai: 50, ...PENDING_TEST }, features: FEATURES }) } } });
   assert.equal(pv.status, 200, JSON.stringify(pv.body)); assert.ok(Array.isArray(pv.body.affected));
+  assert.deepEqual(pv.body.changes.map((c) => c.field), ['limits.users'], 'only the real change is listed');
+  // The diff compares EFFECTIVE features: writing out an always-on (pulse) or absent-allowed (cfo_ai) feature is not a
+  // change, while a real switch (payroll) is.
+  const pv2 = await api.call('/admin/billing/catalog/starter/preview', { method: 'POST', user: STAFF, body: { expected_version: Number(h.catalog_version),
+    terms: { action: 'publish', ...termsFrom((await draftOf('starter')).v, { limits: { users: 2, transactions: 1000, documents: 100, ai: 50, ...PENDING_TEST }, features: { ...FEATURES, pulse: true, cfo_ai: true, payroll: true } }) } } });
+  assert.deepEqual(pv2.body.changes.map((c) => c.field), ['features.payroll'], JSON.stringify(pv2.body.changes));
   assert.equal((await api.call('/admin/billing/catalog/starter', { method: 'POST', user: OA, body: {} })).status, 403);
 });
 test('public catalog: only published plans, values and states, no drafts or internal fields, readable without identity', async (t) => {
