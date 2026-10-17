@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CFO AI — Mobile Experience (390px)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-navy: #003366;
+      --brand-navy-dark: #001A33;
+      --brand-electric-blue: #3399FF;
+      --brand-electric-blue-ink: #1565C0;
+      --surface-page: #F8FAFC;
+      --surface-card: #FFFFFF;
+      --text-primary: #003366;
+      --text-secondary: #334155;
+      --text-muted: #5A6E82;
+      --font-display: 'Archivo Black', 'Manrope', sans-serif;
+      --font-ui: 'Manrope', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body {
+      font-family: var(--font-ui);
+      background-color: var(--surface-page);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      width: 100%;
+      max-width: 390px;
+      margin: 0 auto;
+      border-left: 1px solid #E2E8F0;
+      border-right: 1px solid #E2E8F0;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+      position: relative;
+    }
+    .font-mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums; }
+    .cfo-watermark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.035;
+    }
+    .bento-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 2px 10px rgba(0, 51, 102, 0.04);
+    }
+    .touch-target {
+      min-height: 48px;
+      min-width: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body class="selection:bg-blue-100 selection:text-[#003366] pb-24">
+
+  <!-- TOP UTILITY BAR (390px): SUBTLE NAVY TONAL GRADIENT -->
+  <div class="text-white text-[10px] font-medium py-1.5 px-3 border-b border-white/10 flex items-center justify-between" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="flex items-center gap-1.5">
+      <span class="bg-[#3399FF] text-[#001A33] font-black px-1.5 py-0.2 rounded text-[9px] uppercase">V3</span>
+      <span class="font-semibold text-white/95">CFO AI Indonesia • PT &amp; PT PMA</span>
+    </div>
+    <div class="font-mono text-white/80 font-bold">app.cfo-ai.site</div>
+  </div>
+
+  <!-- MOBILE HEADER -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0] px-4 py-3 flex items-center justify-between">
+    <a href="concept-b-plus-desktop.html" class="flex items-center gap-2.5">
+      <div class="w-8 h-8 flex-shrink-0">
+        <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#003366" fill-rule="evenodd"/>
+          <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+        </svg>
+      </div>
+      <div class="flex flex-col">
+        <span class="font-extrabold text-base tracking-tight text-[#003366] leading-none">CFO AI</span>
+        <span class="text-[9px] font-bold text-[#5A6E82] uppercase tracking-wider mt-0.5">Financial OS</span>
+      </div>
+    </a>
+
+    <div class="flex items-center gap-2">
+      <a href="https://app.cfo-ai.site/login" class="text-xs font-bold text-[#003366] px-2.5 py-1.5">Log In</a>
+      <button onclick="toggleMobileMenu()" class="touch-target p-2 rounded-lg text-[#003366] hover:bg-slate-100" aria-label="Menu">
+        <svg id="m-open" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <svg id="m-close" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MOBILE DRAWER MENU -->
+  <div id="m-drawer" class="hidden bg-white border-b border-[#E2E8F0] px-5 py-4 space-y-3 shadow-xl">
+    <a href="concept-b-plus-desktop.html" class="block py-1.5 font-bold text-sm text-[#003366]">Home</a>
+    <a href="platform-page.html" class="block py-1.5 font-bold text-sm text-[#003366]">Platform</a>
+    <a href="document-intelligence-page.html" class="block py-1.5 font-bold text-sm text-[#003366]">Document Intake</a>
+    <a href="compliance-page.html" class="block py-1.5 font-bold text-sm text-[#003366]">Compliance</a>
+    <a href="pricing-page.html" class="block py-1.5 font-bold text-sm text-[#003366]">Pricing</a>
+    <div class="pt-3 border-t border-[#E2E8F0] flex flex-col gap-2">
+      <a href="https://app.cfo-ai.site/login" class="block w-full text-center font-bold text-xs border border-[#CBD5E1] text-[#003366] py-2.5 rounded-xl">
+        Log In
+      </a>
+      <a href="https://app.cfo-ai.site/signup" class="block w-full text-center font-bold text-xs bg-[#1565C0] text-white py-3 rounded-xl shadow-sm">
+        Start Free — 7 Days
+      </a>
+    </div>
+  </div>
+
+  <!-- 1. MOBILE HERO: CONVERSION FOCUS -->
+  <section id="m-hero" class="p-4 pt-6 bg-gradient-to-b from-[#F8FAFC] to-white relative overflow-hidden border-b border-[#E2E8F0]">
+    
+    <svg viewBox="0 0 200 200" class="cfo-watermark -top-10 -right-10 w-64 h-64 text-[#003366]">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="relative z-10 text-center">
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#3399FF]/40 text-[10px] font-black text-[#003366] mb-3 shadow-sm">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#3399FF]"></span>
+        <span>INTELLIGENT FINANCIAL OS</span>
+      </div>
+
+      <h1 class="text-3xl font-black text-[#003366] tracking-tight leading-[1.12] mb-2">
+        Your AI CFO.<br/>
+        <span class="text-[#1565C0]">Your Business Under Control.</span>
+      </h1>
+
+      <p class="text-xs font-bold text-[#003366] mb-1">
+        Less paperwork. Clearer finances. Smarter decisions.
+      </p>
+
+      <p class="text-xs text-[#334155] leading-relaxed mb-5">
+        See your financial position, organize receipts, prepare accounting workflows, and stay ahead of Indonesian tax updates.
+      </p>
+
+      <a href="https://app.cfo-ai.site/signup" class="touch-target w-full text-sm font-bold bg-[#1565C0] text-white rounded-xl shadow-md flex items-center justify-center gap-2 mb-2">
+        <span>Start Free — 7 Days</span>
+        <span>→</span>
+      </a>
+      <div class="text-[10px] text-[#5A6E82] font-semibold mb-5">
+        7-day free trial • No credit card required • Built for Indonesia
+      </div>
+
+      <!-- Real Vector Dashboard Showcase (Responsive Mobile Fit) -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden text-left mb-4">
+        <div class="w-full bg-[#0F172A] overflow-hidden">
+          <img src="assets/product/dashboard-pulse.svg" alt="CFO AI Mobile Dashboard" class="w-full h-auto block" loading="eager" />
+        </div>
+        <div class="p-3 bg-slate-50 border-t border-slate-200 text-[10px] flex justify-between items-center">
+          <span class="font-bold text-[#003366]">PT Solusi Digital Nusantara</span>
+          <span class="text-emerald-700 font-bold">✓ BCA &amp; Permata Reconciled</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 2. THREE CORE CUSTOMER OUTCOMES ON MOBILE -->
+  <section class="p-4 py-8 bg-white border-b border-[#E2E8F0]">
+    <div class="text-center mb-6">
+      <span class="text-[10px] font-bold text-[#1565C0] uppercase tracking-wider block">CORE VALUE</span>
+      <h2 class="text-xl font-black text-[#003366] mt-0.5">Three Real Business Outcomes</h2>
+    </div>
+
+    <div class="space-y-4">
+      
+      <!-- Outcome 1: Cash Visibility -->
+      <div class="bento-card">
+        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 text-[9px] font-black text-[#1565C0] uppercase mb-2">
+          OUTCOME 01 • VISIBILITY
+        </div>
+        <h3 class="font-black text-sm text-[#003366] mb-1">Real-Time Visibility Over Cash &amp; Runway</h3>
+        <p class="text-[11px] text-[#5A6E82] mb-3 leading-relaxed">
+          Stop guessing next month's liquidity. Track total cash across BCA, Permata, and petty cash with 30-day dynamic forecasting.
+        </p>
+        <div class="rounded-xl overflow-hidden border border-slate-200 mb-2">
+          <img src="assets/product/analytics-radar.svg" alt="Cash Trajectory Mobile" class="w-full h-auto block" loading="lazy" />
+        </div>
+      </div>
+
+      <!-- Outcome 2: Document Intake -->
+      <div class="bento-card">
+        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-[9px] font-black text-emerald-800 uppercase mb-2">
+          OUTCOME 02 • AUTOMATION
+        </div>
+        <h3 class="font-black text-sm text-[#003366] mb-1">Receipts &amp; Invoices Handled Automatically</h3>
+        <p class="text-[11px] text-[#5A6E82] mb-3 leading-relaxed">
+          Employees submit receipts via Telegram. CFO AI extracts DPP and PPN 11%, matching them to bank transactions for human review.
+        </p>
+        <div class="rounded-xl overflow-hidden border border-slate-200 mb-2">
+          <img src="assets/product/document-review-drawer.svg" alt="Document Drawer Mobile" class="w-full h-auto block" loading="lazy" />
+        </div>
+      </div>
+
+      <!-- Outcome 3: Compliance -->
+      <div class="bento-card">
+        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-50 text-[9px] font-black text-purple-800 uppercase mb-2">
+          OUTCOME 03 • COMPLIANCE
+        </div>
+        <h3 class="font-black text-sm text-[#003366] mb-1">Indonesian Tax &amp; CoreTax Preparedness</h3>
+        <p class="text-[11px] text-[#5A6E82] mb-3 leading-relaxed">
+          Track PMK 81/2024 CoreTax transition, PPh 21 TER, PPh 23, and PPN deadlines. Verified 16-digit NPWPs across all vendor records.
+        </p>
+        <div class="rounded-xl overflow-hidden border border-slate-200 mb-2">
+          <img src="assets/product/compliance-calendar-radar.svg" alt="Compliance Calendar Mobile" class="w-full h-auto block" loading="lazy" />
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3. INTAKE CHANNELS -->
+  <section class="p-4 py-8 bg-[#F8FAFC] border-b border-[#E2E8F0]">
+    <div class="text-[10px] font-bold text-[#1565C0] uppercase mb-1">INTEGRATION CHANNELS</div>
+    <h2 class="text-xl font-black text-[#003366] mb-3">Collect From Anywhere</h2>
+    
+    <div class="space-y-2 mb-4">
+      <div class="p-3 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-between text-xs">
+        <span class="font-bold text-[#003366]">Direct PDF &amp; CSV Upload</span>
+        <span class="text-[9px] font-bold bg-[#ECFDF5] text-[#0F7A52] px-2 py-0.5 rounded">AVAILABLE</span>
+      </div>
+      <div class="p-3 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-between text-xs">
+        <span class="font-bold text-[#003366]">Telegram Employee Bot</span>
+        <span class="text-[9px] font-bold bg-[#E0F2FE] text-[#0369A1] px-2 py-0.5 rounded">BETA (PILOT)</span>
+      </div>
+      <div class="p-3 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-between text-xs">
+        <span class="font-bold text-[#003366]">Claude Connector</span>
+        <span class="text-[9px] font-bold bg-[#ECFDF5] text-[#0F7A52] px-2 py-0.5 rounded">AVAILABLE</span>
+      </div>
+      <div class="p-3 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-between text-xs opacity-80">
+        <span class="font-bold text-[#003366]">ChatGPT Action</span>
+        <span class="text-[9px] font-bold bg-[#FFFBEB] text-[#B5740B] px-2 py-0.5 rounded">COMING SOON</span>
+      </div>
+      <div class="p-3 rounded-xl bg-white border border-[#E2E8F0] flex items-center justify-between text-xs opacity-80">
+        <span class="font-bold text-[#003366]">WhatsApp Business</span>
+        <span class="text-[9px] font-bold bg-[#FFFBEB] text-[#B5740B] px-2 py-0.5 rounded">COMING SOON</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. PRICING ON MOBILE -->
+  <section class="p-4 py-8 bg-white border-b border-[#E2E8F0]">
+    <div class="text-center mb-6">
+      <div class="text-[10px] font-bold text-[#1565C0] uppercase mb-1">TRANSPARENT PRICING</div>
+      <h2 class="text-2xl font-black text-[#003366]">Start Free for 7 Days.</h2>
+      <p class="text-xs text-[#5A6E82] mt-0.5">No credit card required • Cancel anytime</p>
+    </div>
+
+    <!-- Featured: Control ($149) -->
+    <div class="bento-card border-2 border-[#1565C0] mb-3 relative bg-white">
+      <div class="text-[10px] font-black uppercase text-[#1565C0] tracking-wider mb-1">MOST POPULAR • CONTROL</div>
+      <div class="flex items-baseline gap-1 mb-1">
+        <span class="text-3xl font-black text-[#003366] font-mono-num">$149</span>
+        <span class="text-xs text-[#64748B]">/ month (USD)</span>
+      </div>
+      <div class="text-xs font-bold text-[#003366] mb-3">Stay in Control of Finances &amp; Obligations</div>
+      <div class="space-y-1.5 text-xs text-[#334155] border-t border-slate-100 pt-3 mb-4">
+        <div>✓ Real-time performance &amp; runway visibility</div>
+        <div>✓ Automatic BCA &amp; Permata bank reconciliation</div>
+        <div>✓ Telegram employee receipt collection bot</div>
+        <div>✓ Indonesian tax calendar &amp; CoreTax updates</div>
+        <div class="text-[10px] font-mono text-[#64748B] pt-1">5 users • 5,000 transactions/mo</div>
+      </div>
+      <a href="https://app.cfo-ai.site/signup?plan=control" class="touch-target w-full text-xs font-bold bg-[#1565C0] text-white rounded-xl shadow-sm">
+        Start Free Trial (7 Days) →
+      </a>
+    </div>
+
+    <!-- Starter & Pro Tiers -->
+    <div class="grid grid-cols-2 gap-2">
+      <div class="bento-card p-3">
+        <div class="font-bold text-xs text-[#003366]">STARTER</div>
+        <div class="font-mono-num font-black text-sm text-[#003366] mt-0.5">$59/mo</div>
+        <div class="text-[10px] text-[#64748B] mt-1 mb-2">2 users • 1,000 tx/mo</div>
+        <a href="https://app.cfo-ai.site/signup?plan=starter" class="block w-full text-center text-[11px] font-bold py-1.5 bg-slate-100 text-[#003366] rounded-lg">
+          Start Trial
+        </a>
+      </div>
+      <div class="bento-card p-3">
+        <div class="font-bold text-xs text-[#003366]">PRO</div>
+        <div class="font-mono-num font-black text-sm text-[#003366] mt-0.5">$299/mo</div>
+        <div class="text-[10px] text-[#64748B] mt-1 mb-2">15 users • 20,000 tx/mo</div>
+        <a href="https://app.cfo-ai.site/signup?plan=pro" class="block w-full text-center text-[11px] font-bold py-1.5 bg-slate-100 text-[#003366] rounded-lg">
+          Start Trial
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. MOBILE RESTORED PROFESSIONAL FOOTER -->
+  <footer class="p-4 py-8 text-white/70 text-[11px] border-t border-white/10 relative overflow-hidden" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="flex items-center gap-2.5 mb-3">
+      <div class="w-7 h-7 flex-shrink-0">
+        <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+          <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+        </svg>
+      </div>
+      <div class="flex flex-col">
+        <span class="font-extrabold text-sm text-white">CFO AI Indonesia</span>
+        <span class="text-[9px] text-[#3399FF] uppercase tracking-wider font-semibold">Financial Operating System</span>
+      </div>
+    </div>
+    
+    <div class="grid grid-cols-2 gap-4 py-3 border-y border-white/10 mb-3 text-[11px]">
+      <div>
+        <div class="font-bold text-white uppercase text-[10px] mb-1.5 tracking-wider">Product</div>
+        <ul class="space-y-1 text-white/60">
+          <li><a href="platform-page.html" class="hover:text-white">Platform</a></li>
+          <li><a href="document-intelligence-page.html" class="hover:text-white">Documents</a></li>
+          <li><a href="compliance-page.html" class="hover:text-white">Compliance</a></li>
+          <li><a href="pricing-page.html" class="hover:text-white">Pricing</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="font-bold text-white uppercase text-[10px] mb-1.5 tracking-wider">Links</div>
+        <ul class="space-y-1 text-white/60">
+          <li><a href="concept-b-plus-desktop.html" class="hover:text-white">Desktop View</a></li>
+          <li><a href="https://app.cfo-ai.site/login" class="hover:text-white">Log In</a></li>
+          <li><a href="https://app.cfo-ai.site/signup" class="hover:text-white font-bold text-[#3399FF]">Free Trial</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="text-[9px] text-white/40 space-y-1">
+      <div>Marketing: https://cfo-ai.site • App: https://app.cfo-ai.site</div>
+      <div>Copyright © 2026 CFO AI. All rights reserved.</div>
+      <div class="pt-0.5 text-white/30">
+        Informational preparation software. Does not replace certified tax consultants.
+      </div>
+    </div>
+  </footer>
+
+  <!-- STICKY BOTTOM THUMB ACTION BAR -->
+  <div class="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#E2E8F0] p-2.5 max-w-[390px] mx-auto flex items-center justify-between gap-3 shadow-2xl">
+    <div class="flex flex-col pl-1">
+      <span class="text-[9px] font-bold text-[#5A6E82] uppercase">7-Day Free Trial</span>
+      <span class="text-xs font-black text-[#003366]">$0 • No Credit Card</span>
+    </div>
+    <a href="https://app.cfo-ai.site/signup" class="touch-target bg-[#1565C0] hover:bg-[#10529C] text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md">
+      Start Free — 7 Days →
+    </a>
+  </div>
+
+  <script>
+    function toggleMobileMenu() {
+      const drawer = document.getElementById('m-drawer');
+      const openIcon = document.getElementById('m-open');
+      const closeIcon = document.getElementById('m-close');
+      if (drawer.classList.contains('hidden')) {
+        drawer.classList.remove('hidden');
+        openIcon.classList.add('hidden');
+        closeIcon.classList.remove('hidden');
+      } else {
+        drawer.classList.add('hidden');
+        openIcon.classList.remove('hidden');
+        closeIcon.classList.add('hidden');
+      }
+    }
+  </script>
+
+</body>
+</html>

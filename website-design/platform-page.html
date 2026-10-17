@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Platform Architecture — CFO AI Indonesia</title>
+  <meta name="description" content="Explore how CFO AI connects your finances, documents, accounting preparation, and Indonesian regulatory monitoring in one intelligent platform.">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-navy: #003366;
+      --brand-navy-dark: #001A33;
+      --brand-electric-blue: #3399FF;
+      --brand-electric-blue-ink: #1565C0;
+      --surface-page: #F8FAFC;
+      --surface-card: #FFFFFF;
+      --text-primary: #003366;
+      --text-secondary: #334155;
+      --text-muted: #5A6E82;
+      --font-display: 'Archivo Black', 'Manrope', sans-serif;
+      --font-ui: 'Manrope', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body {
+      font-family: var(--font-ui);
+      background-color: var(--surface-page);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .font-mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums; }
+    .cfo-watermark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.035;
+    }
+    .cfo-watermark-dark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.055;
+    }
+    .bento-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px -2px rgba(0, 51, 102, 0.05);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .bento-card:hover {
+      border-color: #3399FF;
+      box-shadow: 0 16px 36px -4px rgba(51, 153, 255, 0.14);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="selection:bg-blue-100 selection:text-[#003366]">
+
+  <!-- TOP ANNOUNCEMENT BAR: SUBTLE DARK NAVY TONAL GRADIENT -->
+  <aside aria-label="Platform overview banner" class="text-white text-xs py-2 px-4 sm:px-8 font-medium border-b border-white/10 relative z-50 shadow-sm" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+      <div class="flex items-center gap-2.5">
+        <span class="bg-[#3399FF] text-[#001A33] font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">PLATFORM ARCHITECTURE</span>
+        <span class="font-semibold text-white/95">Everything Connected. Nothing Lost Between Tools.</span>
+      </div>
+      <div class="flex items-center gap-4 text-[11px] text-white/75 font-medium">
+        <span class="hidden md:inline">Marketing: https://cfo-ai.site</span>
+        <span class="text-white/30 hidden md:inline">•</span>
+        <span class="font-mono text-white font-bold">App: https://app.cfo-ai.site</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STICKY HEADER NAVIGATION -->
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Authentic CFO AI Logo -->
+      <a href="concept-b-plus-desktop.html" class="flex items-center gap-3.5 flex-shrink-0 group">
+        <div class="w-10 h-10 flex-shrink-0">
+          <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-sm group-hover:scale-105 transition-transform" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#003366" fill-rule="evenodd"/>
+            <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-xl tracking-tight text-[#003366] leading-none">CFO AI</span>
+            <span class="bg-[#ECFDF5] text-[#0F7A52] text-[10px] font-extrabold px-1.5 py-0.2 rounded border border-[#0F7A52]/20">INDONESIA</span>
+          </div>
+          <span class="text-[10px] tracking-wider uppercase font-bold text-[#5A6E82] mt-0.5">Platform</span>
+        </div>
+      </a>
+
+      <!-- Navigation Links -->
+      <nav class="hidden xl:flex items-center space-x-7 text-sm font-semibold text-[#334155] whitespace-nowrap">
+        <a href="concept-b-plus-desktop.html" class="hover:text-[#1565C0] transition-colors">Home</a>
+        <a href="platform-page.html" class="text-[#1565C0] font-bold border-b-2 border-[#1565C0] pb-1">Platform</a>
+        <a href="document-intelligence-page.html" class="hover:text-[#1565C0] transition-colors">Document Intelligence</a>
+        <a href="compliance-page.html" class="hover:text-[#1565C0] transition-colors">Compliance</a>
+        <a href="pricing-page.html" class="hover:text-[#1565C0] transition-colors">Pricing</a>
+      </nav>
+
+      <!-- Action Buttons -->
+      <div class="hidden sm:flex items-center gap-3.5 flex-shrink-0">
+        <a href="https://app.cfo-ai.site/login" class="text-sm font-bold text-[#003366] hover:text-[#1565C0] transition-colors px-3 py-2 whitespace-nowrap">
+          Log In
+        </a>
+        <a href="https://app.cfo-ai.site/signup" class="text-sm font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-5 py-2.5 rounded-[10px] shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>Start Free — 7 Days</span>
+          <span>→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. COMPACT HERO SECTION -->
+  <section class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F8FAFC] relative overflow-hidden border-b border-[#E2E8F0]">
+    
+    <svg viewBox="0 0 200 200" class="cfo-watermark -top-20 -right-20 w-[600px] h-[600px] text-[#003366]">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#3399FF]/40 text-xs font-black text-[#003366] mb-5 shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-[#3399FF]"></span>
+        <span>CONNECTED FINANCIAL OPERATING SYSTEM</span>
+      </div>
+
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-[#003366] tracking-tight leading-[1.1] mb-5">
+        One Platform.<br/>
+        <span class="text-[#1565C0]">Complete Financial Visibility.</span>
+      </h1>
+
+      <p class="text-base sm:text-lg text-[#334155] max-w-3xl mx-auto leading-relaxed mb-8">
+        From daily transactions to executive decisions — see how CFO AI connects every part of your financial operations into one intelligent system built specifically for Indonesia.
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+        <a href="https://app.cfo-ai.site/signup" class="w-full sm:w-auto text-base font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Start Free — 7 Days</span>
+          <span>→</span>
+        </a>
+        <a href="#pulse-showcase" class="w-full sm:w-auto text-base font-bold text-[#003366] bg-white border border-[#CBD5E1] hover:border-[#1565C0] px-8 py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+          <span>Explore Demonstrations</span>
+          <span>↓</span>
+        </a>
+      </div>
+
+      <div class="text-xs text-[#5A6E82] font-semibold flex items-center justify-center gap-2">
+        <span>7-day free trial</span>
+        <span>•</span>
+        <span class="text-emerald-700 font-bold">No credit card required</span>
+        <span>•</span>
+        <span>PT &amp; PT PMA Ready</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. FINANCIAL COMMAND CENTER (PULSE DEMONSTRATION) -->
+  <section id="pulse-showcase" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20">
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">COMMAND CENTER DEMONSTRATION</span>
+      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+        See the Numbers That Matter
+      </h2>
+      <p class="text-base text-[#5A6E82]">
+        Pulse unifies total liquid cash, burn rate velocity, verified runway, and pending financial decisions onto one high-clarity canvas.
+      </p>
+    </div>
+
+    <!-- Authentic Software Render: Pulse Vector Graphic -->
+    <div class="bento-card p-2 sm:p-4 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden mb-12">
+      <div class="w-full rounded-xl overflow-hidden border border-slate-200 bg-[#0F172A]">
+        <img src="assets/product/dashboard-pulse.svg" alt="CFO AI Pulse Financial Command Center Dashboard" class="w-full h-auto block select-none" loading="eager" />
+      </div>
+      <div class="px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+        <span class="font-bold text-[#003366]">Demonstration 01: Executive Pulse Dashboard (PT Solusi Digital Nusantara)</span>
+        <span class="text-emerald-700 font-bold">● 4 Accounts Reconciled • 162-Day Safety Runway</span>
+      </div>
+    </div>
+
+    <!-- 4 Key Capabilities Callout Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div class="text-xs font-bold uppercase text-[#1565C0] mb-1">01 • TOTAL LIQUID CASH</div>
+        <h3 class="text-base font-extrabold text-[#003366] mb-1">Rp 3.120.450.000</h3>
+        <p class="text-xs text-[#5A6E82] leading-relaxed">
+          Aggregated across BCA Corporate, Bank Permata Operating, and Petty Cash reserves without logging into multiple bank portals.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div class="text-xs font-bold uppercase text-emerald-700 mb-1">02 • RUNWAY &amp; VELOCITY</div>
+        <h3 class="text-base font-extrabold text-[#003366] mb-1">162 Days (5.4 Mo)</h3>
+        <p class="text-xs text-[#5A6E82] leading-relaxed">
+          Calculated automatically against your net monthly burn rate (Rp 192.400.000/mo), keeping founders far above safety thresholds.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div class="text-xs font-bold uppercase text-blue-700 mb-1">03 • 6-MONTH TRENDS</div>
+        <h3 class="text-base font-extrabold text-[#003366] mb-1">Revenue vs Expenses</h3>
+        <p class="text-xs text-[#5A6E82] leading-relaxed">
+          Historical margin tracking from May to October with clear visual separation between operating burn and incoming customer revenue.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+        <div class="text-xs font-bold uppercase text-amber-700 mb-1">04 • PENDING DECISIONS</div>
+        <h3 class="text-base font-extrabold text-[#003366] mb-1">3 Action Items</h3>
+        <p class="text-xs text-[#5A6E82] leading-relaxed">
+          Highlights unapproved vendor invoices, overdue customer receivables, and bank statement gaps that require management attention.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 3. CASH FLOW & ANALYTICS (RADAR DEMONSTRATION) -->
+  <section id="radar-showcase" class="py-24 px-4 sm:px-6 lg:px-8 bg-white border-y border-[#E2E8F0] scroll-mt-20">
+    <div class="max-w-7xl mx-auto">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">PREDICTIVE ANALYTICS DEMONSTRATION</span>
+        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+          Turn Financial Data Into Better Decisions
+        </h2>
+        <p class="text-base text-[#5A6E82]">
+          Radar projects dynamic cash trajectories, simulates what-if business decisions, and surfaces upcoming payment obligations before they impact liquidity.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        
+        <!-- Left: Authentic Product Interface Demonstration -->
+        <div class="lg:col-span-7">
+          <div class="bento-card p-2 sm:p-3 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
+            <div class="w-full rounded-xl overflow-hidden border border-slate-200 bg-[#0F172A]">
+              <img src="assets/product/analytics-radar.svg" alt="CFO AI Radar 30-Day Cash Trajectory and Scenario Modeling" class="w-full h-auto block select-none" loading="lazy" />
+            </div>
+            <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <span class="font-semibold text-[#003366]">Demonstration 02: Radar Analytics &amp; Scenario Simulator</span>
+              <span class="text-emerald-700 font-bold">● Trajectory Floor: Rp 2.85B</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Business Value & Highlights -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-[11px] font-black text-amber-800 uppercase tracking-wider">
+            SCENARIO MODELING &amp; SIGNALS
+          </div>
+
+          <h3 class="text-2xl sm:text-3xl font-black text-[#003366] tracking-tight leading-snug">
+            Plan What-If Situations Before Committing Capital
+          </h3>
+
+          <p class="text-sm text-[#334155] leading-relaxed">
+            Wondering whether you can afford new engineering hires or office expansion? Radar lets you toggle business scenarios and immediately see their impact on your 30-day cash curve and total runway.
+          </p>
+
+          <div class="space-y-3 pt-2">
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <h4 class="font-bold text-xs text-[#003366] mb-0.5">30-Day Dynamic Forecast</h4>
+              <p class="text-[11px] text-[#5A6E82]">Models day-by-day cash fluctuations accounting for payroll cycles, vendor terms, and expected customer settlements.</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <h4 class="font-bold text-xs text-[#003366] mb-0.5">Interactive Scenario Chips</h4>
+              <p class="text-[11px] text-[#5A6E82]">Test real scenarios like "Collect Overdue Invoices (+Rp 150M)" or "Delay Hardware Capex (+Rp 85M)" with real-time trajectory updates.</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <h4 class="font-bold text-xs text-[#003366] mb-0.5">Upcoming Milestones Table</h4>
+              <p class="text-[11px] text-[#5A6E82]">Tracks upcoming obligations including PPh 21/23 tax deposits, office lease renewals, and cloud infrastructure invoices.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 4. AI CHIEF FINANCIAL OFFICER IN ACTION -->
+  <section id="ai-cfo-showcase" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20">
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">NATURAL LANGUAGE FINANCIAL INTELLIGENCE</span>
+      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+        Ask Better Questions. Make Better Decisions.
+      </h2>
+      <p class="text-base text-[#5A6E82]">
+        Natural language financial clarity grounded strictly in your verified company records. Get weekly executive briefs and immediate answers to strategic questions.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      
+      <!-- Left: Copy & Health Score Breakdown -->
+      <div class="lg:col-span-5 space-y-6">
+        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-[11px] font-black text-[#1565C0] uppercase tracking-wider">
+          AI CFO EXECUTIVE ASSISTANCE
+        </div>
+
+        <h3 class="text-2xl sm:text-3xl font-black text-[#003366] tracking-tight leading-snug">
+          Your Strategic Financial Copilot, Available 24/7
+        </h3>
+
+        <p class="text-sm text-[#334155] leading-relaxed">
+          Instead of waiting weeks for monthly management accounts, ask CFO AI directly. The AI CFO synthesizes ledger entries, invoice statuses, and tax schedules to deliver actionable executive intelligence.
+        </p>
+
+        <!-- 5 Health Score Components (Matching cfoModel.js: cash_health, runway, receivables, payables, expense_control) -->
+        <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+            <span class="text-xs font-bold text-[#003366]">5-Factor CFO Health Score</span>
+            <span class="text-sm font-black text-[#1565C0] font-mono">84 / 100</span>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2 text-[11px] text-[#334155]">
+            <div class="flex justify-between p-2 rounded-lg bg-white border border-slate-100">
+              <span>Cash Health:</span>
+              <span class="font-bold text-emerald-700">90 / 100</span>
+            </div>
+            <div class="flex justify-between p-2 rounded-lg bg-white border border-slate-100">
+              <span>Runway:</span>
+              <span class="font-bold text-emerald-700">88 / 100</span>
+            </div>
+            <div class="flex justify-between p-2 rounded-lg bg-white border border-slate-100">
+              <span>Receivables:</span>
+              <span class="font-bold text-amber-700">74 / 100</span>
+            </div>
+            <div class="flex justify-between p-2 rounded-lg bg-white border border-slate-100">
+              <span>Payables:</span>
+              <span class="font-bold text-emerald-700">86 / 100</span>
+            </div>
+          </div>
+          <div class="flex justify-between p-2 rounded-lg bg-white border border-slate-100 text-[11px] text-[#334155]">
+            <span>Expense Control:</span>
+            <span class="font-bold text-emerald-700">82 / 100</span>
+          </div>
+        </div>
+
+        <div class="text-xs text-[#5A6E82] italic">
+          Every response references specific double-entry transactions and verified bank lines, linking directly to underlying records.
+        </div>
+      </div>
+
+      <!-- Right: Authentic Software Render: AI CFO Interface -->
+      <div class="lg:col-span-7">
+        <div class="bento-card p-2 sm:p-3 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden">
+          <div class="w-full rounded-xl overflow-hidden border border-slate-200 bg-[#0F172A]">
+            <img src="assets/product/ai-cfo-brief.svg" alt="CFO AI Executive Brief and Natural Language Financial Q&A" class="w-full h-auto block select-none" loading="lazy" />
+          </div>
+          <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span class="font-semibold text-[#003366]">Demonstration 03: Weekly Executive Brief &amp; Founder Q&amp;A</span>
+            <span class="text-blue-700 font-bold">● Ledger-Verified Responses</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. THE EIGHT CORE PLATFORM MODULES (ARCHITECTURAL FOUNDATION) -->
+  <section id="modules" class="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50 border-t border-[#E2E8F0] scroll-mt-20">
+    <div class="max-w-7xl mx-auto">
+      
+      <div class="text-center mb-16">
+        <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">ARCHITECTURAL FOUNDATION</span>
+        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+          Eight Connected Platform Modules
+        </h2>
+        <p class="text-base text-[#5A6E82] max-w-2xl mx-auto">
+          Every module shares a unified data layer designed specifically for Indonesian corporate entities and PT PMA standards.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        <!-- Module 1: Pulse -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1565C0] mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-[#1565C0] uppercase tracking-wider">COMMAND CENTER</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">Pulse</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              Real-time financial indicators, total available cash across accounts, burn rate velocity, and verified runway calculations.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-[#1565C0]">
+            <span>Runway: 162 Days</span>
+            <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Active</span>
+          </div>
+        </div>
+
+        <!-- Module 2: Radar -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 9a3 3 0 100 6 3 3 0 000-6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m0 12v3m9-9h-3M6 12H3"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider">PREDICTIVE SIGNALS</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">Radar</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              30-day dynamic cash trajectory forecasting, what-if scenario simulations, and automated spend anomaly alerts.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-amber-700">
+            <span>Dynamic Scenarios</span>
+            <span class="text-slate-600 bg-slate-100 px-2 py-0.5 rounded">Continuous</span>
+          </div>
+        </div>
+
+        <!-- Module 3: Transactions -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-[#003366] mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-6.75-9.75h19.5a2.25 2.25 0 012.25 2.25v10.5a2.25 2.25 0 01-2.25 2.25H2.25A2.25 2.25 0 010 19.5V9a2.25 2.25 0 012.25-2.25z"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-[#1565C0] uppercase tracking-wider">LEDGER WORKSPACE</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">Transactions</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              Structured transaction register supporting IDR and multi-currency operations with Indonesian chart of accounts mapping.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-[#003366]">
+            <span>Multi-Period Ledger</span>
+            <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Verified</span>
+          </div>
+        </div>
+
+        <!-- Module 4: Accounts -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1565C0] mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.5m-15 10.5V10.5M1.5 21h21"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-[#1565C0] uppercase tracking-wider">BANK RECONCILIATION</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">Accounts</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              Native support for BCA Corporate CSV exports and Bank Permata statements with verified 100% reconciliation matching.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-[#1565C0]">
+            <span>BCA &amp; Permata</span>
+            <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">100% Matched</span>
+          </div>
+        </div>
+
+        <!-- Module 5: Invoices -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-700 mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-purple-700 uppercase tracking-wider">RECEIVABLES &amp; PAYABLES</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">Invoices</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              Invoice processing, vendor billing schedules, payment status tracking, and 16-digit NPWP record verification.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-purple-700">
+            <span>DPP &amp; PPN 11%</span>
+            <span class="text-slate-600 bg-slate-100 px-2 py-0.5 rounded">Ready</span>
+          </div>
+        </div>
+
+        <!-- Module 6: Documents -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.375v4.875a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25V13.875m-19.5 0L5.25 4.5h13.5l3 9.375"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">INTAKE &amp; ARCHIVE</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">Documents</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              Multi-channel intake (Telegram, direct PDF upload, Claude connector) with 4-step extraction and human review drawer.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-emerald-700">
+            <span>Telegram &amp; Direct</span>
+            <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Multi-Channel</span>
+          </div>
+        </div>
+
+        <!-- Module 7: AI Accountant -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1565C0] mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 3h.008v.008H8.25v-.008zm0 3h.008v.008H8.25v-.008zm3-6h.008v.008H11.25v-.008zm0 3h.008v.008H11.25v-.008zm0 3h.008v.008H11.25v-.008zm3-6h.008v.008H14.25v-.008zm0 3h.008v.008H14.25v-.008zM4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-12h3"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-[#1565C0] uppercase tracking-wider">WORKFLOW PREPARATION</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">AI Accountant</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              Pre-flight accounting verification, monthly trial balance assembly, and structured export packages for your certified accountant.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-[#1565C0]">
+            <span>1-Click Packages</span>
+            <span class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Preparation Only</span>
+          </div>
+        </div>
+
+        <!-- Module 8: Company Management -->
+        <div class="bento-card p-6 flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-[#003366] mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-[#1565C0] uppercase tracking-wider">GOVERNANCE &amp; ACCESS</span>
+            <h3 class="text-lg font-black text-[#003366] mt-1 mb-2">Company Management</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed">
+              Multi-user role segregation (Owner, Finance Manager, Staff), Indonesian company profile configuration, and audit logs.
+            </p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-[#003366]">
+            <span>Role Boundaries</span>
+            <span class="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Strict</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 6. ENTERPRISE ARCHITECTURE & STATUTORY BOUNDARY -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 text-white relative overflow-hidden" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <span class="text-xs font-bold text-[#3399FF] uppercase tracking-wider">ENTERPRISE SECURITY &amp; BOUNDARIES</span>
+      <h2 class="text-3xl sm:text-4xl font-black text-white mt-2 mb-4">
+        Engineered for Company Isolation &amp; Trust
+      </h2>
+      <p class="text-base text-white/70 max-w-2xl mx-auto mb-12">
+        Every financial document, ledger entry, and bank transaction is isolated within your dedicated workspace with strict permission boundaries.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left text-xs">
+        <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h4 class="font-extrabold text-white text-sm mb-2">Company Workspace Isolation</h4>
+          <p class="text-white/70 leading-relaxed">
+            Data never leaks across organizations. Zero co-mingling of financial databases, invoices, or employee submissions.
+          </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h4 class="font-extrabold text-white text-sm mb-2">Multi-Role Access Control</h4>
+          <p class="text-white/70 leading-relaxed">
+            Employees submit receipts via Telegram without seeing overall cash balances, runway projections, or bank statement lines.
+          </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h4 class="font-extrabold text-white text-sm mb-2">Immutable Audit Trails</h4>
+          <p class="text-white/70 leading-relaxed">
+            Every document extraction, reconciliation approval, and export package creation is permanently timestamped with user attribution.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. CTA STRIP -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 bg-white text-center border-t border-[#E2E8F0]">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-black text-[#003366] mb-3">
+        Ready to Connect Your Financial Workflows?
+      </h2>
+      <p class="text-base text-[#5A6E82] mb-8 max-w-2xl mx-auto">
+        Join Indonesian founders and finance managers spending less time on paperwork. Start your 7-day free trial on any plan.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+        <a href="https://app.cfo-ai.site/signup" class="text-base font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Start Free — 7 Days</span>
+          <span>→</span>
+        </a>
+      </div>
+      <div class="text-xs text-[#5A6E82]">
+        No credit card required • Instant access to Pulse, Radar &amp; Documents • PT &amp; PT PMA Ready
+      </div>
+    </div>
+  </section>
+
+  <!-- RESTORED PROFESSIONAL 4-COLUMN FOOTER -->
+  <footer class="text-white/70 py-16 px-4 sm:px-6 lg:px-8 border-t border-white/10 relative overflow-hidden" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    
+    <!-- Subtle Brand Watermark in Footer -->
+    <svg viewBox="0 0 200 200" class="cfo-watermark-dark -bottom-16 -right-16 w-80 h-80 text-white/5 pointer-events-none absolute select-none">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-7xl mx-auto relative z-10">
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-8 lg:gap-12 mb-12">
+        
+        <!-- Brand & Description (Col span 2) -->
+        <div class="col-span-2">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 flex-shrink-0">
+              <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+                <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+              </svg>
+            </div>
+            <div class="flex flex-col">
+              <span class="font-extrabold text-white text-lg tracking-tight leading-none">CFO AI</span>
+              <span class="text-[10px] tracking-wider uppercase font-semibold text-[#3399FF] mt-0.5">Indonesia</span>
+            </div>
+          </div>
+          <p class="text-xs text-white/60 leading-relaxed max-w-sm mb-4">
+            CFO AI — Intelligent Financial Management for Indonesian Businesses. Connected document intelligence, automated accounting preparation, and Indonesian regulatory monitoring.
+          </p>
+          <div class="text-[11px] text-white/40 space-y-1">
+            <div>Marketing: <span class="text-white/60">https://cfo-ai.site</span></div>
+            <div>Application: <span class="text-white/60">https://app.cfo-ai.site</span></div>
+          </div>
+        </div>
+
+        <!-- Col 1: Product -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Product</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="platform-page.html" class="text-white font-semibold">Platform</a></li>
+            <li><a href="concept-b-plus-desktop.html#ai-cfo" class="hover:text-white transition-colors">AI CFO</a></li>
+            <li><a href="concept-b-plus-desktop.html#ai-accountant" class="hover:text-white transition-colors">AI Accountant</a></li>
+            <li><a href="document-intelligence-page.html" class="hover:text-white transition-colors">Document Intelligence</a></li>
+            <li><a href="compliance-page.html" class="hover:text-white transition-colors">Compliance</a></li>
+            <li><a href="pricing-page.html" class="hover:text-white transition-colors">Pricing</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 2: Company -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Company</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="#about" class="hover:text-white transition-colors">About</a></li>
+            <li><a href="#contact" class="hover:text-white transition-colors">Contact</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 3: Legal -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Legal</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="#privacy" class="hover:text-white transition-colors">Privacy Policy</a></li>
+            <li><a href="#terms" class="hover:text-white transition-colors">Terms of Service</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 4: Account -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Account</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="https://app.cfo-ai.site/login" class="hover:text-white transition-colors">Log In</a></li>
+            <li><a href="https://app.cfo-ai.site/signup" class="hover:text-white transition-colors font-semibold text-[#3399FF]">Start Free Trial</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Footer Bottom Separator & Copyright & Disclaimer -->
+      <div class="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-[11px] text-white/50">
+        <div>Copyright © 2026 CFO AI. All rights reserved.</div>
+        <div class="text-center md:text-right max-w-xl">
+          CFO AI assists with financial management and accounting preparation. It does not provide statutory audits, legal advice, or direct tax filing with government portals.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFO AI — Design Concept Selection Showcase</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Manrope', -apple-system, sans-serif;
+      background-color: #0F172A;
+      color: #F8FAFC;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100vh;
+    }
+    .preview-frame {
+      border: none;
+      background: #FFFFFF;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen">
+
+  <!-- Top Selection Navigation Bar -->
+  <header class="bg-[#002244] border-b border-white/10 px-6 py-3 flex items-center justify-between flex-shrink-0 z-50">
+    <div class="flex items-center gap-4">
+      <div class="w-9 h-9 rounded-xl bg-[#003366] border border-white/20 flex items-center justify-center font-black text-white text-lg">
+        C<span class="text-[#3399FF]">.</span>
+      </div>
+      <div>
+        <div class="font-extrabold text-sm text-white tracking-wide flex items-center gap-2">
+          <span>CFO AI — Official Website Design Selection</span>
+          <span class="bg-[#1565C0] text-white text-[10px] px-2 py-0.5 rounded font-bold uppercase">Phase B</span>
+        </div>
+        <div class="text-[11px] text-white/60">Choose between Concept A and Concept B for the official production design</div>
+      </div>
+    </div>
+
+    <!-- View Mode Selector -->
+    <div class="flex items-center bg-[#001A33] p-1 rounded-xl border border-white/10">
+      <button onclick="setViewMode('split')" id="btn-split" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#1565C0] shadow transition-all">
+        Side-by-Side Split
+      </button>
+      <button onclick="setViewMode('a')" id="btn-a" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        Concept A (Financial Intelligence)
+      </button>
+      <button onclick="setViewMode('b')" id="btn-b" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        Concept B (AI Operating System)
+      </button>
+      <button onclick="setViewMode('matrix')" id="btn-matrix" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all">
+        Product Truth Matrix
+      </button>
+    </div>
+
+    <!-- Device Frame Selector -->
+    <div class="flex items-center gap-2 bg-[#001A33] p-1 rounded-xl border border-white/10">
+      <button onclick="setDevice('desktop')" id="btn-desktop" class="px-3 py-1 rounded-lg text-xs font-bold text-white bg-white/20" title="Desktop 100%">
+        🖥️ Desktop
+      </button>
+      <button onclick="setDevice('tablet')" id="btn-tablet" class="px-3 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white" title="Tablet 768px">
+        📱 Tablet
+      </button>
+      <button onclick="setDevice('mobile')" id="btn-mobile" class="px-3 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white" title="Mobile 390px">
+        📱 Mobile
+      </button>
+    </div>
+  </header>
+
+  <!-- Interactive Comparison Workspace -->
+  <main class="flex-1 relative overflow-hidden bg-[#0A0F1D] flex items-center justify-center p-4">
+    
+    <!-- SPLIT VIEW CONTAINER -->
+    <div id="container-split" class="w-full h-full grid grid-cols-2 gap-4">
+      
+      <!-- Frame A -->
+      <div class="flex flex-col h-full bg-[#001A33] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+        <div class="bg-[#002244] px-4 py-2 border-b border-white/10 flex items-center justify-between text-xs text-white">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#1565C0]"></span>
+            <span class="font-extrabold uppercase tracking-wider text-[11px]">Concept A: Premium Financial Intelligence</span>
+          </div>
+          <button onclick="setViewMode('a')" class="text-[11px] text-[#3399FF] hover:underline font-bold">Maximize Full Page ↗</button>
+        </div>
+        <div class="flex-1 w-full bg-slate-100 overflow-hidden relative">
+          <iframe id="iframe-split-a" src="concept-a-preview.html" class="w-full h-full border-0"></iframe>
+        </div>
+      </div>
+
+      <!-- Frame B -->
+      <div class="flex flex-col h-full bg-[#001A33] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+        <div class="bg-[#002244] px-4 py-2 border-b border-white/10 flex items-center justify-between text-xs text-white">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#3399FF]"></span>
+            <span class="font-extrabold uppercase tracking-wider text-[11px]">Concept B: Modern AI Operating System</span>
+          </div>
+          <button onclick="setViewMode('b')" class="text-[11px] text-[#3399FF] hover:underline font-bold">Maximize Full Page ↗</button>
+        </div>
+        <div class="flex-1 w-full bg-slate-100 overflow-hidden relative">
+          <iframe id="iframe-split-b" src="concept-b-preview.html" class="w-full h-full border-0"></iframe>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FULL PAGE SINGLE VIEW CONTAINER (Concept A or B) -->
+    <div id="container-single" class="hidden w-full h-full flex flex-col items-center justify-center">
+      <div id="device-wrapper" class="w-full h-full transition-all duration-300 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+        <iframe id="iframe-single" src="" class="w-full h-full border-0"></iframe>
+      </div>
+    </div>
+
+    <!-- PRODUCT TRUTH MATRIX MODAL CONTAINER -->
+    <div id="container-matrix" class="hidden w-full h-full max-w-5xl bg-white text-[#003366] rounded-2xl p-8 overflow-y-auto shadow-2xl border border-slate-300">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
+        <div>
+          <h2 class="text-2xl font-black text-[#003366]">Product Truth Audit Matrix</h2>
+          <p class="text-xs text-[#5A6E82]">14 Mandatory Capabilities Verified Against Live Codebase & Pilot Scope</p>
+        </div>
+        <button onclick="setViewMode('split')" class="px-4 py-2 rounded-xl bg-[#003366] text-white text-xs font-bold">
+          ← Back to Concepts
+        </button>
+      </div>
+
+      <div class="overflow-x-auto text-xs">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-100 text-[#003366] font-bold border-b border-slate-300">
+              <th class="p-3">Capability</th>
+              <th class="p-3">Implementation Status</th>
+              <th class="p-3">Evidence in Code</th>
+              <th class="p-3">Release Availability</th>
+              <th class="p-3">Approved Website Label</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            <tr>
+              <td class="p-3 font-bold">Direct Document Upload</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Implemented</span></td>
+              <td class="p-3 font-mono text-[11px]">documentIntake.js, uploadIntent.js, SHA-256</td>
+              <td class="p-3 font-bold text-emerald-700">Yes (Live)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Available</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Compliance Calendar</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Implemented</span></td>
+              <td class="p-3 font-mono text-[11px]">Accountant.jsx, taxDeadlines.test.js (PR #153)</td>
+              <td class="p-3 font-bold text-emerald-700">Yes (Live in V2)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Available</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Bank Statement Import</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Partial</span></td>
+              <td class="p-3 font-mono text-[11px]">statementParsers.js, rpc_confirm_bank_import</td>
+              <td class="p-3 font-bold text-blue-700">Yes (BCA CSV & Permata PDF)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Available</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Claude Integration</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Implemented</span></td>
+              <td class="p-3 font-mono text-[11px]">server/mcp/index.js, OAuth connector live</td>
+              <td class="p-3 font-bold text-emerald-700">Yes (MCP OAuth)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">Available</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">AI CFO Contextual Insights</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Partial</span></td>
+              <td class="p-3 font-mono text-[11px]">AICFO.jsx, financialInsights.js (D-EGRESS closed)</td>
+              <td class="p-3 font-bold text-blue-700">Partial (Deterministic heuristics)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Limited / Beta</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">AI Accountant Preparation</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Partial</span></td>
+              <td class="p-3 font-mono text-[11px]">Accountant.jsx, aiAccountantCore.js (Lock missing)</td>
+              <td class="p-3 font-bold text-blue-700">Partial (Preparation only; no filing)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Limited / Beta</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">AI Document Extraction</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Partial</span></td>
+              <td class="p-3 font-mono text-[11px]">documentExtraction.js (OCR flag default OFF)</td>
+              <td class="p-3 font-bold text-blue-700">Partial (Digital PDFs extracted)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Limited / Beta</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Automatic Document Classification</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Partial</span></td>
+              <td class="p-3 font-mono text-[11px]">documentIdentify.js (Keyword & structure)</td>
+              <td class="p-3 font-bold text-blue-700">Partial (Rule-based)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Limited / Beta</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Telegram Employee Submission</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Partial</span></td>
+              <td class="p-3 font-mono text-[11px]">helm-finance-bot/ (Outside immediate pilot)</td>
+              <td class="p-3 font-bold text-blue-700">Partial (Legacy live; future add-on)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Limited / Beta</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Indonesian Regulatory Updates</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Partial</span></td>
+              <td class="p-3 font-mono text-[11px]">indonesia_tax_kb/ (66 official sources collected)</td>
+              <td class="p-3 font-bold text-blue-700">Partial (Curated legal articles)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">Limited / Beta</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Company KBLI Activity Alerts</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Planned</span></td>
+              <td class="p-3 font-mono text-[11px]">Profile captures KBLI; dispatch unhooked</td>
+              <td class="p-3 font-bold text-amber-700">No</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Coming Soon</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">ChatGPT Custom Action</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Planned</span></td>
+              <td class="p-3 font-mono text-[11px]">MCP backend exists; Action not listed</td>
+              <td class="p-3 font-bold text-amber-700">No</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Coming Soon</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">WhatsApp Intake Workflow</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">Not Started</span></td>
+              <td class="p-3 font-mono text-[11px]">0 occurrences in codebase; roadmap item</td>
+              <td class="p-3 font-bold text-slate-600">No</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Coming Soon</span></td>
+            </tr>
+            <tr>
+              <td class="p-3 font-bold">Accountant Review Portal</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Planned</span></td>
+              <td class="p-3 font-mono text-[11px]">Accountant.jsx: "Send to accountant unavailable"</td>
+              <td class="p-3 font-bold text-amber-700">No (ZIP/PDF export works)</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">Coming Soon</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let currentMode = 'split';
+    let currentDevice = 'desktop';
+
+    function setViewMode(mode) {
+      currentMode = mode;
+      
+      // Update Buttons
+      ['split', 'a', 'b', 'matrix'].forEach(m => {
+        const btn = document.getElementById('btn-' + m);
+        if (m === mode) {
+          btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#1565C0] shadow transition-all";
+        } else {
+          btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold text-white/70 hover:text-white transition-all";
+        }
+      });
+
+      // Update Containers
+      const splitCon = document.getElementById('container-split');
+      const singleCon = document.getElementById('container-single');
+      const matrixCon = document.getElementById('container-matrix');
+      const iframeSingle = document.getElementById('iframe-single');
+
+      if (mode === 'split') {
+        splitCon.classList.remove('hidden');
+        singleCon.classList.add('hidden');
+        matrixCon.classList.add('hidden');
+      } else if (mode === 'a') {
+        splitCon.classList.add('hidden');
+        singleCon.classList.remove('hidden');
+        matrixCon.classList.add('hidden');
+        iframeSingle.src = 'concept-a-preview.html';
+      } else if (mode === 'b') {
+        splitCon.classList.add('hidden');
+        singleCon.classList.remove('hidden');
+        matrixCon.classList.add('hidden');
+        iframeSingle.src = 'concept-b-preview.html';
+      } else if (mode === 'matrix') {
+        splitCon.classList.add('hidden');
+        singleCon.classList.add('hidden');
+        matrixCon.classList.remove('hidden');
+      }
+    }
+
+    function setDevice(device) {
+      currentDevice = device;
+      
+      ['desktop', 'tablet', 'mobile'].forEach(d => {
+        const btn = document.getElementById('btn-' + d);
+        if (d === device) {
+          btn.className = "px-3 py-1 rounded-lg text-xs font-bold text-white bg-white/20";
+        } else {
+          btn.className = "px-3 py-1 rounded-lg text-xs font-bold text-white/70 hover:text-white";
+        }
+      });
+
+      const wrapper = document.getElementById('device-wrapper');
+      if (device === 'desktop') {
+        wrapper.style.width = '100%';
+        wrapper.style.maxWidth = '100%';
+      } else if (device === 'tablet') {
+        wrapper.style.width = '768px';
+        wrapper.style.maxWidth = '768px';
+      } else if (device === 'mobile') {
+        wrapper.style.width = '390px';
+        wrapper.style.maxWidth = '390px';
+      }
+    }
+  </script>
+</body>
+</html>

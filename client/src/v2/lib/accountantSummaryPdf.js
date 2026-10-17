@@ -92,6 +92,10 @@ const I18N = {
     typeReadme: 'Инструкция к архиву',
     statusIncluded: 'Приложен в ZIP',
     statusMissing: 'Недоступен',
+    statusEmptyRegistry: 'Пустой (0 проводок)',
+    emptyRegistryTitle: 'Реестр проводок пуст (records_registry.json)',
+    emptyRegistryWarning: 'За отчётный период в журнале операций компании отсутствуют проведённые транзакции. Пакет сформирован в режиме аудита/сверки. Для закрытия месяца необходимо импортировать или восстановить проводки из банковской выписки.',
+    emptyRegistryUnlinked: 'В журнале операций за данный период нет зарегистрированных проводок. Несверенные операции отсутствуют, так как учётные проводки ещё не внесены/не восстановлены из выписки.',
     footerBrand: 'Helm Finance OS · Бухгалтерский пакет документов',
     footerPage: (cur, tot) => `Страница ${cur} из ${tot}`,
   },
@@ -174,6 +178,10 @@ const I18N = {
     typeReadme: 'Archive Readme',
     statusIncluded: 'Included in ZIP',
     statusMissing: 'Unavailable',
+    statusEmptyRegistry: 'Empty (0 records)',
+    emptyRegistryTitle: 'Notice: Records Registry is Empty (records_registry.json)',
+    emptyRegistryWarning: 'No posted ledger transactions exist for this company in the reporting period. The package was generated for audit and reconciliation. Transactions must be imported or restored from bank statements before the month can be closed.',
+    emptyRegistryUnlinked: 'No posted ledger transactions exist for this period. No unlinked transactions are reported because ledger entries have not yet been imported or restored from statement.',
     footerBrand: 'Helm Finance OS · Accountant Package',
     footerPage: (cur, tot) => `Page ${cur} of ${tot}`,
   },
@@ -256,6 +264,10 @@ const I18N = {
     typeReadme: 'Petunjuk Arsip',
     statusIncluded: 'Terlampir dalam ZIP',
     statusMissing: 'Tidak Tersedia',
+    statusEmptyRegistry: 'Kosong (0 catatan)',
+    emptyRegistryTitle: 'Perhatian: Registri Catatan Kosong (records_registry.json)',
+    emptyRegistryWarning: 'Tidak ada transaksi buku besar untuk perusahaan ini dalam periode laporan. Paket dibuat untuk audit dan rekonsiliasi. Transaksi harus diimpor atau dipulihkan dari rekening koran sebelum penutupan buku.',
+    emptyRegistryUnlinked: 'Tidak ada transaksi buku besar yang tercatat untuk periode ini. Tidak ada mutasi tak terhubung karena transaksi belum diimpor atau dipulihkan dari rekening koran.',
     footerBrand: 'Helm Finance OS · Paket Akuntan',
     footerPage: (cur, tot) => `Halaman ${cur} dari ${tot}`,
   },
@@ -513,7 +525,14 @@ export async function generateAccountantSummaryPdf({
   registryRows.push(['accountant-summary.pdf', t.typeReport, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
   registryRows.push(['summary.json', t.typeSummary, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
   registryRows.push(['discrepancies.json', t.typeDiscrepancies, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
-  registryRows.push(['records_registry.json', t.typeRegistry, { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' }])
+  const isRegistryEmpty = !Array.isArray(recordsRegistry) || recordsRegistry.length === 0
+  registryRows.push([
+    'records_registry.json',
+    t.typeRegistry,
+    isRegistryEmpty
+      ? { text: t.statusEmptyRegistry, color: '#b45309', bold: true, alignment: 'center' }
+      : { text: t.statusIncluded, color: '#166534', bold: true, alignment: 'center' },
+  ])
 
   for (const f of attachedFiles) {
     if (['accountant-summary.pdf', 'summary.json', 'discrepancies.json', 'records_registry.json'].includes(f.name)) continue
@@ -613,14 +632,22 @@ export async function generateAccountantSummaryPdf({
 
       // Section 3: Unreconciled Transactions
       { text: t.secUnlinked, fontSize: 12, bold: true, color: '#0f172a', margin: [0, 0, 0, 6] },
-      unlinkedTx.length === 0
+      isRegistryEmpty
         ? {
-            text: t.noUnlinked,
+            text: t.emptyRegistryUnlinked,
             fontSize: 9,
-            color: '#166534',
+            color: '#b45309',
+            italics: true,
             margin: [0, 0, 0, 14],
           }
-        : {
+        : unlinkedTx.length === 0
+          ? {
+              text: t.noUnlinked,
+              fontSize: 9,
+              color: '#166534',
+              margin: [0, 0, 0, 14],
+            }
+          : {
             stack: [
               {
                 text: t.unlinkedCount(unlinkedTx.length),
@@ -693,7 +720,15 @@ export async function generateAccountantSummaryPdf({
                 ],
               }
             : null,
-          (missingStatements.length === 0 && unreconciledStatements.length === 0 && billsWithoutDocs.length === 0 && unavailableFiles.length === 0 && limitations.length === 0)
+          isRegistryEmpty
+            ? {
+                stack: [
+                  { text: t.emptyRegistryTitle, bold: true, fontSize: 9, color: '#b45309', margin: [0, 2, 0, 2] },
+                  { text: t.emptyRegistryWarning, fontSize: 8.5, color: '#92400e', margin: [0, 0, 0, 6] },
+                ],
+              }
+            : null,
+          (missingStatements.length === 0 && unreconciledStatements.length === 0 && billsWithoutDocs.length === 0 && unavailableFiles.length === 0 && limitations.length === 0 && !isRegistryEmpty)
             ? { text: t.noDiscrepancies, fontSize: 9, color: '#166534', margin: [0, 2, 0, 6] }
             : null,
         ].filter(Boolean),

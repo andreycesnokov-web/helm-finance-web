@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Intelligence — CFO AI Indonesia</title>
+  <meta name="description" content="Collect invoices, receipts, and bank statements from Telegram, direct uploads, and Claude directly into your verified company workspace with human review.">
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-navy: #003366;
+      --brand-navy-dark: #001A33;
+      --brand-electric-blue: #3399FF;
+      --brand-electric-blue-ink: #1565C0;
+      --surface-page: #F8FAFC;
+      --surface-card: #FFFFFF;
+      --text-primary: #003366;
+      --text-secondary: #334155;
+      --text-muted: #5A6E82;
+      --font-display: 'Archivo Black', 'Manrope', sans-serif;
+      --font-ui: 'Manrope', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body {
+      font-family: var(--font-ui);
+      background-color: var(--surface-page);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .font-mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums; }
+    .cfo-watermark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.035;
+    }
+    .cfo-watermark-dark {
+      position: absolute;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      opacity: 0.055;
+    }
+    .bento-card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px -2px rgba(0, 51, 102, 0.05);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .bento-card:hover {
+      border-color: #3399FF;
+      box-shadow: 0 16px 36px -4px rgba(51, 153, 255, 0.14);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="selection:bg-blue-100 selection:text-[#003366]">
+
+  <!-- TOP ANNOUNCEMENT BAR: SUBTLE DARK NAVY TONAL GRADIENT -->
+  <aside aria-label="Official release announcement" class="text-white text-xs py-2 px-4 sm:px-8 font-medium border-b border-white/10 relative z-50 shadow-sm" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+      <div class="flex items-center gap-2.5">
+        <span class="bg-[#3399FF] text-[#001A33] font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">DOCUMENT INTELLIGENCE</span>
+        <span class="font-semibold text-white/95">Stop Chasing Documents. Let Them Come to You.</span>
+      </div>
+      <div class="flex items-center gap-4 text-[11px] text-white/75 font-medium">
+        <span class="hidden md:inline">Marketing: https://cfo-ai.site</span>
+        <span class="text-white/30 hidden md:inline">•</span>
+        <span class="font-mono text-white font-bold">App: https://app.cfo-ai.site</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STICKY HEADER NAVIGATION -->
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Authentic CFO AI Logo -->
+      <a href="concept-b-plus-desktop.html" class="flex items-center gap-3.5 flex-shrink-0 group">
+        <div class="w-10 h-10 flex-shrink-0">
+          <svg viewBox="0 0 200 200" class="w-full h-full drop-shadow-sm group-hover:scale-105 transition-transform" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#003366" fill-rule="evenodd"/>
+            <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-xl tracking-tight text-[#003366] leading-none">CFO AI</span>
+            <span class="bg-[#ECFDF5] text-[#0F7A52] text-[10px] font-extrabold px-1.5 py-0.2 rounded border border-[#0F7A52]/20">INDONESIA</span>
+          </div>
+          <span class="text-[10px] tracking-wider uppercase font-bold text-[#5A6E82] mt-0.5">Documents</span>
+        </div>
+      </a>
+
+      <!-- Navigation Links -->
+      <nav class="hidden xl:flex items-center space-x-7 text-sm font-semibold text-[#334155] whitespace-nowrap">
+        <a href="concept-b-plus-desktop.html" class="hover:text-[#1565C0] transition-colors">Home</a>
+        <a href="platform-page.html" class="hover:text-[#1565C0] transition-colors">Platform</a>
+        <a href="document-intelligence-page.html" class="text-[#1565C0] font-bold border-b-2 border-[#1565C0] pb-1">Document Intelligence</a>
+        <a href="compliance-page.html" class="hover:text-[#1565C0] transition-colors">Compliance</a>
+        <a href="pricing-page.html" class="hover:text-[#1565C0] transition-colors">Pricing</a>
+      </nav>
+
+      <!-- Action Buttons -->
+      <div class="hidden sm:flex items-center gap-3.5 flex-shrink-0">
+        <a href="https://app.cfo-ai.site/login" class="text-sm font-bold text-[#003366] hover:text-[#1565C0] transition-colors px-3 py-2 whitespace-nowrap">
+          Log In
+        </a>
+        <a href="https://app.cfo-ai.site/signup" class="text-sm font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-5 py-2.5 rounded-[10px] shadow-sm transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>Start Free — 7 Days</span>
+          <span>→</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- 1. COMPACT HERO SECTION -->
+  <section class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F8FAFC] relative overflow-hidden border-b border-[#E2E8F0]">
+    
+    <svg viewBox="0 0 200 200" class="cfo-watermark -top-20 -right-20 w-[600px] h-[600px] text-[#003366]">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#3399FF]/40 text-xs font-black text-[#003366] mb-5 shadow-sm">
+        <span class="w-2 h-2 rounded-full bg-[#3399FF]"></span>
+        <span>INTELLIGENT DOCUMENT WORKSPACE</span>
+      </div>
+
+      <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-[#003366] tracking-tight leading-[1.1] mb-5">
+        Stop Chasing Documents.<br/>
+        <span class="text-[#1565C0]">Let Them Come to You.</span>
+      </h1>
+
+      <p class="text-base sm:text-lg text-[#334155] max-w-3xl mx-auto leading-relaxed mb-8">
+        Your team works in familiar tools like Telegram or direct web uploads. CFO AI automatically extracts invoice data, separates DPP and PPN 11%, matches bank statements, and organizes clean records for your accountant.
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+        <a href="https://app.cfo-ai.site/signup" class="w-full sm:w-auto text-base font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Start Free — 7 Days</span>
+          <span>→</span>
+        </a>
+        <a href="#workflow" class="w-full sm:w-auto text-base font-bold text-[#003366] bg-white border border-[#CBD5E1] hover:border-[#1565C0] px-8 py-3.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2">
+          <span>See 4-Step Workflow</span>
+          <span>↓</span>
+        </a>
+      </div>
+
+      <div class="text-xs text-[#5A6E82] font-semibold flex items-center justify-center gap-2">
+        <span>Telegram Employee Bot (Beta)</span>
+        <span>•</span>
+        <span>BCA &amp; Permata Reconciliation</span>
+        <span>•</span>
+        <span class="text-emerald-700 font-bold">Human Approval In The Loop</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. THE FOUR-STEP VISUAL WORKFLOW -->
+  <section id="workflow" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto scroll-mt-20">
+    <div class="text-center max-w-3xl mx-auto mb-16">
+      <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">END-TO-END AUTOMATION</span>
+      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+        How Documents Flow Through CFO AI
+      </h2>
+      <p class="text-base text-[#5A6E82]">
+        From the moment an employee receives a receipt to the final monthly accountant handoff package.
+      </p>
+    </div>
+
+    <!-- 4 Step Sequence Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+      
+      <!-- Step 1: Collect -->
+      <div class="bento-card p-6 flex flex-col justify-between border-t-4 border-t-[#1565C0] relative">
+        <div class="absolute -top-3 left-6 bg-[#1565C0] text-white font-black text-[10px] uppercase px-2.5 py-0.5 rounded-full">
+          STEP 01
+        </div>
+        <div class="pt-2">
+          <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#1565C0] flex items-center justify-center mb-4 border border-blue-100">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <h3 class="text-lg font-black text-[#003366] mb-2">Collect From Any Channel</h3>
+          <p class="text-xs text-[#5A6E82] leading-relaxed">
+            Staff snap photos via Telegram, managers drag PDFs into web upload, or external AI agents push documents through authorized connectors.
+          </p>
+        </div>
+        <div class="mt-6 pt-3 border-t border-slate-100 text-[11px] font-bold text-[#1565C0]">
+          Zero training required for staff
+        </div>
+      </div>
+
+      <!-- Step 2: Extract -->
+      <div class="bento-card p-6 flex flex-col justify-between border-t-4 border-t-emerald-600 relative">
+        <div class="absolute -top-3 left-6 bg-emerald-600 text-white font-black text-[10px] uppercase px-2.5 py-0.5 rounded-full">
+          STEP 02
+        </div>
+        <div class="pt-2">
+          <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-4 border border-emerald-100">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+          </div>
+          <h3 class="text-lg font-black text-[#003366] mb-2">Automated Tax Extraction</h3>
+          <p class="text-xs text-[#5A6E82] leading-relaxed">
+            AI extracts vendor name, invoice date, number, line items, DPP (base), and Indonesian PPN 11% with confidence scoring.
+          </p>
+        </div>
+        <div class="mt-6 pt-3 border-t border-slate-100 text-[11px] font-bold text-emerald-700">
+          98%+ line-item accuracy
+        </div>
+      </div>
+
+      <!-- Step 3: Review -->
+      <div class="bento-card p-6 flex flex-col justify-between border-t-4 border-t-purple-600 relative">
+        <div class="absolute -top-3 left-6 bg-purple-600 text-white font-black text-[10px] uppercase px-2.5 py-0.5 rounded-full">
+          STEP 03
+        </div>
+        <div class="pt-2">
+          <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center mb-4 border border-purple-100">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <h3 class="text-lg font-black text-[#003366] mb-2">Human Verification Drawer</h3>
+          <p class="text-xs text-[#5A6E82] leading-relaxed">
+            Your finance manager reviews the side-by-side extraction against the original document. Matches against bank lines with 1 click.
+          </p>
+        </div>
+        <div class="mt-6 pt-3 border-t border-slate-100 text-[11px] font-bold text-purple-700">
+          AI proposes • Human approves
+        </div>
+      </div>
+
+      <!-- Step 4: Organize -->
+      <div class="bento-card p-6 flex flex-col justify-between border-t-4 border-t-blue-600 relative">
+        <div class="absolute -top-3 left-6 bg-blue-600 text-white font-black text-[10px] uppercase px-2.5 py-0.5 rounded-full">
+          STEP 04
+        </div>
+        <div class="pt-2">
+          <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#1565C0] flex items-center justify-center mb-4 border border-blue-100">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+          </div>
+          <h3 class="text-lg font-black text-[#003366] mb-2">Reconcile &amp; Export</h3>
+          <p class="text-xs text-[#5A6E82] leading-relaxed">
+            Linked permanently to your BCA or Permata ledger lines and categorized into Indonesian COA. Ready for monthly accountant export packages.
+          </p>
+        </div>
+        <div class="mt-6 pt-3 border-t border-slate-100 text-[11px] font-bold text-[#003366]">
+          1-Click ZIP packages for accountant
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 3. SOFTWARE DEMONSTRATION: EMBEDDED DOCUMENT REVIEW DRAWER SVG -->
+    <div class="bento-card p-2 sm:p-4 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden mb-8">
+      <div class="w-full rounded-xl overflow-hidden border border-slate-200 bg-[#0F172A]">
+        <img src="assets/product/document-review-drawer.svg" alt="CFO AI Document Extraction and Bank Match Review Drawer Interface" class="w-full h-auto block select-none" loading="eager" />
+      </div>
+      <div class="px-4 py-3 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+        <span class="font-bold text-[#003366]">Software Interface: Invoice Tax Extraction &amp; Bank Matching Drawer (PT Graha Telekomunikasi)</span>
+        <span class="text-emerald-700 font-bold">● DPP: Rp 42.000.000 • PPN 11%: Rp 4.620.000 • Matched to BCA</span>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- 4. VERIFIED INGESTION CHANNELS (HONEST STATUS) -->
+  <section id="channels" class="py-24 px-4 sm:px-6 lg:px-8 bg-white border-y border-[#E2E8F0] scroll-mt-20">
+    <div class="max-w-7xl mx-auto">
+      
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-xs font-bold text-[#1565C0] uppercase tracking-wider">INTEGRATION ECOSYSTEM</span>
+        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-black text-[#003366] mt-2 mb-4 tracking-tight">
+          Connect the Tools Your Team Already Uses
+        </h2>
+        <p class="text-base text-[#5A6E82]">
+          Clear and honest release statuses for every intake channel.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        
+        <!-- Direct Upload -->
+        <div class="bento-card p-6 border-l-4 border-l-emerald-600 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-[#1565C0]">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              </div>
+              <span class="bg-[#ECFDF5] text-[#0F7A52] font-mono text-[10px] font-extrabold px-2.5 py-1 rounded-full">
+                AVAILABLE
+              </span>
+            </div>
+            <h3 class="text-lg font-black text-[#003366] mb-2">Direct Web Upload</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed mb-4">
+              Upload PDF invoices, high-resolution scans, and bank statement CSVs directly via the browser. Instant duplicate detection and OCR processing.
+            </p>
+          </div>
+          <div class="text-[11px] font-mono text-[#003366] bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            PDF, JPG, PNG, CSV • Immediate Review Queue
+          </div>
+        </div>
+
+        <!-- Telegram -->
+        <div class="bento-card p-6 border-l-4 border-l-blue-500 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 flex items-center justify-center">
+                <svg class="w-12 h-12" viewBox="0 0 240 240"><circle cx="120" cy="120" r="120" fill="#229ED9"/><path fill="white" d="M50.2 116.8L177.6 67.7C183.5 65.6 188.6 69.1 186.7 77.9L165 180.2C163.4 187.5 159 189.3 153 185.9L119.9 161.5L103.9 176.9C102.1 178.6 100.6 180.1 97.1 180.1L99.5 146.1L161.4 90.2C164.1 87.8 160.8 86.5 157.2 88.9L80.7 137.1L47.7 126.8C40.6 124.5 40.4 119.7 50.2 116.8Z"/></svg>
+              </div>
+              <span class="bg-[#E0F2FE] text-[#0369A1] font-mono text-[10px] font-extrabold px-2.5 py-1 rounded-full">
+                BETA (PILOT)
+              </span>
+            </div>
+            <h3 class="text-lg font-black text-[#003366] mb-2">Telegram Employee Bot</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed mb-4">
+              Authorized employees snap photos of receipts on the go. Receipts land instantly in the management review queue without granting employees access to company finances.
+            </p>
+          </div>
+          <div class="text-[11px] font-mono text-[#003366] bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            Bot Token Binding • Staff Role Isolation
+          </div>
+        </div>
+
+        <!-- Claude -->
+        <div class="bento-card p-6 border-l-4 border-l-emerald-600 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 rounded-xl bg-[#D97757]/10 flex items-center justify-center text-[#D97757]">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M13.8 2.2a1.8 1.8 0 0 0-3.6 0l-.5 4.3a1.8 1.8 0 0 1-1.6 1.6l-4.3.5a1.8 1.8 0 0 0 0 3.6l4.3.5a1.8 1.8 0 0 1 1.6 1.6l.5 4.3a1.8 1.8 0 0 0 3.6 0l.5-4.3a1.8 1.8 0 0 1 1.6-1.6l4.3-.5a1.8 1.8 0 0 0 0-3.6l-4.3-.5a1.8 1.8 0 0 1-1.6-1.6l-.5-4.3z"/></svg>
+              </div>
+              <span class="bg-[#ECFDF5] text-[#0F7A52] font-mono text-[10px] font-extrabold px-2.5 py-1 rounded-full">
+                AVAILABLE
+              </span>
+            </div>
+            <h3 class="text-lg font-black text-[#003366] mb-2">Claude Connector</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed mb-4">
+              Connect your authorized Claude workspace to send complex agreements, invoice analyses, or vendor summaries directly into CFO AI via secure API tokens.
+            </p>
+          </div>
+          <div class="text-[11px] font-mono text-[#003366] bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            Token Authentication • Structured Data Dispatch
+          </div>
+        </div>
+
+        <!-- ChatGPT -->
+        <div class="bento-card p-6 border-l-4 border-l-amber-500 opacity-90 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 rounded-xl bg-[#10A37F]/10 flex items-center justify-center text-[#10A37F]">
+                <svg class="w-7 h-7" viewBox="0 0 24 24" fill="#10A37F"><path d="M22.28 9.37a5.99 5.99 0 0 0-.52-4.94 6.08 6.08 0 0 0-6.52-2.87 6.04 6.04 0 0 0-4.75-2.28A6.09 6.09 0 0 0 4.8 2.5a6.04 6.04 0 0 0-3.8 4.37 6.08 6.08 0 0 0 .97 7.02 5.99 5.99 0 0 0 .52 4.94 6.08 6.08 0 0 0 6.52 2.87 6.04 6.04 0 0 0 4.75 2.28 6.09 6.09 0 0 0 5.69-3.22 6.04 6.04 0 0 0 3.8-4.37 6.08 6.08 0 0 0-.97-7.02zM12 17.5a5.5 5.5 0 1 1 5.5-5.5 5.5 5.5 0 0 1-5.5 5.5z"/></svg>
+              </div>
+              <span class="bg-[#FFFBEB] text-[#B5740B] font-mono text-[10px] font-extrabold px-2.5 py-1 rounded-full">
+                COMING SOON
+              </span>
+            </div>
+            <h3 class="text-lg font-black text-[#003366] mb-2">ChatGPT Action</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed mb-4">
+              Planned custom GPT action enabling direct document dispatch and query answering from OpenAI chat conversations into your company intake inbox.
+            </p>
+          </div>
+          <div class="text-[11px] font-mono text-[#5A6E82] bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            Planned Release Milestone
+          </div>
+        </div>
+
+        <!-- WhatsApp -->
+        <div class="bento-card p-6 border-l-4 border-l-amber-500 opacity-90 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-12 h-12 flex items-center justify-center">
+                <svg class="w-12 h-12" viewBox="0 0 240 240"><circle cx="120" cy="120" r="120" fill="#25D366"/><path fill="white" d="M175 64.9C160.4 50.3 140.9 42.2 120.3 42.2C77.8 42.2 43.3 76.7 43.3 119.2C43.3 132.8 46.9 146.1 53.7 157.9L42.5 198.8L84.4 187.8C95.7 194 107.9 197.3 120.3 197.3C162.8 197.3 197.3 162.8 197.3 120.3C197.3 99.7 189.6 80.2 175 64.9ZM120.3 184.2C108.8 184.2 97.5 181.1 87.7 175.3L85.3 173.9L60.5 180.4L67.1 156.2L65.6 153.8C59.2 143.6 55.8 131.7 55.8 119.2C55.8 83.6 84.7 54.7 120.3 54.7C137.5 54.7 153.8 61.4 166 73.6C178.2 85.8 184.8 102.1 184.8 119.3C184.8 154.9 155.9 184.2 120.3 184.2ZM155.7 136.6C153.8 135.6 144.3 130.9 142.5 130.3C140.8 129.6 139.5 129.3 138.2 131.2C136.9 133.2 133.3 137.5 132.2 138.8C131.1 140.1 130 140.3 128.1 139.3C126.2 138.3 118.1 135.7 108.5 127.1C101 120.4 95.9 112.2 94.4 109.7C93 107.2 94.3 105.8 95.3 104.9C96.2 104 97.3 102.6 98.3 101.4C99.3 100.2 99.6 99.3 100.3 97.9C101 96.4 100.6 95.2 100.1 94.2C99.6 93.2 95.7 83.6 94.1 79.6C92.5 75.8 90.9 76.3 89.6 76.2H85.8C84.5 76.2 82.4 76.7 80.6 78.7C78.8 80.7 73.7 85.5 73.7 95.2C73.7 104.9 80.8 114.2 81.8 115.5C82.8 116.8 95.8 136.7 115.5 145.2C120.2 147.2 123.9 148.4 126.8 149.3C133 151.3 138.7 151 143.1 150.3C148.1 149.6 158.4 144.1 160.5 138.1C162.7 132.2 162.7 127.1 162 126.1C161.4 125 160.1 124.4 158.2 123.4L155.7 136.6Z"/></svg>
+              </div>
+              <span class="bg-[#FFFBEB] text-[#B5740B] font-mono text-[10px] font-extrabold px-2.5 py-1 rounded-full">
+                COMING SOON
+              </span>
+            </div>
+            <h3 class="text-lg font-black text-[#003366] mb-2">WhatsApp Business</h3>
+            <p class="text-xs text-[#5A6E82] leading-relaxed mb-4">
+              Planned mobile messaging workflow allowing Indonesian field teams to submit receipts and fuel slips directly through verified WhatsApp numbers.
+            </p>
+          </div>
+          <div class="text-[11px] font-mono text-[#5A6E82] bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            Planned Release Milestone
+          </div>
+        </div>
+
+        <!-- Human Verification Card: Subtle Navy Gradient -->
+        <div class="bento-card p-6 text-white flex flex-col justify-between" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+          <div>
+            <div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-[#3399FF] mb-4">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-2.48 7.2A8.966 8.966 0 0112 21a9 9 0 110-18c1.65 0 3.18.45 4.5 1.23M12 9v6"/></svg>
+            </div>
+            <span class="text-[10px] font-bold text-[#3399FF] uppercase tracking-wider">HUMAN IN THE LOOP</span>
+            <h3 class="text-lg font-black text-white mt-1 mb-2">Final Approval Stays With You</h3>
+            <p class="text-xs text-white/70 leading-relaxed mb-4">
+              AI proposes extractions and matching bank transactions, but nothing hits your reconciled ledger without a finance team member clicking Approve.
+            </p>
+          </div>
+          <div class="text-[11px] font-mono text-[#3399FF]">
+            ✓ Controlled Verification • Zero Surprises
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. HUMAN VERIFICATION & AUDIT TRAIL -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 text-white relative overflow-hidden" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    <div class="max-w-5xl mx-auto text-center relative z-10">
+      <span class="text-xs font-bold text-[#3399FF] uppercase tracking-wider">GOVERNANCE &amp; ACCURACY</span>
+      <h2 class="text-3xl sm:text-4xl font-black text-white mt-2 mb-4">
+        AI Extracts. You Decide.
+      </h2>
+      <p class="text-base text-white/70 max-w-2xl mx-auto mb-12">
+        We never compromise on accounting accuracy. Every document parsed by CFO AI comes with full confidence indicators, side-by-side verification, and complete audit history.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left text-xs">
+        <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h4 class="font-extrabold text-white text-sm mb-2">Confidence Scoring</h4>
+          <p class="text-white/70 leading-relaxed">
+            Every vendor name, date, invoice total, DPP, and PPN 11% line item shows an explicit confidence percentage so reviewers know where to focus.
+          </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h4 class="font-extrabold text-white text-sm mb-2">Side-by-Side Review</h4>
+          <p class="text-white/70 leading-relaxed">
+            The review drawer displays the original scanned invoice right next to the extracted values and suggested bank statement transaction match.
+          </p>
+        </div>
+        <div class="p-6 rounded-2xl bg-white/5 border border-white/10">
+          <h4 class="font-extrabold text-white text-sm mb-2">Permanent Audit Trail</h4>
+          <p class="text-white/70 leading-relaxed">
+            Who submitted the receipt, what the AI extracted, who approved the match, and when it was exported is permanently recorded.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. CTA STRIP -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 bg-white text-center border-t border-[#E2E8F0]">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-black text-[#003366] mb-3">
+        Automate Document Collection Today
+      </h2>
+      <p class="text-base text-[#5A6E82] mb-8 max-w-2xl mx-auto">
+        Join Indonesian founders and finance managers spending less time chasing receipts. Start your 7-day free trial on any plan.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+        <a href="https://app.cfo-ai.site/signup" class="text-base font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-8 py-3.5 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+          <span>Start Free — 7 Days</span>
+          <span>→</span>
+        </a>
+      </div>
+      <div class="text-xs text-[#5A6E82]">
+        No credit card required • Instant Telegram bot setup • Built for Indonesia
+      </div>
+    </div>
+  </section>
+
+  <!-- RESTORED PROFESSIONAL 4-COLUMN FOOTER -->
+  <footer class="text-white/70 py-16 px-4 sm:px-6 lg:px-8 border-t border-white/10 relative overflow-hidden" style="background: linear-gradient(110deg, #001A33 0%, #00264D 50%, #003366 100%);">
+    
+    <!-- Subtle Brand Watermark in Footer -->
+    <svg viewBox="0 0 200 200" class="cfo-watermark-dark -bottom-16 -right-16 w-80 h-80 text-white/5 pointer-events-none absolute select-none">
+      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="currentColor" fill-rule="evenodd"/>
+      <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+    </svg>
+
+    <div class="max-w-7xl mx-auto relative z-10">
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-8 lg:gap-12 mb-12">
+        
+        <!-- Brand & Description (Col span 2) -->
+        <div class="col-span-2">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 flex-shrink-0">
+              <svg viewBox="0 0 200 200" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+                <circle cx="101.57" cy="98.67" r="17.91" fill="#3399FF"/>
+              </svg>
+            </div>
+            <div class="flex flex-col">
+              <span class="font-extrabold text-white text-lg tracking-tight leading-none">CFO AI</span>
+              <span class="text-[10px] tracking-wider uppercase font-semibold text-[#3399FF] mt-0.5">Indonesia</span>
+            </div>
+          </div>
+          <p class="text-xs text-white/60 leading-relaxed max-w-sm mb-4">
+            CFO AI — Intelligent Financial Management for Indonesian Businesses. Connected document intelligence, automated accounting preparation, and Indonesian regulatory monitoring.
+          </p>
+          <div class="text-[11px] text-white/40 space-y-1">
+            <div>Marketing: <span class="text-white/60">https://cfo-ai.site</span></div>
+            <div>Application: <span class="text-white/60">https://app.cfo-ai.site</span></div>
+          </div>
+        </div>
+
+        <!-- Col 1: Product -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Product</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="platform-page.html" class="hover:text-white transition-colors">Platform</a></li>
+            <li><a href="concept-b-plus-desktop.html#ai-cfo" class="hover:text-white transition-colors">AI CFO</a></li>
+            <li><a href="concept-b-plus-desktop.html#ai-accountant" class="hover:text-white transition-colors">AI Accountant</a></li>
+            <li><a href="document-intelligence-page.html" class="text-white font-semibold">Document Intelligence</a></li>
+            <li><a href="compliance-page.html" class="hover:text-white transition-colors">Compliance</a></li>
+            <li><a href="pricing-page.html" class="hover:text-white transition-colors">Pricing</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 2: Company -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Company</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="concept-b-plus-desktop.html#about" class="hover:text-white transition-colors">About</a></li>
+            <li><a href="concept-b-plus-desktop.html#contact" class="hover:text-white transition-colors">Contact</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 3: Legal -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Legal</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="concept-b-plus-desktop.html#privacy" class="hover:text-white transition-colors">Privacy Policy</a></li>
+            <li><a href="concept-b-plus-desktop.html#terms" class="hover:text-white transition-colors">Terms of Service</a></li>
+          </ul>
+        </div>
+
+        <!-- Col 4: Account -->
+        <div>
+          <div class="font-bold text-white uppercase text-[11px] tracking-wider mb-3">Account</div>
+          <ul class="space-y-2.5 text-xs text-white/60">
+            <li><a href="https://app.cfo-ai.site/login" class="hover:text-white transition-colors">Log In</a></li>
+            <li><a href="https://app.cfo-ai.site/signup" class="hover:text-white transition-colors font-semibold text-[#3399FF]">Start Free Trial</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Footer Bottom Separator & Copyright & Disclaimer -->
+      <div class="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-[11px] text-white/50">
+        <div>Copyright © 2026 CFO AI. All rights reserved.</div>
+        <div class="text-center md:text-right max-w-xl">
+          CFO AI assists with financial management and accounting preparation. It does not provide statutory audits, legal advice, or direct tax filing with government portals.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
