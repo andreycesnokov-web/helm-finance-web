@@ -186,6 +186,134 @@ const translations = {
       badge: "PLATFORM ARCHITECTURE",
       heading: "A Complete Financial Operating System",
       subheading: "Discover how CFO AI replaces fragmented software with a unified, high-integrity financial operations workspace engineered for Indonesia.",
+      how_it_works_badge: "END-TO-END BUSINESS WORKFLOWS",
+      how_it_works_heading: "One Financial System. From Action to Decision.",
+      how_it_works_subheading: "See how CFO AI connects everyday financial activities with the information business owners need to stay in control.",
+      workflows: [
+        {
+          id: "wf-expense",
+          num: "01",
+          badge: "EXPENSE TO LEDGER",
+          title: "From Employee Expense to Approved Record",
+          desc: "Eliminate lost receipts and delayed expense claims with automated intake, management thresholds, and audit-ready tax booking.",
+          steps: [
+            {
+              step: "01",
+              label: "Receipt Intake",
+              title: "Mobile & Web Voucher Upload",
+              desc: "Employees or vendors submit receipts and PDF invoices directly through role-restricted upload channels.",
+              tag: "Verified",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "AI Extraction",
+              title: "Intelligent Data Parsing",
+              desc: "OCR extracts vendor, date, currency, line items, and PPN 11% tax data for review in the intake workbench.",
+              tag: "AI + Human Confirm",
+              tag_type: "assist"
+            },
+            {
+              step: "03",
+              label: "Approval Queue",
+              title: "Policy-Based Authorization",
+              desc: "Disbursements exceeding company thresholds route automatically to designated managers with complete audit trails.",
+              tag: "Verified",
+              tag_type: "verified"
+            },
+            {
+              step: "04",
+              label: "Audit-Ready Ledger",
+              title: "GL Posting & Tax Schedules",
+              desc: "Approved expenses post immediately to the General Ledger with digital receipt attachments and tax compliance tags.",
+              tag: "Verified",
+              tag_type: "verified"
+            }
+          ]
+        },
+        {
+          id: "wf-invoice",
+          num: "02",
+          badge: "INVOICE TO SETTLEMENT",
+          title: "From Customer Invoice to Collected Payment",
+          desc: "Accelerate cash collection with compliant multi-currency invoicing, aging radar, smart follow-up alerts, and automated bank reconciliation.",
+          steps: [
+            {
+              step: "01",
+              label: "Invoice Issuance",
+              title: "Compliant Billing & DPP/PPN",
+              desc: "Issue multi-currency invoices with mandatory Indonesian Rupiah (IDR) statutory equivalents and customer payment terms.",
+              tag: "Verified",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "Receivables Radar",
+              title: "Real-Time Aging Tracking",
+              desc: "Track open balances across 30, 60, and 90-day aging buckets with instant visibility into overdue accounts.",
+              tag: "Verified",
+              tag_type: "verified"
+            },
+            {
+              step: "03",
+              label: "Follow-Up Alerts",
+              title: "Smart Internal Action Tasks",
+              desc: "Automated alerts flag overdue invoices and generate actionable follow-up tasks for your finance and collection team.",
+              tag: "Smart Assist (Internal)",
+              tag_type: "assist"
+            },
+            {
+              step: "04",
+              label: "Bank Reconciliation",
+              title: "Automated Deposit Matching",
+              desc: "Incoming bank transactions match against open invoices using multi-signal scoring, updating cash balances instantly.",
+              tag: "Verified",
+              tag_type: "verified"
+            }
+          ]
+        },
+        {
+          id: "wf-decision",
+          num: "03",
+          badge: "DATA TO STRATEGY",
+          title: "From Financial Data to Founder Decision",
+          desc: "Turn reconciled transactions into strategic foresight with AI conversational intelligence, forward runway radar, and scenario modeling.",
+          steps: [
+            {
+              step: "01",
+              label: "Verified Foundation",
+              title: "Clean Reconciled Ledgers",
+              desc: "All financial analytics and forecasting draw strictly from reconciled bank feeds and approved operational records.",
+              tag: "Verified",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "AI CFO Synthesis",
+              title: "Conversational Ledger Intelligence",
+              desc: "Ask complex natural language questions about burn, margins, or department spending and get answers with voucher citations.",
+              tag: "Verified AI",
+              tag_type: "verified"
+            },
+            {
+              step: "03",
+              label: "Forward Radar",
+              title: "30-60-90 Day Cash Trajectory",
+              desc: "Simulate revenue delays, tax payments, and hiring runway impact with interactive scenario modeling and buffer alerts.",
+              tag: "Verified",
+              tag_type: "verified"
+            },
+            {
+              step: "04",
+              label: "Founder Execution",
+              title: "Actionable Strategic Decisions",
+              desc: "AI recommendations link directly to execution screens—approving payments, adjusting budgets, and protecting solvency.",
+              tag: "Human-in-the-Loop",
+              tag_type: "governance"
+            }
+          ]
+        }
+      ],
       primary_heading: "Core Operational Cockpit",
       primary_subheading: "Full uncropped visibility into liquidity, cash runway, and transaction streams.",
       secondary_heading: "Extended Management & Regulatory Modules",
@@ -520,6 +648,134 @@ const translations = {
       badge: "ARSITEKTUR PLATFORM",
       heading: "Sistem Operasi Keuangan Menyeluruh",
       subheading: "Ketahui bagaimana CFO AI menggantikan perangkat lunak yang terpisah-pisah dengan ruang kerja operasional keuangan terpadu berintegritas tinggi untuk Indonesia.",
+      how_it_works_badge: "ALUR KERJA BISNIS TERPADU",
+      how_it_works_heading: "Satu Sistem Keuangan. Dari Tindakan hingga Keputusan.",
+      how_it_works_subheading: "Ketahui bagaimana CFO AI menghubungkan aktivitas keuangan harian dengan informasi yang dibutuhkan pemilik bisnis untuk tetap memegang kendali.",
+      workflows: [
+        {
+          id: "wf-expense",
+          num: "01",
+          badge: "PENGELUARAN KE BUKU BESAR",
+          title: "Dari Pengeluaran Staf hingga Catatan Terverifikasi",
+          desc: "Hilangkan bukti pembayaran yang hilang dan klaim biaya yang tertunda dengan pencatatan otomatis, ambang persetujuan, dan pembukuan pajak siap audit.",
+          steps: [
+            {
+              step: "01",
+              label: "Penerimaan Bukti",
+              title: "Unggah Bukti Kas & Faktur",
+              desc: "Karyawan atau vendor mengunggah kuitansi dan faktur PDF secara langsung melalui saluran khusus berbasis peran.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "Ekstraksi AI",
+              title: "Pembacaan Data Cerdas",
+              desc: "OCR mengekstrak data vendor, tanggal, nilai, dan PPN 11% untuk ditinjau di meja kerja konfirmasi dokumen.",
+              tag: "AI + Konfirmasi Pengguna",
+              tag_type: "assist"
+            },
+            {
+              step: "03",
+              label: "Antrean Persetujuan",
+              title: "Otorisasi Berbasis Kebijakan",
+              desc: "Pengeluaran di atas ambang batas perusahaan otomatis diarahkan ke manajer berwenang dengan riwayat audit lengkap.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            },
+            {
+              step: "04",
+              label: "Buku Besar Siap Audit",
+              title: "Posting GL & Jadwal Pajak",
+              desc: "Pengeluaran yang disetujui langsung dibukukan ke General Ledger beserta lampiran bukti digital dan tanda kepatuhan pajak.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            }
+          ]
+        },
+        {
+          id: "wf-invoice",
+          num: "02",
+          badge: "FAKTUR KE PELUNASAN",
+          title: "Dari Faktur Pelanggan hingga Penerimaan Dana",
+          desc: "Percepat penagihan kas dengan faktur multi-valuta resmi, radar umur piutang, peringatan tindak lanjut cerdas, dan rekonsiliasi bank otomatis.",
+          steps: [
+            {
+              step: "01",
+              label: "Penerbitan Faktur",
+              title: "Penagihan Resmi & DPP/PPN",
+              desc: "Terbitkan faktur penjualan multi-valuta dengan ekuivalen Rupiah (IDR) wajib serta syarat pembayaran pelanggan.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "Radar Piutang",
+              title: "Pemantauan Umur Piutang Real-Time",
+              desc: "Lacak saldo tagihan terbuka dalam rentang 30, 60, dan 90 hari dengan visibilitas instan atas tagihan jatuh tempo.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            },
+            {
+              step: "03",
+              label: "Peringatan Tindak Lanjut",
+              title: "Tugas Operasional Cerdas",
+              desc: "Peringatan otomatis menandai faktur jatuh tempo dan membuat tugas tindak lanjut untuk tim keuangan internal.",
+              tag: "Asistensi Cerdas (Internal)",
+              tag_type: "assist"
+            },
+            {
+              step: "04",
+              label: "Rekonsiliasi Bank",
+              title: "Pencocokan Setoran Otomatis",
+              desc: "Mutasi kredit bank dicocokkan dengan faktur penjualan secara akurat menggunakan skor multi-sinyal, memperbarui saldo seketika.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            }
+          ]
+        },
+        {
+          id: "wf-decision",
+          num: "03",
+          badge: "DATA KE STRATEGI",
+          title: "Dari Data Keuangan hingga Keputusan Pendiri",
+          desc: "Ubah transaksi yang telah direkonsiliasi menjadi keunggulan strategis dengan inteligensi AI percakapan, radar runway masa depan, dan simulasi skenario.",
+          steps: [
+            {
+              step: "01",
+              label: "Fondasi Terverifikasi",
+              title: "Buku Besar Bersih & Terekonsiliasi",
+              desc: "Seluruh analitik dan prakiraan keuangan bersumber dari rekening koran yang telah direkonsiliasi dan catatan tervalidasi.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "Sintesis AI CFO",
+              title: "Inteligensi Buku Besar Percakapan",
+              desc: "Ajukan pertanyaan mendalam tentang burn rate, margin, atau biaya divisi dan peroleh jawaban dengan sitasi bukti voucher.",
+              tag: "AI Terverifikasi",
+              tag_type: "verified"
+            },
+            {
+              step: "03",
+              label: "Radar Masa Depan",
+              title: "Proyeksi Kas 30-60-90 Hari",
+              desc: "Simulasikan keterlambatan pembayaran, angsuran pajak, dan dampak perekrutan staf dengan pemodelan skenario interaktif.",
+              tag: "Terverifikasi",
+              tag_type: "verified"
+            },
+            {
+              step: "04",
+              label: "Eksekusi Keputusan",
+              title: "Tindakan Strategis Terarah",
+              desc: "Rekomendasi AI terhubung langsung ke antarmuka operasional—menyetujui pembayaran, mengatur anggaran, dan mengamankan likuiditas.",
+              tag: "Kontrol Penuh Pemilik",
+              tag_type: "governance"
+            }
+          ]
+        }
+      ],
       primary_heading: "Kokpit Operasional Inti",
       primary_subheading: "Visibilitas penuh tanpa potongan gambar terhadap likuiditas, runway, dan mutasi transaksi.",
       secondary_heading: "Modul Manajemen & Regulasi Lanjutan",
@@ -854,6 +1110,134 @@ const translations = {
       badge: "АРХИТЕКТУРА ПЛАТФОРМЫ",
       heading: "Единая финансовая операционная система",
       subheading: "Узнайте, как CFO AI заменяет разрозненный софт целостной финансовой средой, спроектированной под требования бизнеса в Индонезии.",
+      how_it_works_badge: "СКВОЗНЫЕ БИЗНЕС-ПРОЦЕССЫ",
+      how_it_works_heading: "Единая финансовая система. От действия к решению.",
+      how_it_works_subheading: "Посмотрите, как CFO AI связывает повседневные финансовые операции с информацией, необходимой руководителю для полного контроля.",
+      workflows: [
+        {
+          id: "wf-expense",
+          num: "01",
+          badge: "ОТ РАСХОДА ДО ПРОВОДКИ",
+          title: "От Расхода Сотрудника до Проверенной Записи",
+          desc: "Никаких утерянных чеков и задержек в авансовых отчетах: интеллектуальное распознавание, маршруты согласования и налоговый учет, готовый к аудиту.",
+          steps: [
+            {
+              step: "01",
+              label: "Прием чека",
+              title: "Загрузка чеков и счетов",
+              desc: "Сотрудники или контрагенты прикрепляют квитанции и PDF-счета через безопасный интерфейс с разграничением прав доступа.",
+              tag: "Проверено",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "Распознавание AI",
+              title: "Извлечение реквизитов",
+              desc: "Система автоматически считывает поставщика, дату, валюту, позиции и НДС (PPN 11%) для подтверждения в интерфейсе входящих.",
+              tag: "AI + Контроль человека",
+              tag_type: "assist"
+            },
+            {
+              step: "03",
+              label: "Согласование",
+              title: "Маршрутизация по лимитам",
+              desc: "Платежи, превышающие корпоративные пороги, автоматически направляются уполномоченным руководителям с фиксацией аудиторского следа.",
+              tag: "Проверено",
+              tag_type: "verified"
+            },
+            {
+              step: "04",
+              label: "Главная книга",
+              title: "Проводка GL и налоговый регистр",
+              desc: "Одобренный расход мгновенно разносится в главную книгу с прикрепленным электронным чеком и налоговыми метками.",
+              tag: "Проверено",
+              tag_type: "verified"
+            }
+          ]
+        },
+        {
+          id: "wf-invoice",
+          num: "02",
+          badge: "ОТ СЧЕТА ДО ОПЛАТЫ",
+          title: "От Выставления Счета до Поступления Денег",
+          desc: "Ускорение сбора выручки: официальные мультивалютные счета, радар дебиторской задолженности, умные напоминания и автоматическая сверка с банком.",
+          steps: [
+            {
+              step: "01",
+              label: "Выставление счета",
+              title: "Официальный счет и DPP/PPN",
+              desc: "Формирование счетов в любой валюте с обязательным рупийным эквивалентом (IDR), расчетом налогов и условиями оплаты.",
+              tag: "Проверено",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "Радар дебиторки",
+              title: "Мониторинг старения долгов",
+              desc: "Контроль открытых счетов по периодам 30, 60 и 90 дней с моментальным выявлением просроченных обязательств.",
+              tag: "Проверено",
+              tag_type: "verified"
+            },
+            {
+              step: "03",
+              label: "Напоминания",
+              title: "Внутренние операционные задачи",
+              desc: "Система автоматически сигнализирует о приближении срока оплаты и ставит операционные задачи финансовой команде.",
+              tag: "Smart Assist (Внутри)",
+              tag_type: "assist"
+            },
+            {
+              step: "04",
+              label: "Сверка с банком",
+              title: "Автоматический матчинг выписки",
+              desc: "Входящие поступления на расчетный счет сопоставляются со счетами по многофакторному алгоритму, мгновенно закрывая долг.",
+              tag: "Проверено",
+              tag_type: "verified"
+            }
+          ]
+        },
+        {
+          id: "wf-decision",
+          num: "03",
+          badge: "ОТ ДАННЫХ К СТРАТЕГИИ",
+          title: "От Финансовых Данных к Решению Руководителя",
+          desc: "Превратите сверенные банковские проводки в стратегическую уверенность с помощью диалогового AI-директора, радара ликвидности и сценарного анализа.",
+          steps: [
+            {
+              step: "01",
+              label: "Сверенный базис",
+              title: "Чистая и выверенная книга",
+              desc: "Все аналитические отчеты и прогнозные модели строятся исключительно на сверенных банковских операциях и утвержденных ордерах.",
+              tag: "Проверено",
+              tag_type: "verified"
+            },
+            {
+              step: "02",
+              label: "Аналитика AI CFO",
+              title: "Диалоговый финансовый интеллект",
+              desc: "Задавайте вопросы о скорости сжигания капитала, маржинальности или затратах отделов с точными ссылками на первичные ордера.",
+              tag: "Проверенный AI",
+              tag_type: "verified"
+            },
+            {
+              step: "03",
+              label: "Радар ликвидности",
+              title: "Прогноз на 30-60-90 дней",
+              desc: "Моделируйте задержки оплат клиентов, налоговые платежи и финансовую нагрузку при найме персонала в интерактивном режиме.",
+              tag: "Проверено",
+              tag_type: "verified"
+            },
+            {
+              step: "04",
+              label: "Решение фаундера",
+              title: "Прямой переход к действию",
+              desc: "Рекомендации AI содержат прямые ссылки на рабочие экраны: акцепт платежей, корректировка бюджета и защита платежеспособности.",
+              tag: "Контроль владельца",
+              tag_type: "governance"
+            }
+          ]
+        }
+      ],
       primary_heading: "Основной операционный командный центр",
       primary_subheading: "Полный, не обрезанный обзор ликвидности, запаса прочности и реестра операций.",
       secondary_heading: "Специализированные и регуляторные модули",

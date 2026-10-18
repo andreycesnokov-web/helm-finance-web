@@ -701,6 +701,74 @@ function createPublicRoutes(contentStore) {
         </div>
       </section>
 
+      <!-- HOW CFO AI WORKS (Cross-Functional Business Workflows) -->
+      <section class="py-16 px-4 sm:px-6 lg:px-8 bg-ice-light border-b border-[#CBD5E1] relative">
+        <div class="max-w-7xl mx-auto">
+          <div class="text-center max-w-3xl mx-auto mb-14">
+            <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.platform.how_it_works_badge || 'END-TO-END BUSINESS WORKFLOWS'}</span>
+            <h2 class="text-2xl sm:text-4xl font-black text-[#06366B] mt-1.5 mb-3">${t.platform.how_it_works_heading}</h2>
+            <p class="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto leading-relaxed">${t.platform.how_it_works_subheading}</p>
+          </div>
+
+          <!-- 3 Workflows -->
+          <div class="space-y-12">
+            ${(t.platform.workflows || []).map((wf) => `
+              <div class="bento-card p-6 sm:p-8 bg-white border border-[#CBD5E1] shadow-xs">
+                <!-- Workflow Header -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-6 border-b border-slate-100 gap-4">
+                  <div>
+                    <div class="inline-flex items-center gap-2 mb-2">
+                      <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2.5 py-0.5 rounded">WORKFLOW ${wf.num}</span>
+                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-[#06366B] border border-slate-200">${wf.badge}</span>
+                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-[#06366B] tracking-tight">${wf.title}</h3>
+                    <p class="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">${wf.desc}</p>
+                  </div>
+                  <div class="shrink-0">
+                    <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                      <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      4 Connected Steps
+                    </span>
+                  </div>
+                </div>
+
+                <!-- 4 Connected Steps Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 relative">
+                  ${wf.steps.map((st, stepIdx) => {
+                    const isLast = stepIdx === wf.steps.length - 1;
+                    const tagBadge = st.tag_type === 'verified'
+                      ? '<span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">' + st.tag + '</span>'
+                      : st.tag_type === 'assist'
+                      ? '<span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-50 text-[#1768C9] border border-blue-200">' + st.tag + '</span>'
+                      : '<span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200">' + st.tag + '</span>';
+
+                    return `
+                      <div class="relative flex flex-col justify-between bg-slate-50/70 hover:bg-slate-50 rounded-xl border border-slate-200/80 p-5 transition-all">
+                        <div>
+                          <div class="flex items-center justify-between mb-3">
+                            <span class="w-7 h-7 rounded-full bg-[#1768C9] text-white font-mono font-bold text-xs flex items-center justify-center shadow-xs">${st.step}</span>
+                            ${tagBadge}
+                          </div>
+                          <span class="text-[10px] font-bold text-[#1768C9] uppercase tracking-wider block mb-1">${st.label}</span>
+                          <h4 class="text-sm font-black text-[#06366B] mb-2 leading-snug">${st.title}</h4>
+                          <p class="text-xs text-slate-600 leading-relaxed">${st.desc}</p>
+                        </div>
+                        
+                        ${!isLast ? `
+                          <div class="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 z-10 text-slate-400">
+                            <svg class="w-6 h-6 transform translate-x-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>
+
       <!-- PRIMARY PRODUCT SHOWCASES (Complete Uncropped Full UI with Lightbox) -->
       <section class="py-16 px-4 sm:px-6 lg:px-8 bg-ice-light border-b border-[#CBD5E1]">
         <div class="max-w-7xl mx-auto">
@@ -794,10 +862,24 @@ function createPublicRoutes(contentStore) {
             }).join('')}
           </div>
 
-          <div class="mt-16 text-center">
-            <a href="https://app.cfo-ai.site/login" class="inline-block text-xs font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-8 py-3.5 rounded-xl shadow-md transition-all min-h-[44px]">
-              ${t.hero.primary_cta} &rarr;
-            </a>
+        </div>
+      </section>
+
+      <!-- FLOATING FINAL CTA SECTION (Centered 1200px Floating Banner on Ice Blue Canvas) -->
+      <section class="bg-ice-light pt-6 sm:pt-8 pb-[30px] px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1200px] mx-auto">
+          <div class="bg-navy-brand text-white text-center relative overflow-hidden rounded-[20px] py-5 sm:py-5 px-6 sm:px-8 shadow-xl border border-white/10" style="background: linear-gradient(90deg, #021B36 0%, #042C53 25%, #063D72 50%, #042C53 75%, #021B36 100%);">
+            ${renderWatermark({ color: '#FFFFFF', opacity: '0.035', size: 'w-64 h-64', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
+            <div class="max-w-3xl mx-auto relative z-10">
+              <h2 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight mb-1.5 text-white">${t.cta_section.heading}</h2>
+              <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-3.5 leading-normal sm:leading-relaxed">${t.cta_section.subheading}</p>
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
+                  ${t.hero.primary_cta} &rarr;
+                </a>
+              </div>
+              <div class="text-[11px] text-slate-400 mt-2 font-medium">${t.cta_section.note}</div>
+            </div>
           </div>
         </div>
       </section>

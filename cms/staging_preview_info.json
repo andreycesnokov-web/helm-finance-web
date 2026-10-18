@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-10-18T03:08:23.135Z",
+  "generated_at": "2026-10-18T03:30:02.306Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://tab-atmospheric-weight-watson.trycloudflare.com",
-      "english_homepage": "https://tab-atmospheric-weight-watson.trycloudflare.com/en",
-      "indonesian_homepage": "https://tab-atmospheric-weight-watson.trycloudflare.com/id",
-      "pricing_url": "https://tab-atmospheric-weight-watson.trycloudflare.com/en/pricing",
-      "hub_url": "https://tab-atmospheric-weight-watson.trycloudflare.com/en/blog",
+      "https_url": "https://phi-ser-practical-holding.trycloudflare.com",
+      "english_homepage": "https://phi-ser-practical-holding.trycloudflare.com/en",
+      "indonesian_homepage": "https://phi-ser-practical-holding.trycloudflare.com/id",
+      "pricing_url": "https://phi-ser-practical-holding.trycloudflare.com/en/pricing",
+      "hub_url": "https://phi-ser-practical-holding.trycloudflare.com/en/blog",
       "verified_https": false,
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://tribunal-all-prevent-broadband.trycloudflare.com",
-      "admin_login_url": "https://tribunal-all-prevent-broadband.trycloudflare.com/admin/",
+      "https_url": "https://says-pentium-robot-study.trycloudflare.com",
+      "admin_login_url": "https://says-pentium-robot-study.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
         "username": "cfo-admin",
