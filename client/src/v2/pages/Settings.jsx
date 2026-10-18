@@ -21,7 +21,7 @@ import ProfileAvatar from '../components/ProfileAvatar'
 import Modal from '../components/Modal'
 import {
   updateMyProfile, updateCompanyBasics, createCategory, updateCategory, archiveCategory,
-  telegramLinkToken, telegramUnlink, createGateway, inviteMember, revokeInvite, updateMember, removeMember,
+  telegramLinkToken, telegramUnlink, revokeAiAssistant, createGateway, inviteMember, revokeInvite, updateMember, removeMember,
 } from '../lib/actions'
 import { catLabel } from '../lib/categoryLabel'
 import { unsavedFields } from '../lib/savedFields'
@@ -289,15 +289,21 @@ function ConnectionsTab() {
   const invalidate = useInvalidate()
   const tg = useApi('/account/integrations/telegram')
   const cfg = useApi('/telegram/config')
+  const ai = useApi('/account/integrations/ai-assistants')
   const gw = useApi('/payment-connections')
   const wallets = useApi('/wallets')
-  const [dlg, setDlg] = useState(null)        // 'tg' | 'tgOff' | 'gw' | 'ai'
+  const [dlg, setDlg] = useState(null)        // 'tg' | 'tgOff' | 'gw' | 'aiManage' | 'aiHow'
+  const [revokeTarget, setRevokeTarget] = useState(null)
+  const [howTab, setHowTab] = useState('chatgpt')
   const [link, setLink] = useState(null)
   const [g, setG] = useState({ provider: 'xendit', environment: 'sandbox', display_name: '', linked_wallet_id: '', provider_account_id: '' })
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useFlash()
   const connected = tg.data?.status === 'connected'
   const bot = cfg.data?.bot_username || cfg.data?.username
+  const aiConnections = ai.data?.connections || []
+  const activeAiConns = aiConnections.filter((c) => c.status === 'connected')
+  const hasAiConnected = activeAiConns.length > 0
   const openTg = async () => {
     setDlg('tg'); setLink(null)
     try { setLink(await telegramLinkToken(request)) } catch (x) { setLink({ error: x?.status === 503 ? t('set.conn.tgDown') : errMsg(t, x) }) }
@@ -323,8 +329,18 @@ function ConnectionsTab() {
             : <button type="button" className="v2-btn v2-btn-primary" onClick={openTg}>{t('set.conn.connect')}</button>}
         </li>
         <li data-conn="ai"><I.cfo size={18} />
-          <span><strong>{t('set.conn.ai')}</strong><span className="v2-muted v2-small v2-block">{t('set.conn.aiHint')}</span></span>
-          <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setDlg('ai')}>{t('set.conn.how')}</button>
+          <span><strong>{t('set.conn.ai')}</strong> {hasAiConnected ? <Pill tone="good">{t('set.conn.on')}</Pill> : <Pill tone="neutral">{t('set.conn.off')}</Pill>}
+            <span className="v2-muted v2-small v2-block">
+              {hasAiConnected
+                ? `${activeAiConns.map((c) => c.client_name).join(', ')} · ${t('set.conn.aiConnectedHint', { company: activeAiConns[0]?.companies?.[0]?.name || '' })}`
+                : t('set.conn.aiHint')}
+            </span></span>
+          {hasAiConnected || aiConnections.length > 0
+            ? <span className="v2-row-gap">
+                <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setDlg('aiManage')}>{t('set.conn.manage')}</button>
+                <button type="button" className="v2-btn v2-btn-ghost" onClick={() => setDlg('aiHow')}>{t('set.conn.how')}</button>
+              </span>
+            : <button type="button" className="v2-btn v2-btn-primary" onClick={() => setDlg('aiHow')}>{t('set.conn.connect')}</button>}
         </li>
         <li data-conn="gateways"><I.link size={18} />
           <span><strong>{t('set.conn.gw')}</strong>
@@ -353,10 +369,130 @@ function ConnectionsTab() {
           <p className="v2-sec">{t('set.conn.tgOffP')}</p>
         </Modal>
       )}
-      {dlg === 'ai' && (
-        <Modal title={t('set.conn.ai')} onClose={() => setDlg(null)} footer={<button type="button" className="v2-btn v2-btn-primary" onClick={() => setDlg(null)}>{t('set.ok')}</button>}>
-          <ol className="v2-set-steps"><li>{t('set.conn.aiS1')}</li><li>{t('set.conn.aiS2', { url: `${window.location.origin}/mcp` })}</li><li>{t('set.conn.aiS3')}</li></ol>
-          <p className="v2-muted v2-small">{t('set.conn.aiNote')}</p>
+      {dlg === 'aiManage' && (
+        <Modal title={t('set.conn.aiManageTitle')} wide onClose={() => setDlg(null)}
+          footer={<>
+            <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setDlg('aiHow')}>{t('set.conn.aiAddAssistant')}</button>
+            <button type="button" className="v2-btn v2-btn-primary" onClick={() => setDlg(null)}>{t('set.ok')}</button>
+          </>}>
+          {ai.loading ? <Skeleton rows={3} /> : aiConnections.length === 0 ? (
+            <p className="v2-muted">{t('set.conn.aiNoConnections')}</p>
+          ) : (
+            <div className="v2-conn-cards" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {aiConnections.map((c) => {
+                const IconComp = c.client_type === 'chatgpt' ? I.chatgpt : c.client_type === 'claude' ? I.claude : I.bot
+                const isConn = c.status === 'connected'
+                const isRev = c.status === 'revoked'
+                const tone = isConn ? 'good' : isRev ? 'neutral' : 'warn'
+                const statusLabel = isConn ? (c.recently_active ? t('set.conn.aiStatusRecent') : t('set.conn.aiStatusConnected')) : isRev ? t('set.conn.aiStatusRevoked') : t('set.conn.aiStatusExpired')
+                return (
+                  <div key={c.grant_id} style={{ border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', background: 'var(--surface-card)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '8px', background: 'var(--surface-page)' }}><IconComp size={18} /></span>
+                        <strong style={{ fontSize: '15px' }}>{c.client_name}</strong>
+                        <Pill tone={tone}>{statusLabel}</Pill>
+                      </div>
+                      {isConn ? (
+                        <button type="button" className="v2-btn v2-btn-danger" style={{ padding: '4px 10px', fontSize: '13px' }} disabled={busy} onClick={() => setRevokeTarget(c)}>
+                          {t('set.conn.aiRevoke')}
+                        </button>
+                      ) : (
+                        <span className="v2-muted v2-small">{t('set.conn.aiRevokedNote')}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px var(--space-4)', fontSize: '13px' }}>
+                      <div>
+                        <span className="v2-muted v2-block">{t('set.conn.aiAccount')}</span>
+                        <span>{c.user?.email || c.user?.display_name || `User ${c.user?.id}`}</span>
+                      </div>
+                      <div>
+                        <span className="v2-muted v2-block">{t('set.conn.aiCompanies')}</span>
+                        <span>{c.companies?.map((co) => co.name + (co.role ? ` (${co.role})` : '')).join(', ') || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="v2-muted v2-block">{t('set.conn.aiConnectedAt')}</span>
+                        <span>{c.created_at ? new Date(c.created_at).toLocaleString() : '—'}</span>
+                      </div>
+                      <div>
+                        <span className="v2-muted v2-block">{t('set.conn.aiLastActivity')}</span>
+                        <span>{c.last_activity ? new Date(c.last_activity).toLocaleString() : '—'}</span>
+                      </div>
+                    </div>
+                    <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', fontSize: '12px' }}>
+                      <span className="v2-muted v2-block" style={{ marginBottom: '4px' }}>{t('set.conn.aiPermissions')}</span>
+                      <ul style={{ margin: 0, paddingLeft: '16px', color: 'var(--text-secondary)' }}>
+                        {(c.permissions || []).map((p) => (
+                          <li key={p.scope}><strong>{p.scope}</strong>: {p.description}</li>
+                        ))}
+                      </ul>
+                      <p className="v2-muted" style={{ margin: '8px 0 0', fontSize: '11px' }}>{t('set.conn.aiAccountNote')}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
+      {revokeTarget && (
+        <Modal title={t('set.conn.aiRevokeConfirm', { name: revokeTarget.client_name })} onClose={() => setRevokeTarget(null)}
+          footer={<>
+            <button type="button" className="v2-btn v2-btn-secondary" onClick={() => setRevokeTarget(null)}>{t('set.cancel')}</button>
+            <button type="button" className="v2-btn v2-btn-danger" disabled={busy} onClick={() => run(async () => {
+              await revokeAiAssistant(request, revokeTarget.grant_id)
+              setRevokeTarget(null)
+              ai.reload?.()
+            }, t('set.conn.aiRevokedOk'))}>{t('set.conn.aiRevoke')}</button>
+          </>}>
+          <p className="v2-sec">{t('set.conn.aiRevokeDesc')}</p>
+        </Modal>
+      )}
+      {dlg === 'aiHow' && (
+        <Modal title={t('set.conn.aiHowTitle')} wide onClose={() => setDlg(null)}
+          footer={<button type="button" className="v2-btn v2-btn-primary" onClick={() => setDlg(null)}>{t('set.ok')}</button>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div>
+              <label className="v2-field-label" style={{ marginBottom: '6px' }}>{t('set.conn.aiEndpointUrl')}</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input type="text" readOnly className="v2-input" style={{ fontFamily: 'monospace', fontSize: '13px' }} value={ai.data?.mcp_url || `${window.location.origin}/mcp`} />
+                <button type="button" className="v2-btn v2-btn-secondary" onClick={() => {
+                  try { navigator.clipboard.writeText(ai.data?.mcp_url || `${window.location.origin}/mcp`) } catch { /* noop */ }
+                  setFlash({ tone: 'good', text: t('set.conn.aiCopied') })
+                }}>{t('set.conn.aiCopyUrl')}</button>
+              </div>
+            </div>
+
+            <div className="v2-setup-chips" style={{ marginTop: '8px' }}>
+              <button key="cg" type="button" className="v2-chip" aria-pressed={howTab === 'chatgpt'} onClick={() => setHowTab('chatgpt')}>
+                {t('set.conn.aiTabChatGpt')}
+              </button>
+              <button key="cl" type="button" className="v2-chip" aria-pressed={howTab === 'claude'} onClick={() => setHowTab('claude')}>
+                {t('set.conn.aiTabClaude')}
+              </button>
+            </div>
+
+            {howTab === 'chatgpt' ? (
+              <ol className="v2-set-steps" style={{ marginTop: '4px' }}>
+                <li>{t('set.conn.aiChatGptS1')}</li>
+                <li>{t('set.conn.aiChatGptS2', { url: ai.data?.mcp_url || `${window.location.origin}/mcp` })}</li>
+                <li>{t('set.conn.aiChatGptS3')}</li>
+                <li>{t('set.conn.aiChatGptS4')}</li>
+              </ol>
+            ) : (
+              <ol className="v2-set-steps" style={{ marginTop: '4px' }}>
+                <li>{t('set.conn.aiClaudeS1')}</li>
+                <li>{t('set.conn.aiClaudeS2', { url: ai.data?.mcp_url || `${window.location.origin}/mcp` })}</li>
+                <li>{t('set.conn.aiClaudeS3')}</li>
+              </ol>
+            )}
+
+            <div style={{ background: 'var(--surface-page)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+              <strong>Note: </strong>{t('set.conn.aiAccountNote')}
+            </div>
+
+            <p className="v2-muted v2-small">{t('set.conn.aiSecurityNote')}</p>
+          </div>
         </Modal>
       )}
       {dlg === 'gw' && (

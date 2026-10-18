@@ -118,7 +118,7 @@ function createOAuthIntegration(deps = {}) {
     return base ? `${base}/.well-known/oauth-protected-resource/mcp` : null;
   }
 
-  return { sdkEndpoints, consentApi, verifyAccessToken, resourceMetadataUrl, enabled: oauthEnabled,
+  return { store, sdkEndpoints, consentApi, verifyAccessToken, resourceMetadataUrl, enabled: oauthEnabled,
     resourceUrl: () => { const b = publicBaseUrl(); return b ? `${b}/mcp` : null; } };
 }
 

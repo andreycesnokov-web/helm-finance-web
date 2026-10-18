@@ -11,6 +11,7 @@
 const { resolveMcpUser, bearerToken } = require('./auth');
 const { handleMcpRequest } = require('./server');
 const { createOAuthIntegration, publicBaseUrl } = require('./oauth');
+const { createAiAssistantsRouter } = require('./integrations');
 
 function attachMcp(app, deps = {}) {
   const JWT_SECRET = deps.JWT_SECRET;
@@ -23,6 +24,19 @@ function attachMcp(app, deps = {}) {
     supabase: deps.supabase, store: deps.oauthStore, auth: deps.auth,
     now: deps.now, onEvent: deps.onOAuthEvent,
   });
+
+  // ── Account Integrations (Settings → Connections → AI Assistants) ────────
+  if (deps.auth) {
+    const aiAssistantsRouter = createAiAssistantsRouter({
+      store: oauth.store,
+      supabase: deps.supabase,
+      services,
+      now: deps.now,
+      onOAuthEvent: deps.onOAuthEvent,
+      publicBaseUrl,
+    });
+    app.use('/api/account/integrations/ai-assistants', deps.auth, aiAssistantsRouter);
+  }
 
   // ── OAuth (only when MCP_OAUTH_ENABLED) ────────────────────────────────────
   // Consent API for the web app's /oauth/consent page — CFO login required.

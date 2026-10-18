@@ -83,6 +83,92 @@ function createSupabaseOAuthStore(supabase) {
         .update({ revoked_at: nowIso(now) })
         .eq('grant_id', grantId).is('revoked_at', null), 'revoke_grant');
     },
+    async listGrantsForUser(userId) {
+      const tokens = unwrap(await supabase.from('mcp_oauth_tokens')
+        .select('grant_id, client_id, scopes, created_at, expires_at, revoked_at, kind')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }), 'list_tokens_for_user');
+      if (!tokens || !tokens.length) return [];
+
+      const grantsMap = new Map();
+      for (const t of tokens) {
+        let g = grantsMap.get(t.grant_id);
+        if (!g) {
+          g = {
+            grant_id: t.grant_id,
+            client_id: t.client_id,
+            user_id: userId,
+            scopes: t.scopes || [],
+            created_at: t.created_at,
+            last_activity: t.created_at,
+            expires_at: t.expires_at,
+            revoked_at: t.revoked_at,
+          };
+          grantsMap.set(t.grant_id, g);
+        } else {
+          if (new Date(t.created_at) < new Date(g.created_at)) g.created_at = t.created_at;
+          if (new Date(t.created_at) > new Date(g.last_activity)) g.last_activity = t.created_at;
+          if (new Date(t.expires_at) > new Date(g.expires_at)) g.expires_at = t.expires_at;
+          if (t.revoked_at && (!g.revoked_at || new Date(t.revoked_at) > new Date(g.revoked_at))) g.revoked_at = t.revoked_at;
+          if (t.scopes && t.scopes.length) g.scopes = t.scopes;
+        }
+      }
+
+      const clientIds = [...new Set([...grantsMap.values()].map((g) => g.client_id))];
+      const clientsData = clientIds.length ? unwrap(await supabase.from('mcp_oauth_clients')
+        .select('client_id, client_name, redirect_uris, metadata, created_at')
+        .in('client_id', clientIds), 'get_clients_for_grants') : [];
+      const clientMap = new Map((clientsData || []).map((c) => [c.client_id, c]));
+
+      return [...grantsMap.values()].map((g) => {
+        const client = clientMap.get(g.client_id) || {};
+        return {
+          ...g,
+          client_name: client.client_name || null,
+          redirect_uris: client.redirect_uris || [],
+          client_metadata: client.metadata || {},
+        };
+      });
+    },
+    async getGrant(grantId) {
+      const tokens = unwrap(await supabase.from('mcp_oauth_tokens')
+        .select('grant_id, client_id, user_id, scopes, created_at, expires_at, revoked_at, kind')
+        .eq('grant_id', grantId)
+        .order('created_at', { ascending: false }), 'get_grant_tokens');
+      if (!tokens || !tokens.length) return null;
+
+      const first = tokens[0];
+      let createdAt = first.created_at;
+      let lastActivity = first.created_at;
+      let expiresAt = first.expires_at;
+      let revokedAt = first.revoked_at;
+      let scopes = first.scopes;
+
+      for (const t of tokens) {
+        if (new Date(t.created_at) < new Date(createdAt)) createdAt = t.created_at;
+        if (new Date(t.created_at) > new Date(lastActivity)) lastActivity = t.created_at;
+        if (new Date(t.expires_at) > new Date(expiresAt)) expiresAt = t.expires_at;
+        if (t.revoked_at && (!revokedAt || new Date(t.revoked_at) > new Date(revokedAt))) revokedAt = t.revoked_at;
+        if (t.scopes && t.scopes.length) scopes = t.scopes;
+      }
+
+      const client = unwrap(await supabase.from('mcp_oauth_clients').select('*')
+        .eq('client_id', first.client_id).maybeSingle(), 'get_client_for_grant');
+
+      return {
+        grant_id: grantId,
+        client_id: first.client_id,
+        user_id: first.user_id,
+        scopes,
+        created_at: createdAt,
+        last_activity: lastActivity,
+        expires_at: expiresAt,
+        revoked_at: revokedAt,
+        client_name: client?.client_name || null,
+        redirect_uris: client?.redirect_uris || [],
+        client_metadata: client?.metadata || {},
+      };
+    },
   };
 }
 
@@ -124,6 +210,75 @@ function createMemoryOAuthStore() {
     },
     async revokeGrant(grantId, { now }) {
       for (const r of t.tokens.values()) if (r.grant_id === grantId && !r.revoked_at) r.revoked_at = nowIso(now);
+    },
+    async listGrantsForUser(userId) {
+      const tokens = [...t.tokens.values()].filter((r) => r.user_id === userId);
+      if (!tokens.length) return [];
+      const grantsMap = new Map();
+      for (const token of tokens) {
+        let g = grantsMap.get(token.grant_id);
+        if (!g) {
+          g = {
+            grant_id: token.grant_id,
+            client_id: token.client_id,
+            user_id: userId,
+            scopes: token.scopes || [],
+            created_at: token.created_at,
+            last_activity: token.created_at,
+            expires_at: token.expires_at,
+            revoked_at: token.revoked_at,
+          };
+          grantsMap.set(token.grant_id, g);
+        } else {
+          if (new Date(token.created_at) < new Date(g.created_at)) g.created_at = token.created_at;
+          if (new Date(token.created_at) > new Date(g.last_activity)) g.last_activity = token.created_at;
+          if (new Date(token.expires_at) > new Date(g.expires_at)) g.expires_at = token.expires_at;
+          if (token.revoked_at && (!g.revoked_at || new Date(token.revoked_at) > new Date(g.revoked_at))) g.revoked_at = token.revoked_at;
+          if (token.scopes && token.scopes.length) g.scopes = token.scopes;
+        }
+      }
+      return [...grantsMap.values()].map((g) => {
+        const client = t.clients.get(g.client_id) || {};
+        return copy({
+          ...g,
+          client_name: client.client_name || null,
+          redirect_uris: client.redirect_uris || [],
+          client_metadata: client.metadata || {},
+        });
+      });
+    },
+    async getGrant(grantId) {
+      const tokens = [...t.tokens.values()].filter((r) => r.grant_id === grantId);
+      if (!tokens.length) return null;
+      const first = tokens[0];
+      let createdAt = first.created_at;
+      let lastActivity = first.created_at;
+      let expiresAt = first.expires_at;
+      let revokedAt = first.revoked_at;
+      let scopes = first.scopes;
+
+      for (const token of tokens) {
+        if (new Date(token.created_at) < new Date(createdAt)) createdAt = token.created_at;
+        if (new Date(token.created_at) > new Date(lastActivity)) lastActivity = token.created_at;
+        if (new Date(token.expires_at) > new Date(expiresAt)) expiresAt = token.expires_at;
+        if (token.revoked_at && (!revokedAt || new Date(token.revoked_at) > new Date(revokedAt))) revokedAt = token.revoked_at;
+        if (token.scopes && token.scopes.length) scopes = token.scopes;
+      }
+
+      const client = t.clients.get(first.client_id) || {};
+      return copy({
+        grant_id: grantId,
+        client_id: first.client_id,
+        user_id: first.user_id,
+        scopes,
+        created_at: createdAt,
+        last_activity: lastActivity,
+        expires_at: expiresAt,
+        revoked_at: revokedAt,
+        client_name: client.client_name || null,
+        redirect_uris: client.redirect_uris || [],
+        client_metadata: client.metadata || {},
+      });
     },
   };
 }

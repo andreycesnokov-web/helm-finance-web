@@ -240,6 +240,9 @@ export const telegramLinkToken = (token) =>
 export const telegramUnlink = (token) =>
   apiFetch('/account/integrations/telegram/unlink', token, { method: 'POST', body: {} })
 
+export const revokeAiAssistant = (token, grantId) =>
+  apiFetch(`/account/integrations/ai-assistants/${encodeURIComponent(grantId)}/revoke`, token, { method: 'POST', body: {} })
+
 export const createGateway = (token, body) =>
   apiFetch('/payment-connections', token, { method: 'POST', body })
 
