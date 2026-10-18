@@ -1,0 +1,38 @@
+name: Deploy CFO AI Marketing (Cloudflare Pages)
+
+on:
+  push:
+    branches:
+      - main
+      - feat/cfo-ai-cloudflare-launch
+    paths:
+      - 'cms/**'
+      - 'website-design/**'
+      - 'package.json'
+      - '.github/workflows/deploy-marketing.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-marketing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Marketing Website (SSG + Pricing Guard)
+        run: npm run build:marketing
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'abf19a0b6ab7a9b8d670e85d35ae0068' }}
+          command: pages deploy dist_marketing --project-name=cfo-ai-marketing --branch=main

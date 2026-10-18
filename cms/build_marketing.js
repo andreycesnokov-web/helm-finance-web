@@ -126,6 +126,142 @@ async function buildMarketingSite() {
   const robotsTxt = await robotsRes.text();
   fs.writeFileSync(path.join(outputDir, 'robots.txt'), robotsTxt, 'utf8');
 
+  // Render Custom 404 Page (for unpublished locales, draft routes, and broken URLs)
+  const notFoundHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 — Page Not Found | CFO AI</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #F8FAFC;
+      color: #003366;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    .container {
+      max-width: 560px;
+      background: #FFFFFF;
+      padding: 48px 36px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 51, 102, 0.08);
+      border: 1px solid #E2E8F0;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      background: #EFF6FF;
+      color: #1768C9;
+      font-weight: 700;
+      font-size: 14px;
+      border-radius: 9999px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      color: #003366;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+    p {
+      color: #64748B;
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+    .btn {
+      display: block;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .btn-primary {
+      background: #1768C9;
+      color: #FFFFFF;
+    }
+    .btn-primary:hover {
+      background: #12529E;
+    }
+    .btn-outline {
+      background: #F8FAFC;
+      color: #003366;
+      border: 1px solid #CBD5E1;
+    }
+    .btn-outline:hover {
+      background: #F1F5F9;
+    }
+    .links {
+      margin-top: 24px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      font-size: 13px;
+      color: #94A3B8;
+    }
+    .links a {
+      color: #64748B;
+      text-decoration: none;
+    }
+    .links a:hover {
+      color: #1768C9;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="badge">Error 404</div>
+    <h1>Page Not Found</h1>
+    <p>The page you are looking for does not exist, has been moved, or is not yet available in your language.</p>
+    <div class="buttons">
+      <a href="/id" class="btn btn-primary">🇮🇩 Lanjutkan dalam Bahasa Indonesia</a>
+      <a href="/en" class="btn btn-outline">🇺🇸 Continue in English</a>
+      <a href="/ru" class="btn btn-outline">🇷🇺 Продолжить на русском</a>
+    </div>
+    <div class="links">
+      <a href="/id/platform">Platform</a>
+      <span>•</span>
+      <a href="/id/pricing">Pricing</a>
+      <span>•</span>
+      <a href="https://app.cfo-ai.site/login">Log In</a>
+    </div>
+  </div>
+</body>
+</html>`;
+  fs.writeFileSync(path.join(outputDir, '404.html'), notFoundHtml, 'utf8');
+  pageCount++;
+
+  // Export Cloudflare _headers
+  const headersContent = `/404.html
+  X-Robots-Tag: noindex, nofollow
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+`;
+  fs.writeFileSync(path.join(outputDir, '_headers'), headersContent, 'utf8');
+
   // Copy design assets
   const assetSrc = path.join(__dirname, '../website-design/assets');
   const assetDest = path.join(outputDir, 'assets');
