@@ -7,7 +7,8 @@
     "client": "cd client && npm run dev",
     "build": "cd client && npm ci && npm run build",
     "start": "node server/index.js",
-    "start:marketing": "node cms/server/index.js"
+    "start:marketing": "node cms/server/index.js",
+    "build:marketing": "node cms/build_marketing.js"
   },
   "engines": {
     "node": ">=20.11.0"

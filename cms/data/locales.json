@@ -27,7 +27,7 @@
     "code": "fr",
     "name": "French",
     "nativeName": "Français",
-    "status": "published",
+    "status": "staged",
     "isDefault": false,
     "direction": "ltr"
   },
@@ -35,7 +35,7 @@
     "code": "de",
     "name": "German",
     "nativeName": "Deutsch",
-    "status": "published",
+    "status": "staged",
     "isDefault": false,
     "direction": "ltr"
   },
@@ -43,7 +43,7 @@
     "code": "es",
     "name": "Spanish",
     "nativeName": "Español",
-    "status": "published",
+    "status": "staged",
     "isDefault": false,
     "direction": "ltr"
   },
@@ -51,7 +51,7 @@
     "code": "it",
     "name": "Italian",
     "nativeName": "Italiano",
-    "status": "published",
+    "status": "staged",
     "isDefault": false,
     "direction": "ltr"
   },

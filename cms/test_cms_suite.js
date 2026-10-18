@@ -169,11 +169,11 @@ async function runTestSuite() {
     const sitemapRes = await fetch(`${baseUrl}/sitemap.xml`);
     assert(sitemapRes.status === 200, 'sitemap.xml returns HTTP 200');
     const sitemapXml = await sitemapRes.text();
-    const phaseACodes = ['en', 'id', 'ru', 'fr', 'de', 'es', 'it'];
-    for (const c of phaseACodes) {
+    const publishedLaunchCodes = ['en', 'id', 'ru'];
+    for (const c of publishedLaunchCodes) {
       assert(sitemapXml.includes(`<loc>https://cfo-ai.site/${c}</loc>`), `Sitemap contains published ${c} homepage`);
     }
-    const stagedCheckCodes = ['zh-cn', 'ja', 'th', 'vi'];
+    const stagedCheckCodes = ['fr', 'de', 'es', 'it', 'zh-cn', 'ja', 'th', 'vi'];
     for (const sc of stagedCheckCodes) {
       assert(!sitemapXml.includes(`<loc>https://cfo-ai.site/${sc}</loc>`), `Sitemap excludes staged draft ${sc} homepage`);
     }
@@ -333,12 +333,12 @@ async function runTestSuite() {
     const matrix = await matrixRes.json();
     assert(matrix.length === 11, 'Translation matrix tracks all 11 launch locales');
     const publishedCodes = matrix.filter(m => m.status === 'published').map(m => m.code);
-    assert(publishedCodes.length === 7, 'Exactly 7 Phase A locales marked published');
-    const expectedPublished = ['en', 'id', 'ru', 'fr', 'de', 'es', 'it'];
+    assert(publishedCodes.length === 3, 'Exactly 3 approved launch locales marked published (EN, ID, RU)');
+    const expectedPublished = ['en', 'id', 'ru'];
     expectedPublished.forEach(c => assert(publishedCodes.includes(c), `Locale ${c} is published`));
     const stagedCodesInMatrix = matrix.filter(m => m.status === 'staged').map(m => m.code);
-    assert(stagedCodesInMatrix.length === 4, 'Exactly 4 Phase B locales marked staged');
-    const expectedStaged = ['zh-cn', 'ja', 'th', 'vi'];
+    assert(stagedCodesInMatrix.length === 8, 'Exactly 8 locales marked staged/unpublished pending owner approval');
+    const expectedStaged = ['fr', 'de', 'es', 'it', 'zh-cn', 'ja', 'th', 'vi'];
     expectedStaged.forEach(sc => assert(stagedCodesInMatrix.includes(sc), `Locale ${sc} is staged draft`));
 
     console.log(`\n==============================================`);

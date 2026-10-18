@@ -20,3 +20,6 @@ server/data/*.json
 
 # Local tooling binaries
 cms/bin/
+
+# Static marketing build output
+dist_marketing/
