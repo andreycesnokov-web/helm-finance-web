@@ -4,14 +4,78 @@ Read this file before any work in this repository.
 
 ## Required Reading Before Coding
 
-Before changing product code, every AI agent must read:
+Before changing product code, every AI agent must build context in this order.
+
+### 1. Knowledge Vault first (only when it exists)
+
+The project Vault `CFO AI OBSIDIAN/` is an optional, local-only knowledge base kept in the owner's main
+checkout and excluded from Git there via `.git/info/exclude`. It is absent from other clones, cloud
+sessions and CI, and no rule in this file requires it. Locate it from any worktree with:
+
+```bash
+VAULT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/CFO AI OBSIDIAN"
+test -f "$VAULT/CURRENT_STATE.md" && echo "vault: $VAULT" || echo "vault: absent"
+```
+
+If the Vault is present:
+
+1. Read `CURRENT_STATE.md`.
+2. Check freshness: take `commit:` from its frontmatter and run
+   `git merge-base --is-ancestor <commit> HEAD`, `git diff --name-only <commit>` (against the working
+   tree, so uncommitted edits count too) and `git status --short` (untracked files).
+   Trust notes only for files outside that diff; read changed files directly. If HEAD does not contain
+   `<commit>` (another branch), use the Vault as background only and verify every fact in code.
+3. Read `02 Modules/00 Module Index.md`, then only the module notes relevant to the task.
+4. Follow the source links from those notes into the code; read files narrowly (search, then offsets).
+
+### 2. Fallback when the Vault is absent
+
+Read the repository documentation, as before:
 
 1. `_specs/AI_WORKING_MEMORY.md`
 2. `_specs/PROJECT_STATE.md`
 3. `_specs/ARCHITECTURE.md`
 4. `_specs/RISKS_AND_TESTS.md`
 
+These files may lag the code; confirm current state with `git log --oneline -20` and the code itself.
+
+### 3. Older `_specs` and root documents
+
+When the Vault is used, read the four files above and other `_specs/` or root documents selectively, only
+when the task needs their history, a runbook or a decision record. They never override the code.
+
+### Rules for every path
+
+- The Vault, `_specs` and chat memory never override the code, the real schema or this file. SQL, security,
+  auth, migrations, payments, staging and production always need verification against the real code and schema.
+- Code-intelligence tools such as Graphify are optional helpers, never a required step.
+- Never commit the Vault: do not `git add -f` it, and if `CFO AI OBSIDIAN/` shows up as untracked, leave it out.
+  Never store secrets, API keys, JWTs, infrastructure addresses, customer data or financial documents in it.
+- If the Vault is present, update it after a completed PR per its `06 Claude Code Protocol.md`.
+
 Do not start implementation from assumptions or stale chat memory.
+
+## Graphify-Aware Code Intelligence
+
+Graphify (claude.ai connector, workspace `cfo-ai`, repository `andreycesnokov-web/helm-finance-web`) is an
+optional tool for code exploration. The goal is efficiency, not MCP usage. The cloud index follows `main`
+only; unpushed and integration branches are not indexed.
+
+1. Use Graphify first for unfamiliar modules, complex dependencies, call analysis (`graphify_callers` /
+   `graphify_callees`) and impact analysis (`graphify_impact`, `graphify_tests_for`).
+2. For known files, small changes, `git diff`, infrastructure and configuration, use direct tools
+   (Read, Grep, Glob, git) without Graphify.
+3. Freshness: check once per session whether the graph lags HEAD (`freshness.commit` vs `git diff --name-only
+   <commit> HEAD`). Do not re-check the whole diff on every task; use the graph only for unchanged parts.
+4. Limit Graphify calls. If the first queries do not narrow the search, switch to ordinary tools.
+5. Do not load Graphify MCP tools unless the task needs them.
+6. Do not re-read the same files when the code has not changed.
+7. Judge efficiency by total cost (input, cache read/write, output tokens) and result quality, not input tokens alone.
+8. Do not save engineering decisions to Graphify Memory automatically or without review. Never store secrets,
+   JWTs, API keys, customer personal data or financial documents there.
+
+SQL, security, migrations, production and staging: always verify the real schema, configuration and code.
+The graph is not a source of truth about infrastructure state. If Graphify is unavailable, use ordinary tools.
 
 ## Workspace Type Must Be Explicit
 

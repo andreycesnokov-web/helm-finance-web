@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-10-18T02:11:20.330Z",
+  "generated_at": "2026-10-18T02:47:23.654Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://sales-thorough-ala-formation.trycloudflare.com",
-      "english_homepage": "https://sales-thorough-ala-formation.trycloudflare.com/en",
-      "indonesian_homepage": "https://sales-thorough-ala-formation.trycloudflare.com/id",
-      "pricing_url": "https://sales-thorough-ala-formation.trycloudflare.com/en/pricing",
-      "hub_url": "https://sales-thorough-ala-formation.trycloudflare.com/en/blog",
+      "https_url": "https://characterization-cave-lips-said.trycloudflare.com",
+      "english_homepage": "https://characterization-cave-lips-said.trycloudflare.com/en",
+      "indonesian_homepage": "https://characterization-cave-lips-said.trycloudflare.com/id",
+      "pricing_url": "https://characterization-cave-lips-said.trycloudflare.com/en/pricing",
+      "hub_url": "https://characterization-cave-lips-said.trycloudflare.com/en/blog",
       "verified_https": false,
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://from-penetration-imagination-sleeps.trycloudflare.com",
-      "admin_login_url": "https://from-penetration-imagination-sleeps.trycloudflare.com/admin/",
+      "https_url": "https://asian-proved-seal-smart.trycloudflare.com",
+      "admin_login_url": "https://asian-proved-seal-smart.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
         "username": "cfo-admin",

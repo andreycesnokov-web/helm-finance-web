@@ -314,10 +314,9 @@ const translations = {
       privacy_desc: "Fully aligned with Indonesia's Personal Data Protection Law (Law No. 27/2022). Customer financial entries are never used to train public commercial AI models."
     },
     footer: {
-      about_text: "AI-powered financial operating system engineered for Indonesian PT and PT PMA companies. Real-time multi-currency cash visibility, Indonesian tax invoice OCR, automated bank reconciliation, and regulatory compliance intelligence.",
+      about_text: "Financial Operating System engineered for Indonesian PT & PT PMA companies. Real-time cash visibility, tax invoice OCR, and automated bank reconciliation.",
       app_link: "app.cfo-ai.site",
-      footprint: "Footprint: Jakarta • Denpasar, Bali • Operating across Indonesia",
-      security_notice: "Bank-Grade AES-256 • Row-Level Tenant Isolation • Zero AI Training on Customer Data",
+      footprint: "Jakarta • Denpasar, Bali • Operating across Indonesia",
       col_platform: "Platform",
       col_hub: "Knowledge Hub",
       col_legal: "Company & Legal",
@@ -649,10 +648,9 @@ const translations = {
       privacy_desc: "Sepenuhnya selaras dengan Undang-Undang Perlindungan Data Pribadi (UU No. 27/2022). Data pembukuan pelanggan tidak pernah dipakai untuk melatih model AI komersial publik."
     },
     footer: {
-      about_text: "Sistem operasi keuangan bertenaga AI untuk PT dan PT PMA di Indonesia. Visibilitas arus kas multi-valuta real-time, OCR faktur pajak, rekonsiliasi bank otomatis, dan kepatuhan regulasi terpadu.",
+      about_text: "Sistem Operasi Keuangan terintegrasi untuk PT & PT PMA di Indonesia. Visibilitas arus kas real-time, OCR faktur pajak, dan rekonsiliasi bank otomatis.",
       app_link: "app.cfo-ai.site",
-      footprint: "Kantor: Jakarta • Denpasar, Bali • Melayani seluruh Indonesia",
-      security_notice: "Standar Perbankan AES-256 • Isolasi Skema Tingkat Baris • Tanpa Pelatihan AI dari Data Pelanggan",
+      footprint: "Jakarta • Denpasar, Bali • Melayani seluruh Indonesia",
       col_platform: "Platform",
       col_hub: "Pusat Panduan",
       col_legal: "Perusahaan & Hukum",
@@ -984,10 +982,9 @@ const translations = {
       privacy_desc: "Полное соблюдение Закона Индонезии о защите персональных данных (UU No. 27/2022). Данные бухгалтерского учета клиентов никогда не используются для обучения публичных моделей ИИ."
     },
     footer: {
-      about_text: "Финансовая операционная система на базе ИИ для индонезийских компаний PT и PT PMA. Мультивалютная ликвидность в реальном времени, распознавание налоговых счетов, автосверка банка и комплаенс.",
+      about_text: "Финансовая ОС на базе ИИ для индонезийских компаний PT и PT PMA. Контроль денежных потоков, OCR счетов и автосверка выписок.",
       app_link: "app.cfo-ai.site",
-      footprint: "Присутствие: Джакарта • Бали (Денпасар) • Работаем по всей Индонезии",
-      security_notice: "Банковский стандарт AES-256 • Изоляция схем уровня строк • Без обучения ИИ на данных клиента",
+      footprint: "Джакарта • Бали (Денпасар) • Работаем по всей Индонезии",
       col_platform: "Платформа",
       col_hub: "База Знаний",
       col_legal: "О компании и законы",

@@ -229,30 +229,29 @@ function createPublicRoutes(contentStore) {
     ${content}
   </main>
 
-  <!-- FOOTER (Unified 4-Column Layout, 25-30% height reduction: pt-10 pb-8) -->
-  <footer class="bg-navy-brand text-slate-300 pt-10 pb-8 border-t border-slate-700 relative overflow-hidden">
-    ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-[420px] h-[420px]', className: 'absolute -right-20 -bottom-20 pointer-events-none select-none z-0' })}
+  <!-- FOOTER (Unified 4-Column Layout, Rendered Height Reduced by 25-30%) -->
+  <footer class="bg-navy-brand text-slate-300 pt-7 pb-5 border-t border-slate-700 relative overflow-hidden">
+    ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-[360px] h-[360px]', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-5">
         <!-- Col 1: Brand & footprint -->
-        <div class="space-y-3">
-          <div class="flex items-center gap-3">
-            <img src="/assets/brand/logo_dark_bg_white_text.svg" alt="CFO AI Indonesia" class="h-8 w-auto rounded">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2.5">
+            <img src="/assets/brand/logo_dark_bg_white_text.svg" alt="CFO AI Indonesia" class="h-7 w-auto rounded">
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed max-w-xs">
+          <p class="text-xs text-slate-300 leading-snug max-w-xs line-clamp-3">
             ${t.footer.about_text}
           </p>
-          <div class="text-[11px] text-slate-400 space-y-1 pt-1">
-            <div>SaaS Application: <a href="https://app.cfo-ai.site" class="text-blue-300 underline font-mono">${t.footer.app_link}</a></div>
+          <div class="text-[11px] text-slate-400 space-y-0.5 pt-0.5">
+            <div>SaaS Application: <a href="https://app.cfo-ai.site" class="text-blue-300 hover:text-white underline font-mono">${t.footer.app_link}</a></div>
             <div>${t.footer.footprint}</div>
-            <div class="text-slate-300 font-medium">${t.footer.security_notice}</div>
           </div>
         </div>
 
         <!-- Col 2: Platform -->
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">${t.footer.col_platform}</h4>
-          <ul class="space-y-2 text-xs">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2">${t.footer.col_platform}</h4>
+          <ul class="space-y-1.5 text-xs">
             <li><a href="/${locale}/platform" class="hover:text-white transition-colors">${t.footer.link_overview}</a></li>
             <li><a href="/${locale}/platform#features" class="hover:text-white transition-colors">${t.footer.link_features}</a></li>
             <li><a href="/${locale}/document-intelligence" class="hover:text-white transition-colors">${t.nav.doc_intelligence}</a></li>
@@ -263,8 +262,8 @@ function createPublicRoutes(contentStore) {
 
         <!-- Col 3: Knowledge Hub -->
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">${t.footer.col_hub}</h4>
-          <ul class="space-y-2 text-xs">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2">${t.footer.col_hub}</h4>
+          <ul class="space-y-1.5 text-xs">
             <li><a href="/${locale}/blog" class="hover:text-white transition-colors">All Tax &amp; Business Guides</a></li>
             <li><a href="/${locale}/blog/pt-pma-tax-compliance-guide-2026" class="hover:text-white transition-colors">${t.footer.link_tax_guides}</a></li>
             <li><a href="/${locale}/blog/pph-21-ter-calculation-rules-indonesia" class="hover:text-white transition-colors">${t.footer.link_pph21}</a></li>
@@ -274,24 +273,25 @@ function createPublicRoutes(contentStore) {
 
         <!-- Col 4: Company & Legal -->
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">${t.footer.col_legal}</h4>
-          <ul class="space-y-2 text-xs">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2">${t.footer.col_legal}</h4>
+          <ul class="space-y-1.5 text-xs">
             <li><a href="/${locale}/about" class="hover:text-white transition-colors">${t.nav.about}</a></li>
             <li><a href="/${locale}/about#contact" class="hover:text-white transition-colors">${t.footer.link_contact}</a></li>
             <li><a href="/${locale}/privacy" class="hover:text-white transition-colors">${t.footer.link_privacy}</a></li>
             <li><a href="/${locale}/terms" class="hover:text-white transition-colors">${t.footer.link_terms}</a></li>
-            <li class="pt-1"><a href="https://app.cfo-ai.site/login" class="text-blue-300 font-bold hover:underline inline-flex items-center gap-1">${t.nav.trial_cta} &rarr;</a></li>
+            <li class="pt-0.5"><a href="https://app.cfo-ai.site/login" class="text-blue-300 font-bold hover:underline inline-flex items-center gap-1">${t.nav.trial_cta} &rarr;</a></li>
           </ul>
         </div>
       </div>
 
-      <!-- Footer Bottom Bar with Back to Top -->
-      <div class="border-t border-slate-700/80 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
-        <div>${t.footer.copyright}</div>
-        <div class="text-[11px] max-w-md text-center sm:text-left text-slate-400">
-          ${t.footer.disclaimer}
+      <!-- Footer Bottom Bar with Back to Top (Consolidated Compact Single Row) -->
+      <div class="border-t border-slate-700/60 pt-3.5 flex flex-col md:flex-row items-center justify-between text-[11px] text-slate-400 gap-3">
+        <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-center md:text-left">
+          <span class="font-medium text-slate-300">${t.footer.copyright}</span>
+          <span class="hidden md:inline text-slate-600">&bull;</span>
+          <span class="max-w-xl text-slate-400">${t.footer.disclaimer}</span>
         </div>
-        <button onclick="scrollToTop()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 min-h-[36px]" aria-label="${t.footer.back_to_top}">
+        <button onclick="scrollToTop()" class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 min-h-[32px]" aria-label="${t.footer.back_to_top}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
           <span>${t.footer.back_to_top}</span>
         </button>
@@ -739,7 +739,7 @@ function createPublicRoutes(contentStore) {
                             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
                             <span class="font-mono ml-2 font-bold text-[#06366B]">${mod.title}</span>
                           </div>
-                          <span class="text-[10px] font-semibold text-slate-400 font-mono">100% Complete UI</span>
+                          <span class="text-[10px] font-semibold text-[#475569] font-mono">100% Complete UI</span>
                         </div>
                         <div class="p-2 sm:p-4 bg-white flex items-center justify-center">
                           <img src="${m.img}" alt="${mod.title}" class="w-full h-auto max-h-[380px] object-contain rounded" />
@@ -846,7 +846,7 @@ function createPublicRoutes(contentStore) {
         return '<span class="inline-flex items-center justify-center text-emerald-600 font-extrabold text-sm" title="Included">✓</span>';
       }
       if (val === '—' || val === '-' || val === 'Not Included' || val === false) {
-        return '<span class="inline-flex items-center justify-center text-slate-300 font-bold text-sm" title="Not Included">—</span>';
+        return '<span class="inline-flex items-center justify-center text-slate-400 font-bold text-sm" title="Not Included">—</span>';
       }
       return `<span class="font-mono-num ${isControl ? 'font-bold text-[#06366B]' : 'font-semibold text-slate-700'} text-xs">${val}</span>`;
     };
@@ -955,13 +955,14 @@ function createPublicRoutes(contentStore) {
             </div>
           </div>
 
-          <!-- Enterprise Custom Inquiries Banner (Dark Navy Gradient) positioned after full matrix -->
-          <div class="bento-card p-8 bg-navy-brand text-white max-w-4xl mx-auto text-center relative overflow-hidden">
-            ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-80 h-80', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
+          <!-- Enterprise Custom Inquiries Banner (Clean White Card with Deep Navy & Slate Typography) -->
+          <div class="bento-card p-8 sm:p-10 bg-white border border-[#CBD5E1] shadow-sm max-w-4xl mx-auto text-center relative overflow-hidden">
+            ${renderWatermark({ color: '#06366B', opacity: '0.03', size: 'w-80 h-80', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
             <div class="relative z-10">
-              <h3 class="text-xl font-black mb-2">${t.pricing_page.custom_enterprise_title}</h3>
-              <p class="text-xs text-slate-300 max-w-xl mx-auto mb-6">${t.pricing_page.custom_enterprise_desc}</p>
-              <a href="mailto:enterprise@cfo-ai.site" class="inline-block text-xs font-bold bg-[#1768C9] hover:bg-[#063D72] text-white px-6 py-3 rounded-xl min-h-[44px]">
+              <span class="text-[10px] font-black uppercase tracking-wider text-[#1768C9] bg-blue-50 px-3 py-1 rounded-full mb-3 inline-block">CUSTOM MULTI-ENTITY DEPLOYMENT</span>
+              <h3 class="text-xl sm:text-2xl font-black text-[#06366B] mb-2.5">${t.pricing_page.custom_enterprise_title}</h3>
+              <p class="text-xs sm:text-sm text-[#475569] max-w-xl mx-auto mb-6 leading-relaxed">${t.pricing_page.custom_enterprise_desc}</p>
+              <a href="mailto:enterprise@cfo-ai.site" class="inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-7 py-3.5 rounded-xl shadow-sm transition-all min-h-[44px]">
                 ${t.pricing_page.custom_enterprise_btn} &rarr;
               </a>
             </div>
@@ -1067,7 +1068,7 @@ function createPublicRoutes(contentStore) {
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               ${briefs.map(b => `
                 <div class="bento-card p-5 bg-white border border-slate-200">
-                  <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mb-2">
+                  <div class="flex items-center justify-between text-[10px] text-[#475569] font-mono mb-2">
                     <span class="text-[#1768C9] font-bold uppercase">${b.category}</span>
                     <span>${b.reading_time_minutes} min</span>
                   </div>
@@ -1153,7 +1154,7 @@ function createPublicRoutes(contentStore) {
                 </div>
               </div>
               <div class="text-right">
-                <div class="text-[11px] text-slate-400">Statutory Citation:</div>
+                <div class="text-[11px] text-[#475569] font-medium">Statutory Citation:</div>
                 <div class="font-mono font-bold text-[#06366B]">UU No. 7/2021 &bull; CoreTax PMK No. 81/2024</div>
               </div>
             </div>
@@ -1401,14 +1402,13 @@ function createPublicRoutes(contentStore) {
               </div>
             </div>
 
-            <div class="bento-card p-8 bg-navy-brand text-white relative overflow-hidden">
-              ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-80 h-80', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
+            <div class="bento-card p-8 bg-white border border-[#CBD5E1] shadow-sm relative overflow-hidden">
+              ${renderWatermark({ color: '#06366B', opacity: '0.03', size: 'w-80 h-80', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
               <div class="relative z-10">
-                <h2 class="text-lg font-black mb-2">Statutory Accounting Disclosure</h2>
-                <p class="text-slate-300 text-xs leading-relaxed mb-6">
-                  ${t.footer.disclaimer}
-                </p>
-                <a href="https://app.cfo-ai.site/login" class="inline-block text-xs font-bold bg-[#1768C9] hover:bg-[#063D72] text-white px-6 py-3 rounded-xl min-h-[44px]">
+                <span class="text-[10px] font-black uppercase tracking-wider text-[#1768C9] bg-blue-50 px-3 py-1 rounded-full mb-3 inline-block">LEGAL &amp; COMPLIANCE NOTICE</span>
+                <h2 class="text-lg sm:text-xl font-black text-[#06366B] mb-2.5">Statutory Accounting Disclosure</h2>
+                <p class="text-[#475569] text-xs sm:text-sm leading-relaxed mb-6 max-w-2xl">${t.footer.disclaimer}</p>
+                <a href="https://app.cfo-ai.site/login" class="inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-7 py-3 rounded-xl shadow-sm transition-all min-h-[44px]">
                   ${t.hero.primary_cta} &rarr;
                 </a>
               </div>

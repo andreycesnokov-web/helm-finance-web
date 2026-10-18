@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "client"],
       "port": 5173
+    },
+    {
+      "name": "cfo-int-v2-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/tmp/cfo-int/client/node_modules/vite/bin/vite.js", "preview", "C:/tmp/cfo-int/client", "--port", "4173", "--strictPort"],
+      "port": 4173
     }
   ]
 }
