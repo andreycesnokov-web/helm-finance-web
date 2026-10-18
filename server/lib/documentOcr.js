@@ -38,23 +38,35 @@ const OCR_TYPES = ['invoice', 'faktur_pajak', 'payment_proof', 'receipt', 'contr
   'bank_statement', 'tax_document', 'payroll_document', 'unknown'];
 
 // Field-by-field, so a model that invents a key cannot put it into the pipeline.
-const FIELD_KEYS = ['document_number', 'issuer_name', 'buyer_name', 'counterparty_name',
-  'date', 'currency', 'amount', 'commercial_base_amount', 'commercial_tax_amount',
-  'gross_amount', 'payment_method', 'period_start', 'period_end', 'reference_number', 'npwp'];
+const FIELD_KEYS = [
+  'document_number', 'issuer_name', 'buyer_name', 'counterparty_name',
+  'date', 'invoice_date', 'due_date', 'currency', 'amount',
+  'subtotal', 'commercial_base_amount', 'tax_base_dpp', 'discount_amount',
+  'commercial_tax_amount', 'gross_amount',
+  'payment_method', 'period_start', 'period_end', 'reference_number',
+  'npwp', 'issuer_npwp', 'buyer_npwp', 'tax_invoice_serial',
+];
 
-const NUMERIC_FIELDS = new Set(['amount', 'commercial_base_amount', 'commercial_tax_amount',
-  'gross_amount']);
+const NUMERIC_FIELDS = new Set([
+  'amount', 'subtotal', 'commercial_base_amount', 'tax_base_dpp', 'discount_amount',
+  'commercial_tax_amount', 'gross_amount',
+]);
 
 const PROMPT = `You are reading a scanned business document for an Indonesian accounting system.
 
 Return ONLY a JSON object, no markdown fence, no commentary:
-{"text":"","document_type":"","confidence":"","fields":{},"warnings":[]}
+{"text":"","document_type":"","confidence":"","fields":{},"warnings":[],"supporting_documents":{}}
 
 document_type must be exactly one of: ${OCR_TYPES.join(', ')}.
 Indonesian guidance:
 - "KWITANSI"/"KUITANSI" (often with "Sudah terima dari", "Berupa", "Untuk pembayaran",
   "Terbilang") is a RECEIPT for money already handed over -> "receipt", NOT "invoice".
-- "Faktur Pajak" (with a Kode dan Nomor Seri) -> "faktur_pajak".
+- Multi-page document / package rule:
+  * When a document contains a commercial invoice / bill asking for payment, the primary
+    document_type is "invoice", even if accompanied by a Faktur Pajak or contract/agreement.
+  * Report attached supporting documents in supporting_documents:
+    {"invoice": true/false, "tax_invoice": true/false, "contract": true/false, "payment_proof": true/false}.
+- Standalone "Faktur Pajak" (with a Kode dan Nomor Seri and no commercial invoice) -> "faktur_pajak".
 - "Invoice"/"Tagihan" asking for payment -> "invoice".
 - A bank transfer slip / "Bukti Transfer" -> "payment_proof".
 - "Rekening Koran"/"Mutasi Rekening" -> "bank_statement".
@@ -65,13 +77,30 @@ confidence: "high" only if the document type and the total amount are both unamb
 "medium" if one is inferred; "low" if the page is unclear.
 
 fields (use null for anything not printed on the document — never guess):
- document_number, issuer_name, buyer_name, counterparty_name, date (YYYY-MM-DD),
- currency (ISO, "IDR" for Rp), amount, commercial_base_amount (DPP),
- commercial_tax_amount (PPN), gross_amount, payment_method, period_start, period_end,
- reference_number, npwp.
-Amounts: digits only, no separators. "Rp 11.322.000" -> 11322000.
-On a kwitansi: issuer_name is who RECEIVED the money, counterparty_name is who PAID
-("Sudah terima dari"), and amount is the "Jumlah".
+ document_number (commercial invoice reference, e.g. X2610001139),
+ tax_invoice_serial (16-digit Faktur Pajak serial, digits only),
+ issuer_name (supplier/seller), buyer_name (customer/buyer), counterparty_name,
+ issuer_npwp, buyer_npwp,
+ date (YYYY-MM-DD), invoice_date (YYYY-MM-DD), due_date (YYYY-MM-DD),
+ currency (ISO, "IDR" for Rp),
+ subtotal (commercial subtotal before tax/incentives),
+ commercial_base_amount (tax base or commercial base),
+ tax_base_dpp (Dasar Pengenaan Pajak on Faktur Pajak),
+ discount_amount (trade discount / incentive),
+ commercial_tax_amount (PPN / VAT),
+ gross_amount (total payable printed on commercial invoice, e.g. 143856000),
+ amount (same as gross_amount for invoices),
+ payment_method, period_start, period_end, reference_number, npwp.
+
+FINANCIAL RECONCILIATION RULE:
+- NEVER confuse Dasar Pengenaan Pajak (DPP, tax base) with commercial Subtotal or Total.
+  In Indonesian retail/trade terms, Subtotal (129,600,000) minus discount/incentive (10,800,000) = DPP (118,800,000).
+  PPN is 14,256,000. Commercial total payable is 143,856,000.
+  Read the explicit total printed on the commercial invoice for gross_amount.
+  Never calculate Gross Total as DPP + PPN if an explicit commercial total is printed.
+- Amounts: digits only, no separators. "Rp 143.856.000" -> 143856000.
+- On a kwitansi: issuer_name is who RECEIVED the money, counterparty_name is who PAID
+  ("Sudah terima dari"), and amount is the "Jumlah".
 
 text: a short plain-text transcript of the document, at most 1500 characters.
 warnings: short strings for anything unreadable, ambiguous or contradictory.
@@ -118,6 +147,15 @@ function normalizeResult(parsed) {
     warnings.push('No amount could be read from this document. Check it before using the result.');
   }
 
+  const supporting_documents = src.supporting_documents && typeof src.supporting_documents === 'object'
+    ? {
+      invoice: !!src.supporting_documents.invoice,
+      tax_invoice: !!src.supporting_documents.tax_invoice,
+      contract: !!src.supporting_documents.contract,
+      payment_proof: !!src.supporting_documents.payment_proof,
+    }
+    : null;
+
   return {
     ok: true,
     source: 'ocr_vision',
@@ -125,6 +163,7 @@ function normalizeResult(parsed) {
     document_type: type,
     confidence: anyAmount === null && confidence === 'high' ? 'medium' : confidence,
     fields,
+    supporting_documents,
     warnings,
   };
 }
@@ -199,18 +238,24 @@ async function readDocumentWithVision(buffer, opts = {}) {
 // these are the model's own structured answer.
 const FILL_FROM_OCR = {
   document_number: (f) => f.document_number,
+  tax_invoice_serial: (f) => f.tax_invoice_serial,
   issuer_name: (f) => f.issuer_name,
   buyer_name: (f) => f.buyer_name ?? f.counterparty_name,
-  issuer_npwp: (f) => f.npwp,
+  issuer_npwp: (f) => f.issuer_npwp ?? f.npwp,
+  buyer_npwp: (f) => f.buyer_npwp,
   description: () => null,
   currency: (f) => f.currency,
-  commercial_base_amount: (f) => f.commercial_base_amount,
+  subtotal: (f) => f.subtotal ?? f.commercial_base_amount,
+  commercial_base_amount: (f) => f.commercial_base_amount ?? f.subtotal,
+  tax_base_dpp: (f) => f.tax_base_dpp,
+  discount_amount: (f) => f.discount_amount,
   commercial_tax_amount: (f) => f.commercial_tax_amount,
   gross_amount: (f) => f.gross_amount ?? f.amount,
   amount: (f) => f.amount ?? f.gross_amount,
   payment_method: (f) => f.payment_method,
   payment_reference_number: (f) => f.reference_number,
   transfer_date_text: (f) => f.date,
+  document_date: (f) => f.invoice_date ?? f.date,
 };
 
 /**
@@ -235,8 +280,21 @@ function mergeIntoExtraction(base, ocr) {
     }
   }
 
-  const type = (base.document_type && base.document_type !== 'unknown')
+  let type = (base.document_type && base.document_type !== 'unknown')
     ? base.document_type : ocr.document_type;
+
+  // Package reconciliation: if an invoice number/commercial bill exists alongside a Faktur Pajak,
+  // the document is a commercial invoice package and its primary payable type is invoice.
+  if (type === 'faktur_pajak' && (ocr.supporting_documents?.invoice || fields.document_number)) {
+    type = 'invoice';
+  }
+
+  const detected_supporting_documents = {
+    invoice: type === 'invoice' || !!(ocr.supporting_documents && ocr.supporting_documents.invoice),
+    tax_invoice: type === 'faktur_pajak' || !!fields.tax_invoice_serial || !!(ocr.supporting_documents && ocr.supporting_documents.tax_invoice),
+    contract: type === 'contract' || !!(ocr.supporting_documents && ocr.supporting_documents.contract),
+    payment_proof: type === 'payment_proof' || !!(ocr.supporting_documents && ocr.supporting_documents.payment_proof),
+  };
 
   const RANK = { needs_review: 0, low: 1, medium: 2, high: 3 };
   const capped = Math.min(RANK[base.confidence] ?? 0, RANK[ocr.confidence] ?? 0, RANK.medium);
@@ -257,6 +315,7 @@ function mergeIntoExtraction(base, ocr) {
     confidence,
     status: 'suggested',
     fields,
+    detected_supporting_documents,
     missing_fields: missing,
     warnings,
     // Never the full transcript: this travels with the document row.

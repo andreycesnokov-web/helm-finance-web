@@ -210,7 +210,7 @@ async function runInvoiceAnalysis(args, ctx, biz) {
   const readinessSrc = linked
     ? { basis: 'linked_invoice', invoice_id: linked.invoice.debt_id, settlement: linked.settlement,
         documents: linked.documents, closeout: linked.closeout }
-    : s.invoiceReadinessPreview(f, intake.tax || {});
+    : s.invoiceReadinessPreview(f, intake.tax || {}, ex.detected_supporting_documents || {});
   const close = readinessSrc.closeout || {};
   const checklist = close.checklist || [];
   const required = checklist.filter((d) => d.required);
@@ -235,7 +235,9 @@ async function runInvoiceAnalysis(args, ctx, biz) {
       invoice_date: dateOf(dates.document_date),
       due_date: dateOf(dates.due_date),
       currency: f.currency || (intake.financial_record && intake.financial_record.currency) || null,
-      subtotal: f.commercial_base_amount ?? null,
+      subtotal: f.subtotal ?? f.commercial_base_amount ?? null,
+      tax_base_dpp: f.tax_base_dpp ?? null,
+      discount_amount: f.discount_amount ?? null,
       tax_amount_read: f.commercial_tax_amount ?? null,
       total: f.gross_amount ?? null,
       description: f.description ?? null,
@@ -796,7 +798,8 @@ function writeTools(ctx) {
           + 'reimbursement) that an owner, admin or CFO must approve.',
         inputSchema: {
           company_id: COMPANY_ID,
-          request_key: z.string().uuid().describe('Stable UUID for this reviewed create. Reuse after response loss; a different payload with this key is refused.'),
+          request_key: z.string().uuid().default(() => crypto.randomUUID())
+            .describe('Stable UUID for this reviewed create. Reuse after response loss; a different payload with this key is refused.'),
           document_id: z.string().min(1).max(64).optional()
             .describe('Id of a document already stored in CFO Finance for this company'),
           invoice_text: z.string().max(20000).optional()

@@ -3312,14 +3312,24 @@ async function linkedInvoiceSettlement(biz, docId) {
 // the SAME settlement + closeout engine as a stored invoice, fed the only facts known —
 // this document is the invoice, no payment is allocated, tax as the intake assessed it.
 // A preview for a caller deciding whether to enter it; never a stored state.
-function invoiceReadinessPreview(fields = {}, tax = {}) {
+function invoiceReadinessPreview(fields = {}, tax = {}, detectedDocs = {}) {
   const settlement = SETTLE.settlementOf({
     invoice_total: fields.gross_amount,
     base_amount: fields.commercial_base_amount,
     tax_amount: tax.ppn_detected ? tax.ppn_amount : null,
     allocations: [],
   });
-  const documents = { invoice: true };
+  const hasTaxInvoice = !!(
+    detectedDocs.tax_invoice
+    || fields.tax_invoice_serial
+    || fields.faktur_pajak
+  );
+  const documents = {
+    invoice: true,
+    tax_invoice: hasTaxInvoice,
+    contract: !!detectedDocs.contract,
+    payment_proof: !!detectedDocs.payment_proof,
+  };
   const closeout = SETTLE.closeoutState({ settlement, documents, has_tax: !!tax.ppn_detected });
   return { basis: 'preview_as_new_invoice', settlement, documents, closeout };
 }
@@ -15268,7 +15278,9 @@ async function readDocumentForIntake(biz, doc) {
   // 600-character excerpt stored on the row — a due date or a second party block
   // routinely sits past that cut.
   const readText = (readSource === 'ocr_vision' ? (ocr && ocr.text) : ex.text) || '';
-  const dates = docDates.extractDates(readText, { document_type: extraction.document_type });
+  const knownDate = extraction.fields?.document_date || extraction.fields?.transfer_date_text || ocr?.fields?.invoice_date || ocr?.fields?.date || null;
+  const dueDate = ocr?.fields?.due_date || null;
+  const dates = docDates.extractDates(readText, { document_type: extraction.document_type, known_date: knownDate, due_date: dueDate });
   const parties = docParties.extractParties(readText);
 
   return { file, buf, extraction, readSource, ocr, dates, parties };
@@ -15281,7 +15293,8 @@ async function readDocumentForIntake(biz, doc) {
 function readTextForIntake(text) {
   const body = String(text || '');
   const extraction = docExtract.extractFromText(body, { text_available: body.trim().length > 0 });
-  const dates = docDates.extractDates(body, { document_type: extraction.document_type });
+  const knownDate = extraction.fields?.document_date || extraction.fields?.transfer_date_text || null;
+  const dates = docDates.extractDates(body, { document_type: extraction.document_type, known_date: knownDate });
   const parties = docParties.extractParties(body);
   return { file: null, buf: null, extraction, readSource: 'client_model_text', ocr: null, dates, parties };
 }
