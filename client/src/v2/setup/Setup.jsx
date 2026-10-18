@@ -24,7 +24,8 @@ import I from '../icons'
 import { Pill, Skeleton, ErrorBox } from '../ui'
 import { useT, useLang } from '../i18n'
 import { V2DataProvider, useApi, useInvalidate } from '../data'
-import { LangSwitch } from '../auth/AuthApp'
+import { LangSwitch, SelectedPlanBadge } from '../auth/AuthApp'
+import { captureSelectedPlan, getSelectedPlan, appendPlanParam } from '../../lib/planSelection'
 import { TaxList, ruleTitle } from '../pages/Accountant'
 import { optLabel } from '../pages/CompanyProfileEdit'
 import {performProfileOperation,recoverProfileOperation,profileCurrent,unconfirmedProfileFields} from '../lib/profileOperation'
@@ -108,7 +109,10 @@ function SetupChrome() {
 /* ── R4: about the company → creates it ──────────────────────────────────── */
 export function SetupAbout() {
   const t = useT()
+  const lang = useLang()
   const nav = useNavigate()
+  const loc = useLocation()
+  captureSelectedPlan(loc.search)
   const { token, logout } = useAuth()
   const { applyActive, refresh, selectionRef, loading } = useWorkspace()
   const mounted = useRef(true)
@@ -146,7 +150,8 @@ export function SetupAbout() {
     finishCompanyCreation(token)
     applyActive({ id: business.id, name: business.name, type: 'business', role: 'owner', business_code: business.business_code })
     refresh()
-    nav((business.billing_policy==='commercial_v2'?'/business/trial':'/business/setup/docs')+'?business_id='+encodeURIComponent(business.id))
+    const targetUrl = (business.billing_policy==='commercial_v2'?'/business/trial':'/business/setup/docs')+'?business_id='+encodeURIComponent(business.id)
+    nav(appendPlanParam(targetUrl, getSelectedPlan()))
   }
   const submit = async (e) => {
     e.preventDefault()
@@ -164,13 +169,14 @@ export function SetupAbout() {
       if(x?.code==='company_session_invalid'){logout();return}
       if(isCurrent()){
         setPending(pendingCompanyCreation(token))
-        const message=x?.code==='company_recovery_storage_required'?t('setup.creation.storage'):x?.code==='company_serialization_required'?t('setup.creation.browser'):x?.status===400?t('setup.creation.invalid'):t('setup.creation.unknown')
+        const message=x?.code==='company_limit_reached'||x?.status===402?(x?.data?.message||(lang==='ru'?'Достигнут лимит компаний для вашего тарифа. Перейдите на тариф Control или Pro.':lang==='id'?'Batas perusahaan untuk paket Anda telah tercapai. Tingkatkan ke paket Control atau Pro.':'Company limit reached for your plan. Please upgrade to Control or Pro.')):x?.code==='company_recovery_storage_required'?t('setup.creation.storage'):x?.code==='company_serialization_required'?t('setup.creation.browser'):x?.status===400?t('setup.creation.invalid'):t('setup.creation.unknown')
         setErr({form_:message})
       }
     } finally { if(mounted.current)setBusy(false) }
   }
   return (
     <form className="v2-setup-card" onSubmit={submit} noValidate>
+      <SelectedPlanBadge />
       <h1 className="v2-auth-h1">{t('setup.about.title')}</h1>
       <p className="v2-auth-p">{t('setup.about.p')}</p>
       {pending && <div className="v2-banner v2-tone-info" role="status"><span>{pending.state==='completed'&&checked?t('setup.creation.completed',{name:pending.result.business.name}):t('setup.creation.unknown')}</span></div>}

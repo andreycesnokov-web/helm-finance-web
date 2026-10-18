@@ -3,7 +3,7 @@
 // > stored/default free. Trial is effective ONLY by trial_ends_at, never by the
 // stale trial_status field. Stored / subscription / trial / override are reported
 // SEPARATELY and never merged into one field.
-const VALID_PLANS = ['free', 'starter', 'business', 'founder', 'enterprise'];
+const VALID_PLANS = ['free', 'starter', 'control', 'pro', 'business', 'founder', 'enterprise'];
 
 function computeBusinessAccess(business, now = new Date(), billing = null) {
   // Only a server-loaded, company-scoped billing snapshot opts into V2 policy.

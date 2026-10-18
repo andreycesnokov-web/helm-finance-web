@@ -8,6 +8,7 @@ import { getLang, setLang } from './i18n/index'
 import { apiFetch } from './lib/api'
 import { WorkspaceProvider } from './shell/WorkspaceProvider'
 import { legacyDestination } from './lib/routeIntent'
+import { captureSelectedPlan } from './lib/planSelection'
 
 // ── Localize text from backend (AI insight strings) ──────────────────────────
 const RU_TEXT_MAP = {
@@ -592,9 +593,18 @@ function AccountantRedirect({ to = '/business/accountant' }) {
   return <Navigate to={`${targetPath}${searchStr ? '?' + searchStr : ''}`} replace />
 }
 
+function PlanWatcher() {
+  const location = useLocation()
+  useEffect(() => {
+    captureSelectedPlan(location.search)
+  }, [location.search])
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <PlanWatcher />
       <AuthProvider>
         <SwipeBackIndicator />
         <Routes>
@@ -610,6 +620,7 @@ export default function App() {
           {EMAIL_AUTH_UI && <Route path="/account" element={V2_AUTH ? v2Auth('account') : <PersonalProfile />} />}
           {V2_AUTH && <Route path="/join" element={v2Auth('join')} />}
           {PASSWORD_UI && <Route path="/register" element={v2Auth('register')} />}
+          <Route path="/signup" element={PASSWORD_UI ? v2Auth('register') : (V2_AUTH ? v2Auth('signin') : <Login />)} />
           {PASSWORD_UI && <Route path="/auth/confirmed" element={v2Auth('confirmed')} />}
           {PASSWORD_UI && <Route path="/auth/forgot" element={v2Auth('forgot')} />}
           {PASSWORD_UI && <Route path="/auth/reset" element={v2Auth('reset')} />}

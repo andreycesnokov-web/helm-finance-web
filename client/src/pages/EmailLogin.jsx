@@ -2,16 +2,18 @@
 // backend also gated by EMAIL_AUTH_ENABLED. Primary: "Send sign-in link" → user clicks
 // the emailed link (/login/email/callback?token=…). Secondary: manual 6-digit code.
 // In local dev (backend EMAIL_AUTH_DEV_RETURN_CODE) the link + code are shown for testing.
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { consumePostLoginRedirect } from '../lib/api'
+import { captureSelectedPlan, getSelectedPlan, PLAN_DETAILS } from '../lib/planSelection'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function EmailLogin() {
   const { loginWithToken } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [step, setStep] = useState(1)       // 1 = email, 2 = link sent
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -20,6 +22,13 @@ export default function EmailLogin() {
   const [error, setError] = useState('')
   const [devLink, setDevLink] = useState('')  // local dev only
   const [devCode, setDevCode] = useState('')  // local dev only
+
+  useEffect(() => {
+    captureSelectedPlan(location.search)
+  }, [location.search])
+
+  const selectedPlanCode = getSelectedPlan()
+  const planInfo = selectedPlanCode ? PLAN_DETAILS[selectedPlanCode] : null
 
   const start = async (e) => {
     e?.preventDefault?.()
@@ -71,6 +80,11 @@ export default function EmailLogin() {
 
   return (
     <div style={{ maxWidth: 380, margin: '0 auto', padding: '48px 20px' }}>
+      {planInfo && (
+        <div style={{ padding: '12px 14px', borderRadius: 8, background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF', fontSize: 13, marginBottom: 16 }}>
+          <strong>{planInfo.name} Plan</strong> ({planInfo.priceMonthly}/mo) · {planInfo.trialDays}-day free trial included
+        </div>
+      )}
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Sign in with email</h1>
       <p style={{ fontSize: 14, color: 'var(--text-3, #777)', marginBottom: 24 }}>
         We'll email you a secure sign-in link. New here? Your Personal Account is created automatically.

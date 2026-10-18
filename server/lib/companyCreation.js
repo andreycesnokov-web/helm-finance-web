@@ -16,8 +16,8 @@ function creationInput(body, currencies) {
 }
 function creationError(res,error) {
   const msg=error?.message||'';
-  const known=[['company_creation_key_mismatch',409],['company_creation_unavailable',410],['invalid_company_creation',400]];
-  for(const [code,status]of known)if(msg.includes(code))return res.status(status).json({error:code});
+  const known=[['company_creation_key_mismatch',409],['company_creation_unavailable',410],['invalid_company_creation',400],['company_limit_reached',402],['billing_quota_reached',402]];
+  for(const [code,status]of known)if(msg.includes(code))return res.status(status).json({error:code,message:'You have reached the company limit for your current subscription plan.'});
   if(['PGRST202','42883','42703','42P01'].includes(error?.code))return res.status(503).json({error:'company_creation_unavailable_schema',outcome:'rolled_back'});
   // A gateway failure can follow a committed RPC. Never label it as rollback.
   return res.status(503).json({error:'company_creation_outcome_unknown',outcome:'unknown',automatic_retry:false});

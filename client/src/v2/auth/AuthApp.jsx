@@ -24,6 +24,7 @@ import {
   lookupInvite, readInviteMembership, readMyProfile, readWorkspaces,
   passwordRegister, passwordResend, passwordSignIn, passwordForgot, passwordReset, passwordLinkUsed,
 } from '../lib/actions'
+import { captureSelectedPlan, getSelectedPlan, appendPlanParam, PLAN_DETAILS } from '../../lib/planSelection'
 import '../v2.css'
 
 const SYMBOL = '/brand/symbol_navy_transparent.svg'
@@ -32,6 +33,20 @@ export const PASSWORD_UI = import.meta.env.VITE_PASSWORD_AUTH_ENABLED === 'true'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const RESEND_SECONDS = 45
 const INVITE_KEY = 'post_login_redirect'
+
+export function SelectedPlanBadge({ plan: planProp, style }) {
+  const planCode = planProp || getSelectedPlan()
+  if (!planCode || !PLAN_DETAILS[planCode]) return null
+  const plan = PLAN_DETAILS[planCode]
+  return (
+    <div className="v2-banner v2-tone-info" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, ...style }} role="status">
+      <I.check size={18} />
+      <span className="v2-banner-text">
+        <strong>{plan.name} Plan</strong> ({plan.priceMonthly}/mo) · {plan.trialDays}-day free trial, no credit card required
+      </span>
+    </div>
+  )
+}
 
 function detectTimezone() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' } }
 
@@ -78,6 +93,8 @@ export function SignIn() {
 function LinkSignIn() {
   const t = useT()
   const nav = useNavigate()
+  const loc = useLocation()
+  const selectedPlan = captureSelectedPlan(loc.search)
   const { user } = useAuth()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(null)        // { email, devLink }
@@ -104,6 +121,7 @@ function LinkSignIn() {
     return (
       <AuthFrame>
         <section className="v2-auth-card" aria-labelledby="r2-title">
+          <SelectedPlanBadge plan={selectedPlan} />
           <span className="v2-auth-icon" aria-hidden="true"><I.send size={22} /></span>
           <h1 id="r2-title" className="v2-auth-h1">{t('auth.r2.title')}</h1>
           <p className="v2-auth-p">{t('auth.r2.p', { email: sent.email })}</p>
@@ -137,6 +155,7 @@ function LinkSignIn() {
           </ul>
         </section>
         <section className="v2-auth-card" aria-labelledby="r1-title">
+          <SelectedPlanBadge plan={selectedPlan} />
           <h2 id="r1-title" className="v2-auth-h1">{t('auth.r1.title')}</h2>
           <p className="v2-auth-p">{t('auth.r1.p')}</p>
           <form onSubmit={send} noValidate>
@@ -221,6 +240,8 @@ function ResendLink({ email }) {
 function PasswordSignIn() {
   const t = useT()
   const nav = useNavigate()
+  const loc = useLocation()
+  const selectedPlan = captureSelectedPlan(loc.search)
   const { user, loginWithToken } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -254,6 +275,7 @@ function PasswordSignIn() {
           </ul>
         </section>
         <section className="v2-auth-card" aria-labelledby="pw-title">
+          <SelectedPlanBadge plan={selectedPlan} />
           <h2 id="pw-title" className="v2-auth-h1">{t('auth.pw.title')}</h2>
           <p className="v2-auth-p">{t('auth.pw.p')}</p>
           <form onSubmit={submit} noValidate>
@@ -268,7 +290,7 @@ function PasswordSignIn() {
           </form>
           {unconfirmed && <ResendLink email={unconfirmed} />}
           <Link to="/auth/forgot" className="v2-btn-link">{t('auth.pw.forgot')}</Link>
-          <p className="v2-auth-p">{t('auth.pw.noAccount')} <Link to="/register">{t('auth.pw.register')}</Link></p>
+          <p className="v2-auth-p">{t('auth.pw.noAccount')} <Link to={appendPlanParam('/register', selectedPlan)}>{t('auth.pw.register')}</Link></p>
           <div className="v2-auth-or"><span>{t('auth.or')}</span></div>
           <Link to="/join" className="v2-btn v2-btn-secondary v2-btn-block">{t('auth.r1.invite')}</Link>
           <p className="v2-muted v2-small">{t('auth.r1.tg')} <Link to="/login/telegram">{t('auth.r1.tgLink')}</Link>. {t('auth.r1.terms')}</p>
@@ -281,6 +303,8 @@ function PasswordSignIn() {
 export function Register() {
   const t = useT()
   const nav = useNavigate()
+  const loc = useLocation()
+  const selectedPlan = captureSelectedPlan(loc.search)
   const { user } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -302,11 +326,12 @@ export function Register() {
     return (
       <AuthFrame>
         <section className="v2-auth-card" aria-labelledby="reg-sent">
+          <SelectedPlanBadge plan={selectedPlan} />
           <span className="v2-auth-icon" aria-hidden="true"><I.send size={22} /></span>
           <h1 id="reg-sent" className="v2-auth-h1">{t('auth.pw.sentTitle')}</h1>
           <p className="v2-auth-p">{t('auth.pw.sentP', { email: sent })}</p>
           <ResendLink email={sent} />
-          <Link to="/login" className="v2-btn-link">{t('auth.pw.back')}</Link>
+          <Link to={appendPlanParam('/login', selectedPlan)} className="v2-btn-link">{t('auth.pw.back')}</Link>
           <p className="v2-muted v2-small">{t('auth.r2.spam')}</p>
         </section>
       </AuthFrame>
@@ -315,6 +340,7 @@ export function Register() {
   return (
     <AuthFrame>
       <section className="v2-auth-card" aria-labelledby="reg-title">
+        <SelectedPlanBadge plan={selectedPlan} />
         <h1 id="reg-title" className="v2-auth-h1">{t('auth.pw.regTitle')}</h1>
         <p className="v2-auth-p">{t('auth.pw.regP')}</p>
         <form onSubmit={submit} noValidate>
@@ -329,7 +355,7 @@ export function Register() {
           {err && <p className="v2-inline-err" role="alert">{err}</p>}
           <button type="submit" className="v2-btn v2-btn-primary v2-btn-block" disabled={busy}>{busy ? t('auth.sending') : t('auth.pw.regSubmit')}</button>
         </form>
-        <p className="v2-auth-p">{t('auth.pw.haveAccount')} <Link to="/login">{t('auth.pw.signIn')}</Link></p>
+        <p className="v2-auth-p">{t('auth.pw.haveAccount')} <Link to={appendPlanParam('/login', selectedPlan)}>{t('auth.pw.signIn')}</Link></p>
         <p className="v2-muted v2-small">{t('auth.r1.terms')}</p>
       </section>
     </AuthFrame>
@@ -373,7 +399,8 @@ export function EmailConfirmed() {
               <span className="v2-auth-icon" aria-hidden="true"><I.check size={22} /></span>
               <h1 className="v2-auth-h1">{t('auth.pw.confirmedTitle')}</h1>
               <p className="v2-auth-p">{t('auth.pw.confirmedP')}</p>
-              <Link to="/login" className="v2-btn v2-btn-primary v2-btn-block">{t('auth.pw.signIn')}</Link>
+              <SelectedPlanBadge />
+              <Link to={appendPlanParam('/login', getSelectedPlan())} className="v2-btn v2-btn-primary v2-btn-block">{t('auth.pw.signIn')}</Link>
             </>
           : <LinkProblem resend />}
       </section>
@@ -598,8 +625,9 @@ export function Account() {
           </ul>
         </section>
       )}
+      {companies.length === 0 && <SelectedPlanBadge style={{ marginTop: 12 }} />}
       {workspaceState==='ready'&&<div className="v2-auth-choices">
-        <Link to="/business/new" className="v2-auth-choice">
+        <Link to={appendPlanParam('/business/new', getSelectedPlan())} className="v2-auth-choice">
           <span className="v2-auth-choice-ic" aria-hidden="true"><I.plus size={22} /></span>
           <strong>{companies.length ? t('auth.r3.createAnother') : t('auth.r3.create')}</strong>
           <span className="v2-muted">{t('auth.r3.createP')}</span>

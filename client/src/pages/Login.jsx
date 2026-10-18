@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import TelegramLoginWidget from '../components/TelegramLoginWidget'
+import { captureSelectedPlan, appendPlanParam, getSelectedPlan } from '../lib/planSelection'
 
 // Email is the PRIMARY login when enabled. Telegram becomes legacy access (a small
 // secondary link → /login/telegram). When the flag is OFF, /login keeps the old
@@ -11,6 +12,11 @@ const EMAIL_AUTH_UI = import.meta.env.VITE_EMAIL_AUTH_ENABLED === 'true'
 export default function Login() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    captureSelectedPlan(location.search)
+  }, [location.search])
 
   // Already signed in → home (covers the email-first branch which doesn't mount the widget).
   useEffect(() => { if (user) navigate('/') }, [user]) // eslint-disable-line
@@ -35,7 +41,7 @@ export default function Login() {
         {EMAIL_AUTH_UI ? (
           <>
             {/* PRIMARY: email / magic link */}
-            <button style={primaryBtn} onClick={() => navigate('/login/email')}>Sign in with email</button>
+            <button style={primaryBtn} onClick={() => navigate(appendPlanParam('/login/email', getSelectedPlan()))}>Sign in with email</button>
             <div style={{ fontSize: 12, color: 'var(--text-3, #999)', marginTop: 8 }}>We'll email you a secure sign-in link.</div>
             {/* SECONDARY: legacy Telegram */}
             <button style={linkBtn} onClick={() => navigate('/login/telegram')}>
