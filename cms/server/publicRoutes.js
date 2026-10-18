@@ -1230,8 +1230,9 @@ function createPublicRoutes(contentStore) {
     const t = getT(locale);
     const pricing = contentStore.getPricing();
     const seo = contentStore.getSeo();
-    const title = seo.pages_meta?.pricing?.title || `${t.pricing_page.heading} — CFO AI Indonesia`;
-    const description = seo.pages_meta?.pricing?.description || t.pricing_page.subheadline;
+    const pPage = t.pricing_page || {};
+    const title = seo.pages_meta?.pricing?.title || `${pPage.heading} — CFO AI Indonesia`;
+    const description = seo.pages_meta?.pricing?.description || (pPage.subheading || pPage.subheadline || '');
     const canonical = `https://cfo-ai.site/${locale}/pricing`;
 
     const hreflangs = locales.filter(l => l.status === 'published').map(l => ({
@@ -1240,17 +1241,17 @@ function createPublicRoutes(contentStore) {
     }));
 
     const categoryTitles = {
-      financial_core: t.pricing_page.cat_financial_core || "Financial Core",
-      operations: t.pricing_page.cat_operations || "Operations & Spend Control",
-      ai_automation: t.pricing_page.cat_ai_automation || "AI & Automation",
-      tax_compliance: t.pricing_page.cat_tax_compliance || "Tax & Compliance",
-      team_organization: t.pricing_page.cat_team_organization || "Team & Organization",
-      integrations_usage: t.pricing_page.cat_integrations_usage || "Integrations & Platform"
+      financial_core: pPage.cat_financial_core || "Financial Core",
+      operations: pPage.cat_operations || "Operations & Spend Control",
+      ai_automation: pPage.cat_ai_automation || "AI & Automation",
+      tax_compliance: pPage.cat_tax_compliance || "Tax & Compliance",
+      team_organization: pPage.cat_team_organization || "Team & Organization",
+      integrations_usage: pPage.cat_integrations_usage || "Integrations & Platform"
     };
 
     const renderCell = (val, isControl = false) => {
       if (val === 'Included' || val === true) {
-        return '<span class="inline-flex items-center justify-center text-emerald-600 font-extrabold text-sm" title="Included">✓</span>';
+        return '<span class="inline-flex items-center justify-center text-emerald-600 font-extrabold text-sm" title="Included"><svg class="w-4 h-4 text-emerald-600 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></span>';
       }
       if (val === '—' || val === '-' || val === 'Not Included' || val === false) {
         return '<span class="inline-flex items-center justify-center text-slate-400 font-bold text-sm" title="Not Included">—</span>';
@@ -1258,9 +1259,15 @@ function createPublicRoutes(contentStore) {
       return `<span class="font-mono-num ${isControl ? 'font-bold text-[#06366B]' : 'font-semibold text-slate-700'} text-xs">${val}</span>`;
     };
 
-    const matrixHtml = (pricing.matrix_categories || []).map(cat => {
+    const isQuotaRow = r => r.name.includes('/ Month') || r.name.includes('Seats') || r.name.includes('Workspaces') || r.name.includes('Accounts') || r.name.includes('Booked') || r.name.includes('Requests') || r.name.includes('OCR');
+
+    // Level A: Business Capabilities Rows
+    const levelARowsHtml = (pricing.matrix_categories || []).map(cat => {
       const catTitle = categoryTitles[cat.id] || cat.category_name;
-      const rowsHtml = (cat.rows || []).map(r => `
+      const capabilities = (cat.rows || []).filter(r => !isQuotaRow(r));
+      if (capabilities.length === 0) return '';
+
+      const rows = capabilities.map(r => `
         <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-colors">
           <td class="p-3.5 sm:p-4 font-semibold text-[#06366B]">
             <div class="font-bold text-xs">${r.name}</div>
@@ -1280,97 +1287,332 @@ function createPublicRoutes(contentStore) {
 
       return `
         <tr class="bg-slate-100/90 border-t-2 border-slate-200">
-          <th colspan="4" class="py-3 px-4 text-xs font-black uppercase tracking-wider text-[#06366B] bg-slate-100/90 text-left">
+          <th colspan="4" class="py-2.5 px-4 text-xs font-black uppercase tracking-wider text-[#06366B] bg-slate-100/90 text-left">
             ${catTitle}
           </th>
         </tr>
-        ${rowsHtml}
+        ${rows}
       `;
     }).join('');
 
+    // Level B: Technical Limits & Quotas Rows
+    const levelBRowsHtml = (pricing.matrix_categories || []).map(cat => {
+      const catTitle = categoryTitles[cat.id] || cat.category_name;
+      const quotas = (cat.rows || []).filter(r => isQuotaRow(r));
+      if (quotas.length === 0) return '';
+
+      const rows = quotas.map(r => `
+        <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-colors">
+          <td class="p-3.5 sm:p-4 font-semibold text-[#06366B]">
+            <div class="font-bold text-xs">${r.name}</div>
+            ${r.desc ? `<div class="text-[11px] text-slate-500 font-normal leading-tight mt-0.5">${r.desc}</div>` : ''}
+          </td>
+          <td class="p-3.5 sm:p-4 text-center">
+            ${renderCell(r.starter)}
+          </td>
+          <td class="p-3.5 sm:p-4 text-center bg-blue-50/30 border-x border-blue-100 font-bold text-[#06366B]">
+            ${renderCell(r.control, true)}
+          </td>
+          <td class="p-3.5 sm:p-4 text-center">
+            ${renderCell(r.pro)}
+          </td>
+        </tr>
+      `).join('');
+
+      return `
+        <tr class="bg-slate-100/90 border-t-2 border-slate-200">
+          <th colspan="4" class="py-2.5 px-4 text-xs font-black uppercase tracking-wider text-[#06366B] bg-slate-100/90 text-left">
+            ${catTitle}
+          </th>
+        </tr>
+        ${rows}
+      `;
+    }).join('');
+
+    const plans = [
+      { key: 'starter', ...pPage.cards.starter, is_recommended: false, price_val: '$59' },
+      { key: 'control', ...pPage.cards.control, is_recommended: true, price_val: '$149' },
+      { key: 'pro', ...pPage.cards.pro, is_recommended: false, price_val: '$249' }
+    ];
+
     const contentHtml = `
-      <section class="py-16 px-4 sm:px-6 lg:px-8 bg-ice-primary border-b border-[#CBD5E1] relative overflow-hidden">
+      <section class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-ice-primary border-b border-[#CBD5E1] relative overflow-hidden" id="pricing-hero">
         ${renderWatermark({ color: '#06366B', opacity: '0.04', size: 'w-96 h-96', className: 'absolute -right-20 -top-10 pointer-events-none select-none z-0' })}
         <div class="max-w-7xl mx-auto text-center relative z-10">
-          <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.pricing_page.badge}</span>
-          <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4">${t.pricing_page.heading}</h1>
-          <p class="text-sm text-slate-700 max-w-2xl mx-auto mb-12">${t.pricing_page.subheadline}</p>
+          <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.badge}</span>
+          <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4 tracking-tight">${pPage.heading}</h1>
+          <p class="text-sm sm:text-base text-slate-700 max-w-2xl mx-auto mb-8 leading-relaxed">${pPage.subheading || pPage.subheadline}</p>
 
-          <!-- PRICING CARDS (Standardized Monthly Pricing) -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16 text-left">
-            ${pricing.plans.map(p => `
-              <div class="bento-card p-8 flex flex-col justify-between ${p.is_recommended ? 'border-2 border-[#1768C9] shadow-xl relative' : ''}">
-                ${p.is_recommended ? `<div class="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-[#1768C9] text-white text-[10px] font-black uppercase px-3 py-1 rounded-full">${p.badge}</div>` : ''}
+          <!-- VALUE PILLS -->
+          <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-14 max-w-4xl mx-auto">
+            ${(pPage.pills || []).map(pill => `
+              <div class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-[#CBD5E1] shadow-xs text-xs font-semibold text-[#06366B]">
+                <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span>${pill}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- 3 OUTCOME-ORIENTED PRICING CARDS -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-20 text-left items-stretch">
+            ${plans.map(p => `
+              <div class="bento-card p-7 sm:p-8 flex flex-col justify-between bg-white rounded-2xl ${p.is_recommended ? 'border-2 border-[#1768C9] shadow-xl relative ring-4 ring-blue-500/10' : 'border border-[#CBD5E1] shadow-sm'}">
+                ${p.is_recommended ? `<div class="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-[#1768C9] text-white text-[10px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-sm">${p.badge}</div>` : ''}
                 <div>
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-black uppercase text-[#1768C9]">${p.name}</span>
-                    <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">${t.pricing_page.trial_badge}</span>
+                    <span class="text-xs font-black uppercase tracking-wider text-[#1768C9]">${p.name}</span>
+                    <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">${pPage.trial_badge}</span>
                   </div>
-                  <h3 class="text-xl font-black text-[#06366B] mb-1">${p.tagline}</h3>
-                  <p class="text-xs text-slate-600 mb-6">${p.description}</p>
+                  <h3 class="text-xl font-black text-[#06366B] mb-2">${p.outcome}</h3>
+                  <p class="text-xs text-slate-600 mb-6 leading-relaxed">${p.desc}</p>
                   
-                  <div class="flex items-baseline gap-1 mb-6">
-                    <span class="text-4xl font-black text-[#06366B] font-mono-num plan-price">$${p.price_monthly}</span>
-                    <span class="text-xs text-slate-500 plan-interval">${t.pricing_page.per_month}</span>
+                  <div class="flex items-baseline gap-1 mb-4">
+                    <span class="text-4xl font-black text-[#06366B] font-mono-num plan-price">${p.price_val}</span>
+                    <span class="text-xs text-slate-500 plan-interval">${pPage.per_month}</span>
                   </div>
 
-                  <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-[#06366B] font-semibold mb-6 space-y-1.5">
-                    ${p.capacity_highlights.map(h => `<div class="flex justify-between"><span>${h.label}:</span><span class="font-bold text-[#1768C9]">${h.value}</span></div>`).join('')}
+                  <div class="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-[#06366B] font-semibold mb-6 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    <span>${p.limits_highlight}</span>
                   </div>
 
-                  <ul class="space-y-2 text-xs text-slate-700 mb-8">
-                    ${p.feature_bullets.map(b => `<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#1768C9] shrink-0"></span>${b}</li>`).join('')}
+                  <ul class="space-y-2.5 text-xs text-slate-700 mb-8">
+                    ${p.benefits.map(b => `
+                      <li class="flex items-start gap-2.5">
+                        <svg class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        <span class="leading-snug">${b}</span>
+                      </li>
+                    `).join('')}
                   </ul>
                 </div>
 
-                <a href="${p.cta_url}" class="w-full text-center text-xs font-bold py-3.5 rounded-xl transition-all min-h-[44px] flex items-center justify-center ${p.is_recommended ? 'bg-[#1768C9] hover:bg-[#06366B] text-white shadow-md' : 'bg-white hover:bg-slate-50 text-[#06366B] border border-[#CBD5E1]'}">
-                  ${p.cta_text} &rarr;
+                <a href="${p.url}" data-track-cta="pricing-plan-trial" data-track-plan="${p.key}" class="w-full text-center text-xs font-bold py-3.5 rounded-xl transition-all min-h-[44px] flex items-center justify-center ${p.is_recommended ? 'bg-[#1768C9] hover:bg-[#06366B] text-white shadow-md' : 'bg-white hover:bg-slate-50 text-[#06366B] border border-[#CBD5E1]'}">
+                  ${p.cta} &rarr;
                 </a>
               </div>
             `).join('')}
           </div>
 
-          <!-- UNIFIED 6-CATEGORY FEATURE & USAGE MATRIX -->
-          <div class="max-w-6xl mx-auto mb-16 text-left">
-            <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mb-2 text-center">${t.pricing_page.features_title}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 mb-8 text-center max-w-2xl mx-auto">${t.pricing_page.features_sub}</p>
+          <!-- HOW CFO AI WORKS FOR YOUR TEAM (OPERATIONAL WORKFLOW) -->
+          <div class="max-w-6xl mx-auto mb-20 text-left">
+            <div class="text-center mb-10 max-w-3xl mx-auto">
+              <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.team_workflow.eyebrow}</span>
+              <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.team_workflow.title}</h2>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.team_workflow.subtitle}</p>
+            </div>
 
-            <div class="bento-card overflow-x-auto shadow-sm">
-              <table class="w-full text-xs text-left border-collapse min-w-[680px]">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B]">
-                    <th class="p-4 text-left font-bold text-xs uppercase tracking-wider w-2/5">Feature &amp; Operational Quota</th>
-                    <th class="p-4 text-center font-bold text-xs w-1/5">
-                      <div class="text-[#06366B] font-black text-sm">Starter</div>
-                      <div class="font-mono-num text-xs text-slate-500 mt-0.5">$59/mo</div>
-                    </th>
-                    <th class="p-4 text-center font-bold text-xs w-1/5 bg-blue-50/80 text-[#1768C9] border-x border-blue-200/80 relative">
-                      <span class="text-[10px] uppercase font-black tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full inline-block mb-1">RECOMMENDED</span>
-                      <div class="text-[#1768C9] font-black text-sm">Control</div>
-                      <div class="font-mono-num text-xs font-bold text-[#06366B] mt-0.5">$149/mo</div>
-                    </th>
-                    <th class="p-4 text-center font-bold text-xs w-1/5">
-                      <div class="text-[#06366B] font-black text-sm">Pro</div>
-                      <div class="font-mono-num text-xs text-slate-500 mt-0.5">$249/mo</div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  ${matrixHtml}
-                </tbody>
-              </table>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              ${pPage.team_workflow.steps.map(s => `
+                <div class="bento-card p-6 bg-white rounded-2xl border border-[#CBD5E1] shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between mb-4">
+                      <span class="text-xs font-mono font-black text-[#1768C9] bg-blue-50 px-2.5 py-1 rounded border border-blue-200">STEP ${s.num}</span>
+                      <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">${s.phase}</span>
+                    </div>
+                    <h3 class="text-lg font-black text-[#06366B] mb-2">${s.title}</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">${s.desc}</p>
+                  </div>
+                </div>
+              `).join('')}
             </div>
           </div>
 
-          <!-- Enterprise Custom Inquiries Banner (Clean White Card with Deep Navy & Slate Typography) -->
-          <div class="bento-card p-8 sm:p-10 bg-white border border-[#CBD5E1] shadow-sm max-w-4xl mx-auto text-center relative overflow-hidden">
+          <!-- WHAT EVERY PLAN INCLUDES (FOUNDATIONAL PLATFORM TRUST) -->
+          <div class="max-w-6xl mx-auto mb-20 text-left">
+            <div class="text-center mb-10 max-w-3xl mx-auto">
+              <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.platform_foundation.eyebrow}</span>
+              <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.platform_foundation.title}</h2>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.platform_foundation.subtitle}</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              ${pPage.platform_foundation.items.map((item, idx) => `
+                <div class="bento-card p-6 bg-white rounded-2xl border border-[#CBD5E1] shadow-xs">
+                  <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1768C9] mb-3 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                  </div>
+                  <h4 class="font-bold text-xs sm:text-sm text-[#06366B] mb-1.5">${item.title}</h4>
+                  <p class="text-xs text-slate-600 leading-relaxed">${item.desc}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- TWO-LEVEL COMPARISON MATRIX -->
+          <div class="max-w-6xl mx-auto mb-20 text-left" id="plan-comparison">
+            <div class="text-center mb-8 max-w-3xl mx-auto">
+              <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">COMPREHENSIVE PLAN COMPARISON</span>
+              <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.comparison.title}</h2>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.comparison.subtitle}</p>
+            </div>
+
+            <!-- LEVEL A: BUSINESS CAPABILITIES TABLE -->
+            <div class="mb-6">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL A</span>
+                <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">${pPage.comparison.level_a_tab}</span>
+              </div>
+
+              <div class="bento-card overflow-x-auto shadow-sm rounded-2xl bg-white border border-[#CBD5E1]">
+                <table class="w-full text-xs text-left border-collapse min-w-[680px]">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B]">
+                      <th class="p-4 text-left font-bold text-xs uppercase tracking-wider w-2/5">${pPage.comparison.th_feature}</th>
+                      <th class="p-4 text-center font-bold text-xs w-1/5">
+                        <div class="text-[#06366B] font-black text-sm">Starter</div>
+                        <div class="font-mono-num text-xs text-slate-500 mt-0.5">$59/mo</div>
+                      </th>
+                      <th class="p-4 text-center font-bold text-xs w-1/5 bg-blue-50/80 text-[#1768C9] border-x border-blue-200/80 relative">
+                        <span class="text-[10px] uppercase font-black tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full inline-block mb-1">${pPage.comparison.recommended_tag}</span>
+                        <div class="text-[#1768C9] font-black text-sm">Control</div>
+                        <div class="font-mono-num text-xs font-bold text-[#06366B] mt-0.5">$149/mo</div>
+                      </th>
+                      <th class="p-4 text-center font-bold text-xs w-1/5">
+                        <div class="text-[#06366B] font-black text-sm">Pro</div>
+                        <div class="font-mono-num text-xs text-slate-500 mt-0.5">$249/mo</div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    ${levelARowsHtml}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- LEVEL B: TECHNICAL LIMITS & QUOTAS (COLLAPSIBLE ACCORDION) -->
+            <details class="group bento-card overflow-hidden bg-white border border-[#CBD5E1] shadow-sm rounded-2xl">
+              <summary class="p-4 sm:p-5 cursor-pointer flex items-center justify-between font-bold text-[#06366B] hover:bg-slate-50 transition-colors select-none list-none">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                  <div class="inline-flex items-center gap-2">
+                    <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL B</span>
+                    <span class="text-xs sm:text-sm font-black text-[#06366B]">${pPage.comparison.level_b_tab}</span>
+                  </div>
+                  <span class="text-[11px] text-slate-500 font-normal">(${pPage.comparison.level_b_hint})</span>
+                </div>
+                <span class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-open:bg-blue-50 group-open:text-[#1768C9] transition-transform group-open:rotate-180 shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </span>
+              </summary>
+              <div class="border-t border-slate-200 overflow-x-auto">
+                <table class="w-full text-xs text-left border-collapse min-w-[680px]">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B]">
+                      <th class="p-4 text-left font-bold text-xs uppercase tracking-wider w-2/5">${pPage.comparison.th_quota}</th>
+                      <th class="p-4 text-center font-bold text-xs w-1/5">
+                        <div class="text-[#06366B] font-black text-sm">Starter</div>
+                        <div class="font-mono-num text-xs text-slate-500 mt-0.5">$59/mo</div>
+                      </th>
+                      <th class="p-4 text-center font-bold text-xs w-1/5 bg-blue-50/80 text-[#1768C9] border-x border-blue-200/80">
+                        <div class="text-[#1768C9] font-black text-sm">Control</div>
+                        <div class="font-mono-num text-xs font-bold text-[#06366B] mt-0.5">$149/mo</div>
+                      </th>
+                      <th class="p-4 text-center font-bold text-xs w-1/5">
+                        <div class="text-[#06366B] font-black text-sm">Pro</div>
+                        <div class="font-mono-num text-xs text-slate-500 mt-0.5">$249/mo</div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    ${levelBRowsHtml}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          </div>
+
+          <!-- CONNECTED FINANCIAL WORKSPACE (INTEGRATION CHANNELS) -->
+          <div class="max-w-6xl mx-auto mb-20 text-left">
+            <div class="text-center mb-10 max-w-3xl mx-auto">
+              <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.connected_channels.eyebrow}</span>
+              <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.connected_channels.title}</h2>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.connected_channels.subtitle}</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+              ${pPage.connected_channels.channels.map(ch => `
+                <div class="bento-card p-5 bg-white border border-[#CBD5E1] shadow-xs rounded-xl flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between mb-3">
+                      <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                        ${renderChannelBrandIcon(ch.id)}
+                      </div>
+                      <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ${ch.status}
+                      </span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mb-1">
+                      <h4 class="font-bold text-xs sm:text-sm text-[#06366B]">${ch.name}</h4>
+                    </div>
+                    <div class="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-2">${ch.type}</div>
+                    <p class="text-xs text-slate-600 mb-4 leading-relaxed">${ch.desc}</p>
+                  </div>
+                  <div class="pt-3 border-t border-slate-100 text-[11px] font-semibold text-[#1768C9] flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span>${ch.quota_note}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <p class="text-xs text-slate-500 text-center max-w-2xl mx-auto">${pPage.connected_channels.hint}</p>
+          </div>
+
+          <!-- SOFTWARE SUBSCRIPTION VS PROFESSIONAL ACCOUNTING SERVICES NOTICE -->
+          <div class="bento-card p-6 sm:p-8 bg-slate-50/90 border border-slate-200 rounded-2xl max-w-5xl mx-auto mb-20 text-left">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">${pPage.accountant_notice.eyebrow}</span>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-black text-[#06366B] mb-2">${pPage.accountant_notice.title}</h3>
+            <p class="text-xs sm:text-sm text-slate-700 font-semibold mb-6 p-3 bg-white border border-slate-200 rounded-xl leading-relaxed">
+              ${pPage.accountant_notice.statement}
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${pPage.accountant_notice.distinctions.map(d => `
+                <div class="p-4 bg-white rounded-xl border border-slate-200">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded">${d.num}</span>
+                    <h4 class="font-bold text-xs sm:text-sm text-[#06366B]">${d.title}</h4>
+                  </div>
+                  <p class="text-xs text-slate-600 leading-relaxed">${d.desc}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- 12 FREQUENTLY ASKED QUESTIONS -->
+          <div class="max-w-4xl mx-auto mb-20 text-left" id="pricing-faq">
+            <div class="text-center mb-10 max-w-3xl mx-auto">
+              <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">FREQUENTLY ASKED QUESTIONS</span>
+              <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.faqs.title}</h2>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.faqs.subtitle}</p>
+            </div>
+
+            <div class="space-y-3">
+              ${pPage.faqs.items.map((item, idx) => `
+                <details class="group bg-white rounded-xl border border-[#CBD5E1] p-4 sm:p-5 transition-all hover:border-blue-300 shadow-2xs" data-faq-index="${idx}">
+                  <summary class="flex items-center justify-between cursor-pointer font-bold text-xs sm:text-sm text-[#06366B] select-none list-none">
+                    <span class="pr-4 leading-snug">${item.q}</span>
+                    <span class="shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-open:bg-blue-50 group-open:text-[#1768C9] transition-transform group-open:rotate-180">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </span>
+                  </summary>
+                  <div class="mt-3 pt-3 border-t border-slate-100 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    ${item.a}
+                  </div>
+                </details>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- ENTERPRISE CUSTOM MULTI-ENTITY DEPLOYMENT BANNER -->
+          <div class="bento-card p-8 sm:p-10 bg-white border border-[#CBD5E1] shadow-sm max-w-4xl mx-auto text-center relative overflow-hidden rounded-2xl">
             ${renderWatermark({ color: '#06366B', opacity: '0.03', size: 'w-80 h-80', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
             <div class="relative z-10">
               <span class="text-[10px] font-black uppercase tracking-wider text-[#1768C9] bg-blue-50 px-3 py-1 rounded-full mb-3 inline-block">CUSTOM MULTI-ENTITY DEPLOYMENT</span>
-              <h3 class="text-xl sm:text-2xl font-black text-[#06366B] mb-2.5">${t.pricing_page.custom_enterprise_title}</h3>
-              <p class="text-xs sm:text-sm text-[#475569] max-w-xl mx-auto mb-6 leading-relaxed">${t.pricing_page.custom_enterprise_desc}</p>
-              <a href="mailto:enterprise@cfo-ai.site" class="inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-7 py-3.5 rounded-xl shadow-sm transition-all min-h-[44px]">
-                ${t.pricing_page.custom_enterprise_btn} &rarr;
+              <h3 class="text-xl sm:text-2xl font-black text-[#06366B] mb-2.5">${pPage.custom_enterprise_title}</h3>
+              <p class="text-xs sm:text-sm text-[#475569] max-w-xl mx-auto mb-6 leading-relaxed">${pPage.custom_enterprise_desc}</p>
+              <a href="mailto:enterprise@cfo-ai.site" data-track-cta="pricing-enterprise-contact" class="inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-7 py-3.5 rounded-xl shadow-sm transition-all min-h-[44px]">
+                ${pPage.custom_enterprise_btn} &rarr;
               </a>
             </div>
           </div>

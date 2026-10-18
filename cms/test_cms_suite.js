@@ -51,6 +51,31 @@ async function runTestSuite() {
     assert(pricingHtml.includes('$249'), 'Pricing table displays Pro $249');
     assert(pricingHtml.includes('50'), 'Pricing table displays 50 Pro accounts');
     assert(pricingHtml.includes('50,000'), 'Pricing table displays 50,000 bank rows');
+    assert(!pricingHtml.includes('undefined'), 'Pricing page /en/pricing contains 0 undefined strings');
+    assert(!pricingHtml.includes('null'), 'Pricing page /en/pricing contains 0 null strings');
+    assert(pricingHtml.includes('RECOMMENDED'), 'Pricing page displays Control RECOMMENDED badge');
+    assert(pricingHtml.includes('LEVEL A'), 'Pricing page displays Level A capabilities');
+    assert(pricingHtml.includes('LEVEL B'), 'Pricing page displays Level B quotas');
+    assert(pricingHtml.includes('ChatGPT'), 'Pricing page displays ChatGPT channel');
+    assert(pricingHtml.includes('Claude'), 'Pricing page displays Claude channel');
+    assert(pricingHtml.includes('data-faq-index="11"'), 'Pricing page renders all 12 FAQs');
+
+    // Multilingual Pricing checks (ID & RU)
+    const idPricingRes = await fetch(`${baseUrl}/id/pricing`);
+    assert(idPricingRes.status === 200, 'Pricing /id/pricing returns HTTP 200');
+    const idPricingHtml = await idPricingRes.text();
+    assert(!idPricingHtml.includes('undefined'), 'Pricing page /id/pricing contains 0 undefined strings');
+    assert(!idPricingHtml.includes('null'), 'Pricing page /id/pricing contains 0 null strings');
+    assert(idPricingHtml.includes('DIREKOMENDASIKAN'), 'ID pricing displays recommended badge');
+    assert(idPricingHtml.includes('data-faq-index="11"'), 'ID pricing renders all 12 FAQs');
+
+    const ruPricingRes = await fetch(`${baseUrl}/ru/pricing`);
+    assert(ruPricingRes.status === 200, 'Pricing /ru/pricing returns HTTP 200');
+    const ruPricingHtml = await ruPricingRes.text();
+    assert(!ruPricingHtml.includes('undefined'), 'Pricing page /ru/pricing contains 0 undefined strings');
+    assert(!ruPricingHtml.includes('null'), 'Pricing page /ru/pricing contains 0 null strings');
+    assert(ruPricingHtml.includes('РЕКОМЕНДУЕМЫЙ'), 'RU pricing displays recommended badge');
+    assert(ruPricingHtml.includes('data-faq-index="11"'), 'RU pricing renders all 12 FAQs');
 
     // Test platform, document-intelligence, compliance, about, privacy, terms
     const platformRes = await fetch(`${baseUrl}/en/platform`);

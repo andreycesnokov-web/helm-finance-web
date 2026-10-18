@@ -516,26 +516,273 @@ const translations = {
       ppn_desc: "Cross-checks Pajak Keluaran (output VAT) against Pajak Masukan (input VAT) under applicable tax rates to ensure accurate net tax calculation before filing deadlines."
     },
     pricing_page: {
-      badge: "TRANSPARENT SUBSCRIPTION PRICING",
-      heading: "Simple, Transparent Subscription Pricing",
-      subheading: "Designed for Indonesian PT and PT PMA businesses. No hidden setup fees. 7-day free trial on all plans.",
-      monthly_btn: "Monthly Billing",
-      annual_btn: "Annual Billing",
-      discount_badge: "-20% DISCOUNT",
+      badge: "FLEXIBLE COMMERCIAL PLANS",
+      heading: "Financial Control That Grows With Your Business.",
+      subheading: "From organizing expenses and invoices to managing team approvals and multiple companies, choose the financial workspace that fits your business.",
+      subheadline: "From organizing expenses and invoices to managing team approvals and multiple companies, choose the financial workspace that fits your business.",
       per_month: "/ month (USD)",
       trial_badge: "7-Day Free Trial",
-      limits_title: "Comprehensive Usage Entitlements",
-      limits_sub: "Every limit is strictly enforced with zero silent penalties.",
-      features_title: "Feature Matrix Comparison",
-      features_sub: "Full functionality breakdown across Starter, Control, and Pro plans.",
-      cat_financial_core: "Financial Core",
-      cat_operations: "Operations & Spend Control",
-      cat_ai_automation: "AI & Automation",
-      cat_tax_compliance: "Tax & Compliance",
-      cat_team_organization: "Team & Organization",
-      cat_integrations_usage: "Integrations & Platform",
+      pills: [
+        "7-Day Free Trial (Full Access)",
+        "No Credit Card Required",
+        "Transparent Monthly Billing",
+        "Switch or Upgrade Anytime"
+      ],
+      cards: {
+        starter: {
+          name: "Starter",
+          price: "$59",
+          outcome: "Know Your Numbers",
+          desc: "For business owners who want organized finances and clearer visibility without scattered spreadsheets.",
+          limits_highlight: "1 Company Workspace • 5 Team Users",
+          benefits: [
+            "Income, cash flow and real-time Pulse runway visibility",
+            "Invoices, bills, and digital document attachments archive",
+            "Universal bank statement import and feed categorization",
+            "Conversational AI financial queries with voucher citations (50/mo)",
+            "Standard role permissions (Owner, Director, Member, Viewer)"
+          ],
+          cta: "Start 7-Day Free Trial",
+          url: "https://app.cfo-ai.site/login?plan=starter"
+        },
+        control: {
+          name: "Control",
+          badge: "RECOMMENDED",
+          price: "$149",
+          outcome: "Run Your Business With Control",
+          desc: "For growing businesses where employees create expenses, managers approve transactions, and owners need reliable financial oversight.",
+          limits_highlight: "2 Company Workspaces • 10 Team Users",
+          benefits: [
+            "Everything in Starter included",
+            "Multi-step spend approvals and threshold-based authorization",
+            "Receivables and payables aging tracking with cash outflow forecasts",
+            "AI CFO briefings and AI Accountant month-end close assistance",
+            "Universal bank reconciliation with BCA, Mandiri & Permata feeds",
+            "Staff compensation registers and monthly payroll preparation"
+          ],
+          cta: "Start 7-Day Free Trial",
+          url: "https://app.cfo-ai.site/login?plan=control"
+        },
+        pro: {
+          name: "Pro",
+          price: "$249",
+          outcome: "One View Across Your Companies",
+          desc: "For founders and finance teams managing multiple legal entities, broader teams, and more complex financial operations.",
+          limits_highlight: "5 Company Workspaces • 30 Team Users",
+          benefits: [
+            "Everything in Control included",
+            "Up to 5 separate company workspaces with strictly isolated ledgers",
+            "Extended team capacity (30 seats) with department-level role controls",
+            "High-capacity processing: 50,000 transactions & 3,000 documents/mo",
+            "Model Context Protocol (MCP) & programmatic API tool calls (15,000/mo)",
+            "Comprehensive immutable audit trail & priority processing queue"
+          ],
+          cta: "Start 7-Day Free Trial",
+          url: "https://app.cfo-ai.site/login?plan=pro"
+        }
+      },
+      team_workflow: {
+        eyebrow: "OPERATIONAL TEAM WORKFLOW",
+        title: "How CFO AI Works for Your Team",
+        subtitle: "Connect employees, managers, and business owners in one controlled, transparent financial workspace.",
+        steps: [
+          {
+            num: "01",
+            phase: "INTAKE",
+            title: "Capture",
+            desc: "Employees record expenses, submit invoices, and upload supporting receipts or payment proofs directly via web or messaging channels."
+          },
+          {
+            num: "02",
+            phase: "GOVERNANCE",
+            title: "Review",
+            desc: "Managers review AI-extracted information, verify document amounts, and approve financial actions according to company permissions."
+          },
+          {
+            num: "03",
+            phase: "VISIBILITY",
+            title: "Understand",
+            desc: "Business owners see confirmed financial activity, outstanding obligations, cash runway trajectories, and actionable insights in one workspace."
+          }
+        ]
+      },
+      platform_foundation: {
+        eyebrow: "FOUNDATIONAL PLATFORM TRUST",
+        title: "What Every Plan Includes",
+        subtitle: "Core financial security, data ownership, and governance are built into every CFO AI subscription tier.",
+        items: [
+          {
+            title: "Company-Based Access & Role Permissions",
+            desc: "Role-based access control (Owner, Director, Accountant, Member, Viewer) ensuring staff members only access authorized records."
+          },
+          {
+            title: "Digital Document Archive",
+            desc: "Centralized, searchable repository for vendor bills, sales invoices, tax vouchers, and payment receipts with permanent retention."
+          },
+          {
+            title: "Traceability of Financial Actions",
+            desc: "Every transaction, edit, status change, and approval action is permanently logged with timestamps and user attribution."
+          },
+          {
+            title: "Complete Raw Data Ownership",
+            desc: "One-click export of general ledger journals, transaction records, and attachments in open formats (CSV/ZIP) with zero vendor lock-in."
+          },
+          {
+            title: "Human-in-the-Loop AI Verification",
+            desc: "Every AI document recognition and OCR extraction requires human confirmation before posting to the ledger."
+          },
+          {
+            title: "Bank-Grade Infrastructure Security",
+            desc: "AES-256 encryption at rest, TLS 1.3 in transit, and strict row-level tenant data isolation across all companies."
+          }
+        ]
+      },
+      comparison: {
+        title: "Compare Plan Capabilities",
+        subtitle: "Choose between high-level business capabilities or inspect detailed technical quotas.",
+        level_a_tab: "Level A: Business Capabilities",
+        level_b_tab: "Level B: Technical Limits & Quotas",
+        level_b_hint: "Click to expand or collapse monthly operational and storage allowances",
+        th_feature: "Business Capability",
+        th_quota: "Operational Quota",
+        th_starter: "Starter",
+        th_control: "Control",
+        th_pro: "Pro",
+        recommended_tag: "RECOMMENDED",
+        included: "Included",
+        not_included: "Not Included"
+      },
+      connected_channels: {
+        eyebrow: "CONNECTED FINANCIAL WORKSPACE",
+        title: "Interact Through Your Preferred Channels",
+        subtitle: "Work with your financial information through CFO AI and the communication or AI tools your team already uses.",
+        hint: "All 5 integration channels are available across every plan with tier-based usage quotas.",
+        channels: [
+          {
+            id: "chatgpt",
+            name: "ChatGPT",
+            type: "MCP Interface",
+            status: "Available",
+            desc: "Ask conversational financial queries, balance checks, and spending summaries via Model Context Protocol.",
+            quota_note: "500 / 3,000 / 15,000 tool calls/mo"
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            type: "MCP Interface",
+            status: "Available",
+            desc: "Perform deep financial analysis, burn rate evaluations, and voucher synthesis with company-defined read permissions.",
+            quota_note: "500 / 3,000 / 15,000 tool calls/mo"
+          },
+          {
+            id: "telegram",
+            name: "Telegram",
+            type: "Messaging Bot",
+            status: "Available",
+            desc: "Submit receipts and invoices via chat, receive runway summaries, and approve pending transactions on the go.",
+            quota_note: "Included in all plans"
+          },
+          {
+            id: "whatsapp",
+            name: "WhatsApp",
+            type: "Messaging Bot",
+            status: "Available",
+            desc: "Forward vendor bills and payment receipts for automated OCR extraction and human verification review.",
+            quota_note: "Included in all plans"
+          },
+          {
+            id: "webapp",
+            name: "CFO AI Web App",
+            type: "Full Workspace",
+            status: "Available",
+            desc: "The primary control center for multi-account reconciliation, approvals, tax calendar, and financial reporting.",
+            quota_note: "Included in all plans"
+          }
+        ]
+      },
+      accountant_notice: {
+        eyebrow: "IMPORTANT REGULATORY & PROFESSIONAL NOTICE",
+        title: "Software Subscription vs. Professional Accounting Services",
+        statement: "CFO AI software subscriptions do not automatically include unlimited services from a licensed accountant.",
+        distinctions: [
+          {
+            num: "01",
+            title: "AI-Powered Accounting & Compliance Assistance",
+            desc: "Intelligent software algorithms assist in organizing records, checking PPh 21 TER withholding tax formulas, and detecting ledger discrepancies."
+          },
+          {
+            num: "02",
+            title: "Structured Document & Tax Preparation Workflows",
+            desc: "Automated generation of balanced GL journals, expense reports, and PMK 81/2024 CoreTax readiness worksheets."
+          },
+          {
+            num: "03",
+            title: "Human Accountant Review & Professional Advisory",
+            desc: "Official statutory tax filing, audited financial statements, and formal tax dispute representation must be executed by your retained licensed Konsultan Pajak or certified public accountant."
+          },
+          {
+            num: "04",
+            title: "Future Accountant Marketplace Add-On",
+            desc: "Curated access to verified Indonesian tax and accounting advisory firms is planned as a future optional service and is not included in standard subscription pricing."
+          }
+        ]
+      },
+      faqs: {
+        title: "Frequently Asked Questions",
+        subtitle: "Clear, transparent answers about subscriptions, billing behavior, data ownership, and entitlements.",
+        items: [
+          {
+            q: "What happens after the seven-day trial?",
+            a: "You receive full, unrestricted access to all features in your chosen tier for 168 hours (7 days). If you choose not to subscribe when the trial concludes, your workspace transitions into a read-only archive. Your data remains fully accessible for viewing and exporting; no unexpected charges will ever occur."
+          },
+          {
+            q: "Is a credit card required to start the trial?",
+            a: "No. You can start exploring CFO AI immediately with just your work email address. No credit card, bank account, or payment authorization is required to activate your 7-day trial."
+          },
+          {
+            q: "Can I upgrade or downgrade my plan later?",
+            a: "Yes. You can switch between Starter, Control, and Pro at any time from your in-app Billing Center. Upgrades apply immediately with prorated billing for the remainder of your monthly billing cycle."
+          },
+          {
+            q: "How are users counted?",
+            a: "Users are counted as active team member seats assigned to your company workspace (including Owner, Director, Accountant, Member, and Viewer roles). Deactivating or removing a user immediately frees up their seat."
+          },
+          {
+            q: "Does one user accessing two companies count once or twice?",
+            a: "Each company workspace operates as an independent legal entity with its own seat allocation. A team member who belongs to two separate company workspaces occupies one seat in each respective company subscription."
+          },
+          {
+            q: "What happens if I exceed document or transaction limits?",
+            a: "CFO AI never interrupts core cash visibility or blocks read access. When your workspace reaches 80% and 100% of your monthly document or transaction allowance, the account owner receives an email notification with options to upgrade or purchase supplemental quota packs."
+          },
+          {
+            q: "Are additional users or companies available?",
+            a: "If your organization requires more seats or legal entities than included in Starter (5 users / 1 company), Control (10 users / 2 companies), or Pro (30 users / 5 companies), custom multi-entity packages are available via Enterprise Advisory."
+          },
+          {
+            q: "Does the subscription include a professional accountant?",
+            a: "No. CFO AI is financial operating software. It assists in organizing records, calculating withholdings, matching bank statements, and preparing closing schedules. It does not replace your licensed in-house accountant or external Indonesian tax consultant (Konsultan Pajak)."
+          },
+          {
+            q: "What happens to my data if I cancel?",
+            a: "You maintain 100% ownership of your data at all times. If you cancel your subscription, you can export all general ledger journals, bank statements, receipts, and audit logs in standard CSV/ZIP formats. Data is retained securely according to our privacy policy or deleted upon verified written request."
+          },
+          {
+            q: "Are taxes included in the displayed price?",
+            a: "Displayed subscription prices ($59, $149, $249 USD) are net of applicable statutory taxes. Depending on your corporate tax residency and invoicing entity in Indonesia, applicable value-added tax (PPN) may be charged at checkout where required by law."
+          },
+          {
+            q: "Which integrations are available on each plan?",
+            a: "The CFO AI Web App, Telegram intake, WhatsApp intake, ChatGPT MCP connector, and Claude MCP connector are available across all plans. Programmatic API and MCP tool call volumes are scaled by tier: 500/mo on Starter, 3,000/mo on Control, and 15,000/mo on Pro."
+          },
+          {
+            q: "Can I export my financial data?",
+            a: "Yes. Complete raw data export is included in every plan. You can download your transaction records, chart of accounts, invoice archives, and audit history at any time without fees or proprietary lock-in."
+          }
+        ]
+      },
       custom_enterprise_title: "Need a custom multi-entity deployment?",
-      custom_enterprise_desc: "For groups operating more than 5 Indonesian entities, holding companies, or specialized CoreTax ERP integrations.",
+      custom_enterprise_desc: "For corporate groups operating more than 5 Indonesian entities, holding companies, or specialized CoreTax ERP integrations.",
       custom_enterprise_btn: "Contact Enterprise Advisory"
     },
     cta_section: {
@@ -1092,26 +1339,273 @@ const translations = {
       ppn_desc: "Mencocokkan Pajak Keluaran terhadap Pajak Masukan untuk memastikan keakuratan pajak kurang bayar sebelum batas waktu akhir bulan."
     },
     pricing_page: {
-      badge: "HARGA LANGGANAN TRANSPARAN",
-      heading: "Harga Langganan Sederhana & Transparan",
-      subheading: "Dirancang untuk PT dan PT PMA di Indonesia. Tanpa biaya setup tersembunyi. Uji coba gratis 7 hari di semua paket.",
-      monthly_btn: "Tagihan Bulanan",
-      annual_btn: "Tagihan Tahunan",
-      discount_badge: "DISKON -20%",
+      badge: "PILIHAN PAKET KOMERSIAL FLEKSIBEL",
+      heading: "Kontrol Keuangan yang Tumbuh Bersama Bisnis Anda.",
+      subheading: "Dari merapikan pengeluaran dan faktur hingga persetujuan tim dan multi-perusahaan, pilih ruang kerja keuangan yang sesuai dengan skala bisnis Anda.",
+      subheadline: "Dari merapikan pengeluaran dan faktur hingga persetujuan tim dan multi-perusahaan, pilih ruang kerja keuangan yang sesuai dengan skala bisnis Anda.",
       per_month: "/ bulan (USD)",
       trial_badge: "Coba Gratis 7 Hari",
-      limits_title: "Rincian Hak Operasional Lengkap",
-      limits_sub: "Setiap batasan diberlakukan secara transparan tanpa denda tersembunyi.",
-      features_title: "Perbandingan Matriks Fitur",
-      features_sub: "Rincian modul lengkap antara paket Starter, Control, dan Pro.",
-      cat_financial_core: "Inti Keuangan",
-      cat_operations: "Operasional & Kontrol Biaya",
-      cat_ai_automation: "AI & Otomasi",
-      cat_tax_compliance: "Pajak & Kepatuhan",
-      cat_team_organization: "Tim & Organisasi",
-      cat_integrations_usage: "Integrasi & Platform",
+      pills: [
+        "Uji Coba 7 Hari (Akses Penuh)",
+        "Tanpa Kartu Kredit",
+        "Tagihan Bulanan Transparan",
+        "Upgrade Paket Kapan Saja"
+      ],
+      cards: {
+        starter: {
+          name: "Starter",
+          price: "$59",
+          outcome: "Ketahui Angka Keuangan Anda",
+          desc: "Untuk pemilik bisnis yang menginginkan keuangan rapi dan visibilitas kas jelas tanpa spreadsheet yang terpecah.",
+          limits_highlight: "1 Ruang Kerja Perusahaan • 5 Pengguna Tim",
+          benefits: [
+            "Visibilitas pemasukan, arus kas, dan runway Pulse real-time",
+            "Arsip digital untuk faktur penjualan, tagihan vendor, dan bukti bayar",
+            "Impor rekening koran bank universal dan kategorisasi arus kas",
+            "Tanya jawab keuangan berbasis AI dengan sitasi bukti transaksi (50/bln)",
+            "Pemisahan peran standar (Owner, Director, Member, Viewer)"
+          ],
+          cta: "Coba Gratis 7 Hari",
+          url: "https://app.cfo-ai.site/login?plan=starter"
+        },
+        control: {
+          name: "Control",
+          badge: "DIREKOMENDASIKAN",
+          price: "$149",
+          outcome: "Kelola Bisnis dengan Kontrol Penuh",
+          desc: "Untuk bisnis yang sedang berkembang di mana karyawan mencatat pengeluaran, manajer menyetujui transaksi, dan pemilik membutuhkan pengawasan finansial yang andal.",
+          limits_highlight: "2 Ruang Kerja Perusahaan • 10 Pengguna Tim",
+          benefits: [
+            "Semua fitur di paket Starter sudah termasuk",
+            "Alur persetujuan pengeluaran berjenjang dan otorisasi transaksi",
+            "Pelacakan umur piutang dan utang usaha dengan perkiraan arus kas keluar",
+            "Briefing eksekutif AI CFO dan bantuan penutupan buku AI Accountant",
+            "Rekonsiliasi bank universal dengan rekening BCA, Mandiri & Permata",
+            "Register kompensasi staf dan persiapan penggajian bulanan"
+          ],
+          cta: "Coba Gratis 7 Hari",
+          url: "https://app.cfo-ai.site/login?plan=control"
+        },
+        pro: {
+          name: "Pro",
+          price: "$249",
+          outcome: "Satu Pandangan untuk Seluruh Perusahaan Anda",
+          desc: "Untuk pendiri dan tim keuangan yang mengelola beberapa entitas legal, tim yang lebih besar, dan operasional finansial yang lebih kompleks.",
+          limits_highlight: "5 Ruang Kerja Perusahaan • 30 Pengguna Tim",
+          benefits: [
+            "Semua fitur di paket Control sudah termasuk",
+            "Hingga 5 ruang kerja perusahaan terpisah dengan buku besar terisolasi",
+            "Kapasitas tim diperluas (30 kursi) dengan kontrol peran per departemen",
+            "Pemrosesan kapasitas tinggi: 50.000 transaksi & 3.000 dokumen per bulan",
+            "Model Context Protocol (MCP) & panggilan API terprogram (15.000/bln)",
+            "Audit trail lengkap yang tidak dapat diubah & antrean prioritas"
+          ],
+          cta: "Coba Gratis 7 Hari",
+          url: "https://app.cfo-ai.site/login?plan=pro"
+        }
+      },
+      team_workflow: {
+        eyebrow: "ALUR KERJA OPERASIONAL TIM",
+        title: "Bagaimana CFO AI Bekerja untuk Tim Anda",
+        subtitle: "Hubungkan karyawan, manajer, dan pemilik bisnis dalam satu ruang kerja keuangan terkontrol dan transparan.",
+        steps: [
+          {
+            num: "01",
+            phase: "INTAKE",
+            title: "Catat",
+            desc: "Karyawan mencatat pengeluaran, mengirimkan faktur, dan mengunggah kuitansi atau bukti pembayaran langsung melalui web atau saluran pesan."
+          },
+          {
+            num: "02",
+            phase: "GOVERNANCE",
+            title: "Tinjau",
+            desc: "Manajer meninjau informasi hasil ekstraksi AI, memverifikasi nilai dokumen, dan menyetujui transaksi sesuai wewenang perusahaan."
+          },
+          {
+            num: "03",
+            phase: "VISIBILITY",
+            title: "Pahami",
+            desc: "Pemilik bisnis melihat aktivitas keuangan terkonfirmasi, kewajiban mendatang, proyeksi runway kas, dan wawasan terpercaya dalam satu ruang kerja."
+          }
+        ]
+      },
+      platform_foundation: {
+        eyebrow: "FONDASI KEAMANAN PLATFORM",
+        title: "Apa yang Termasuk di Setiap Paket",
+        subtitle: "Keamanan finansial inti, kepemilikan data penuh, dan tata kelola terpasang di setiap tingkatan langganan CFO AI.",
+        items: [
+          {
+            title: "Akses Berbasis Perusahaan & Izin Peran",
+            desc: "Kontrol akses berbasis peran (Owner, Director, Accountant, Member, Viewer) memastikan staf hanya mengakses catatan yang diotorisasi."
+          },
+          {
+            title: "Arsip Dokumen Digital Terpusat",
+            desc: "Penyimpanan terpusat dan dapat dicari untuk tagihan vendor, faktur penjualan, bukti potong pajak, dan bukti pembayaran dengan retensi permanen."
+          },
+          {
+            title: "Keterlacakan Tindakan Finansial",
+            desc: "Setiap transaksi, pengeditan, perubahan status, dan tindakan persetujuan dicatat secara permanen dengan stempel waktu dan atribusi pengguna."
+          },
+          {
+            title: "Kepemilikan Data Mentah Sepenuhnya",
+            desc: "Ekspor satu klik untuk jurnal buku besar, data transaksi, dan lampiran dalam format terbuka (CSV/ZIP) tanpa penguncian vendor."
+          },
+          {
+            title: "Verifikasi AI dengan Pengawasan Manusia",
+            desc: "Setiap pengenalan dokumen AI dan ekstraksi OCR memerlukan konfirmasi manusia sebelum dibukukan ke buku besar."
+          },
+          {
+            title: "Keamanan Infrastruktur Setara Bank",
+            desc: "Enkripsi AES-256 saat diam, TLS 1.3 saat transit, dan isolasi data penyewa setingkat baris di semua perusahaan."
+          }
+        ]
+      },
+      comparison: {
+        title: "Bandingkan Kemampuan Paket",
+        subtitle: "Pilih antara kapabilitas bisnis utama atau periksa kuota teknis operasional secara mendalam.",
+        level_a_tab: "Level A: Kapabilitas Bisnis",
+        level_b_tab: "Level B: Kuota & Batasan Teknis",
+        level_b_hint: "Klik untuk membuka atau menutup rincian kuota operasional dan penyimpanan bulanan",
+        th_feature: "Kapabilitas Bisnis",
+        th_quota: "Kuota Operasional",
+        th_starter: "Starter",
+        th_control: "Control",
+        th_pro: "Pro",
+        recommended_tag: "DIREKOMENDASIKAN",
+        included: "Termasuk",
+        not_included: "Tidak Termasuk"
+      },
+      connected_channels: {
+        eyebrow: "RUANG KERJA KEUANGAN TERHUBUNG",
+        title: "Berinteraksi Melalui Saluran Pilihan Anda",
+        subtitle: "Akses informasi keuangan Anda melalui CFO AI dan alat komunikasi atau AI yang sudah digunakan tim Anda.",
+        hint: "Kelima saluran integrasi tersedia di seluruh paket dengan kuota penggunaan berbasis tingkatan.",
+        channels: [
+          {
+            id: "chatgpt",
+            name: "ChatGPT",
+            type: "Antarmuka MCP",
+            status: "Tersedia",
+            desc: "Ajukan pertanyaan keuangan percakapan, cek saldo, dan ringkasan pengeluaran melalui Model Context Protocol.",
+            quota_note: "500 / 3.000 / 15.000 panggilan alat/bln"
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            type: "Antarmuka MCP",
+            status: "Tersedia",
+            desc: "Lakukan analisis keuangan mendalam, evaluasi burn rate, dan sintesis bukti transaksi dengan izin baca terkelola.",
+            quota_note: "500 / 3.000 / 15.000 panggilan alat/bln"
+          },
+          {
+            id: "telegram",
+            name: "Telegram",
+            type: "Bot Pesan",
+            status: "Tersedia",
+            desc: "Kirim kuitansi dan faktur melalui chat, terima ringkasan runway harian, dan setujui transaksi tertunda langsung dari ponsel.",
+            quota_note: "Termasuk di semua paket"
+          },
+          {
+            id: "whatsapp",
+            name: "WhatsApp",
+            type: "Bot Pesan",
+            status: "Tersedia",
+            desc: "Teruskan tagihan vendor dan bukti transfer untuk ekstraksi OCR otomatis dan tinjauan verifikasi manusia.",
+            quota_note: "Termasuk di semua paket"
+          },
+          {
+            id: "webapp",
+            name: "Aplikasi Web CFO AI",
+            type: "Ruang Kerja Lengkap",
+            status: "Tersedia",
+            desc: "Pusat kendali utama untuk rekonsiliasi multi-rekening, persetujuan transaksi, kalender pajak, dan laporan keuangan.",
+            quota_note: "Termasuk di semua paket"
+          }
+        ]
+      },
+      accountant_notice: {
+        eyebrow: "PEMBERITAHUAN REGULASI & PROFESIONAL PENTING",
+        title: "Langganan Perangkat Lunak vs. Layanan Akuntan Profesional",
+        statement: "Langganan perangkat lunak CFO AI tidak secara otomatis mencakup layanan tak terbatas dari akuntan berlisensi.",
+        distinctions: [
+          {
+            num: "01",
+            title: "Bantuan Akuntansi & Kepatuhan Berbasis AI",
+            desc: "Algoritma perangkat lunak membantu merapikan catatan, memeriksa rumus pemotongan PPh 21 TER, dan mendeteksi selisih angka buku besar."
+          },
+          {
+            num: "02",
+            title: "Alur Kerja Penyiapan Dokumen & Kesiapan Pajak",
+            desc: "Otomasi penyusunan jurnal umum berimbang, laporan pengeluaran, dan lembar kerja kesiapan CoreTax PMK 81/2024."
+          },
+          {
+            num: "03",
+            title: "Tinjauan Akuntan Manusia & Layanan Profesional",
+            desc: "Pelaporan pajak resmi, penerbitan laporan keuangan audit, dan pendampingan sengketa pajak harus dilakukan oleh Konsultan Pajak berlisensi atau akuntan publik terdaftar Anda."
+          },
+          {
+            num: "04",
+            title: "Layanan Marketplace Akuntan Masa Depan",
+            desc: "Akses terkurasi ke kantor konsultan pajak dan akuntansi mitra terverifikasi di Indonesia direncanakan sebagai layanan opsional mendatang dan tidak termasuk dalam harga langganan standar."
+          }
+        ]
+      },
+      faqs: {
+        title: "Pertanyaan yang Sering Diajukan",
+        subtitle: "Jawaban transparan seputar langganan, sistem penagihan, kepemilikan data, dan hak operasional Anda.",
+        items: [
+          {
+            q: "Apa yang terjadi setelah uji coba 7 hari selesai?",
+            a: "Anda mendapatkan akses penuh tanpa batas ke semua fitur pada paket pilihan Anda selama 168 jam (7 hari). Jika Anda memutuskan untuk tidak berlangganan di akhir uji coba, ruang kerja Anda beralih ke mode arsip hanya-baca. Data Anda tetap aman dan dapat dilihat serta diekspor kapan saja; tidak ada pemotongan biaya tak terduga."
+          },
+          {
+            q: "Apakah kartu kredit diperlukan untuk memulai uji coba?",
+            a: "Tidak. Anda dapat mulai mencoba CFO AI langsung hanya dengan alamat email kerja Anda. Tidak diperlukan kartu kredit, rekening bank, atau otorisasi pembayaran apa pun untuk mengaktifkan uji coba 7 hari."
+          },
+          {
+            q: "Bisakah saya meningkatkan atau menurunkan paket nanti?",
+            a: "Ya. Anda dapat beralih antara Starter, Control, dan Pro kapan saja melalui Pusat Penagihan di dalam aplikasi. Peningkatan paket langsung berlaku seketika dengan penyesuaian biaya prorata untuk sisa siklus penagihan bulanan Anda."
+          },
+          {
+            q: "Bagaimana cara penghitungan pengguna?",
+            a: "Pengguna dihitung berdasarkan kursi anggota tim aktif yang terdaftar di ruang kerja perusahaan Anda (termasuk peran Owner, Director, Accountant, Member, dan Viewer). Menonaktifkan atau menghapus pengguna akan segera membebaskan kursi tersebut."
+          },
+          {
+            q: "Apakah satu pengguna yang mengakses dua perusahaan dihitung sekali atau dua kali?",
+            a: "Setiap ruang kerja perusahaan beroperasi sebagai entitas hukum independen dengan alokasi kursi masing-masing. Anggota tim yang terdaftar di dua ruang kerja perusahaan berbeda akan menempati satu kursi pada masing-masing langganan perusahaan tersebut."
+          },
+          {
+            q: "Apa yang terjadi jika saya melampaui batas dokumen atau transaksi?",
+            a: "CFO AI tidak pernah memblokir visibilitas kas utama atau akses baca Anda. Saat ruang kerja Anda mencapai 80% dan 100% dari kuota bulanan dokumen atau transaksi, pemilik akun akan menerima pemberitahuan email disertai opsi untuk upgrade atau membeli paket kuota tambahan."
+          },
+          {
+            q: "Apakah tersedia penambahan pengguna atau perusahaan?",
+            a: "Jika organisasi Anda membutuhkan lebih banyak kursi pengguna atau entitas hukum dibandingkan paket standar Starter (5 pengguna / 1 perusahaan), Control (10 pengguna / 2 perusahaan), atau Pro (30 pengguna / 5 perusahaan), paket multi-entitas kustom tersedia melalui Tim Penasihat Enterprise."
+          },
+          {
+            q: "Apakah langganan ini sudah termasuk akuntan profesional?",
+            a: "Tidak. CFO AI adalah perangkat lunak operasional keuangan. Platform ini membantu merapikan catatan, menghitung pemotongan pajak, mencocokkan mutasi bank, dan menyiapkan jadwal penutupan buku. Ini tidak menggantikan akuntan in-house berlisensi atau Konsultan Pajak eksternal Anda."
+          },
+          {
+            q: "Apa yang terjadi pada data saya jika saya membatalkan langganan?",
+            a: "Anda memegang 100% kepemilikan atas data keuangan Anda setiap saat. Jika Anda membatalkan langganan, Anda dapat mengekspor seluruh jurnal buku besar, rekening koran bank, kuitansi, dan audit log dalam format standar CSV/ZIP. Data disimpan dengan aman sesuai kebijakan privasi kami atau dihapus atas permintaan tertulis terverifikasi."
+          },
+          {
+            q: "Apakah pajak sudah termasuk dalam harga yang ditampilkan?",
+            a: "Harga langganan yang ditampilkan ($59, $149, $249 USD) adalah harga bersih di luar pajak yang berlaku. Tergantung domisili pajak perusahaan Anda dan entitas penerbit tagihan di Indonesia, Pajak Pertambahan Nilai (PPN) yang berlaku dapat ditambahkan pada saat checkout sesuai ketentuan perundang-undangan."
+          },
+          {
+            q: "Integrasi mana saja yang tersedia pada setiap paket?",
+            a: "Aplikasi Web CFO AI, bot Telegram, bot WhatsApp, konektor ChatGPT MCP, dan konektor Claude MCP tersedia di semua paket. Volume panggilan alat API dan MCP disesuaikan menurut tingkatan: 500/bln di Starter, 3.000/bln di Control, dan 15.000/bln di Pro."
+          },
+          {
+            q: "Bisakah saya mengekspor data keuangan saya?",
+            a: "Ya. Ekspor data mentah lengkap tersedia di semua paket. Anda dapat mengunduh catatan transaksi, bagan akun (COA), arsip faktur, dan riwayat audit kapan saja tanpa biaya tambahan atau penguncian format kepemilikan."
+          }
+        ]
+      },
       custom_enterprise_title: "Membutuhkan implementasi khusus multi-entitas?",
-      custom_enterprise_desc: "Untuk grup dengan lebih dari 5 entitas di Indonesia, perusahaan holding, atau integrasi ERP CoreTax khusus.",
+      custom_enterprise_desc: "Untuk grup perusahaan dengan lebih dari 5 entitas di Indonesia, perusahaan holding, atau integrasi ERP CoreTax khusus.",
       custom_enterprise_btn: "Hubungi Tim Penasihat Enterprise"
     },
     cta_section: {
@@ -1668,27 +2162,274 @@ const translations = {
       ppn_desc: "Перекрестная сверка исходящего НДС (Pajak Keluaran) и входящего (Pajak Masukan) для точного расчета налога к уплате до конца отчетного периода."
     },
     pricing_page: {
-      badge: "ПРОЗРАЧНЫЕ ТАРИФЫ",
-      heading: "Простые и прозрачные тарифные планы",
-      subheading: "Спроектировано для индонезийских компаний PT и PT PMA. Никаких скрытых платежей за настройку. 7 дней бесплатного теста на всех тарифах.",
-      monthly_btn: "Ежемесячная оплата",
-      annual_btn: "Оплата за год",
-      discount_badge: "СКИДКА -20%",
+      badge: "ТАРИФНЫЕ ПЛАНЫ ПОДПИСКИ",
+      heading: "Финансовый контроль, который растет вместе с вашим бизнесом.",
+      subheading: "От структурирования расходов и счетов до командных согласований и управления группой компаний — выберите финансовое пространство под масштаб вашего бизнеса.",
+      subheadline: "От структурирования расходов и счетов до командных согласований и управления группой компаний — выберите финансовое пространство под масштаб вашего бизнеса.",
       per_month: "/ месяц (USD)",
       trial_badge: "7 дней бесплатно",
-      limits_title: "Подробные операционные лимиты",
-      limits_sub: "Каждый лимит строго зафиксирован без скрытых штрафов за перерасход.",
-      features_title: "Сравнительная матрица функционала",
-      features_sub: "Полное распределение возможностей между тарифами Starter, Control и Pro.",
+      pills: [
+        "7 дней бесплатного теста (полный доступ)",
+        "Банковская карта не требуется",
+        "Прозрачная помесячная оплата",
+        "Смена тарифа в любой момент"
+      ],
+      cards: {
+        starter: {
+          name: "Starter",
+          price: "$59",
+          outcome: "Знайте свои финансовые показатели",
+          desc: "Для владельцев бизнеса, которым нужен понятный учет и прозрачность денежных потоков без разрозненных таблиц.",
+          limits_highlight: "1 компания • 5 пользователей",
+          benefits: [
+            "Прозрачность доходов, расходов и операционного запаса Pulse в реальном времени",
+            "Цифровой архив выставленных счетов, счетов поставщиков и чеков",
+            "Импорт банковских выписок и структурирование банковских потоков",
+            "Интеллектуальные финансовые запросы к ИИ с точными ссылками на первичные документы (50/мес)",
+            "Стандартные роли доступа (Owner, Director, Member, Viewer)"
+          ],
+          cta: "Попробовать 7 дней бесплатно",
+          url: "https://app.cfo-ai.site/login?plan=starter"
+        },
+        control: {
+          name: "Control",
+          badge: "РЕКОМЕНДУЕМЫЙ",
+          price: "$149",
+          outcome: "Управляйте бизнесом с полным контролем",
+          desc: "Для растущего бизнеса, где сотрудники создают заявки на расходы, менеджеры утверждают платежи, а собственники получают надежный финансовый надзор.",
+          limits_highlight: "2 компании • 10 пользователей",
+          benefits: [
+            "Все возможности тарифа Starter включены",
+            "Многоступенчатые согласования расходов и пороговые лимиты авторизации",
+            "Контроль старения дебиторской и кредиторской задолженности с прогнозом выплат",
+            "Брифинги ИИ CFO и помощь в ежемесячном закрытии периода ИИ Бухгалтера",
+            "Универсальная банковская сверка с выписками BCA, Mandiri и Permata",
+            "Ведение реестров начислений сотрудникам и расчет зарплат"
+          ],
+          cta: "Попробовать 7 дней бесплатно",
+          url: "https://app.cfo-ai.site/login?plan=control"
+        },
+        pro: {
+          name: "Pro",
+          price: "$249",
+          outcome: "Единый обзор по всем вашим компаниям",
+          desc: "Для фаундеров и финансовых команд, управляющих несколькими юридическими лицами, широкой командой и масштабными финансовыми потоками.",
+          limits_highlight: "5 компаний • 30 пользователей",
+          benefits: [
+            "Все возможности тарифа Control включены",
+            "До 5 изолированных пространств компаний с независимыми главными книгами",
+            "Расширенная команда (до 30 мест) с разграничением прав по отделам",
+            "Высокие объемы операций: 50 000 проводок и 3 000 документов в месяц",
+            "Model Context Protocol (MCP) и программные вызовы API (15 000/мес)",
+            "Полный неизменяемый аудиторский журнал и приоритетная обработка очереди"
+          ],
+          cta: "Попробовать 7 дней бесплатно",
+          url: "https://app.cfo-ai.site/login?plan=pro"
+        }
+      },
+      team_workflow: {
+        eyebrow: "ОПЕРАЦИОННЫЙ РАБОЧИЙ ПРОЦЕСС",
+        title: "Как CFO AI работает в вашей команде",
+        subtitle: "Объединяйте сотрудников, руководителей и владельцев бизнеса в едином контролируемом и прозрачном финансовом пространстве.",
+        steps: [
+          {
+            num: "01",
+            phase: "INTAKE",
+            title: "Сбор данных",
+            desc: "Сотрудники вносят расходы, отправляют счета и прикрепляют чеки через веб-интерфейс или каналы связи."
+          },
+          {
+            num: "02",
+            phase: "GOVERNANCE",
+            title: "Проверка",
+            desc: "Менеджеры проверяют распознанные ИИ данные, сверяют суммы документов и утверждают действия в соответствии с правами доступа."
+          },
+          {
+            num: "03",
+            phase: "VISIBILITY",
+            title: "Анализ",
+            desc: "Собственники видят подтвержденные операции, текущие обязательства, прогноз кассового разрыва и проверенные инсайты в одном окне."
+          }
+        ]
+      },
+      platform_foundation: {
+        eyebrow: "БАЗОВЫЙ ФУНДАМЕНТ БЕЗОПАСНОСТИ",
+        title: "Что входит в каждый тариф",
+        subtitle: "Банковская безопасность, полное владение данными и финансовый контроль встроены в каждый тариф CFO AI.",
+        items: [
+          {
+            title: "Разграничение прав доступа компании",
+            desc: "Ролевая модель доступа (Владелец, Директор, Бухгалтер, Сотрудник, Наблюдатель) защищает конфиденциальные данные."
+          },
+          {
+            title: "Централизованный цифровой архив",
+            desc: "Единое защищенное хранилище счетов поставщиков, актов, налоговых квитанций и банковских платежек."
+          },
+          {
+            title: "Полная прослеживаемость действий",
+            desc: "Каждая операция, изменение статуса и согласование фиксируются с меткой точного времени и авторством пользователя."
+          },
+          {
+            title: "Полное владение исходными данными",
+            desc: "Выгрузка проводок главной книги, журналов операций и вложений в открытых форматах (CSV/ZIP) без привязки к платформе."
+          },
+          {
+            title: "Контроль человека над выводами ИИ",
+            desc: "Все распознанные ИИ данные счетов и налоговых накладных требуют явного подтверждения человеком перед проводкой в баланс."
+          },
+          {
+            title: "Безопасность банковского уровня",
+            desc: "Шифрование AES-256 в хранилище, TLS 1.3 при передаче и строгая изоляция баз данных клиентов на уровне строк."
+          }
+        ]
+      },
+      comparison: {
+        title: "Сравнение возможностей тарифов",
+        subtitle: "Выберите между ключевыми возможностями для бизнеса и подробными техническими квотами.",
+        level_a_tab: "Уровень А: Возможности для бизнеса",
+        level_b_tab: "Уровень B: Технические лимиты и квоты",
+        level_b_hint: "Нажмите, чтобы развернуть или свернуть ежемесячные операционные лимиты и объемы хранилища",
+        th_feature: "Возможности для бизнеса",
+        th_quota: "Операционный лимит",
+        th_starter: "Starter",
+        th_control: "Control",
+        th_pro: "Pro",
+        recommended_tag: "РЕКОМЕНДУЕМЫЙ",
+        included: "Включено",
+        not_included: "Не включено"
+      },
+      connected_channels: {
+        eyebrow: "ЕДИНОЕ РАБОЧЕЕ ПРОСТРАНСТВО",
+        title: "Взаимодействие через привычные каналы",
+        subtitle: "Работайте с финансовыми данными через CFO AI и привычные инструменты коммуникации или ИИ-ассистенты.",
+        hint: "Все 5 каналов интеграции доступны на всех тарифных планах с масштабируемыми квотами вызовов.",
+        channels: [
+          {
+            id: "chatgpt",
+            name: "ChatGPT",
+            type: "Интерфейс MCP",
+            status: "Доступно",
+            desc: "Задавайте вопросы по финансам, проверяйте остатки и анализируйте статьи затрат через Model Context Protocol.",
+            quota_note: "500 / 3 000 / 15 000 вызовов инструментов/мес"
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            type: "Интерфейс MCP",
+            status: "Доступно",
+            desc: "Проводите глубокий финансовый анализ, стройте сценарные прогнозы и сопоставляйте первичные документы.",
+            quota_note: "500 / 3 000 / 15 000 вызовов инструментов/мес"
+          },
+          {
+            id: "telegram",
+            name: "Telegram",
+            type: "Бот-ассистент",
+            status: "Доступно",
+            desc: "Отправляйте чеки и счета через чат, получайте сводки по кассе и утверждайте заявки прямо со смартфона.",
+            quota_note: "Включено во все тарифы"
+          },
+          {
+            id: "whatsapp",
+            name: "WhatsApp",
+            type: "Бот-ассистент",
+            status: "Доступно",
+            desc: "Пересылайте входящие счета поставщиков и чеки для автоматического OCR-распознавания и проверки человеком.",
+            quota_note: "Включено во все тарифы"
+          },
+          {
+            id: "webapp",
+            name: "Веб-приложение CFO AI",
+            type: "Основное рабочее место",
+            status: "Доступно",
+            desc: "Главный центр управления для сверки счетов, согласований, налогового календаря и финансовой отчетности.",
+            quota_note: "Включено во все тарифы"
+          }
+        ]
+      },
+      accountant_notice: {
+        eyebrow: "ВАЖНОЕ ПРАВОВОЕ И ПРОФЕССИОНАЛЬНОЕ УВЕДОМЛЕНИЕ",
+        title: "Программная подписка и профессиональные бухгалтерские услуги",
+        statement: "Подписка на программное обеспечение CFO AI не включает в себя неограниченные услуги лицензированного бухгалтера.",
+        distinctions: [
+          {
+            num: "01",
+            title: "Бухгалтерский и налоговый ассистент на базе ИИ",
+            desc: "Программные алгоритмы помогают упорядочивать записи, рассчитывать ставки подоходного налога PPh 21 TER и выявлять несоответствия в главной книге."
+          },
+          {
+            num: "02",
+            title: "Автоматизированная подготовка документов и отчетов",
+            desc: "Формирование сбалансированных проводок, отчетов о расходах и рабочих ведомостей для системы CoreTax PMK 81/2024."
+          },
+          {
+            num: "03",
+            title: "Аудит человеком и профессиональные услуги",
+            desc: "Официальная подача налоговых деклараций, заверение аудиторских отчетов и представление интересов в налоговых органах осуществляются вашим штатным бухгалтером или лицензированным налоговым консультантом (Konsultan Pajak)."
+          },
+          {
+            num: "04",
+            title: "Маркетплейс аккредитованных бухгалтеров",
+            desc: "Доступ к проверенным индонезийским налоговым и бухгалтерским компаниям-партнерам запланирован как будущий дополнительный сервис и не входит в стоимость стандартной подписки."
+          }
+        ]
+      },
+      faqs: {
+        title: "Часто задаваемые вопросы",
+        subtitle: "Открытые и точные ответы о подписке, расчетных периодах, владении данными и доступном функционале.",
+        items: [
+          {
+            q: "Что происходит по истечении 7 дней бесплатного теста?",
+            a: "В течение 168 часов (7 дней) вы получаете полный неограниченный доступ ко всем функциям выбранного тарифа. Если по истечении срока вы решите не оформлять подписку, пространство перейдет в режим «только чтение». Ваши данные сохраняются, доступны для просмотра и выгрузки; никаких неожиданных списаний не произойдет."
+          },
+          {
+            q: "Нужна ли банковская карта для начала пробного периода?",
+            a: "Нет. Начать работу в CFO AI можно сразу, указав только рабочий email. Для активации 7-дневного теста привязка карты или счета не требуется."
+          },
+          {
+            q: "Можно ли сменить тариф позже?",
+            a: "Да. Вы можете переходить между тарифами Starter, Control и Pro в любой момент в личном кабинете. Повышение тарифа вступает в силу немедленно с пересчетом стоимости за оставшиеся дни расчетного месяца."
+          },
+          {
+            q: "Как учитываются пользователи?",
+            a: "Пользователями считаются активные места членов команды в пространстве вашей компании (включая роли Владелец, Директор, Бухгалтер, Сотрудник, Наблюдатель). При деактивации или удалении сотрудника его место сразу освобождается."
+          },
+          {
+            q: "Если один человек работает в двух компаниях, он считается дважды?",
+            a: "Каждая компания функционирует как отдельное юридическое лицо со своим лимитом мест. Пользователь, подключенный к двум разным компаниям, занимает по одному месту в подписке каждой из них."
+          },
+          {
+            q: "Что происходит при превышении лимита документов или операций?",
+            a: "CFO AI никогда не блокирует просмотр балансов или чтение данных. При приближении к 80% и 100% лимита владелец аккаунта получает уведомление по email с возможностью повысить тариф или докупить дополнительный пакет квот."
+          },
+          {
+            q: "Можно ли добавить дополнительных пользователей или компании?",
+            a: "Если вашей компании требуется больше мест или юридических лиц, чем предусмотрено в тарифах Starter (5 пользователей / 1 компания), Control (10 пользователей / 2 компании) или Pro (30 пользователей / 5 компаний), вы можете запросить индивидуальную конфигурацию у команды Enterprise."
+          },
+          {
+            q: "Входит ли в подписку персональный бухгалтер?",
+            a: "Нет. CFO AI — это финансовая операционная система. Она автоматизирует учет, рассчитывает удержания, сопоставляет выписки и готовит ведомости к закрытию периода, но не заменяет вашего штатного специалиста или лицензированного налогового консультанта (Konsultan Pajak)."
+          },
+          {
+            q: "Что произойдет с данными при отмене подписки?",
+            a: "Вы остаетесь 100% владельцем своих данных. При отмене подписки вы можете в любой момент выгрузить проводки главной книги, банковские выписки, первичные документы и историю действий в форматах CSV/ZIP. Данные надежно сохраняются в соответствии с политикой конфиденциальности или удаляются по верифицированному запросу."
+          },
+          {
+            q: "Включены ли налоги в указанную стоимость?",
+            a: "Указанные цены ($59, $149, $249 USD) не включают применимые налоги. В зависимости от налогового резидентства вашей компании и юридического лица в Индонезии при оплате может начисляться установленный законом НДС (PPN)."
+          },
+          {
+            q: "Какие интеграции доступны на каждом тарифе?",
+            a: "Веб-приложение CFO AI, бот в Telegram, бот в WhatsApp и коннекторы к ChatGPT и Claude через MCP доступны на всех тарифах. Лимиты программных вызовов зависят от плана: 500/мес на Starter, 3 000/мес на Control и 15 000/мес на Pro."
+          },
+          {
+            q: "Могу ли я выгрузить свои финансовые данные?",
+            a: "Да. Полная выгрузка исходных данных включена во все тарифы. Вы можете скачать историю операций, план счетов, архив документов и журнал аудита без каких-либо комиссий и ограничений."
+          }
+        ]
+      },
       custom_enterprise_title: "Нужна кастомная корпоративная конфигурация?",
       custom_enterprise_desc: "Для холдингов с более чем 5 юридическими лицами в Индонезии или интеграции со сложными ERP-системами CoreTax.",
-      custom_enterprise_btn: "Связаться с Enterprise отделом",
-      cat_financial_core: "Финансовое ядро",
-      cat_operations: "Операции и контроль расходов",
-      cat_ai_automation: "ИИ и автоматизация",
-      cat_tax_compliance: "Налоги и комплаенс",
-      cat_team_organization: "Команда и структура",
-      cat_integrations_usage: "Интеграции и платформа"
+      custom_enterprise_btn: "Связаться с Enterprise отделом"
     },
     cta_section: {
       heading: "Готовы взять финансы бизнеса под полный контроль?",
