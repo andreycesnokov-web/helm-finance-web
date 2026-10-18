@@ -660,10 +660,10 @@ function createPublicRoutes(contentStore) {
       return `<svg class="w-5 h-5 text-[#229ED9] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>`;
     }
     if (id === 'chatgpt') {
-      return `<svg class="w-5 h-5 text-[#10A37F] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M22.28 9.37a5.98 5.98 0 0 0-.52-4.94 6.08 6.08 0 0 0-6.19-2.91 6.01 6.01 0 0 0-4.59-2.02A6.08 6.08 0 0 0 5.1 2.91a5.99 5.99 0 0 0-4.08 4.41 6.08 6.08 0 0 0 1.08 6.85 5.98 5.98 0 0 0 .52 4.94 6.08 6.08 0 0 0 6.19 2.91 6.01 6.01 0 0 0 4.59 2.02 6.08 6.08 0 0 0 5.88-3.41 5.99 5.99 0 0 0 4.08-4.41 6.08 6.08 0 0 0-1.08-6.85zM12 21.08a4.57 4.57 0 0 1-2.9-1.03l.14-.08 4.83-2.79a.78.78 0 0 0 .39-.68v-6.83l2.06 1.19a.07.07 0 0 1 .04.06v5.59a4.59 4.59 0 0 1-4.56 4.57zm-8.5-4.9a4.58 4.58 0 0 1-.54-3.03l.14.09 4.83 2.79c.24.14.39.4.39.68v2.37l-2.06-1.19a.07.07 0 0 1-.04-.06v-1.65zm-.96-8.91a4.58 4.58 0 0 1 2.36-2.01l-.01.17v5.58a.78.78 0 0 0 .39.68l5.92 3.42-2.06 1.19a.07.07 0 0 1-.07 0l-4.84-2.79a4.59 4.59 0 0 1-1.69-6.24zm14.38 3.12l-5.92-3.42 2.06-1.19a.07.07 0 0 1 .07 0l4.84 2.79a4.59 4.59 0 0 1 .84 7.66l-.14-.09-4.83-2.79a.78.78 0 0 0-.92.04v-2.98zm2.46-3.83l-.14-.08-4.83-2.79a.78.78 0 0 0-.78 0l-5.92 3.42 2.06 1.19a.07.07 0 0 1 .04.06v5.59l2.06-1.19a.07.07 0 0 0 .04-.06v-5.59a4.59 4.59 0 0 1 7.47-.64zm-8.38 6.42l-2.65-1.53 2.65-1.53 2.65 1.53-2.65 1.53z"/></svg>`;
+      return `<svg class="w-5 h-5 text-[#10A37F] shrink-0" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24"><path d="M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.946-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z"/></svg>`;
     }
     if (id === 'claude') {
-      return `<svg class="w-5 h-5 text-[#D97706] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z"/></svg>`;
+      return `<svg class="w-5 h-5 text-[#D97757] shrink-0" fill="currentColor" fill-rule="nonzero" viewBox="0 0 24 24"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></svg>`;
     }
     return `<svg class="w-5 h-5 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><path d="M8 21h8M12 17v4" stroke-width="2" stroke-linecap="round"/></svg>`;
   }
@@ -683,6 +683,7 @@ function createPublicRoutes(contentStore) {
   function renderConnectedWorkspaceSection(t, locale) {
     const cw = t.platform.connected_workspace;
     if (!cw) return '';
+    const ui = cw.ui || {};
 
     return `
       <!-- CONNECTED FINANCIAL WORKSPACE ARCHITECTURE -->
@@ -700,10 +701,10 @@ function createPublicRoutes(contentStore) {
           <div class="mb-4">
             <div class="flex items-center justify-between mb-3 px-1">
               <div class="inline-flex items-center gap-2">
-                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL 1</span>
-                <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">Input &amp; Interaction Channels</span>
+                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_1_badge || 'LEVEL 1'}</span>
+                <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">${ui.level_1_title || 'Input &amp; Interaction Channels'}</span>
               </div>
-              <span class="text-[11px] text-slate-500 hidden sm:inline">Click any channel to inspect pipeline and governance</span>
+              <span class="text-[11px] text-slate-500 hidden sm:inline">${ui.level_1_hint || 'Click any channel to inspect pipeline and governance'}</span>
             </div>
 
             <!-- 5 Channels Grid -->
@@ -741,7 +742,7 @@ function createPublicRoutes(contentStore) {
                       <p class="text-xs text-slate-600 line-clamp-2 leading-snug">${ch.example}</p>
                     </div>
                     <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-[#1768C9]">
-                      <span>Inspect flow</span>
+                      <span>${ui.inspect_flow || 'Inspect flow'}</span>
                       <span>&rarr;</span>
                     </div>
                   </div>
@@ -754,7 +755,7 @@ function createPublicRoutes(contentStore) {
           <div class="flex justify-center py-2 sm:py-3 relative">
             <div class="inline-flex items-center gap-2 text-xs font-mono font-bold text-slate-400 bg-white/70 backdrop-blur-xs px-3 py-1 rounded-full border border-slate-200">
               <svg class="w-3.5 h-3.5 text-[#1768C9] animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-              <span>Secure Ingestion &amp; API Integration</span>
+              <span>${ui.connector_1 || 'Secure Ingestion &amp; API Integration'}</span>
             </div>
           </div>
 
@@ -774,8 +775,8 @@ function createPublicRoutes(contentStore) {
                   </div>
                   <div>
                     <div class="inline-flex items-center gap-2 mb-1">
-                      <span class="text-[10px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL 2 • CENTRAL CORE</span>
-                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">AI Suggests • User Confirms</span>
+                      <span class="text-[10px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_2_badge || 'LEVEL 2 • CENTRAL CORE'}</span>
+                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${ui.level_2_pill || 'AI Suggests • User Confirms'}</span>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black text-[#06366B] tracking-tight">${cw.intelligence_engine.title}</h3>
                     <p class="text-xs text-slate-500 mt-0.5">${cw.intelligence_engine.subtitle}</p>
@@ -784,7 +785,7 @@ function createPublicRoutes(contentStore) {
                 <div class="shrink-0 flex items-center gap-2">
                   <span class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    Centralized Validation Core
+                    ${ui.level_2_status || 'Centralized Validation Core'}
                   </span>
                 </div>
               </div>
@@ -806,7 +807,10 @@ function createPublicRoutes(contentStore) {
               <div id="cw-inspector" class="bg-gradient-to-r from-blue-50/70 via-slate-50 to-blue-50/40 rounded-xl border border-blue-200/80 p-5 relative z-10">
                 <div class="flex flex-col md:flex-row md:items-center justify-between pb-3 mb-3 border-b border-blue-100 gap-2">
                   <div class="flex items-center gap-2.5">
-                    <span class="text-[10px] font-mono font-bold text-[#1768C9] bg-white px-2 py-0.5 rounded border border-blue-200">ACTIVE CHANNEL INSPECTOR</span>
+                    <span class="text-[10px] font-mono font-bold text-[#1768C9] bg-white px-2 py-0.5 rounded border border-blue-200">${ui.inspector_badge || 'ACTIVE CHANNEL INSPECTOR'}</span>
+                    <div id="cw-insp-icon" class="w-6 h-6 rounded bg-white border border-slate-200 flex items-center justify-center shrink-0">
+                      ${renderChannelBrandIcon(cw.channels[4].id)}
+                    </div>
                     <span id="cw-insp-title" class="text-sm font-black text-[#06366B]">${cw.channels[4].name}</span>
                   </div>
                   <div class="flex items-center gap-2">
@@ -819,7 +823,7 @@ function createPublicRoutes(contentStore) {
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
                   <!-- Col 1: Business Scenario -->
                   <div class="space-y-1">
-                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Business Scenario</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">${ui.inspector_col1 || 'Business Scenario'}</span>
                     <div id="cw-insp-example" class="font-medium text-[#06366B] italic bg-white/70 p-2.5 rounded-lg border border-slate-200/60 leading-snug">
                       "${cw.channels[4].example}"
                     </div>
@@ -827,7 +831,7 @@ function createPublicRoutes(contentStore) {
 
                   <!-- Col 2: Pipeline Data Flow -->
                   <div class="space-y-1">
-                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">End-to-End Pipeline</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">${ui.inspector_col2 || 'End-to-End Pipeline'}</span>
                     <div class="bg-white/70 p-2.5 rounded-lg border border-slate-200/60">
                       <div id="cw-insp-flow" class="font-mono text-[11px] text-[#1768C9] font-bold leading-snug">
                         ${cw.channels[4].flow_desc}
@@ -837,7 +841,7 @@ function createPublicRoutes(contentStore) {
 
                   <!-- Col 3: Governance & Technical Boundary -->
                   <div class="space-y-1">
-                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Governance &amp; Controls</span>
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">${ui.inspector_col3 || 'Governance &amp; Controls'}</span>
                     <div id="cw-insp-desc" class="text-slate-600 bg-white/70 p-2.5 rounded-lg border border-slate-200/60 leading-snug">
                       ${cw.channels[4].description}
                     </div>
@@ -851,7 +855,7 @@ function createPublicRoutes(contentStore) {
           <div class="flex justify-center py-2 sm:py-3 relative">
             <div class="inline-flex items-center gap-2 text-xs font-mono font-bold text-slate-400 bg-white/70 backdrop-blur-xs px-3 py-1 rounded-full border border-slate-200">
               <svg class="w-3.5 h-3.5 text-[#1768C9] animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-              <span>Verified Ledger Posting &amp; Tenant Isolation</span>
+              <span>${ui.connector_2 || 'Verified Ledger Posting &amp; Tenant Isolation'}</span>
             </div>
           </div>
 
@@ -859,7 +863,7 @@ function createPublicRoutes(contentStore) {
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3 px-1">
               <div class="inline-flex items-center gap-2">
-                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL 3</span>
+                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_3_badge || 'LEVEL 3'}</span>
                 <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">${cw.workspace_destinations.badge}</span>
               </div>
               <span class="text-[11px] text-slate-500 hidden sm:inline">${cw.workspace_destinations.title}</span>
@@ -876,9 +880,9 @@ function createPublicRoutes(contentStore) {
                     <h5 class="text-xs font-black text-[#06366B] mb-1">${it.name}</h5>
                     <p class="text-[10px] text-slate-600 leading-tight">${it.desc}</p>
                   </div>
-                  <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-1 text-[9px] font-bold text-emerald-700">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span>Reconciled</span>
+                  <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[9px] font-bold text-slate-500">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#1768C9]"></span>
+                    <span>${it.tag || 'Operational Domain'}</span>
                   </div>
                 </div>
               `).join('')}
@@ -889,12 +893,12 @@ function createPublicRoutes(contentStore) {
           <div class="bg-gradient-to-r from-[#021B36] via-[#042C53] to-[#021B36] text-white rounded-xl p-5 sm:p-6 text-center max-w-4xl mx-auto shadow-sm border border-white/10 relative overflow-hidden">
             ${renderWatermark({ color: '#FFFFFF', opacity: '0.03', size: 'w-48 h-48', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
             <div class="relative z-10 max-w-2xl mx-auto">
-              <span class="text-[10px] font-mono font-bold uppercase tracking-widest text-blue-300 block mb-1">END-TO-END FLOW ARCHITECTURE</span>
+              <span class="text-[10px] font-mono font-bold uppercase tracking-widest text-blue-300 block mb-1">${ui.transition_badge || 'END-TO-END FLOW ARCHITECTURE'}</span>
               <p class="text-xs sm:text-sm font-semibold text-slate-100 leading-relaxed mb-3">
                 ${cw.transition}
               </p>
               <div class="inline-flex items-center gap-2 text-xs font-bold text-blue-300 hover:text-white transition-colors">
-                <span>Explore the 3 end-to-end workflows below</span>
+                <span>${ui.transition_cta || 'Explore the 3 end-to-end workflows below'}</span>
                 <svg class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
               </div>
             </div>
@@ -941,6 +945,12 @@ function createPublicRoutes(contentStore) {
             const exampleEl = document.getElementById('cw-insp-example');
 
             if (titleEl) titleEl.textContent = channel.name;
+            const iconEl = document.getElementById('cw-insp-icon');
+            const cardEl = document.getElementById('cw-channel-' + id);
+            if (iconEl && cardEl) {
+              const cardSvg = cardEl.querySelector('svg');
+              if (cardSvg) iconEl.innerHTML = cardSvg.outerHTML;
+            }
             if (exampleEl) exampleEl.textContent = '"' + channel.example + '"';
             if (flowEl) flowEl.textContent = channel.flow_desc;
             if (descEl) descEl.textContent = channel.description;
@@ -983,7 +993,7 @@ function createPublicRoutes(contentStore) {
       { id: 'radar', key: 'radar', img: '/assets/screens/Radar.png' },
       { id: 'accounts', key: 'accounts', img: '/assets/screens/Accounts.png' },
       { id: 'transactions', key: 'transactions', img: '/assets/screens/Transactions.png' },
-      { id: 'bank-import', key: 'bank_import', img: '/assets/screens/Transactions.png' }
+      { id: 'bank-import', key: 'bank_import', img: '/assets/screens/BankImport.png' }
     ];
 
     // Secondary feature grid: compact cards with full uncropped previews + lightbox
@@ -1039,7 +1049,7 @@ function createPublicRoutes(contentStore) {
                   <div class="shrink-0">
                     <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
                       <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      4 Connected Steps
+                      ${(t.platform.connected_workspace && t.platform.connected_workspace.ui) ? t.platform.connected_workspace.ui.connected_steps : '4 Connected Steps'}
                     </span>
                   </div>
                 </div>
@@ -1048,11 +1058,14 @@ function createPublicRoutes(contentStore) {
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 relative">
                   ${wf.steps.map((st, stepIdx) => {
                     const isLast = stepIdx === wf.steps.length - 1;
-                    const tagBadge = st.tag_type === 'verified'
-                      ? '<span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">' + st.tag + '</span>'
-                      : st.tag_type === 'assist'
-                      ? '<span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-50 text-[#1768C9] border border-blue-200">' + st.tag + '</span>'
-                      : '<span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200">' + st.tag + '</span>';
+                    const tagClass = (st.tag_type === 'authorized' || st.tag_type === 'settled' || st.tag_type === 'actionable' || st.tag_type === 'verified')
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      : (st.tag_type === 'assist' || st.tag_type === 'projected' || st.tag_type === 'separated')
+                      ? 'bg-blue-50 text-[#1768C9] border-blue-200'
+                      : (st.tag_type === 'reviewed' || st.tag_type === 'tracked' || st.tag_type === 'aggregated')
+                      ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                      : 'bg-slate-100 text-slate-700 border-slate-300';
+                    const tagBadge = '<span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ' + tagClass + '">' + st.tag + '</span>';
 
                     return `
                       <div class="relative flex flex-col justify-between bg-slate-50/70 hover:bg-slate-50 rounded-xl border border-slate-200/80 p-5 transition-all">

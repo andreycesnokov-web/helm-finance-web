@@ -60,13 +60,13 @@ const translations = {
         {
           num: "02",
           title: "Document Intelligence & OCR",
-          desc: "Multi-channel intake (web upload and mobile), AI vision extraction of vendor names, DPP, and PPN 11% with human review drawer.",
+          desc: "Multi-channel intake (web upload and mobile), AI vision extraction of vendor names, DPP, and applicable taxes with human review drawer.",
           link: "Review workflow"
         },
         {
           num: "03",
           title: "Indonesian Tax Radar",
-          desc: "Indonesian statutory calendar monitoring, PPh 21 TER formulas, PPh 23, PPN 11%, and CoreTax PMK 81/2024 compliance advisories.",
+          desc: "Indonesian statutory calendar monitoring, PPh 21 TER formulas, PPh 23, applicable VAT, and CoreTax PMK 81/2024 compliance advisories.",
           link: "Explore radar"
         },
         {
@@ -108,7 +108,7 @@ const translations = {
           badge: "Core Workflow",
           role: "In-House Finance Teams",
           title: "Eliminate 80% of Manual Ledger Work",
-          desc: "Upload photos of receipts or PDF tax invoices. OCR extracts DPP, PPN 11%, and vendor details, automatically matching transactions to imported bank statement rows.",
+          desc: "Upload photos of receipts or PDF tax invoices. OCR extracts DPP, applicable taxes, and vendor details for review and matching against imported bank statement rows.",
           bullets: [
             "Corporate statement auto-matching and rule-based reconciliation",
             "Side-by-side OCR verification drawer with DPP/PPN split",
@@ -183,25 +183,44 @@ const translations = {
       ]
     },
     platform: {
-      badge: "PLATFORM ARCHITECTURE",
-      heading: "A Complete Financial Operating System",
-      subheading: "Discover how CFO AI replaces fragmented software with a unified, high-integrity financial operations workspace engineered for Indonesia.",
+      badge: "FINANCIAL OPERATING SYSTEM",
+      heading: "Run Your Business Finances in One Place.",
+      subheading: "Manage expenses, invoices, approvals, and financial decisions in one connected workspace. Know what's confirmed, what's expected, and what needs your attention.",
       connected_workspace: {
         eyebrow: "CONNECTED FINANCIAL WORKSPACE",
         heading: "Your Financial Data. One Intelligent System.",
         subheading: "Connect your team, documents, and AI assistants to a unified financial workspace.",
-        footnote: "Conceptual architecture visualization. All ledger modifications and financial disbursements require authenticated role permissions and human confirmation.",
+        footnote: "Operational architecture overview. All financial disbursements, accounting modifications, and tax filings require authenticated user authorization and company-defined controls.",
         transition: "However your financial information enters CFO AI, it becomes part of connected, controlled financial workflows.",
+        ui: {
+          level_1_badge: "LEVEL 1",
+          level_1_title: "Input & Interaction Channels",
+          level_1_hint: "Click any channel to inspect pipeline and governance",
+          inspect_flow: "Inspect flow",
+          connector_1: "Secure Ingestion & API Integration",
+          level_2_badge: "LEVEL 2 • CENTRAL CORE",
+          level_2_pill: "AI Suggests • User Confirms",
+          level_2_status: "Centralized Validation Core",
+          inspector_badge: "ACTIVE CHANNEL INSPECTOR",
+          inspector_col1: "Business Scenario",
+          inspector_col2: "End-to-End Pipeline",
+          inspector_col3: "Governance & Controls",
+          connector_2: "Verified Ledger Posting & Tenant Isolation",
+          level_3_badge: "LEVEL 3",
+          transition_badge: "END-TO-END FLOW ARCHITECTURE",
+          transition_cta: "Explore the 3 end-to-end workflows below",
+          connected_steps: "4 Connected Steps"
+        },
         channels: [
           {
             id: "whatsapp",
             name: "WhatsApp",
             subtitle: "Messaging & Receipt Intake",
-            status: "Planned",
-            status_type: "planned",
+            status: "Available",
+            status_type: "available",
             example: "Send a receipt or invoice directly from a conversation.",
-            description: "Employee captures an expense receipt on mobile and sends it to the finance inbox. (Conceptual workflow — WhatsApp integration is on the product roadmap).",
-            flow_desc: "Direct photo capture → AI parsing draft → Approval queue"
+            description: "Team members submit receipts and vendor invoices via chat. Ingested documents enter the central queue for OCR processing, human review, and policy-based approval.",
+            flow_desc: "Direct photo capture -> Central intake queue -> Human review & approval"
           },
           {
             id: "telegram",
@@ -209,39 +228,39 @@ const translations = {
             subtitle: "Summaries & Approvals",
             status: "Available",
             status_type: "available",
-            example: "Request financial information and approve authorized actions.",
-            description: "Finance managers check cash runway, inspect overdue debts, and approve or reject expenses via authenticated bot tokens with full role verification.",
-            flow_desc: "Bot commands & notifications → Inline one-tap approval → Instant audit record"
+            example: "Ask for today's cash runway or approve a pending vendor bill.",
+            description: "Authorized managers review pending expenses, approve disbursements with one tap, and query runway metrics directly in chat with full cryptographic audit logs.",
+            flow_desc: "Runway & balance queries -> Pending approval alert -> Authenticated one-tap action"
           },
           {
             id: "chatgpt",
             name: "ChatGPT",
-            subtitle: "Conversational Queries (MCP)",
-            status: "In Development",
-            status_type: "in_dev",
-            example: "Ask financial questions through a connected AI assistant.",
-            description: "Connect via Model Context Protocol (MCP) for authorized read-only financial inquiries and runway analysis. No automatic posting without user confirmation.",
-            flow_desc: "Natural language query → Authorized MCP endpoint → Scoped ledger insight"
+            subtitle: "Conversational Financial Queries",
+            status: "Available",
+            status_type: "available",
+            example: "Ask about cash flow, outstanding invoices, expenses, and financial performance using your preferred AI assistant.",
+            description: "Connect ChatGPT via Model Context Protocol (MCP) to query confirmed balances, outstanding receivables, and expense breakdowns with company-governed access.",
+            flow_desc: "Governed MCP connection -> Natural language query -> Company-scoped read analysis"
           },
           {
             id: "claude",
             name: "Claude",
-            subtitle: "Context & Analysis (MCP)",
-            status: "In Development",
-            status_type: "in_dev",
-            example: "Access authorized financial context using MCP.",
-            description: "Leverage Claude's reasoning with scoped, read-only financial data and voucher citations. Write operations require explicit pending draft creation.",
-            flow_desc: "Deep financial analysis → MCP schema isolation → Verified voucher citations"
+            subtitle: "Financial Analysis & Synthesis",
+            status: "Available",
+            status_type: "available",
+            example: "Analyze burn rate trends and summarize vendor spending this quarter.",
+            description: "Use Claude with MCP integration for deep financial synthesis, voucher citations, and runway scenario planning governed by authenticated read permissions.",
+            flow_desc: "MCP session handshake -> Financial synthesis prompt -> Governed context & voucher citation"
           },
           {
             id: "webapp",
             name: "CFO AI Web App",
-            subtitle: "Direct Upload & Ops",
+            subtitle: "Operations & Verification Workbench",
             status: "Available",
             status_type: "available",
-            example: "Upload invoices, documents, and bank statements directly.",
-            description: "Full-featured web application supporting PDF/JPG/PNG document intake, corporate bank statement reconciliation (CSV, MT940), and multi-currency billing.",
-            flow_desc: "Drag-and-drop file upload → OCR intake workbench → Reconciled General Ledger"
+            example: "Upload vendor invoices, review AI extraction, match bank feeds, and authorize entries.",
+            description: "The primary control center for financial operations. Review incoming documents side-by-side with OCR extraction, verify bank suggestions, and approve ledger postings.",
+            flow_desc: "Multi-format document upload -> Side-by-side human verification -> Approved posting & reconciliation"
           }
         ],
         intelligence_engine: {
@@ -251,7 +270,7 @@ const translations = {
           capabilities: [
             {
               title: "Document Intelligence",
-              desc: "Multimodal OCR extracts vendor, date, DPP, and PPN 11% tax data"
+              desc: "Multimodal OCR extracts vendor, date, DPP, and applicable Indonesian tax data"
             },
             {
               title: "Data Validation & Human Review",
@@ -270,14 +289,14 @@ const translations = {
         workspace_destinations: {
           badge: "UNIFIED FINANCIAL WORKSPACE",
           title: "Authorized Information Flows Into One Operating Environment",
-          subtitle: "Clean, reconciled financial records populate isolated operational domains",
+          subtitle: "Verified operational records populate dedicated business domains",
           items: [
-            { name: "Transactions", desc: "Reconciled bank records & feeds" },
-            { name: "Documents", desc: "Digital receipts, invoices & proofs" },
-            { name: "Invoices & Bills", desc: "Receivables aging & payable queue" },
-            { name: "Approvals", desc: "Decision trail & limits" },
-            { name: "Financial Reports", desc: "Balanced P&L & tax schedules" },
-            { name: "Audit Trail", desc: "Activity logs & compliance history" }
+            { name: "Transactions", desc: "Reconciled bank records & feeds", tag: "Bank & Cash Feeds" },
+            { name: "Documents", desc: "Digital receipts, invoices & proofs", tag: "Digital Archive" },
+            { name: "Invoices & Bills", desc: "Receivables aging & payable queue", tag: "AR & AP Ledger" },
+            { name: "Approvals", desc: "Decision trail & limits", tag: "Authorization History" },
+            { name: "Financial Reports", desc: "Balanced P&L & tax schedules", tag: "Financial Statements" },
+            { name: "Audit Trail", desc: "Activity logs & compliance history", tag: "Activity Logs" }
           ]
         }
       },
@@ -290,39 +309,39 @@ const translations = {
           num: "01",
           badge: "EXPENSE TO LEDGER",
           title: "From Employee Expense to Approved Record",
-          desc: "Eliminate lost receipts and delayed expense claims with automated intake, management thresholds, and audit-ready tax booking.",
+          desc: "Eliminate lost receipts and delayed claims with structured intake, policy-based approvals, and audit-ready bookkeeping.",
           steps: [
             {
               step: "01",
-              label: "Receipt Intake",
-              title: "Mobile & Web Voucher Upload",
-              desc: "Employees or vendors submit receipts and PDF invoices directly through role-restricted upload channels.",
-              tag: "Verified",
-              tag_type: "verified"
+              label: "Voucher Intake",
+              title: "Receipt & Invoice Submission",
+              desc: "Employees or vendors submit receipts and PDF invoices through chat, web upload, or email forwarding.",
+              tag: "Submitted",
+              tag_type: "submitted"
             },
             {
               step: "02",
               label: "AI Extraction",
               title: "Intelligent Data Parsing",
-              desc: "OCR extracts vendor, date, currency, line items, and PPN 11% tax data for review in the intake workbench.",
-              tag: "AI + Human Confirm",
+              desc: "OCR extracts vendor, date, currency, line items, and applicable tax fields into a pending review queue.",
+              tag: "AI Extracted",
               tag_type: "assist"
             },
             {
               step: "03",
-              label: "Approval Queue",
-              title: "Policy-Based Authorization",
-              desc: "Disbursements exceeding company thresholds route automatically to designated managers with complete audit trails.",
-              tag: "Verified",
-              tag_type: "verified"
+              label: "Human Review",
+              title: "Verification & Discrepancy Check",
+              desc: "Finance team reviews extracted data side-by-side with the original voucher before authorization.",
+              tag: "Reviewed",
+              tag_type: "reviewed"
             },
             {
               step: "04",
-              label: "Audit-Ready Ledger",
-              title: "GL Posting & Tax Schedules",
-              desc: "Approved expenses post immediately to the General Ledger with digital receipt attachments and tax compliance tags.",
-              tag: "Verified",
-              tag_type: "verified"
+              label: "Approval & Posting",
+              title: "Manager Approval & Ledger Entry",
+              desc: "Authorized managers approve disbursements according to company policy, creating audit-ready accounting records.",
+              tag: "Authorized",
+              tag_type: "authorized"
             }
           ]
         },
@@ -331,39 +350,39 @@ const translations = {
           num: "02",
           badge: "INVOICE TO SETTLEMENT",
           title: "From Customer Invoice to Collected Payment",
-          desc: "Accelerate cash collection with compliant multi-currency invoicing, aging radar, smart follow-up alerts, and automated bank reconciliation.",
+          desc: "Accelerate cash collection with compliant multi-currency invoicing, aging radar, follow-up alerts, and suggested bank matching.",
           steps: [
             {
               step: "01",
               label: "Invoice Issuance",
-              title: "Compliant Billing & DPP/PPN",
-              desc: "Issue multi-currency invoices with mandatory Indonesian Rupiah (IDR) statutory equivalents and customer payment terms.",
-              tag: "Verified",
-              tag_type: "verified"
+              title: "Compliant Billing & DPP/Tax",
+              desc: "Issue multi-currency invoices with required Indonesian Rupiah equivalents and specified payment terms.",
+              tag: "Issued",
+              tag_type: "issued"
             },
             {
               step: "02",
-              label: "Receivables Radar",
-              title: "Real-Time Aging Tracking",
-              desc: "Track open balances across 30, 60, and 90-day aging buckets with instant visibility into overdue accounts.",
-              tag: "Verified",
-              tag_type: "verified"
+              label: "Receivables Tracking",
+              title: "Real-Time Aging & Overdue Monitoring",
+              desc: "Track open balances across 30, 60, and 90-day aging buckets with timely follow-up alerts.",
+              tag: "Tracked",
+              tag_type: "tracked"
             },
             {
               step: "03",
-              label: "Follow-Up Alerts",
-              title: "Smart Internal Action Tasks",
-              desc: "Automated alerts flag overdue invoices and generate actionable follow-up tasks for your finance and collection team.",
-              tag: "Smart Assist (Internal)",
+              label: "Deposit Matching",
+              title: "Intelligent Match Suggestions",
+              desc: "Incoming bank statement lines suggest matching invoices based on amount, invoice reference, and counterparty.",
+              tag: "Suggested Match",
               tag_type: "assist"
             },
             {
               step: "04",
-              label: "Bank Reconciliation",
-              title: "Automated Deposit Matching",
-              desc: "Incoming bank transactions match against open invoices using multi-signal scoring, updating cash balances instantly.",
-              tag: "Verified",
-              tag_type: "verified"
+              label: "Settlement Confirmation",
+              title: "Confirmed Match & Receivable Close",
+              desc: "Finance operator confirms verified bank matches, updating receivable balances and closing open items.",
+              tag: "Settled",
+              tag_type: "settled"
             }
           ]
         },
@@ -371,40 +390,40 @@ const translations = {
           id: "wf-decision",
           num: "03",
           badge: "DATA TO STRATEGY",
-          title: "From Financial Data to Founder Decision",
-          desc: "Turn reconciled transactions into strategic foresight with AI conversational intelligence, forward runway radar, and scenario modeling.",
+          title: "Reliable Financial Data. Better Decisions.",
+          desc: "CFO AI brings together confirmed financial transactions, banking data, receivables, payables, and known financial obligations to support reporting and forecasting. Unconfirmed transactions, expected payments, and missing information are identified separately, helping business owners understand the reliability of their financial picture.",
           steps: [
             {
               step: "01",
-              label: "Verified Foundation",
-              title: "Clean Reconciled Ledgers",
-              desc: "All financial analytics and forecasting draw strictly from reconciled bank feeds and approved operational records.",
-              tag: "Verified",
-              tag_type: "verified"
+              label: "Consolidated Data",
+              title: "Unified Financial Records",
+              desc: "Brings together confirmed transactions, banking feeds, open receivables, payables, and known financial commitments.",
+              tag: "Aggregated",
+              tag_type: "aggregated"
             },
             {
               step: "02",
-              label: "AI CFO Synthesis",
-              title: "Conversational Ledger Intelligence",
-              desc: "Ask complex natural language questions about burn, margins, or department spending and get answers with voucher citations.",
-              tag: "Verified AI",
-              tag_type: "verified"
+              label: "Reliability Check",
+              title: "Confirmed vs. Expected Separation",
+              desc: "Distinguishes verified historical records from pending drafts and unconfirmed entries to ensure reporting integrity.",
+              tag: "Separated",
+              tag_type: "separated"
             },
             {
               step: "03",
-              label: "Forward Radar",
-              title: "30-60-90 Day Cash Trajectory",
-              desc: "Simulate revenue delays, tax payments, and hiring runway impact with interactive scenario modeling and buffer alerts.",
-              tag: "Verified",
-              tag_type: "verified"
+              label: "Forward Trajectory",
+              title: "30-60-90 Day Cash Horizon",
+              desc: "Models upcoming operational cash commitments, expected collections, and tax obligations across forward horizons.",
+              tag: "Projected",
+              tag_type: "projected"
             },
             {
               step: "04",
-              label: "Founder Execution",
-              title: "Actionable Strategic Decisions",
-              desc: "AI recommendations link directly to execution screens—approving payments, adjusting budgets, and protecting solvency.",
-              tag: "Human-in-the-Loop",
-              tag_type: "governance"
+              label: "Executive Action",
+              title: "Informed Strategic Decisions",
+              desc: "Financial insights connect directly to underlying transaction records, supporting sound leadership decisions.",
+              tag: "Actionable",
+              tag_type: "actionable"
             }
           ]
         }
@@ -413,36 +432,36 @@ const translations = {
       primary_subheading: "Full uncropped visibility into liquidity, cash runway, and transaction streams.",
       secondary_heading: "Extended Management & Regulatory Modules",
       secondary_subheading: "Click any preview to inspect the full interface in high resolution.",
-      click_to_enlarge: "Click to enlarge full UI",
-      authentic_tag: "AUTHENTIC V2 SCREEN",
+      click_to_enlarge: "Click to enlarge full preview",
+      authentic_tag: "V2 AUTHENTIC SCREEN",
       modules: {
         pulse: {
           title: "Pulse Command Center",
-          desc: "Executive financial cockpit offering unified multi-currency liquidity visibility across bank accounts and cash floats with real-time runway forecasting."
+          desc: "Executive liquidity cockpit showing real-time multi-currency cash balances across BCA, Mandiri, and operational accounts with dynamic runway estimates."
         },
         radar: {
-          title: "Radar Forward Trajectory",
-          desc: "Predictive cash flow modeling with 30, 60, and 90-day step horizons. Interactive what-if scenario levers simulate customer payment delays and corporate tax installments."
+          title: "Radar Runway Forecast",
+          desc: "Forward-looking 30, 60, and 90-day cash trajectory simulation. Adjust revenue collection delays, statutory tax payments, and hiring runway impact."
         },
         accounts: {
-          title: "Accounts & Treasury Portfolio",
-          desc: "Consolidated multi-account overview tracking balances across checking, savings, term deposits, and petty cash with currency revaluations."
+          title: "Multi-Currency Treasury Accounts",
+          desc: "Centralized overview of domestic IDR accounts and foreign currency holdings with real-time Bank Indonesia exchange rate tracking."
         },
         transactions: {
-          title: "Bank Transactions & Matching",
-          desc: "Unified transaction stream with automatic categorization, status indicators, and rule-based matching against vendor bills and customer invoices."
+          title: "Operational Transaction Feed",
+          desc: "Searchable transaction ledger with real-time balance tracking, tax invoice (Faktur Pajak) attachment links, and counterparty categorization."
         },
         bank_import: {
-          title: "Bank Statement Import Engine",
-          desc: "Import corporate bank statements (CSV, PDF, MT940), reconcile transactions automatically, and consolidate financial activity across business accounts."
+          title: "Bank Statement Import & Review",
+          desc: "Direct import of BCA, Mandiri, and generic MT940/CSV statements with intelligent transaction deduplication and side-by-side reconciliation."
         },
         invoicing: {
-          title: "Invoicing & Accounts Receivable (AR)",
-          desc: "Multi-currency sales invoicing with Indonesian Rupiah (IDR) statutory equivalents, aging analysis, customer tracking, and settlement records."
+          title: "Multi-Currency Invoicing",
+          desc: "Compliant commercial invoices with mandatory Indonesian Rupiah (IDR) statutory equivalents, tax calculations, and payment tracking."
         },
         bills: {
-          title: "Bills & Accounts Payable (AP)",
-          desc: "Vendor bill management with approval thresholds, duplicate detection, payment scheduling, and automated withholding tax deduction (PPh 23)."
+          title: "Accounts Payable & Bills",
+          desc: "Vendor bill management with approval thresholds, duplicate detection, payment scheduling, and applicable withholding tax tracking."
         },
         approvals: {
           title: "Disbursement Approval Queue",
@@ -450,7 +469,7 @@ const translations = {
         },
         doc_intelligence: {
           title: "Document Intelligence & OCR",
-          desc: "Multimodal AI vision extraction for Indonesian tax invoices (Faktur Pajak) and receipts. Automatically parses vendor name, DPP, and PPN 11%."
+          desc: "Multimodal AI vision extraction for Indonesian tax invoices (Faktur Pajak) and receipts. Extracts vendor name, DPP, and applicable Indonesian VAT and withholding taxes."
         },
         ai_cfo: {
           title: "AI Chief Financial Officer",
@@ -462,7 +481,7 @@ const translations = {
         },
         compliance: {
           title: "Indonesian Tax Radar",
-          desc: "Continuous statutory calendar monitoring for PPh 21 TER, PPh 23, PPh 4(2), and PPN 11%. Automated tax worksheets prevent late penalties under UU KUP."
+          desc: "Continuous statutory calendar monitoring for PPh 21 TER, PPh 23, PPh 4(2), and applicable VAT. Helps businesses monitor deadlines, prepare supporting documents, and reduce the risk of missed obligations and reporting errors."
         },
         payroll: {
           title: "Payroll & PPh 21 TER Engine",
@@ -479,7 +498,7 @@ const translations = {
       heading: "From Paper Receipt to General Ledger in Seconds",
       subheading: "Eliminate 80% of manual data entry with multimodal vision OCR, human-in-the-loop verification, and automated bank matching.",
       faktur_title: "Faktur Pajak & QR Scanner",
-      faktur_desc: "Instantly parses DGT standard tax invoices, extracting Nomor Seri Faktur Pajak (NSFP), NPWP, DPP, and PPN 11% with automated QR validation.",
+      faktur_desc: "Parses DGT standard tax invoices, extracting Nomor Seri Faktur Pajak (NSFP), NPWP, DPP, and applicable VAT with QR validation.",
       intake_title: "Mobile & Drag-and-Drop Intake",
       intake_desc: "Finance teams upload PDFs or snap photos of receipts on mobile. CFO AI ingests the image and stages it for review within seconds.",
       review_title: "Human-in-the-Loop Verification",
@@ -488,13 +507,13 @@ const translations = {
     tax_page: {
       badge: "STATUTORY RADAR",
       heading: "Indonesian Tax & CoreTax Radar",
-      subheading: "Stay ahead of PPh 21 TER, PPh 23, PPN 11%, and PMK 81/2024 CoreTax transition deadlines with automated calculation worksheets.",
+      subheading: "Stay ahead of PPh 21 TER, PPh 23, applicable VAT, and PMK 81/2024 CoreTax transition deadlines with automated calculation worksheets.",
       pph21_title: "PPh 21 TER Engine",
       pph21_desc: "Automatically calculates monthly employee withholding using Tarif Efektif Rata-Rata (TER Categories A, B, C) per PP 58/2023 and PMK 168/2023.",
       pph23_title: "PPh 23 & PPh 4(2) Withholding",
       pph23_desc: "Tracks 2% service withholding and final tax on commercial property leases, auto-generating Bukti Potong summaries for month-end filing.",
-      ppn_title: "PPN 11% VAT Reconciliation",
-      ppn_desc: "Cross-checks Pajak Keluaran (output VAT) against Pajak Masukan (input VAT) to ensure accurate net tax payable before the end-of-month deadline."
+      ppn_title: "Indonesian VAT Reconciliation",
+      ppn_desc: "Cross-checks Pajak Keluaran (output VAT) against Pajak Masukan (input VAT) under applicable tax rates to ensure accurate net tax calculation before filing deadlines."
     },
     pricing_page: {
       badge: "TRANSPARENT SUBSCRIPTION PRICING",
@@ -617,13 +636,13 @@ const translations = {
         {
           num: "02",
           title: "Intelijen Dokumen & OCR",
-          desc: "Pemasukan multi-kanal (web dan mobile), ekstraksi AI visi untuk nama vendor, DPP, dan PPN 11% dengan laci verifikasi manusia.",
+          desc: "Pemasukan multi-kanal (web dan mobile), ekstraksi AI visi untuk nama vendor, DPP, dan pajak yang berlaku dengan laci verifikasi manusia.",
           link: "Tinjau alur kerja"
         },
         {
           num: "03",
           title: "Radar Kepatuhan Pajak",
-          desc: "Pemantauan kalender resmi pajak, formula PPh 21 TER, PPh 23, PPN 11%, dan notifikasi kepatuhan CoreTax PMK 81/2024.",
+          desc: "Pemantauan kalender resmi pajak, formula PPh 21 TER, PPh 23, PPN yang berlaku, dan notifikasi kepatuhan CoreTax PMK 81/2024.",
           link: "Jelajahi radar"
         },
         {
@@ -665,7 +684,7 @@ const translations = {
           badge: "Alur Inti",
           role: "Tim Keuangan Internal",
           title: "Pangkas 80% Beban Entri Jurnal Manual",
-          desc: "Unggah foto kuitansi atau faktur pajak PDF. OCR mengekstrak DPP, PPN 11%, dan rincian vendor, mencocokkan otomatis dengan mutasi bank yang diimpor.",
+          desc: "Unggah foto kuitansi atau faktur pajak PDF. OCR mengekstrak DPP, pajak yang berlaku, dan rincian vendor untuk ditinjau dan dicocokkan dengan mutasi bank yang diimpor.",
           bullets: [
             "Pencocokan mutasi koran otomatis berbasis aturan",
             "Laci verifikasi OCR berdampingan dengan pemisahan DPP/PPN",
@@ -740,25 +759,44 @@ const translations = {
       ]
     },
     platform: {
-      badge: "ARSITEKTUR PLATFORM",
-      heading: "Sistem Operasi Keuangan Menyeluruh",
-      subheading: "Ketahui bagaimana CFO AI menggantikan perangkat lunak yang terpisah-pisah dengan ruang kerja operasional keuangan terpadu berintegritas tinggi untuk Indonesia.",
+      badge: "SISTEM OPERASI KEUANGAN",
+      heading: "Kelola Keuangan Bisnis Anda di Satu Tempat.",
+      subheading: "Kelola pengeluaran, faktur, persetujuan, dan keputusan keuangan dalam satu ruang kerja terpadu. Ketahui apa yang sudah terkonfirmasi, apa yang diperkirakan, dan apa yang memerlukan perhatian Anda.",
       connected_workspace: {
         eyebrow: "RUANG KERJA KEUANGAN TERPADU",
         heading: "Data Keuangan Anda. Satu Sistem Cerdas.",
         subheading: "Hubungkan tim, dokumen, dan asisten AI Anda ke dalam satu ruang kerja keuangan terintegrasi.",
-        footnote: "Visualisasi arsitektur konseptual. Seluruh perubahan buku besar dan pengeluaran dana memerlukan hak akses terotentikasi dan konfirmasi manusia.",
+        footnote: "Gambaran arsitektur operasional. Seluruh pengeluaran keuangan, perubahan pembukuan, dan pelaporan pajak memerlukan otorisasi pengguna terotentikasi dan kontrol internal perusahaan.",
         transition: "Bagaimanapun data keuangan Anda masuk ke CFO AI, seluruhnya menjadi bagian dari alur kerja keuangan yang terhubung dan terkendali.",
+        ui: {
+          level_1_badge: "TINGKAT 1",
+          level_1_title: "Kanal Input & Interaksi",
+          level_1_hint: "Klik kanal mana saja untuk melihat alur dan tata kelola",
+          inspect_flow: "Lihat alur",
+          connector_1: "Penerimaan Aman & Integrasi API",
+          level_2_badge: "TINGKAT 2 • INTI PUSAT",
+          level_2_pill: "AI Menyarankan • Pengguna Mengonfirmasi",
+          level_2_status: "Inti Validasi Terpusat",
+          inspector_badge: "INSPEKTUR KANAL AKTIF",
+          inspector_col1: "Skenario Bisnis",
+          inspector_col2: "Alur Kerja Menyeluruh",
+          inspector_col3: "Tata Kelola & Kontrol",
+          connector_2: "Pembukuan Terverifikasi & Isolasi Data Perusahaan",
+          level_3_badge: "TINGKAT 3",
+          transition_badge: "ARSITEKTUR ALUR TERPADU",
+          transition_cta: "Jelajahi 3 alur kerja menyeluruh di bawah ini",
+          connected_steps: "4 Langkah Terhubung"
+        },
         channels: [
           {
             id: "whatsapp",
             name: "WhatsApp",
-            subtitle: "Pesan & Penerimaan Bukti",
-            status: "Direncanakan",
-            status_type: "planned",
-            example: "Kirim kuitansi atau faktur langsung dari ruang percakapan.",
-            description: "Karyawan memfoto kuitansi pengeluaran di ponsel dan mengirimkannya ke kontak keuangan. (Alur kerja konseptual — integrasi WhatsApp berada dalam rencana pengembangan).",
-            flow_desc: "Pengambilan foto langsung → Draf ekstraksi AI → Antrean persetujuan"
+            subtitle: "Pesan & Pengiriman Bukti",
+            status: "Tersedia",
+            status_type: "available",
+            example: "Kirim kuitansi atau faktur langsung dari percakapan.",
+            description: "Anggota tim mengirim kuitansi dan faktur vendor melalui chat. Dokumen masuk ke antrean pusat untuk pemrosesan OCR, tinjauan manusia, dan persetujuan berbasis kebijakan.",
+            flow_desc: "Pengambilan foto langsung -> Antrean penerimaan pusat -> Tinjauan manusia & persetujuan"
           },
           {
             id: "telegram",
@@ -766,75 +804,75 @@ const translations = {
             subtitle: "Ringkasan & Persetujuan",
             status: "Tersedia",
             status_type: "available",
-            example: "Minta ringkasan keuangan dan setujui tindakan berwenang.",
-            description: "Manajer keuangan memantau runway kas, memeriksa tagihan tertunda, serta menyetujui atau menolak pengeluaran via token bot terotentikasi.",
-            flow_desc: "Perintah & notifikasi bot → Persetujuan satu ketukan → Catatan audit instan"
+            example: "Tanyakan runway kas hari ini atau setujui tagihan vendor yang tertunda.",
+            description: "Manajer berwenang meninjau pengeluaran tertunda, menyetujui pembayaran dengan satu ketukan, dan menanyakan metrik runway langsung di chat dengan jejak audit kriptografis.",
+            flow_desc: "Kueri saldo & runway -> Notifikasi persetujuan tertunda -> Tindakan terotentikasi"
           },
           {
             id: "chatgpt",
             name: "ChatGPT",
-            subtitle: "Pertanyaan Percakapan (MCP)",
-            status: "Dalam Pengembangan",
-            status_type: "in_dev",
-            example: "Ajukan pertanyaan keuangan melalui asisten AI terhubung.",
-            description: "Terhubung melalui Model Context Protocol (MCP) untuk analisis keuangan dan proyeksi kas mode baca saja. Tidak ada posting otomatis tanpa konfirmasi pengguna.",
-            flow_desc: "Kueri bahasa alami → Endpoint MCP terotorisasi → Wawasan buku besar terisolasi"
+            subtitle: "Kueri Keuangan Percakapan",
+            status: "Tersedia",
+            status_type: "available",
+            example: "Tanyakan arus kas, faktur tertunggak, pengeluaran, dan kinerja keuangan menggunakan asisten AI pilihan Anda.",
+            description: "Hubungkan ChatGPT melalui Model Context Protocol (MCP) untuk menanyakan saldo terkonfirmasi, piutang tertunggak, dan rincian biaya dengan izin kelola perusahaan.",
+            flow_desc: "Koneksi MCP terkendali -> Kueri bahasa alami -> Analisis baca berizin perusahaan"
           },
           {
             id: "claude",
             name: "Claude",
-            subtitle: "Konteks & Analisis (MCP)",
-            status: "Dalam Pengembangan",
-            status_type: "in_dev",
-            example: "Akses konteks keuangan terotorisasi menggunakan MCP.",
-            description: "Manfaatkan penalaran Claude dengan data keuangan mode baca saja yang aman dan sitasi bukti nyata. Tindakan penulisan dibatasi pada draf tertunda.",
-            flow_desc: "Analisis keuangan mendalam → Isolasi skema MCP → Sitasi bukti terverifikasi"
+            subtitle: "Analisis & Sintesis Keuangan",
+            status: "Tersedia",
+            status_type: "available",
+            example: "Analisis tren burn rate dan rangkum pengeluaran vendor kuartal ini.",
+            description: "Gunakan Claude dengan integrasi MCP untuk sintesis keuangan mendalam, sitasi bukti transaksi, dan perencanaan skenario kas dengan hak akses baca terverifikasi.",
+            flow_desc: "Handshake sesi MCP -> Perintah analisis keuangan -> Konteks teratur & sitasi dokumen"
           },
           {
             id: "webapp",
             name: "CFO AI Web App",
-            subtitle: "Unggah Langsung & Operasional",
+            subtitle: "Meja Kerja Operasi & Verifikasi",
             status: "Tersedia",
             status_type: "available",
-            example: "Unggah faktur, dokumen, dan rekening koran secara langsung.",
-            description: "Aplikasi web lengkap mendukung penerimaan dokumen PDF/JPG/PNG, rekonsiliasi rekening koran bank perusahaan (CSV, MT940), dan penagihan multi-valuta.",
-            flow_desc: "Unggah seret-lepas berkas → Meja kerja OCR → Buku Besar terekonsiliasi"
+            example: "Unggah faktur vendor, tinjau ekstraksi AI, cocokkan mutasi bank, dan otorisasi entri.",
+            description: "Pusat kendali utama operasi keuangan. Tinjau dokumen bersama hasil ekstraksi OCR, verifikasi saran mutasi bank, dan setujui pembukuan buku besar.",
+            flow_desc: "Unggah dokumen multi-format -> Verifikasi berdampingan oleh manusia -> Pembukuan & rekonsiliasi disetujui"
           }
         ],
         intelligence_engine: {
-          badge: "INTI PEMROSESAN PUSAT",
-          title: "CFO AI — Intelijen Keuangan",
-          subtitle: "Semua saluran terhubung ke satu mesin pemrosesan pusat",
+          badge: "INTELIGENSI KEUANGAN CFO AI",
+          title: "CFO AI — Inteligensi Keuangan",
+          subtitle: "Seluruh kanal terhubung ke satu mesin pemrosesan pusat",
           capabilities: [
             {
-              title: "Intelijen Dokumen",
-              desc: "OCR multimodal membaca vendor, tanggal, DPP, dan pajak PPN 11%"
+              title: "Inteligensi Dokumen",
+              desc: "OCR multimodal membaca vendor, tanggal, DPP, dan pajak Indonesia yang berlaku"
             },
             {
-              title: "Validasi Data & Tinjauan Manusia",
-              desc: "Meja kerja konfirmasi manusia: AI mengusulkan, pengguna memastikan"
+              title: "Validasi Data & Verifikasi Manusia",
+              desc: "Meja kerja kendali manusia: AI menyarankan, pengguna mengonfirmasi"
             },
             {
-              title: "Alur Persetujuan & Tata Kelola",
-              desc: "Perutean berbasis batas ambang dan pemisahan wewenang yang ketat"
+              title: "Persetujuan & Alur Kerja Keuangan",
+              desc: "Perutean berbasis ambang batas dan pemisahan tugas yang ketat"
             },
             {
-              title: "Rekonsiliasi & Wawasan Keuangan",
-              desc: "Pencocokan multi-sinyal bank dan radar arus kas prediktif 30/60/90 hari"
+              title: "Rekonsiliasi & Wawasan Finansial",
+              desc: "Pencocokan mutasi bank multi-sinyal dan radar prediksi kas 30/60/90 hari"
             }
           ]
         },
         workspace_destinations: {
           badge: "RUANG KERJA KEUANGAN TERPADU",
-          title: "Informasi Resmi Mengalir ke Satu Lingkungan Operasional",
-          subtitle: "Catatan keuangan bersih dan terekonsiliasi mengisi domain operasional yang terisolasi",
+          title: "Informasi Terotorisasi Mengalir ke Satu Lingkungan Operasional",
+          subtitle: "Catatan operasional terverifikasi mengisi domain bisnis khusus",
           items: [
-            { name: "Transaksi", desc: "Mutasi bank terekonsiliasi & umpan langsung" },
-            { name: "Dokumen", desc: "Kuitansi digital, Faktur Pajak & bukti bayar" },
-            { name: "Faktur & Tagihan", desc: "Umur piutang penjualan & jadwal utang vendor" },
-            { name: "Persetujuan", desc: "Jejak keputusan manajemen & batas otorisasi" },
-            { name: "Laporan Keuangan", desc: "Laba rugi seimbang & jadwal pajak" },
-            { name: "Jejak Audit", desc: "Log aktivitas anti-manipulasi & riwayat kepatuhan" }
+            { name: "Transaksi", desc: "Mutasi & saldo rekening bank", tag: "Mutasi Bank & Kas" },
+            { name: "Dokumen", desc: "Kuitansi digital, faktur & bukti", tag: "Arsip Digital" },
+            { name: "Faktur & Tagihan", desc: "Umur piutang & antrean bayar", tag: "Buku Piutang & Hutang" },
+            { name: "Persetujuan", desc: "Jejak keputusan & batasan", tag: "Riwayat Otorisasi" },
+            { name: "Laporan Keuangan", desc: "Laba rugi & jadwal pajak", tag: "Laporan Keuangan" },
+            { name: "Jejak Audit", desc: "Log aktivitas & kepatuhan", tag: "Log Aktivitas" }
           ]
         }
       },
@@ -847,39 +885,39 @@ const translations = {
           num: "01",
           badge: "PENGELUARAN KE BUKU BESAR",
           title: "Dari Pengeluaran Staf hingga Catatan Terverifikasi",
-          desc: "Hilangkan bukti pembayaran yang hilang dan klaim biaya yang tertunda dengan pencatatan otomatis, ambang persetujuan, dan pembukuan pajak siap audit.",
+          desc: "Hilangkan bukti pembayaran yang hilang dan klaim tertunda dengan penerimaan terstruktur, persetujuan berbasis kebijakan, dan pembukuan siap audit.",
           steps: [
             {
               step: "01",
               label: "Penerimaan Bukti",
-              title: "Unggah Bukti Kas & Faktur",
-              desc: "Karyawan atau vendor mengunggah kuitansi dan faktur PDF secara langsung melalui saluran khusus berbasis peran.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              title: "Pengiriman Kuitansi & Faktur",
+              desc: "Karyawan atau vendor mengirimkan kuitansi dan faktur PDF melalui chat, unggahan web, atau penerusan email.",
+              tag: "Terkirim",
+              tag_type: "submitted"
             },
             {
               step: "02",
               label: "Ekstraksi AI",
               title: "Pembacaan Data Cerdas",
-              desc: "OCR mengekstrak data vendor, tanggal, nilai, dan PPN 11% untuk ditinjau di meja kerja konfirmasi dokumen.",
-              tag: "AI + Konfirmasi Pengguna",
+              desc: "OCR mengekstrak data vendor, tanggal, nilai, dan pajak yang berlaku ke dalam antrean tinjauan tertunda.",
+              tag: "Ekstraksi AI",
               tag_type: "assist"
             },
             {
               step: "03",
-              label: "Antrean Persetujuan",
-              title: "Otorisasi Berbasis Kebijakan",
-              desc: "Pengeluaran di atas ambang batas perusahaan otomatis diarahkan ke manajer berwenang dengan riwayat audit lengkap.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              label: "Verifikasi Manusia",
+              title: "Tinjauan & Pemeriksaan Selisih",
+              desc: "Tim keuangan meninjau data hasil ekstraksi berdampingan dengan dokumen asli sebelum otorisasi.",
+              tag: "Ditinjau",
+              tag_type: "reviewed"
             },
             {
               step: "04",
-              label: "Buku Besar Siap Audit",
-              title: "Posting GL & Jadwal Pajak",
-              desc: "Pengeluaran yang disetujui langsung dibukukan ke General Ledger beserta lampiran bukti digital dan tanda kepatuhan pajak.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              label: "Persetujuan & Pembukuan",
+              title: "Otorisasi Manajer & Entri Buku Besar",
+              desc: "Manajer berwenang menyetujui pengeluaran sesuai batas wewenang perusahaan, menghasilkan catatan akuntansi siap audit.",
+              tag: "Diotorisasi",
+              tag_type: "authorized"
             }
           ]
         },
@@ -888,39 +926,39 @@ const translations = {
           num: "02",
           badge: "FAKTUR KE PELUNASAN",
           title: "Dari Faktur Pelanggan hingga Penerimaan Dana",
-          desc: "Percepat penagihan kas dengan faktur multi-valuta resmi, radar umur piutang, peringatan tindak lanjut cerdas, dan rekonsiliasi bank otomatis.",
+          desc: "Percepat penagihan kas dengan faktur multi-valuta resmi, radar umur piutang, peringatan tindak lanjut, dan saran pencocokan mutasi bank.",
           steps: [
             {
               step: "01",
               label: "Penerbitan Faktur",
-              title: "Penagihan Resmi & DPP/PPN",
-              desc: "Terbitkan faktur penjualan multi-valuta dengan ekuivalen Rupiah (IDR) wajib serta syarat pembayaran pelanggan.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              title: "Penagihan Resmi & DPP/Pajak",
+              desc: "Terbitkan faktur penjualan multi-valuta dengan ekuivalen Rupiah (IDR) wajib serta syarat pembayaran yang ditentukan.",
+              tag: "Diterbitkan",
+              tag_type: "issued"
             },
             {
               step: "02",
-              label: "Radar Piutang",
-              title: "Pemantauan Umur Piutang Real-Time",
-              desc: "Lacak saldo tagihan terbuka dalam rentang 30, 60, dan 90 hari dengan visibilitas instan atas tagihan jatuh tempo.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              label: "Pelacakan Piutang",
+              title: "Pemantauan Umur & Jatuh Tempo Real-Time",
+              desc: "Lacak saldo tagihan terbuka dalam kelompok 30, 60, dan 90 hari dengan peringatan tindak lanjut tepat waktu.",
+              tag: "Dilacak",
+              tag_type: "tracked"
             },
             {
               step: "03",
-              label: "Peringatan Tindak Lanjut",
-              title: "Tugas Operasional Cerdas",
-              desc: "Peringatan otomatis menandai faktur jatuh tempo dan membuat tugas tindak lanjut untuk tim keuangan internal.",
-              tag: "Asistensi Cerdas (Internal)",
+              label: "Pencocokan Setoran",
+              title: "Saran Pencocokan Cerdas",
+              desc: "Mutasi kredit rekening koran menyarankan faktur yang cocok berdasarkan jumlah uang, nomor referensi, dan pihak lawan.",
+              tag: "Saran Cocok",
               tag_type: "assist"
             },
             {
               step: "04",
-              label: "Rekonsiliasi Bank",
-              title: "Pencocokan Setoran Otomatis",
-              desc: "Mutasi kredit bank dicocokkan dengan faktur penjualan secara akurat menggunakan skor multi-sinyal, memperbarui saldo seketika.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              label: "Konfirmasi Pelunasan",
+              title: "Pencocokan Terverifikasi & Penutupan Piutang",
+              desc: "Operator keuangan mengonfirmasi kecocokan mutasi bank yang terverifikasi, memperbarui saldo piutang dan menutup tagihan.",
+              tag: "Lunas",
+              tag_type: "settled"
             }
           ]
         },
@@ -928,40 +966,40 @@ const translations = {
           id: "wf-decision",
           num: "03",
           badge: "DATA KE STRATEGI",
-          title: "Dari Data Keuangan hingga Keputusan Pendiri",
-          desc: "Ubah transaksi yang telah direkonsiliasi menjadi keunggulan strategis dengan inteligensi AI percakapan, radar runway masa depan, dan simulasi skenario.",
+          title: "Data Keuangan Andal. Keputusan Lebih Baik.",
+          desc: "CFO AI menyatukan transaksi keuangan terkonfirmasi, data perbankan, piutang, hutang, dan kewajiban keuangan yang diketahui untuk mendukung pelaporan dan prakiraan. Transaksi yang belum terkonfirmasi, pembayaran yang diperkirakan, dan informasi yang belum lengkap dipisahkan secara jelas, membantu pemilik bisnis memahami keandalan gambaran keuangan mereka.",
           steps: [
             {
               step: "01",
-              label: "Fondasi Terverifikasi",
-              title: "Buku Besar Bersih & Terekonsiliasi",
-              desc: "Seluruh analitik dan prakiraan keuangan bersumber dari rekening koran yang telah direkonsiliasi dan catatan tervalidasi.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              label: "Konsolidasi Data",
+              title: "Catatan Keuangan Terpadu",
+              desc: "Menyatukan transaksi terkonfirmasi, mutasi bank, piutang terbuka, hutang, dan komitmen keuangan terdata.",
+              tag: "Terkonsolidasi",
+              tag_type: "aggregated"
             },
             {
               step: "02",
-              label: "Sintesis AI CFO",
-              title: "Inteligensi Buku Besar Percakapan",
-              desc: "Ajukan pertanyaan mendalam tentang burn rate, margin, atau biaya divisi dan peroleh jawaban dengan sitasi bukti voucher.",
-              tag: "AI Terverifikasi",
-              tag_type: "verified"
+              label: "Pemeriksaan Keandalan",
+              title: "Pemisahan Konfirmasi & Estimasi",
+              desc: "Membedakan catatan historis terverifikasi dari draf tertunda dan entri belum terkonfirmasi demi integritas pelaporan.",
+              tag: "Terpisah",
+              tag_type: "separated"
             },
             {
               step: "03",
-              label: "Radar Masa Depan",
+              label: "Horizon Kas",
               title: "Proyeksi Kas 30-60-90 Hari",
-              desc: "Simulasikan keterlambatan pembayaran, angsuran pajak, dan dampak perekrutan staf dengan pemodelan skenario interaktif.",
-              tag: "Terverifikasi",
-              tag_type: "verified"
+              desc: "Memodelkan komitmen kas operasional mendatang, perkiraan penerimaan, dan kewajiban pajak dalam cakrawala waktu ke depan.",
+              tag: "Terproyeksi",
+              tag_type: "projected"
             },
             {
               step: "04",
-              label: "Eksekusi Keputusan",
-              title: "Tindakan Strategis Terarah",
-              desc: "Rekomendasi AI terhubung langsung ke antarmuka operasional—menyetujui pembayaran, mengatur anggaran, dan mengamankan likuiditas.",
-              tag: "Kontrol Penuh Pemilik",
-              tag_type: "governance"
+              label: "Tindakan Eksekutif",
+              title: "Keputusan Strategis Terarah",
+              desc: "Wawasan keuangan terhubung langsung ke catatan transaksi dasar, mendukung pengambilan keputusan pimpinan yang tepat.",
+              tag: "Siap Dijalankan",
+              tag_type: "actionable"
             }
           ]
         }
@@ -975,58 +1013,58 @@ const translations = {
       modules: {
         pulse: {
           title: "Pulse Command Center",
-          desc: "Kokpit keuangan eksekutif yang menawarkan visibilitas likuiditas multi-valuta di seluruh rekening bank dan kas kecil dengan proyeksi runway real-time."
+          desc: "Dasbor likuiditas eksekutif yang menampilkan saldo kas multi-valuta langsung dari rekening BCA, Mandiri, dan kas operasional beserta estimasi runway dinamis."
         },
         radar: {
-          title: "Radar Proyeksi Kas",
-          desc: "Pemodelan arus kas prediktif dengan cakrawala 30, 60, dan 90 hari. Pengungkit skenario interaktif untuk mensimulasikan keterlambatan pembayaran pelanggan dan angsuran pajak."
+          title: "Radar Proyeksi Runway",
+          desc: "Simulasi trajektori kas 30, 60, dan 90 hari ke depan. Sesuaikan penundaan pembayaran pelanggan, pajak terutang, dan rencana rekrutmen tim."
         },
         accounts: {
-          title: "Portofolio Rekening & Kas",
-          desc: "Ikhtisar multi-rekening terkonsolidasi yang melacak saldo giro, tabungan, deposito, dan kas kecil dengan penyesuaian nilai valuta asing."
+          title: "Akun Kas & Treasury Multi-Valuta",
+          desc: "Pusat kendali rekening giro domestik IDR dan saldo valuta asing dengan pembaruan kurs Bank Indonesia secara berkala."
         },
         transactions: {
-          title: "Transaksi & Pencocokan Bank",
-          desc: "Aliran transaksi terpadu dengan kategorisasi otomatis, indikator status, dan pencocokan berbasis aturan terhadap tagihan vendor dan faktur penjualan."
+          title: "Buku Mutasi Operasional",
+          desc: "Buku besar transaksi yang dapat dicari dengan pelacakan saldo real-time, tautan lampiran Faktur Pajak, dan kategorisasi mitra bisnis."
         },
         bank_import: {
-          title: "Mesin Impor Rekening Koran",
-          desc: "Impor rekening koran bank perusahaan (CSV, PDF, MT940), rekonsiliasi transaksi secara otomatis, dan konsolidasi aktivitas di seluruh rekening."
+          title: "Impor Rekening Koran & Review",
+          desc: "Impor langsung mutasi bank BCA, Mandiri, dan format MT940/CSV dengan deteksi duplikasi cerdas serta verifikasi rekonsiliasi berdampingan."
         },
         invoicing: {
-          title: "Faktur & Piutang Usaha (AR)",
-          desc: "Penerbitan faktur penjualan multi-valuta dengan ekuivalen Rupiah (IDR), analisis umur piutang, pelacakan pelanggan, dan bukti pelunasan."
+          title: "Faktur Penjualan Multi-Valuta",
+          desc: "Faktur komersial resmi dengan konversi Rupiah (IDR) wajib, penghitungan pajak terutang, dan pelacakan status pelunasan."
         },
         bills: {
-          title: "Tagihan & Utang Usaha (AP)",
-          desc: "Manajemen tagihan vendor dengan batas persetujuan, deteksi duplikasi, penjadwalan pembayaran, dan pemotongan otomatis PPh 23."
+          title: "Hutang Usaha & Tagihan Vendor",
+          desc: "Manajemen tagihan vendor dengan batas persetujuan, deteksi duplikasi, penjadwalan pembayaran, dan pelacakan pemotongan pajak."
         },
         approvals: {
           title: "Antrean Persetujuan Pengeluaran",
-          desc: "Alur kerja persetujuan yang dapat disesuaikan untuk menerapkan kontrol internal atas biaya dan pembayaran vendor yang melebihi batas otorisasi."
+          desc: "Alur kerja persetujuan berjenjang yang menegakkan kendali internal atas biaya operasional dan pembayaran vendor sesuai batas wewenang."
         },
         doc_intelligence: {
-          title: "Intelijen Dokumen & OCR",
-          desc: "Ekstraksi AI visi multimodal untuk Faktur Pajak Indonesia dan kuitansi. Mengekstrak nama vendor, DPP, dan PPN 11% secara otomatis."
+          title: "Inteligensi Dokumen & OCR",
+          desc: "Ekstraksi AI visi multimodal untuk Faktur Pajak Indonesia dan kuitansi. Mengekstrak nama vendor, DPP, serta PPN dan PPh yang berlaku."
         },
         ai_cfo: {
           title: "AI Chief Financial Officer",
-          desc: "Antarmuka percakapan bahasa alami untuk menjawab pertanyaan buku besar (contoh: 'Berapa pengeluaran pemasaran kuartal lalu?') disertai kutipan bukti nyata."
+          desc: "Antarmuka percakapan bahasa alami untuk menjawab pertanyaan pembukuan (misal: 'Berapa burn rate marketing kuartal lalu?') dengan bukti voucher transaksi."
         },
         ai_accountant: {
           title: "Paket Kesiapan Akuntan",
-          desc: "Ekspor satu klik paket arsip ZIP siap audit yang berisi CSV Buku Besar seimbang, log rekonsiliasi, lembar kerja pajak, dan arsip bukti kuitansi."
+          desc: "Ekspor satu klik paket arsip audit berisi CSV Buku Besar seimbang, log rekonsiliasi, jadwal pajak, dan dokumen pendukung."
         },
         compliance: {
           title: "Radar Kepatuhan Pajak Indonesia",
-          desc: "Pemantauan kalender pajak berkelanjutan untuk PPh 21 TER, PPh 23, PPh 4(2), dan PPN 11%. Lembar kerja otomatis mencegah sanksi keterlambatan UU KUP."
+          desc: "Pemantauan kalender pajak berkelanjutan untuk PPh 21 TER, PPh 23, PPh 4(2), dan PPN yang berlaku. Membantu bisnis memantau tenggat waktu, menyiapkan dokumen pendukung, dan mengurangi risiko keterlambatan serta kesalahan pelaporan."
         },
         payroll: {
-          title: "Penggajian & Mesin PPh 21 TER",
-          desc: "Modul perhitungan gaji staf menerapkan tabel TER Kategori A, B, dan C pemerintah sesuai PP 58/2023 dan PMK 168/2023."
+          title: "Mesin Penggajian & PPh 21 TER",
+          desc: "Modul perhitungan gaji karyawan menggunakan tabel resmi TER Kategori A, B, dan C sesuai PP 58/2023 dan PMK 168/2023."
         },
         multi_company: {
-          title: "Pergantian Ruang Kerja Multi-Entitas",
+          title: "Peralihan Ruang Kerja Multi-Entitas",
           desc: "Beralih secara instan antara entitas bisnis yang berbeda (operasi PT dan PT PMA). Setiap perusahaan memiliki buku besar terisolasi, rekening bank independen, dan hak akses khusus."
         }
       }
@@ -1036,7 +1074,7 @@ const translations = {
       heading: "Dari Kuitansi Kertas ke Buku Besar dalam Hitungan Detik",
       subheading: "Pangkas 80% entri data manual dengan OCR visi multimodal, verifikasi manusia, dan pencocokan otomatis ke rekening koran.",
       faktur_title: "Faktur Pajak & Pemindai QR",
-      faktur_desc: "Mengekstrak faktur pajak standar DJP, membaca Nomor Seri Faktur Pajak (NSFP), NPWP, DPP, dan PPN 11% dengan validasi QR otomatis.",
+      faktur_desc: "Mengekstrak faktur pajak standar DJP, membaca Nomor Seri Faktur Pajak (NSFP), NPWP, DPP, dan PPN yang berlaku dengan validasi QR.",
       intake_title: "Pemasukan Mobile & Unggah Berkas",
       intake_desc: "Tim keuangan mengunggah PDF atau memotret kuitansi dari ponsel. CFO AI memproses gambar dan menyiapkannya untuk ditinjau dalam hitungan detik.",
       review_title: "Verifikasi Berdampingan",
@@ -1045,12 +1083,12 @@ const translations = {
     tax_page: {
       badge: "RADAR KEPATUHAN",
       heading: "Radar Pajak Indonesia & CoreTax",
-      subheading: "Antisipasi tenggat waktu PPh 21 TER, PPh 23, PPN 11%, dan transisi CoreTax PMK 81/2024 dengan lembar kerja perhitungan otomatis.",
+      subheading: "Antisipasi tenggat waktu PPh 21 TER, PPh 23, PPN yang berlaku, dan transisi CoreTax PMK 81/2024 dengan lembar kerja perhitungan otomatis.",
       pph21_title: "Mesin PPh 21 TER",
       pph21_desc: "Menghitung pemotongan bulanan karyawan menggunakan Tarif Efektif Rata-Rata (TER Kategori A, B, C) sesuai PP 58/2023 dan PMK 168/2023.",
       pph23_title: "Pemotongan PPh 23 & PPh 4(2)",
       pph23_desc: "Melacak pemotongan 2% jasa dan pajak final sewa tempat usaha komersial, membuat rekap Bukti Potong untuk pelaporan bulanan.",
-      ppn_title: "Rekonsiliasi PPN 11%",
+      ppn_title: "Rekonsiliasi PPN Indonesia",
       ppn_desc: "Mencocokkan Pajak Keluaran terhadap Pajak Masukan untuk memastikan keakuratan pajak kurang bayar sebelum batas waktu akhir bulan."
     },
     pricing_page: {
@@ -1174,13 +1212,13 @@ const translations = {
         {
           num: "02",
           title: "Распознавание документов и OCR",
-          desc: "Мультиканальная загрузка (веб и мобильная), компьютерное зрение для извлечения поставщика, базы DPP и НДС (PPN 11%) с панелью верификации.",
+          desc: "Мультиканальная загрузка (веб и мобильная), компьютерное зрение для извлечения поставщика, базы DPP и применимых налогов с панелью верификации.",
           link: "Обзор процессов"
         },
         {
           num: "03",
           title: "Налоговый радар Индонезии",
-          desc: "Мониторинг налогового календаря, формулы PPh 21 TER, налог у источника PPh 23, PPN 11% и подготовка к реформе CoreTax PMK 81/2024.",
+          desc: "Мониторинг налогового календаря, формулы PPh 21 TER, налог у источника PPh 23, применимый НДС и подготовка к реформе CoreTax PMK 81/2024.",
           link: "Открыть радар"
         },
         {
@@ -1297,101 +1335,120 @@ const translations = {
       ]
     },
     platform: {
-      badge: "АРХИТЕКТУРА ПЛАТФОРМЫ",
-      heading: "Единая финансовая операционная система",
-      subheading: "Узнайте, как CFO AI заменяет разрозненный софт целостной финансовой средой, спроектированной под требования бизнеса в Индонезии.",
+      badge: "ФИНАНСОВАЯ ОПЕРАЦИОННАЯ СИСТЕМА",
+      heading: "Управляйте финансами бизнеса в единой системе.",
+      subheading: "Управляйте расходами, счетами, согласованиями и финансовыми решениями в единой рабочей среде. Контролируйте подтвержденные данные, ожидаемые платежи и зоны внимания.",
       connected_workspace: {
         eyebrow: "ЕДИНОЕ ФИНАНСОВОЕ ПРОСТРАНСТВО",
         heading: "Ваши финансовые данные. Единый интеллект.",
-        subheading: "Объедините команду, первичные документы и AI-ассистентов в единой финансовой рабочей среде.",
-        footnote: "Концептуальная визуализация архитектуры. Любые проводки в главной книге и выплаты требуют авторизованных прав доступа и подтверждения человеком.",
-        transition: "Каким бы путем данные ни поступали в CFO AI, они становятся частью сквозных контролируемых финансовых процессов.",
+        subheading: "Подключите команду, первичные документы и AI-ассистентов к единой рабочей финансовой среде.",
+        footnote: "Обзор операционной архитектуры. Все финансовые выплаты, проводки в главной книге и налоговые отчеты требуют авторизации уполномоченных сотрудников и корпоративного контроля.",
+        transition: "Каким бы путем данные ни поступали в CFO AI, они становятся частью единого контролируемого финансового контура.",
+        ui: {
+          level_1_badge: "УРОВЕНЬ 1",
+          level_1_title: "Каналы ввода и взаимодействия",
+          level_1_hint: "Нажмите на канал для просмотра пайплайна и правил доступа",
+          inspect_flow: "Смотреть пайплайн",
+          connector_1: "Защищенный прием данных и API-интеграция",
+          level_2_badge: "УРОВЕНЬ 2 • ЦЕНТРАЛЬНОЕ ЯДРО",
+          level_2_pill: "ИИ предлагает • Человек подтверждает",
+          level_2_status: "Централизованное ядро валидации",
+          inspector_badge: "ИНСПЕКТОР АКТИВНОГО КАНАЛА",
+          inspector_col1: "Бизнес-сценарий",
+          inspector_col2: "Сквозной пайплайн",
+          inspector_col3: "Контроль и безопасность",
+          connector_2: "Авторизованные проводки и изоляция данных бизнеса",
+          level_3_badge: "УРОВЕНЬ 3",
+          transition_badge: "СКВОЗНАЯ АРХИТЕКТУРА ПРОЦЕССОВ",
+          transition_cta: "Изучите 3 сквозных рабочих процесса ниже",
+          connected_steps: "4 связанных шага"
+        },
         channels: [
           {
             id: "whatsapp",
             name: "WhatsApp",
-            subtitle: "Сообщения и прием чеков",
-            status: "Запланировано",
-            status_type: "planned",
-            example: "Отправляйте квитанцию или счет прямо из чата.",
-            description: "Сотрудник фотографирует чек и отправляет в рабочий чат бухгалтерии. (Концептуальный сценарий — интеграция WhatsApp находится в плане разработки).",
-            flow_desc: "Фото с камеры → Черновик распознавания AI → Очередь согласования"
+            subtitle: "Сообщения и отправка чеков",
+            status: "Доступно",
+            status_type: "available",
+            example: "Отправляйте чеки или счета прямо из диалога.",
+            description: "Сотрудники отправляют чеки и счета поставщиков через чат. Документы поступают в центральную очередь для оптического распознавания, проверки человеком и согласования.",
+            flow_desc: "Фотосъемка чека -> Центральная очередь -> Проверка человеком и утверждение"
           },
           {
             id: "telegram",
             name: "Telegram",
-            subtitle: "Сводки и согласование",
+            subtitle: "Сводки и согласования",
             status: "Доступно",
             status_type: "available",
-            example: "Запрашивайте финансовые сводки и согласовывайте платежи.",
-            description: "Руководители проверяют остатки и запас прочности, просматривают счета и акцептуют платежи через безопасный бот с проверкой прав доступа.",
-            flow_desc: "Команды и алерты бота → Акцепт в один клик → Мгновенный аудиторский след"
+            example: "Узнайте текущий запас денежных средств или согласуйте счет поставщика.",
+            description: "Руководители просматривают ожидающие расходы, утверждают выплаты в одно касание и запрашивают показатели ликвидности в чате с полной фиксацией аудиторского следа.",
+            flow_desc: "Запросы баланса и runway -> Уведомление о согласовании -> Авторизованное действие"
           },
           {
             id: "chatgpt",
             name: "ChatGPT",
-            subtitle: "Диалоговые запросы (MCP)",
-            status: "В разработке",
-            status_type: "in_dev",
-            example: "Задавайте вопросы по финансам через подключенного AI-ассистента.",
-            description: "Подключение по протоколу Model Context Protocol (MCP) для аналитических запросов в режиме чтения. Никаких автоматических проводок без подтверждения.",
-            flow_desc: "Вопрос на естественном языке → Авторизованный MCP-эндпоинт → Анализ главной книги"
+            subtitle: "Финансовые диалоговые запросы",
+            status: "Доступно",
+            status_type: "available",
+            example: "Задавайте вопросы о денежном потоке, неоплаченных счетах, расходах и финансовых результатах вашему ИИ-ассистенту.",
+            description: "Подключайте ChatGPT через Model Context Protocol (MCP) для анализа подтвержденных остатков, дебиторской задолженности и расходов в рамках корпоративных прав доступа.",
+            flow_desc: "Защищенное MCP-подключение -> Запрос на естественном языке -> Анализ данных по правам компании"
           },
           {
             id: "claude",
             name: "Claude",
-            subtitle: "Контекст и анализ (MCP)",
-            status: "В разработке",
-            status_type: "in_dev",
-            example: "Получайте финансовый контекст компании через MCP.",
-            description: "Используйте логику Claude с защищенным доступом к финансовым данным в режиме чтения и цитированием первичных документов.",
-            flow_desc: "Глубокий финансовый анализ → Изоляция схемы MCP → Проверенные ссылки на ордера"
+            subtitle: "Финансовый анализ и синтез",
+            status: "Доступно",
+            status_type: "available",
+            example: "Анализируйте динамику расходов и структурируйте затраты по поставщикам за квартал.",
+            description: "Используйте Claude с интеграцией MCP для глубокого финансового анализа, ссылок на первичные документы и сценарного моделирования с разграничением прав доступа.",
+            flow_desc: "Сессия MCP -> Аналитический запрос -> Контролируемый контекст со ссылками на первичку"
           },
           {
             id: "webapp",
-            name: "Веб-приложение CFO AI",
-            subtitle: "Прямая загрузка и учет",
+            name: "CFO AI Web App",
+            subtitle: "Рабочее место операций и верификации",
             status: "Доступно",
             status_type: "available",
-            example: "Загружайте счета, документы и банковские выписки напрямую.",
-            description: "Полнофункциональное веб-приложение: загрузка файлов PDF/JPG/PNG, сверка корпоративных выписок (CSV, MT940) и мультивалютный биллинг.",
-            flow_desc: "Загрузка файлов drag-and-drop → Рабочий стол верификации OCR → Главная книга"
+            example: "Загружайте счета поставщиков, проверяйте распознавание, сопоставляйте банковские выписки и утверждайте проводки.",
+            description: "Основной центр управления финансовыми операциями. Сопоставляйте оригиналы документов с распознанными данными, подтверждайте банковские матчинги и утверждайте записи.",
+            flow_desc: "Загрузка любых документов -> Двусторонняя проверка человеком -> Утвержденная запись и сверка"
           }
         ],
         intelligence_engine: {
-          badge: "CFO AI ФИНАНСОВЫЙ ИНТЕЛЛЕКТ",
+          badge: "ФИНАНСОВЫЙ ИНТЕЛЛЕКТ CFO AI",
           title: "CFO AI — Финансовый Интеллект",
-          subtitle: "Все каналы подключаются к единому центральному ядру обработки",
+          subtitle: "Все каналы подключены к единому вычислительному ядру",
           capabilities: [
             {
-              title: "Распознавание Документов",
-              desc: "Мультимодальный OCR: считывание поставщика, даты, базы DPP и НДС (PPN 11%)"
+              title: "Интеллект документов",
+              desc: "Мультимодальный OCR: считывание поставщика, даты, базы DPP и применимых налогов Индонезии"
             },
             {
-              title: "Проверка Данных и Верификация",
-              desc: "Контроль человеком: AI предлагает варианты, оператор подтверждает"
+              title: "Контроль данных и проверка человеком",
+              desc: "Интерфейс под контролем человека: AI предлагает, специалист подтверждает"
             },
             {
-              title: "Согласования и Маршруты Контроля",
-              desc: "Разграничение полномочий и маршрутизация по финансовым лимитам"
+              title: "Согласования и регламентные процессы",
+              desc: "Маршрутизация по финансовым лимитам и строгое разграничение полномочий"
             },
             {
-              title: "Сверка и Финансовая Аналитика",
-              desc: "Многофакторное сопоставление выписок и радар прогноза ликвидности на 30-90 дней"
+              title: "Сверка и финансовая аналитика",
+              desc: "Многофакторное сопоставление выписок и радар прогноза ликвидности на 30/60/90 дней"
             }
           ]
         },
         workspace_destinations: {
-          badge: "ЕДИНОЕ РАБОЧЕЕ ПРОСТРАНСТВО",
-          title: "Авторизованные данные поступают в единую рабочую среду",
-          subtitle: "Чистые сверенные записи формируют изолированные операционные контуры",
+          badge: "ЕДИНАЯ ОПЕРАЦИОННАЯ СРЕДА",
+          title: "Авторизованные потоки данных сходятся в единой системе",
+          subtitle: "Проверенные операционные записи распределяются по специализированным разделам",
           items: [
-            { name: "Транзакции", desc: "Сверенные банковские проводки и выписки" },
-            { name: "Документы", desc: "Электронные чеки, Faktur Pajak и квитанции" },
-            { name: "Счета и Накладные", desc: "Старение дебиторки и график кредиторки" },
-            { name: "Согласования", desc: "Журнал решений руководства и лимиты" },
-            { name: "Отчетность", desc: "Главная книга, баланс и налоговые регистры" },
-            { name: "Аудиторский След", desc: "Неизменяемый протокол действий и комплаенс" }
+            { name: "Транзакции", desc: "Банковские записи и выписки", tag: "Банк и касса" },
+            { name: "Документы", desc: "Цифровые чеки, счета и акты", tag: "Цифровой архив" },
+            { name: "Счета и оплата", desc: "Старение дебиторки и кредиторка", tag: "Дебиторы и кредиторы" },
+            { name: "Согласования", desc: "История решений и лимиты", tag: "История согласований" },
+            { name: "Отчетность", desc: "Баланс, ОПУ и налоговые отчеты", tag: "Финансовая отчетность" },
+            { name: "Журнал аудита", desc: "Логи действий и комплаенс", tag: "Журнал аудита" }
           ]
         }
       },
@@ -1404,39 +1461,39 @@ const translations = {
           num: "01",
           badge: "ОТ РАСХОДА ДО ПРОВОДКИ",
           title: "От Расхода Сотрудника до Проверенной Записи",
-          desc: "Никаких утерянных чеков и задержек в авансовых отчетах: интеллектуальное распознавание, маршруты согласования и налоговый учет, готовый к аудиту.",
+          desc: "Исключите утерю чеков и задержки в авансовых отчетах: структурированный прием, регламентные согласования и учет, готовый к проверкам.",
           steps: [
             {
               step: "01",
               label: "Прием чека",
-              title: "Загрузка чеков и счетов",
-              desc: "Сотрудники или контрагенты прикрепляют квитанции и PDF-счета через безопасный интерфейс с разграничением прав доступа.",
-              tag: "Проверено",
-              tag_type: "verified"
+              title: "Отправка чеков и счетов",
+              desc: "Сотрудники или контрагенты отправляют квитанции и PDF-счета через чат, веб-форму или по электронной почте.",
+              tag: "Отправлено",
+              tag_type: "submitted"
             },
             {
               step: "02",
               label: "Распознавание AI",
               title: "Извлечение реквизитов",
-              desc: "Система автоматически считывает поставщика, дату, валюту, позиции и НДС (PPN 11%) для подтверждения в интерфейсе входящих.",
-              tag: "AI + Контроль человека",
+              desc: "Система считывает поставщика, дату, валюту, позиции и применимые налоги в очередь предварительной проверки.",
+              tag: "Распознано AI",
               tag_type: "assist"
             },
             {
               step: "03",
-              label: "Согласование",
-              title: "Маршрутизация по лимитам",
-              desc: "Платежи, превышающие корпоративные пороги, автоматически направляются уполномоченным руководителям с фиксацией аудиторского следа.",
+              label: "Проверка человеком",
+              title: "Сверка и контроль расхождений",
+              desc: "Финансовая служба проверяет распознанные данные бок о бок с оригиналом документа перед авторизацией.",
               tag: "Проверено",
-              tag_type: "verified"
+              tag_type: "reviewed"
             },
             {
               step: "04",
-              label: "Главная книга",
-              title: "Проводка GL и налоговый регистр",
-              desc: "Одобренный расход мгновенно разносится в главную книгу с прикрепленным электронным чеком и налоговыми метками.",
-              tag: "Проверено",
-              tag_type: "verified"
+              label: "Утверждение и проводка",
+              title: "Согласование и запись в книгу",
+              desc: "Уполномоченный руководитель утверждает выплату по правилам компании с формированием записи в главной книге.",
+              tag: "Авторизовано",
+              tag_type: "authorized"
             }
           ]
         },
@@ -1445,39 +1502,39 @@ const translations = {
           num: "02",
           badge: "ОТ СЧЕТА ДО ОПЛАТЫ",
           title: "От Выставления Счета до Поступления Денег",
-          desc: "Ускорение сбора выручки: официальные мультивалютные счета, радар дебиторской задолженности, умные напоминания и автоматическая сверка с банком.",
+          desc: "Ускорение сбора выручки: официальные мультивалютные счета, радар задолженности, напоминания и интеллектуальный подбор соответствий.",
           steps: [
             {
               step: "01",
               label: "Выставление счета",
-              title: "Официальный счет и DPP/PPN",
-              desc: "Формирование счетов в любой валюте с обязательным рупийным эквивалентом (IDR), расчетом налогов и условиями оплаты.",
-              tag: "Проверено",
-              tag_type: "verified"
+              title: "Официальный счет и налоги",
+              desc: "Формирование счетов в любой валюте с обязательным рупийным эквивалентом (IDR) и согласованными условиями оплаты.",
+              tag: "Выставлен",
+              tag_type: "issued"
             },
             {
               step: "02",
-              label: "Радар дебиторки",
-              title: "Мониторинг старения долгов",
-              desc: "Контроль открытых счетов по периодам 30, 60 и 90 дней с моментальным выявлением просроченных обязательств.",
-              tag: "Проверено",
-              tag_type: "verified"
+              label: "Контроль дебиторки",
+              title: "Мониторинг старения и сроков оплаты",
+              desc: "Контроль открытых счетов по корзинам 30, 60 и 90 дней со своевременными напоминаниями о просрочке.",
+              tag: "На контроле",
+              tag_type: "tracked"
             },
             {
               step: "03",
-              label: "Напоминания",
-              title: "Внутренние операционные задачи",
-              desc: "Система автоматически сигнализирует о приближении срока оплаты и ставит операционные задачи финансовой команде.",
-              tag: "Smart Assist (Внутри)",
+              label: "Матчинг выписки",
+              title: "Интеллектуальный подбор соответствий",
+              desc: "Строки банковской выписки сопоставляются со счетами по сумме, назначению платежа и контрагенту в виде рекомендаций.",
+              tag: "Предложен матч",
               tag_type: "assist"
             },
             {
               step: "04",
-              label: "Сверка с банком",
-              title: "Автоматический матчинг выписки",
-              desc: "Входящие поступления на расчетный счет сопоставляются со счетами по многофакторному алгоритму, мгновенно закрывая долг.",
-              tag: "Проверено",
-              tag_type: "verified"
+              label: "Подтверждение закрытия",
+              title: "Подтвержденный расчет и погашение долга",
+              desc: "Специалист подтверждает проверенное совпадение с банком, обновляя сальдо дебиторки и закрывая открытую позицию.",
+              tag: "Погашено",
+              tag_type: "settled"
             }
           ]
         },
@@ -1485,40 +1542,40 @@ const translations = {
           id: "wf-decision",
           num: "03",
           badge: "ОТ ДАННЫХ К СТРАТЕГИИ",
-          title: "От Финансовых Данных к Решению Руководителя",
-          desc: "Превратите сверенные банковские проводки в стратегическую уверенность с помощью диалогового AI-директора, радара ликвидности и сценарного анализа.",
+          title: "Надежные финансовые данные. Взвешенные решения.",
+          desc: "CFO AI объединяет подтвержденные финансовые операции, банковские выписки, дебиторскую и кредиторскую задолженность и зафиксированные обязательства для формирования отчетности и прогнозов. Неподтвержденные операции, ожидаемые поступления и недостающие сведения отражаются раздельно, позволяя руководителям объективно оценивать надежность картины бизнеса.",
           steps: [
             {
               step: "01",
-              label: "Сверенный базис",
-              title: "Чистая и выверенная книга",
-              desc: "Все аналитические отчеты и прогнозные модели строятся исключительно на сверенных банковских операциях и утвержденных ордерах.",
-              tag: "Проверено",
-              tag_type: "verified"
+              label: "Консолидация данных",
+              title: "Единый финансовый контур",
+              desc: "Сводит воедино подтвержденные операции, банковские выписки, дебиторку, кредиторку и зафиксированные обязательства.",
+              tag: "Сведено",
+              tag_type: "aggregated"
             },
             {
               step: "02",
-              label: "Аналитика AI CFO",
-              title: "Диалоговый финансовый интеллект",
-              desc: "Задавайте вопросы о скорости сжигания капитала, маржинальности или затратах отделов с точными ссылками на первичные ордера.",
-              tag: "Проверенный AI",
-              tag_type: "verified"
+              label: "Контроль надежности",
+              title: "Разделение факта и прогноза",
+              desc: "Отделяет верифицированные исторические записи от неподтвержденных черновиков и ожиданий ради достоверности отчетности.",
+              tag: "Разделено",
+              tag_type: "separated"
             },
             {
               step: "03",
-              label: "Радар ликвидности",
-              title: "Прогноз на 30-60-90 дней",
-              desc: "Моделируйте задержки оплат клиентов, налоговые платежи и финансовую нагрузку при найме персонала в интерактивном режиме.",
-              tag: "Проверено",
-              tag_type: "verified"
+              label: "Горизонт ликвидности",
+              title: "Прогноз кассы на 30-60-90 дней",
+              desc: "Моделирует предстоящие операционные расходы, ожидаемые сборы и налоговые обязательства на заданном горизонте.",
+              tag: "Спрогнозировано",
+              tag_type: "projected"
             },
             {
               step: "04",
-              label: "Решение фаундера",
-              title: "Прямой переход к действию",
-              desc: "Рекомендации AI содержат прямые ссылки на рабочие экраны: акцепт платежей, корректировка бюджета и защита платежеспособности.",
-              tag: "Контроль владельца",
-              tag_type: "governance"
+              label: "Управленческое действие",
+              title: "Обоснованные решения руководства",
+              desc: "Финансовые выводы опираются на первичные записи, обеспечивая базу для уверенных стратегических решений.",
+              tag: "Готово к действию",
+              tag_type: "actionable"
             }
           ]
         }
@@ -1539,51 +1596,51 @@ const translations = {
           desc: "Прогностическое моделирование денежных потоков на 30, 60 и 90 дней. Интерактивные рычаги сценариев позволяют симулировать задержки оплат и налоговые платежи."
         },
         accounts: {
-          title: "Счета и Казначейский Портфель",
-          desc: "Консолидированный обзор расчетных счетов, депозитов и кассы с валютной переоценкой остатков."
+          title: "Мультивалютные казначейские счета",
+          desc: "Централизованный учет рупийных счетов IDR и валютных остатков с автоматическим обновлением курсов Банка Индонезии."
         },
         transactions: {
-          title: "Банковские Транзакции и Сверка",
-          desc: "Единый реестр операций с автокатегоризацией, индикаторами статуса и сопоставлением со счетами поставщиков и клиентов."
+          title: "Операционный журнал транзакций",
+          desc: "Детализированный реестр операций с контролем баланса в реальном времени, привязкой налоговых счетов Faktur Pajak и контрагентов."
         },
         bank_import: {
-          title: "Модуль Импорта Выписок",
-          desc: "Импорт корпоративных выписок (CSV, PDF, MT940), автоматическое сопоставление проводок и объединение финансовой активности по счетам бизнеса."
+          title: "Импорт и сверка банковских выписок",
+          desc: "Прямой импорт выписок BCA, Mandiri и файлов MT940/CSV с интеллектуальной дедупликацией и двусторонней сверкой."
         },
         invoicing: {
-          title: "Счета Клиентам и Дебиторская Задолженность (AR)",
-          desc: "Выставление мультивалютных счетов с обязательным рупийным эквивалентом (IDR), анализ старения долгов и фиксация оплат."
+          title: "Мультивалютные счета клиентам",
+          desc: "Официальные коммерческие счета с обязательным рупийным эквивалентом (IDR), расчетом налогов и отслеживанием статусов оплаты."
         },
         bills: {
-          title: "Счета Поставщиков и Кредиторская Задолженность (AP)",
-          desc: "Учет входящих счетов с проверкой дубликатов, графиком оплат и удержанием налога на услуги PPh 23."
+          title: "Счета к оплате и кредиторка",
+          desc: "Учет счетов поставщиков с порогами согласования, защитой от двойных выплат, графиком платежей и учетом налоговых удержаний."
         },
         approvals: {
-          title: "Очередь Согласования Платежей",
-          desc: "Настраиваемые маршруты акцепта расходов и платежей поставщикам, превышающих лимиты операционных полномочий."
+          title: "Очередь согласования платежей",
+          desc: "Настраиваемая маршрутизация согласований с контролем корпоративных лимитов на расходы и платежи контрагентам."
         },
         doc_intelligence: {
-          title: "Распознавание Документов и OCR",
-          desc: "Зрительное распознавание налоговых счетов Faktur Pajak и чеков: автоматическое считывание поставщика, базы DPP и НДС (PPN 11%)."
+          title: "Интеллект документов и OCR",
+          desc: "Зрительное распознавание налоговых счетов Faktur Pajak и чеков: считывание поставщика, базы DPP и применимых налогов Индонезии."
         },
         ai_cfo: {
           title: "AI Финансовый Директор",
-          desc: "Диалоговый ассистент на естественном языке, отвечающий на вопросы по главной книге (например: 'Сколько мы потратили на маркетинг в Q2?') с точными ссылками на ордера."
+          desc: "Диалоговый ИИ-ассистент: ответы на финансовые вопросы (например, 'Каковы расходы на маркетинг за прошлый квартал?') со ссылками на первичные ордера."
         },
         ai_accountant: {
-          title: "Пакеты Закрытия для Бухгалтера",
-          desc: "Выгрузка готового ZIP-пакета со сверенным журналом главной книги, протоколом сверки, налоговыми ведомостями и копиями чеков в один клик."
+          title: "Пакеты для бухгалтера и аудитора",
+          desc: "Выгрузка в один клик полного архива для аудитора: главная книга в CSV, протоколы сверки, налоговые регистры и архив чеков."
         },
         compliance: {
-          title: "Налоговый Радар Индонезии",
-          desc: "Непрерывный мониторинг сроков по PPh 21 TER, PPh 23, PPh 4(2) и PPN 11%. Автоматические ведомости защищают от штрафов UU KUP."
+          title: "Радар налогового соответствия",
+          desc: "Непрерывный мониторинг сроков по PPh 21 TER, PPh 23, PPh 4(2) и применимому НДС. Помогает бизнесу отслеживать сроки, готовить первичные документы и снижать риск задержек и ошибок в отчетности."
         },
         payroll: {
-          title: "Зарплатный Модуль и PPh 21 TER",
-          desc: "Расчет налогов с фонда оплаты труда по государственным таблицам TER категорий A, B и C согласно PP 58/2023 и PMK 168/2023."
+          title: "Расчет зарплаты и PPh 21 TER",
+          desc: "Модуль расчета оплаты труда персонала с государственными таблицами TER (категории A, B, C) согласно PP 58/2023 и PMK 168/2023."
         },
         multi_company: {
-          title: "Переключение Между Юрлицами (Multi-Entity)",
+          title: "Переключение между юрлицами",
           desc: "Быстрое переключение между независимыми юридическими лицами (PT и PT PMA). Каждая компания работает в изолированном защищенном контуре со своими счетами, правами и отчетностью."
         }
       }
@@ -1602,12 +1659,12 @@ const translations = {
     tax_page: {
       badge: "НАЛОГОВЫЙ РАДАР",
       heading: "Налоги Индонезии и Готовность к CoreTax",
-      subheading: "Будьте готовы к срокам PPh 21 TER, PPh 23, PPN 11% и переходу на систему CoreTax (PMK 81/2024) с автоматическими расчетами.",
+      subheading: "Будьте готовы к срокам PPh 21 TER, PPh 23, применимого НДС и переходу на систему CoreTax (PMK 81/2024) с автоматическими расчетами.",
       pph21_title: "Модуль PPh 21 TER",
       pph21_desc: "Автоматический расчет удержаний с зарплаты по средним эффективным ставкам (категории TER A, B, C) согласно PP 58/2023 и PMK 168/2023.",
       pph23_title: "Удержания PPh 23 и PPh 4(2)",
       pph23_desc: "Учет 2% налога у источника при оплате услуг и финального налога на аренду помещений с формированием сводок Bukti Potong к концу месяца.",
-      ppn_title: "Сверка НДС (PPN 11%)",
+      ppn_title: "Сверка НДС (PPN)",
       ppn_desc: "Перекрестная сверка исходящего НДС (Pajak Keluaran) и входящего (Pajak Masukan) для точного расчета налога к уплате до конца отчетного периода."
     },
     pricing_page: {

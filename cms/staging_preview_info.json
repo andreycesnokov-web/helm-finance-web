@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-10-18T03:30:02.306Z",
+  "generated_at": "2026-10-18T05:44:40.957Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://phi-ser-practical-holding.trycloudflare.com",
-      "english_homepage": "https://phi-ser-practical-holding.trycloudflare.com/en",
-      "indonesian_homepage": "https://phi-ser-practical-holding.trycloudflare.com/id",
-      "pricing_url": "https://phi-ser-practical-holding.trycloudflare.com/en/pricing",
-      "hub_url": "https://phi-ser-practical-holding.trycloudflare.com/en/blog",
+      "https_url": "https://had-reflected-instant-feat.trycloudflare.com",
+      "english_homepage": "https://had-reflected-instant-feat.trycloudflare.com/en",
+      "indonesian_homepage": "https://had-reflected-instant-feat.trycloudflare.com/id",
+      "pricing_url": "https://had-reflected-instant-feat.trycloudflare.com/en/pricing",
+      "hub_url": "https://had-reflected-instant-feat.trycloudflare.com/en/blog",
       "verified_https": false,
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://says-pentium-robot-study.trycloudflare.com",
-      "admin_login_url": "https://says-pentium-robot-study.trycloudflare.com/admin/",
+      "https_url": "https://funky-introduce-truck-trace.trycloudflare.com",
+      "admin_login_url": "https://funky-introduce-truck-trace.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
         "username": "cfo-admin",
@@ -36,7 +36,7 @@
           "permissions": "Read-only preview, audit inspect"
         }
       ],
-      "verified_https": false,
+      "verified_https": true,
       "local_port": 3003
     }
   }
