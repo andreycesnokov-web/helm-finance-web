@@ -282,6 +282,12 @@ function mergeIntoExtraction(base, ocr) {
     }
   }
 
+  const subtotalVal = fields.subtotal ?? fields.commercial_base_amount ?? null;
+  const dppVal = fields.tax_base_dpp ?? null;
+  if (subtotalVal !== null && dppVal !== null && subtotalVal !== dppVal) {
+    fields.subtotal_dpp_variance = Math.abs(subtotalVal - dppVal);
+  }
+
   let type = (base.document_type && base.document_type !== 'unknown')
     ? base.document_type : ocr.document_type;
 
