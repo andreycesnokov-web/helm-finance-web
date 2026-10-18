@@ -102,16 +102,35 @@ function createSupabaseOAuthStore(supabase) {
             created_at: t.created_at,
             last_activity: t.created_at,
             expires_at: t.expires_at,
-            revoked_at: t.revoked_at,
+            tokens: [t],
           };
           grantsMap.set(t.grant_id, g);
         } else {
           if (new Date(t.created_at) < new Date(g.created_at)) g.created_at = t.created_at;
           if (new Date(t.created_at) > new Date(g.last_activity)) g.last_activity = t.created_at;
           if (new Date(t.expires_at) > new Date(g.expires_at)) g.expires_at = t.expires_at;
-          if (t.revoked_at && (!g.revoked_at || new Date(t.revoked_at) > new Date(g.revoked_at))) g.revoked_at = t.revoked_at;
           if (t.scopes && t.scopes.length) g.scopes = t.scopes;
+          g.tokens.push(t);
         }
+      }
+
+      // Determine revoked_at: A grant is revoked ONLY IF all of its tokens are revoked.
+      // (Token rotation revokes the old refresh token while issuing new active tokens;
+      // the grant remains active as long as at least one token is unrevoked).
+      for (const g of grantsMap.values()) {
+        const hasUnrevoked = g.tokens.some((t) => !t.revoked_at);
+        if (hasUnrevoked) {
+          g.revoked_at = null;
+        } else {
+          let latestRevoked = null;
+          for (const t of g.tokens) {
+            if (t.revoked_at && (!latestRevoked || new Date(t.revoked_at) > new Date(latestRevoked))) {
+              latestRevoked = t.revoked_at;
+            }
+          }
+          g.revoked_at = latestRevoked;
+        }
+        delete g.tokens;
       }
 
       const clientIds = [...new Set([...grantsMap.values()].map((g) => g.client_id))];
@@ -141,15 +160,23 @@ function createSupabaseOAuthStore(supabase) {
       let createdAt = first.created_at;
       let lastActivity = first.created_at;
       let expiresAt = first.expires_at;
-      let revokedAt = first.revoked_at;
       let scopes = first.scopes;
 
       for (const t of tokens) {
         if (new Date(t.created_at) < new Date(createdAt)) createdAt = t.created_at;
         if (new Date(t.created_at) > new Date(lastActivity)) lastActivity = t.created_at;
         if (new Date(t.expires_at) > new Date(expiresAt)) expiresAt = t.expires_at;
-        if (t.revoked_at && (!revokedAt || new Date(t.revoked_at) > new Date(revokedAt))) revokedAt = t.revoked_at;
         if (t.scopes && t.scopes.length) scopes = t.scopes;
+      }
+
+      const hasUnrevoked = tokens.some((t) => !t.revoked_at);
+      let revokedAt = null;
+      if (!hasUnrevoked) {
+        for (const t of tokens) {
+          if (t.revoked_at && (!revokedAt || new Date(t.revoked_at) > new Date(revokedAt))) {
+            revokedAt = t.revoked_at;
+          }
+        }
       }
 
       const client = unwrap(await supabase.from('mcp_oauth_clients').select('*')
@@ -226,17 +253,34 @@ function createMemoryOAuthStore() {
             created_at: token.created_at,
             last_activity: token.created_at,
             expires_at: token.expires_at,
-            revoked_at: token.revoked_at,
+            tokens: [token],
           };
           grantsMap.set(token.grant_id, g);
         } else {
           if (new Date(token.created_at) < new Date(g.created_at)) g.created_at = token.created_at;
           if (new Date(token.created_at) > new Date(g.last_activity)) g.last_activity = token.created_at;
           if (new Date(token.expires_at) > new Date(g.expires_at)) g.expires_at = token.expires_at;
-          if (token.revoked_at && (!g.revoked_at || new Date(token.revoked_at) > new Date(g.revoked_at))) g.revoked_at = token.revoked_at;
           if (token.scopes && token.scopes.length) g.scopes = token.scopes;
+          g.tokens.push(token);
         }
       }
+
+      for (const g of grantsMap.values()) {
+        const hasUnrevoked = g.tokens.some((token) => !token.revoked_at);
+        if (hasUnrevoked) {
+          g.revoked_at = null;
+        } else {
+          let latestRevoked = null;
+          for (const token of g.tokens) {
+            if (token.revoked_at && (!latestRevoked || new Date(token.revoked_at) > new Date(latestRevoked))) {
+              latestRevoked = token.revoked_at;
+            }
+          }
+          g.revoked_at = latestRevoked;
+        }
+        delete g.tokens;
+      }
+
       return [...grantsMap.values()].map((g) => {
         const client = t.clients.get(g.client_id) || {};
         return copy({
@@ -254,15 +298,23 @@ function createMemoryOAuthStore() {
       let createdAt = first.created_at;
       let lastActivity = first.created_at;
       let expiresAt = first.expires_at;
-      let revokedAt = first.revoked_at;
       let scopes = first.scopes;
 
       for (const token of tokens) {
         if (new Date(token.created_at) < new Date(createdAt)) createdAt = token.created_at;
         if (new Date(token.created_at) > new Date(lastActivity)) lastActivity = token.created_at;
         if (new Date(token.expires_at) > new Date(expiresAt)) expiresAt = token.expires_at;
-        if (token.revoked_at && (!revokedAt || new Date(token.revoked_at) > new Date(revokedAt))) revokedAt = token.revoked_at;
         if (token.scopes && token.scopes.length) scopes = token.scopes;
+      }
+
+      const hasUnrevoked = tokens.some((token) => !token.revoked_at);
+      let revokedAt = null;
+      if (!hasUnrevoked) {
+        for (const token of tokens) {
+          if (token.revoked_at && (!revokedAt || new Date(token.revoked_at) > new Date(revokedAt))) {
+            revokedAt = token.revoked_at;
+          }
+        }
       }
 
       const client = t.clients.get(first.client_id) || {};

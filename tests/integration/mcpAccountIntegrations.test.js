@@ -127,6 +127,17 @@ async function mcpCall(token, body = INIT) {
   return { status: res.status, headers: res.headers };
 }
 
+async function postForm(path, form) {
+  const body = new URLSearchParams(form).toString();
+  const res = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  const data = await res.json().catch(() => null);
+  return { status: res.status, data };
+}
+
 test('GET /api/account/integrations/ai-assistants requires authentication', async () => {
   const r = await api('/api/account/integrations/ai-assistants');
   assert.strictEqual(r.status, 401);
@@ -325,6 +336,15 @@ test('Immediate server-side revocation terminates access and refresh tokens', as
   const postCheck = await mcpCall(rawAccess);
   assert.strictEqual(postCheck.status, 401);
 
+  // Immediate server-side revocation: refresh token cannot generate new access tokens
+  const refreshRes = await postForm('/token', {
+    grant_type: 'refresh_token',
+    refresh_token: rawRefresh,
+    client_id: 'chatgpt-revocable',
+  });
+  assert.strictEqual(refreshRes.status, 400);
+  assert.strictEqual(refreshRes.data.error, 'invalid_grant');
+
   // Idempotent re-revocation
   const reRevoke = await api(`/api/account/integrations/ai-assistants/${grantId}/revoke`, {
     method: 'POST',
@@ -389,4 +409,115 @@ test('Client classification: Claude and Local MCP clients', async () => {
   const localConn = r.data.connections.find((c) => c.grant_id === localGrant);
   assert.ok(localConn);
   assert.strictEqual(localConn.client_type, 'local');
+});
+
+test('Revoking one grant leaves other active grants for the same user unaffected', async () => {
+  const client1 = 'chatgpt-multi-1';
+  const client2 = 'claude-multi-2';
+  const grant1 = crypto.randomUUID();
+  const grant2 = crypto.randomUUID();
+  const access1 = 'access-multi-1';
+  const refresh1 = 'refresh-multi-1';
+  const access2 = 'access-multi-2';
+  const refresh2 = 'refresh-multi-2';
+
+  await store.insertClient({
+    client_id: client1,
+    client_name: 'ChatGPT',
+    redirect_uris: [CHATGPT_CB],
+    created_at: new Date(clock).toISOString(),
+  });
+  await store.insertClient({
+    client_id: client2,
+    client_name: 'Anthropic Claude',
+    redirect_uris: [CLAUDE_CB],
+    created_at: new Date(clock).toISOString(),
+  });
+
+  await store.insertTokens([
+    {
+      token_hash: sha256(access1),
+      kind: 'access',
+      grant_id: grant1,
+      client_id: client1,
+      user_id: 1001,
+      scopes: ['cfo:read'],
+      resource: `${base}/mcp`,
+      created_at: new Date(clock).toISOString(),
+      expires_at: new Date(clock + 3600 * 1000).toISOString(),
+    },
+    {
+      token_hash: sha256(refresh1),
+      kind: 'refresh',
+      grant_id: grant1,
+      client_id: client1,
+      user_id: 1001,
+      scopes: ['cfo:read'],
+      resource: `${base}/mcp`,
+      created_at: new Date(clock).toISOString(),
+      expires_at: new Date(clock + 30 * 86400 * 1000).toISOString(),
+    },
+    {
+      token_hash: sha256(access2),
+      kind: 'access',
+      grant_id: grant2,
+      client_id: client2,
+      user_id: 1001,
+      scopes: ['cfo:read', 'cfo:drafts'],
+      resource: `${base}/mcp`,
+      created_at: new Date(clock).toISOString(),
+      expires_at: new Date(clock + 3600 * 1000).toISOString(),
+    },
+    {
+      token_hash: sha256(refresh2),
+      kind: 'refresh',
+      grant_id: grant2,
+      client_id: client2,
+      user_id: 1001,
+      scopes: ['cfo:read', 'cfo:drafts'],
+      resource: `${base}/mcp`,
+      created_at: new Date(clock).toISOString(),
+      expires_at: new Date(clock + 30 * 86400 * 1000).toISOString(),
+    },
+  ]);
+
+  // Both work prior to revocation
+  assert.strictEqual((await mcpCall(access1)).status, 200);
+  assert.strictEqual((await mcpCall(access2)).status, 200);
+
+  // Revoke grant1
+  const rev = await api(`/api/account/integrations/ai-assistants/${grant1}/revoke`, {
+    method: 'POST',
+    user: 1001,
+  });
+  assert.strictEqual(rev.status, 200);
+  assert.strictEqual(rev.data.status, 'revoked');
+
+  // grant1 is dead on /mcp and /token
+  assert.strictEqual((await mcpCall(access1)).status, 401);
+  const rRef1 = await postForm('/token', {
+    grant_type: 'refresh_token',
+    refresh_token: refresh1,
+    client_id: client1,
+  });
+  assert.strictEqual(rRef1.status, 400);
+  assert.strictEqual(rRef1.data.error, 'invalid_grant');
+
+  // grant2 remains fully active and working
+  assert.strictEqual((await mcpCall(access2)).status, 200);
+  const rRef2 = await postForm('/token', {
+    grant_type: 'refresh_token',
+    refresh_token: refresh2,
+    client_id: client2,
+  });
+  assert.strictEqual(rRef2.status, 200);
+  assert.ok(rRef2.data.access_token);
+  assert.strictEqual((await mcpCall(rRef2.data.access_token)).status, 200);
+
+  // Check UI list API: grant1 is revoked, grant2 is connected
+  const list = await api('/api/account/integrations/ai-assistants', { user: 1001 });
+  const c1 = list.data.connections.find((c) => c.grant_id === grant1);
+  const c2 = list.data.connections.find((c) => c.grant_id === grant2);
+  assert.strictEqual(c1.status, 'revoked');
+  assert.strictEqual(c2.status, 'connected');
 });
