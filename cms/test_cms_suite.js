@@ -133,6 +133,16 @@ async function runTestSuite() {
     const termsRes = await fetch(`${baseUrl}/en/terms`);
     assert(termsRes.status === 200, 'Terms of Service /en/terms returns HTTP 200');
 
+    // Health checks
+    const healthRes = await fetch(`${baseUrl}/health`);
+    assert(healthRes.status === 200, 'Health endpoint /health returns HTTP 200');
+    const healthJson = await healthRes.json();
+    assert(healthJson.status === 'ok', 'Health endpoint reports status ok');
+    assert(healthJson.service === 'cfo-marketing-staging', 'Health endpoint reports correct service identifier');
+
+    const healthzRes = await fetch(`${baseUrl}/healthz`);
+    assert(healthzRes.status === 200, 'Container probe /healthz returns HTTP 200');
+
     // Check emoji absence across all pages
     const emojiRegex = /[\uD83C-\uDBFF\uDC00-\uDFFF]/;
     assert(!emojiRegex.test(enHomeHtml), 'Homepage contains 0 emojis');
