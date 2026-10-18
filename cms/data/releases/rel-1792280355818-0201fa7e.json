@@ -163,8 +163,8 @@
       }
     ],
     "pricing": {
-      "updated_at": "2026-10-18T07:20:00Z",
-      "updated_by": "system",
+      "updated_at": "2026-10-18T02:06:43.289Z",
+      "updated_by": "test-runner",
       "headline": "Simple, Transparent Subscription Pricing",
       "subheadline": "Designed for Indonesian PT and PT PMA businesses. No hidden setup fees. 7-day free trial on all plans.",
       "trial_badge": "7-Day Free Trial (Zero Card Required)",
@@ -362,6 +362,80 @@
           "pro": "15,000"
         }
       ],
+      "features_table": [
+        {
+          "name": "Pulse & Radar Cash Dashboard",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Invoices & Bills, Documents",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Basic AI CFO Financial Assistant",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Universal Bank Statement Import",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Team Invitations & Role Permissions",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Spend Approvals & Spend Authorization",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Staff Compensation & Payroll Workflows",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "AI Accountant Month-End Close Assistant",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Tax & Compliance Monitoring (PPh 21 TER / PPN)",
+          "starter": "Basic",
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Auditor-Ready General Ledger ZIP Export",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Group Company Management",
+          "starter": false,
+          "control": false,
+          "pro": "5 Entities"
+        },
+        {
+          "name": "Multi-Entity Workspace Switching",
+          "starter": false,
+          "control": false,
+          "pro": "Included (Pro)"
+        }
+      ],
       "feature_availability_table": [
         {
           "key": "pulse_radar_transactions",
@@ -446,6 +520,244 @@
           "starter": "Not Included",
           "control": "Not Included",
           "pro": "Included (Pro)"
+        }
+      ],
+      "matrix_categories": [
+        {
+          "id": "financial_core",
+          "category_name": "Financial Core",
+          "rows": [
+            {
+              "key": "pulse_radar",
+              "name": "Real-Time Cash Cockpit (Pulse & Radar)",
+              "desc": "Executive cash runway tracking & 30/60/90-day trajectory modeling",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "accounts",
+              "name": "Financial Accounts (Wallets)",
+              "desc": "Operating accounts, savings, cash floats & foreign currency ledgers",
+              "starter": "5",
+              "control": "15",
+              "pro": "50"
+            },
+            {
+              "key": "bank_imports",
+              "name": "Bank Statement Imports / Month",
+              "desc": "Corporate bank statement parsing via CSV, PDF, and MT940",
+              "starter": "5 / mo",
+              "control": "20 / mo",
+              "pro": "100 / mo"
+            },
+            {
+              "key": "bank_rows",
+              "name": "Bank Statement Rows / Month",
+              "desc": "Statement transaction rows submitted for reconciliation",
+              "starter": "1,000 / mo",
+              "control": "10,000 / mo",
+              "pro": "50,000 / mo"
+            },
+            {
+              "key": "transactions",
+              "name": "Monthly Booked Transactions",
+              "desc": "General ledger transaction volume per accounting period",
+              "starter": "2,000 / mo",
+              "control": "10,000 / mo",
+              "pro": "50,000 / mo"
+            },
+            {
+              "key": "recon",
+              "name": "Bank Reconciliation Engine",
+              "desc": "Rule-based and automatic matching against bank feeds",
+              "starter": "Standard",
+              "control": "Automated",
+              "pro": "Multi-Account Auto"
+            }
+          ]
+        },
+        {
+          "id": "operations",
+          "category_name": "Operations & Spend Control",
+          "rows": [
+            {
+              "key": "bills_invoices",
+              "name": "Invoices, Bills & Vendor Records",
+              "desc": "Sales invoicing, vendor bills, customer directory & payment status",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "documents",
+              "name": "Document Uploads & Storage / Month",
+              "desc": "Monthly receipts, invoices, and payment proof attachments",
+              "starter": "200 / mo",
+              "control": "1,000 / mo",
+              "pro": "3,000 / mo"
+            },
+            {
+              "key": "approvals",
+              "name": "Spend Approvals & Authorization Workflows",
+              "desc": "Internal controls on vendor payments and expense disbursements",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "payroll",
+              "name": "Staff Compensation & Payroll Workflows",
+              "desc": "Monthly payroll preparation, salary registers & pay slip tracking",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            }
+          ]
+        },
+        {
+          "id": "ai_automation",
+          "category_name": "AI & Automation",
+          "rows": [
+            {
+              "key": "ai",
+              "name": "AI CFO Financial Inquiries / Month",
+              "desc": "Natural language questions answered with exact voucher citations",
+              "starter": "50 / mo",
+              "control": "300 / mo",
+              "pro": "1,000 / mo"
+            },
+            {
+              "key": "ai_extraction",
+              "name": "Multimodal Document OCR (Faktur Pajak)",
+              "desc": "Vision OCR parsing DPP, PPN 11%, NSFP, and vendor details",
+              "starter": "100 / mo",
+              "control": "500 / mo",
+              "pro": "1,500 / mo"
+            },
+            {
+              "key": "ai_accountant",
+              "name": "AI Accountant Month-End Close Requests",
+              "desc": "Assisted month-end closing, discrepancy resolution & review checklists",
+              "starter": "—",
+              "control": "50 / mo",
+              "pro": "200 / mo"
+            },
+            {
+              "key": "categorization",
+              "name": "Automatic Transaction Matching",
+              "desc": "Intelligent matching between bank feeds and supporting documents",
+              "starter": "Rule-Based",
+              "control": "Machine Learning",
+              "pro": "Custom Rules Engine"
+            }
+          ]
+        },
+        {
+          "id": "tax_compliance",
+          "category_name": "Tax & Compliance",
+          "rows": [
+            {
+              "key": "tax_calendar",
+              "name": "Indonesian Statutory Tax Calendar",
+              "desc": "Filing deadline tracking for PPh 21, PPh 23, PPh 4(2), and PPN 11%",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "pph21",
+              "name": "PPh 21 TER Withholding Calculator",
+              "desc": "Government-mandated TER Categories A, B, C per PP 58/2023",
+              "starter": "Basic Preview",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "coretax",
+              "name": "CoreTax (PMK 81/2024) Readiness Worksheets",
+              "desc": "Structured filing schedules for the DGT nationwide tax transition",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "accounting_export",
+              "name": "Auditor-Ready General Ledger ZIP Export",
+              "desc": "One-click export with balanced GL CSVs, voucher attachments & audit logs",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            }
+          ]
+        },
+        {
+          "id": "team_organization",
+          "category_name": "Team & Organization",
+          "rows": [
+            {
+              "key": "users",
+              "name": "Active Member Seats Included",
+              "desc": "Finance directors, operators, accountants, and staff members",
+              "starter": "5 Seats",
+              "control": "10 Seats",
+              "pro": "30 Seats"
+            },
+            {
+              "key": "team_roles",
+              "name": "Employee Invitations & Role Permissions",
+              "desc": "Owner, Director, Accountant, Member, and Viewer role isolation",
+              "starter": "Standard Roles",
+              "control": "Custom Permissions",
+              "pro": "Department Isolation"
+            },
+            {
+              "key": "companies",
+              "name": "Owned Company Workspaces",
+              "desc": "Completely separate company organizations under one master login",
+              "starter": "1 Company",
+              "control": "2 Companies",
+              "pro": "5 Companies"
+            },
+            {
+              "key": "multi_company",
+              "name": "Multi-Entity Workspace Switching",
+              "desc": "Tenant data isolation across multiple PT and PT PMA entities",
+              "starter": "—",
+              "control": "—",
+              "pro": "5 Entities (Isolated Ledgers)"
+            }
+          ]
+        },
+        {
+          "id": "integrations_usage",
+          "category_name": "Integrations & Platform",
+          "rows": [
+            {
+              "key": "mcp",
+              "name": "MCP & REST API Tool Calls / Month",
+              "desc": "Programmatic integration via Model Context Protocol & REST endpoints",
+              "starter": "500 / mo",
+              "control": "3,000 / mo",
+              "pro": "15,000 / mo"
+            },
+            {
+              "key": "bank_formats",
+              "name": "Universal Statement Compatibility",
+              "desc": "Supports BCA, Mandiri, Permata, BRI & international bank statement files",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "data_ownership",
+              "name": "Raw Data Export & Portability",
+              "desc": "Full customer ownership with zero vendor lock-in",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            }
+          ]
         }
       ],
       "faqs": [

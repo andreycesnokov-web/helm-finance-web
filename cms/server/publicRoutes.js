@@ -169,14 +169,15 @@ function createPublicRoutes(contentStore) {
 
   <!-- NAVIGATION HEADER (White with crisp border, 35% increased official logo) -->
   <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#CBD5E1]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-22 flex items-center justify-between">
-      <div class="flex items-center gap-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-22 flex items-center justify-between gap-4 lg:gap-6 xl:gap-8">
+      <div class="flex items-center gap-4 lg:gap-6 xl:gap-8 min-w-0">
         <!-- Official Logo increased by 35% -->
-        <a href="/${locale}" class="flex items-center py-2" aria-label="CFO AI Homepage">
-          <img src="/assets/brand/logo_main_navy_transparent.svg" alt="CFO AI Financial OS" class="h-12 sm:h-13 w-auto object-contain">
+        <a href="/${locale}" class="flex items-center py-2 shrink-0" aria-label="CFO AI Homepage">
+          <img src="/assets/brand/logo_main_navy_transparent.svg" alt="CFO AI Financial OS" class="h-11 sm:h-12 w-auto object-contain">
         </a>
 
-        <nav class="hidden lg:flex items-center gap-5 xl:gap-6 text-sm font-semibold text-[#06366B]">
+        <nav class="hidden lg:flex items-center gap-3.5 xl:gap-5 text-xs xl:text-sm font-semibold text-[#06366B]">
+          <a href="/${locale}" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'home' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.home}</a>
           <a href="/${locale}/platform" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'platform' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.platform}</a>
           <a href="/${locale}/document-intelligence" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'doc' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.doc_intelligence}</a>
           <a href="/${locale}/compliance" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'compliance' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.compliance}</a>
@@ -186,28 +187,29 @@ function createPublicRoutes(contentStore) {
         </nav>
       </div>
 
-      <div class="flex items-center gap-3 shrink-0">
-        <a href="https://app.cfo-ai.site/login" class="hidden sm:inline-block text-sm font-bold text-[#06366B] hover:text-[#318FF4] px-3 py-2 transition-colors whitespace-nowrap">
+      <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <a href="https://app.cfo-ai.site/login" class="hidden sm:inline-block text-xs xl:text-sm font-bold text-[#06366B] hover:text-[#318FF4] px-2.5 py-2 transition-colors whitespace-nowrap">
           ${t.nav.login}
         </a>
-        <a href="https://app.cfo-ai.site/login" class="text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-sm transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap">
+        <a href="https://app.cfo-ai.site/login" class="text-xs xl:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-3.5 sm:px-5 py-2.5 rounded-xl shadow-sm transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap">
           ${t.nav.trial_cta}
         </a>
         <!-- Mobile Menu Toggle Button -->
-        <button onclick="toggleMobileMenu()" class="lg:hidden p-2.5 rounded-lg text-slate-700 hover:text-[#318FF4] hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Toggle navigation menu">
+        <button onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-lg text-slate-700 hover:text-[#318FF4] hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Toggle navigation menu">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
       </div>
     </div>
 
     <!-- Mobile Drawer Navigation -->
-    <div id="mobile-menu" class="hidden lg:hidden border-t border-slate-200 bg-white px-4 pt-4 pb-6 space-y-3">
-      <a href="/${locale}/platform" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center">${t.nav.platform}</a>
-      <a href="/${locale}/document-intelligence" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center">${t.nav.doc_intelligence}</a>
-      <a href="/${locale}/compliance" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center">${t.nav.compliance}</a>
-      <a href="/${locale}/blog" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center">${t.nav.hub}</a>
-      <a href="/${locale}/pricing" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center">${t.nav.pricing}</a>
-      <a href="/${locale}/about" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center">${t.nav.about}</a>
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-1.5">
+      <a href="/${locale}" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'home' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.home}</a>
+      <a href="/${locale}/platform" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'platform' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.platform}</a>
+      <a href="/${locale}/document-intelligence" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'doc' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.doc_intelligence}</a>
+      <a href="/${locale}/compliance" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'compliance' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.compliance}</a>
+      <a href="/${locale}/blog" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'blog' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.hub}</a>
+      <a href="/${locale}/pricing" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'pricing' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.pricing}</a>
+      <a href="/${locale}/about" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'about' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.about}</a>
       <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
         <span class="text-xs font-bold text-slate-500">Language:</span>
         <select onchange="window.location.href='/' + this.value + window.location.pathname.substring(3)" class="bg-slate-100 text-slate-800 text-xs rounded px-2.5 py-1.5 border border-slate-300">
@@ -227,63 +229,72 @@ function createPublicRoutes(contentStore) {
     ${content}
   </main>
 
-  <!-- FOOTER (Dark -> Luminous Navy -> Dark Gradient) -->
-  <footer class="bg-navy-brand text-slate-300 pt-16 pb-12 border-t border-slate-700 relative overflow-hidden">
-    ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-[450px] h-[450px]', className: 'absolute -right-24 -bottom-24 pointer-events-none select-none z-0' })}
+  <!-- FOOTER (Unified 4-Column Layout, 25-30% height reduction: pt-10 pb-8) -->
+  <footer class="bg-navy-brand text-slate-300 pt-10 pb-8 border-t border-slate-700 relative overflow-hidden">
+    ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-[420px] h-[420px]', className: 'absolute -right-20 -bottom-20 pointer-events-none select-none z-0' })}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-10 mb-12">
-        <div class="md:col-span-2">
-          <div class="flex items-center gap-3 mb-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+        <!-- Col 1: Brand & footprint -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
             <img src="/assets/brand/logo_dark_bg_white_text.svg" alt="CFO AI Indonesia" class="h-8 w-auto rounded">
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed mb-6 max-w-sm">
+          <p class="text-xs text-slate-300 leading-relaxed max-w-xs">
             ${t.footer.about_text}
           </p>
-          <div class="text-[11px] text-slate-400 space-y-1">
+          <div class="text-[11px] text-slate-400 space-y-1 pt-1">
             <div>SaaS Application: <a href="https://app.cfo-ai.site" class="text-blue-300 underline font-mono">${t.footer.app_link}</a></div>
             <div>${t.footer.footprint}</div>
-            <div>${t.footer.security_notice}</div>
+            <div class="text-slate-300 font-medium">${t.footer.security_notice}</div>
           </div>
         </div>
 
+        <!-- Col 2: Platform -->
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-4">${t.footer.col_platform}</h4>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">${t.footer.col_platform}</h4>
           <ul class="space-y-2 text-xs">
-            <li><a href="/${locale}/platform#pulse" class="hover:text-white transition-colors">Pulse Command Center</a></li>
-            <li><a href="/${locale}/platform#radar" class="hover:text-white transition-colors">Radar Trajectory</a></li>
+            <li><a href="/${locale}/platform" class="hover:text-white transition-colors">${t.footer.link_overview}</a></li>
+            <li><a href="/${locale}/platform#features" class="hover:text-white transition-colors">${t.footer.link_features}</a></li>
             <li><a href="/${locale}/document-intelligence" class="hover:text-white transition-colors">${t.nav.doc_intelligence}</a></li>
-            <li><a href="/${locale}/platform#bank-import" class="hover:text-white transition-colors">Bank Reconciliation</a></li>
+            <li><a href="/${locale}/compliance" class="hover:text-white transition-colors">${t.nav.compliance}</a></li>
             <li><a href="/${locale}/pricing" class="hover:text-white transition-colors">${t.nav.pricing}</a></li>
           </ul>
         </div>
 
+        <!-- Col 3: Knowledge Hub -->
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-4">${t.footer.col_hub}</h4>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">${t.footer.col_hub}</h4>
           <ul class="space-y-2 text-xs">
             <li><a href="/${locale}/blog" class="hover:text-white transition-colors">All Tax &amp; Business Guides</a></li>
-            <li><a href="/${locale}/blog/pt-pma-tax-compliance-guide-2026" class="hover:text-white transition-colors">PT PMA Tax Guide 2026</a></li>
-            <li><a href="/${locale}/blog/pph-21-ter-calculation-rules-indonesia" class="hover:text-white transition-colors">PPh 21 TER Formulas</a></li>
-            <li><a href="/${locale}/blog/coretax-pmk-81-2024-transition-guide" class="hover:text-white transition-colors">CoreTax PMK 81/2024</a></li>
+            <li><a href="/${locale}/blog/pt-pma-tax-compliance-guide-2026" class="hover:text-white transition-colors">${t.footer.link_tax_guides}</a></li>
+            <li><a href="/${locale}/blog/pph-21-ter-calculation-rules-indonesia" class="hover:text-white transition-colors">${t.footer.link_pph21}</a></li>
+            <li><a href="/${locale}/blog/coretax-pmk-81-2024-transition-guide" class="hover:text-white transition-colors">${t.footer.link_coretax}</a></li>
           </ul>
         </div>
 
+        <!-- Col 4: Company & Legal -->
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-4">${t.footer.col_legal}</h4>
+          <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-3.5">${t.footer.col_legal}</h4>
           <ul class="space-y-2 text-xs">
             <li><a href="/${locale}/about" class="hover:text-white transition-colors">${t.nav.about}</a></li>
-            <li><a href="/${locale}/compliance" class="hover:text-white transition-colors">${t.nav.compliance}</a></li>
-            <li><a href="/${locale}/privacy" class="hover:text-white transition-colors">Privacy Policy (UU PDP)</a></li>
-            <li><a href="/${locale}/terms" class="hover:text-white transition-colors">Terms of Service</a></li>
-            <li><a href="https://app.cfo-ai.site/login" class="text-blue-300 font-bold hover:underline">${t.nav.trial_cta} &rarr;</a></li>
+            <li><a href="/${locale}/about#contact" class="hover:text-white transition-colors">${t.footer.link_contact}</a></li>
+            <li><a href="/${locale}/privacy" class="hover:text-white transition-colors">${t.footer.link_privacy}</a></li>
+            <li><a href="/${locale}/terms" class="hover:text-white transition-colors">${t.footer.link_terms}</a></li>
+            <li class="pt-1"><a href="https://app.cfo-ai.site/login" class="text-blue-300 font-bold hover:underline inline-flex items-center gap-1">${t.nav.trial_cta} &rarr;</a></li>
           </ul>
         </div>
       </div>
 
-      <div class="border-t border-slate-700/80 pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
+      <!-- Footer Bottom Bar with Back to Top -->
+      <div class="border-t border-slate-700/80 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
         <div>${t.footer.copyright}</div>
-        <div class="text-[11px] max-w-xl text-center sm:text-right text-slate-400">
+        <div class="text-[11px] max-w-md text-center sm:text-left text-slate-400">
           ${t.footer.disclaimer}
         </div>
+        <button onclick="scrollToTop()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 min-h-[36px]" aria-label="${t.footer.back_to_top}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+          <span>${t.footer.back_to_top}</span>
+        </button>
       </div>
     </div>
   </footer>
@@ -312,6 +323,14 @@ function createPublicRoutes(contentStore) {
   </div>
 
   <script>
+    function scrollToTop() {
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({
+        top: 0,
+        behavior: prefersReducedMotion ? 'auto' : 'smooth'
+      });
+    }
+
     function toggleMobileMenu() {
       const el = document.getElementById('mobile-menu');
       if (el) el.classList.toggle('hidden');
@@ -605,16 +624,18 @@ function createPublicRoutes(contentStore) {
         </div>
       </section>
 
-      <!-- CTA BANNER (Dark -> Luminous Navy -> Dark Gradient with Watermark) -->
-      <section class="py-16 px-4 sm:px-6 lg:px-8 bg-navy-brand text-white text-center relative overflow-hidden">
-        ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-96 h-96', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
-        <div class="max-w-4xl mx-auto relative z-10">
-          <h2 class="text-3xl sm:text-4xl font-black tracking-tight mb-4">Ready to bring complete clarity to your business finances?</h2>
-          <p class="text-sm text-slate-300 max-w-xl mx-auto mb-8">Join Indonesian businesses that have streamlined cash visibility, bank reconciliation, and tax readiness with CFO AI.</p>
-          <a href="https://app.cfo-ai.site/login" class="inline-block text-sm font-bold bg-[#1768C9] hover:bg-[#063D72] text-white px-8 py-4 rounded-xl shadow-lg transition-all min-h-[44px]">
-            ${t.hero.primary_cta} &rarr;
-          </a>
-          <div class="text-[11px] text-slate-400 mt-4">${t.hero.disclaimer}</div>
+      <!-- COMPACT FINAL CTA SECTION -->
+      <section class="py-8 sm:py-10 px-4 sm:px-6 lg:px-8 bg-navy-brand text-white text-center relative overflow-hidden border-b border-slate-700/60 shadow-inner">
+        ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-72 h-72', className: 'absolute -right-12 -bottom-12 pointer-events-none select-none z-0' })}
+        <div class="max-w-3xl mx-auto relative z-10">
+          <h2 class="text-xl sm:text-2xl font-black tracking-tight mb-2 text-white">${t.cta_section.heading}</h2>
+          <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-5 leading-relaxed">${t.cta_section.subheading}</p>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-7 py-3 rounded-xl shadow-md transition-all min-h-[44px]">
+              ${t.hero.primary_cta} &rarr;
+            </a>
+          </div>
+          <div class="text-[11px] text-slate-400 mt-3 font-medium">${t.cta_section.note}</div>
         </div>
       </section>
     `;
@@ -811,26 +832,64 @@ function createPublicRoutes(contentStore) {
       url: `https://cfo-ai.site/${l.code}/pricing`
     }));
 
+    const categoryTitles = {
+      financial_core: t.pricing_page.cat_financial_core || "Financial Core",
+      operations: t.pricing_page.cat_operations || "Operations & Spend Control",
+      ai_automation: t.pricing_page.cat_ai_automation || "AI & Automation",
+      tax_compliance: t.pricing_page.cat_tax_compliance || "Tax & Compliance",
+      team_organization: t.pricing_page.cat_team_organization || "Team & Organization",
+      integrations_usage: t.pricing_page.cat_integrations_usage || "Integrations & Platform"
+    };
+
+    const renderCell = (val, isControl = false) => {
+      if (val === 'Included' || val === true) {
+        return '<span class="inline-flex items-center justify-center text-emerald-600 font-extrabold text-sm" title="Included">✓</span>';
+      }
+      if (val === '—' || val === '-' || val === 'Not Included' || val === false) {
+        return '<span class="inline-flex items-center justify-center text-slate-300 font-bold text-sm" title="Not Included">—</span>';
+      }
+      return `<span class="font-mono-num ${isControl ? 'font-bold text-[#06366B]' : 'font-semibold text-slate-700'} text-xs">${val}</span>`;
+    };
+
+    const matrixHtml = (pricing.matrix_categories || []).map(cat => {
+      const catTitle = categoryTitles[cat.id] || cat.category_name;
+      const rowsHtml = (cat.rows || []).map(r => `
+        <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-colors">
+          <td class="p-3.5 sm:p-4 font-semibold text-[#06366B]">
+            <div class="font-bold text-xs">${r.name}</div>
+            ${r.desc ? `<div class="text-[11px] text-slate-500 font-normal leading-tight mt-0.5">${r.desc}</div>` : ''}
+          </td>
+          <td class="p-3.5 sm:p-4 text-center">
+            ${renderCell(r.starter)}
+          </td>
+          <td class="p-3.5 sm:p-4 text-center bg-blue-50/30 border-x border-blue-100 font-bold text-[#06366B]">
+            ${renderCell(r.control, true)}
+          </td>
+          <td class="p-3.5 sm:p-4 text-center">
+            ${renderCell(r.pro)}
+          </td>
+        </tr>
+      `).join('');
+
+      return `
+        <tr class="bg-slate-100/90 border-t-2 border-slate-200">
+          <th colspan="4" class="py-3 px-4 text-xs font-black uppercase tracking-wider text-[#06366B] bg-slate-100/90 text-left">
+            ${catTitle}
+          </th>
+        </tr>
+        ${rowsHtml}
+      `;
+    }).join('');
+
     const contentHtml = `
       <section class="py-16 px-4 sm:px-6 lg:px-8 bg-ice-primary border-b border-[#CBD5E1] relative overflow-hidden">
         ${renderWatermark({ color: '#06366B', opacity: '0.04', size: 'w-96 h-96', className: 'absolute -right-20 -top-10 pointer-events-none select-none z-0' })}
         <div class="max-w-7xl mx-auto text-center relative z-10">
           <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.pricing_page.badge}</span>
           <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4">${t.pricing_page.heading}</h1>
-          <p class="text-sm text-slate-700 max-w-2xl mx-auto mb-10">${t.pricing_page.subheadline}</p>
+          <p class="text-sm text-slate-700 max-w-2xl mx-auto mb-12">${t.pricing_page.subheadline}</p>
 
-          <!-- Interactive Billing Interval Switcher -->
-          <div class="inline-flex items-center p-1.5 rounded-xl bg-white border border-[#CBD5E1] shadow-sm mb-12">
-            <button id="btn-monthly" onclick="setBillingInterval('monthly')" class="px-5 py-2 rounded-lg text-xs font-bold transition-all bg-[#06366B] text-white min-h-[44px]">
-              ${t.pricing_page.monthly_btn}
-            </button>
-            <button id="btn-annual" onclick="setBillingInterval('annual')" class="px-5 py-2 rounded-lg text-xs font-bold transition-all text-slate-600 hover:text-[#06366B] min-h-[44px] flex items-center gap-1.5">
-              <span>${t.pricing_page.annual_btn}</span>
-              <span class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-extrabold">${t.pricing_page.discount_badge}</span>
-            </button>
-          </div>
-
-          <!-- PRICING CARDS -->
+          <!-- PRICING CARDS (Standardized Monthly Pricing) -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16 text-left">
             ${pricing.plans.map(p => `
               <div class="bento-card p-8 flex flex-col justify-between ${p.is_recommended ? 'border-2 border-[#1768C9] shadow-xl relative' : ''}">
@@ -844,7 +903,7 @@ function createPublicRoutes(contentStore) {
                   <p class="text-xs text-slate-600 mb-6">${p.description}</p>
                   
                   <div class="flex items-baseline gap-1 mb-6">
-                    <span class="text-4xl font-black text-[#06366B] font-mono-num plan-price" data-monthly="${p.price_monthly}" data-annual="${Math.round(p.price_monthly * 0.8)}">$${p.price_monthly}</span>
+                    <span class="text-4xl font-black text-[#06366B] font-mono-num plan-price">$${p.price_monthly}</span>
                     <span class="text-xs text-slate-500 plan-interval">${t.pricing_page.per_month}</span>
                   </div>
 
@@ -864,72 +923,39 @@ function createPublicRoutes(contentStore) {
             `).join('')}
           </div>
 
-          <!-- USAGE LIMITS COMPARISON TABLE (11 Authoritative Limits) -->
+          <!-- UNIFIED 6-CATEGORY FEATURE & USAGE MATRIX -->
           <div class="max-w-6xl mx-auto mb-16 text-left">
-            <h2 class="text-2xl font-black text-[#06366B] mb-2 text-center">${t.pricing_page.limits_title}</h2>
-            <p class="text-xs text-slate-600 mb-8 text-center">${t.pricing_page.limits_sub}</p>
+            <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mb-2 text-center">${t.pricing_page.features_title}</h2>
+            <p class="text-xs sm:text-sm text-slate-600 mb-8 text-center max-w-2xl mx-auto">${t.pricing_page.features_sub}</p>
 
             <div class="bento-card overflow-x-auto shadow-sm">
-              <table class="w-full text-xs text-left border-collapse">
+              <table class="w-full text-xs text-left border-collapse min-w-[680px]">
                 <thead>
-                  <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B] font-bold">
-                    <th class="p-4">Operational Limit Category</th>
-                    <th class="p-4 text-center">Starter ($59/mo)</th>
-                    <th class="p-4 text-center bg-blue-50/50 text-[#1768C9]">Control ($149/mo)</th>
-                    <th class="p-4 text-center">Pro ($249/mo)</th>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B]">
+                    <th class="p-4 text-left font-bold text-xs uppercase tracking-wider w-2/5">Feature &amp; Operational Quota</th>
+                    <th class="p-4 text-center font-bold text-xs w-1/5">
+                      <div class="text-[#06366B] font-black text-sm">Starter</div>
+                      <div class="font-mono-num text-xs text-slate-500 mt-0.5">$59/mo</div>
+                    </th>
+                    <th class="p-4 text-center font-bold text-xs w-1/5 bg-blue-50/80 text-[#1768C9] border-x border-blue-200/80 relative">
+                      <span class="text-[10px] uppercase font-black tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full inline-block mb-1">RECOMMENDED</span>
+                      <div class="text-[#1768C9] font-black text-sm">Control</div>
+                      <div class="font-mono-num text-xs font-bold text-[#06366B] mt-0.5">$149/mo</div>
+                    </th>
+                    <th class="p-4 text-center font-bold text-xs w-1/5">
+                      <div class="text-[#06366B] font-black text-sm">Pro</div>
+                      <div class="font-mono-num text-xs text-slate-500 mt-0.5">$249/mo</div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                  ${(pricing.usage_limits_table || []).map(row => `
-                    <tr class="hover:bg-slate-50/50">
-                      <td class="p-4 font-semibold text-[#06366B]">${row.label}</td>
-                      <td class="p-4 text-center font-mono-num text-slate-700">${row.starter}</td>
-                      <td class="p-4 text-center font-mono-num font-bold text-[#1768C9] bg-blue-50/30">${row.control}</td>
-                      <td class="p-4 text-center font-mono-num text-slate-700">${row.pro}</td>
-                    </tr>
-                  `).join('')}
+                  ${matrixHtml}
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- 12 FEATURE CATEGORIES COMPARISON TABLE -->
-          <div class="max-w-6xl mx-auto mb-16 text-left">
-            <h2 class="text-2xl font-black text-[#06366B] mb-2 text-center">${t.pricing_page.features_title}</h2>
-            <p class="text-xs text-slate-600 mb-8 text-center">${t.pricing_page.features_sub}</p>
-
-            <div class="bento-card overflow-x-auto shadow-sm">
-              <table class="w-full text-xs text-left border-collapse">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B] font-bold">
-                    <th class="p-4">Feature Module</th>
-                    <th class="p-4 text-center">Starter</th>
-                    <th class="p-4 text-center bg-blue-50/50 text-[#1768C9]">Control</th>
-                    <th class="p-4 text-center">Pro</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  ${(pricing.features_table || []).map(f => {
-                    const renderVal = val => {
-                      if (val === true) return '<span class="text-emerald-700 font-bold font-mono">YES</span>';
-                      if (val === false) return '<span class="text-slate-300 font-mono">-</span>';
-                      return `<span class="text-slate-700 font-semibold">${val}</span>`;
-                    };
-                    return `
-                      <tr class="hover:bg-slate-50/50">
-                        <td class="p-4 font-semibold text-[#06366B]">${f.name}</td>
-                        <td class="p-4 text-center">${renderVal(f.starter)}</td>
-                        <td class="p-4 text-center bg-blue-50/30">${renderVal(f.control)}</td>
-                        <td class="p-4 text-center">${renderVal(f.pro)}</td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Enterprise Custom Inquiries Banner (Dark Navy Gradient) -->
+          <!-- Enterprise Custom Inquiries Banner (Dark Navy Gradient) positioned after full matrix -->
           <div class="bento-card p-8 bg-navy-brand text-white max-w-4xl mx-auto text-center relative overflow-hidden">
             ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-80 h-80', className: 'absolute -right-16 -bottom-16 pointer-events-none select-none z-0' })}
             <div class="relative z-10">
@@ -942,41 +968,6 @@ function createPublicRoutes(contentStore) {
           </div>
         </div>
       </section>
-
-      <script>
-        function setBillingInterval(mode) {
-          const btnMonthly = document.getElementById('btn-monthly');
-          const btnAnnual = document.getElementById('btn-annual');
-          const priceEls = document.querySelectorAll('.plan-price');
-          const intervalEls = document.querySelectorAll('.plan-interval');
-
-          if (mode === 'annual') {
-            btnAnnual.classList.remove('text-slate-600', 'hover:text-[#06366B]');
-            btnAnnual.classList.add('bg-[#06366B]', 'text-white');
-            btnMonthly.classList.remove('bg-[#06366B]', 'text-white');
-            btnMonthly.classList.add('text-slate-600', 'hover:text-[#06366B]');
-
-            priceEls.forEach(el => {
-              el.textContent = '$' + el.getAttribute('data-annual');
-            });
-            intervalEls.forEach(el => {
-              el.textContent = '/ month, billed annually';
-            });
-          } else {
-            btnMonthly.classList.remove('text-slate-600', 'hover:text-[#06366B]');
-            btnMonthly.classList.add('bg-[#06366B]', 'text-white');
-            btnAnnual.classList.remove('bg-[#06366B]', 'text-white');
-            btnAnnual.classList.add('text-slate-600', 'hover:text-[#06366B]');
-
-            priceEls.forEach(el => {
-              el.textContent = '$' + el.getAttribute('data-monthly');
-            });
-            intervalEls.forEach(el => {
-              el.textContent = '${t.pricing_page.per_month}';
-            });
-          }
-        }
-      </script>
     `;
 
     res.send(renderLayout({

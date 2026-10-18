@@ -7,6 +7,7 @@
 const translations = {
   en: {
     nav: {
+      home: "Home",
       platform: "Platform",
       doc_intelligence: "Document Intelligence",
       compliance: "Tax & Compliance",
@@ -285,9 +286,20 @@ const translations = {
       limits_sub: "Every limit is strictly enforced with zero silent penalties.",
       features_title: "Feature Matrix Comparison",
       features_sub: "Full functionality breakdown across Starter, Control, and Pro plans.",
+      cat_financial_core: "Financial Core",
+      cat_operations: "Operations & Spend Control",
+      cat_ai_automation: "AI & Automation",
+      cat_tax_compliance: "Tax & Compliance",
+      cat_team_organization: "Team & Organization",
+      cat_integrations_usage: "Integrations & Platform",
       custom_enterprise_title: "Need a custom multi-entity deployment?",
       custom_enterprise_desc: "For groups operating more than 5 Indonesian entities, holding companies, or specialized CoreTax ERP integrations.",
       custom_enterprise_btn: "Contact Enterprise Advisory"
+    },
+    cta_section: {
+      heading: "Ready to take command of your business finances?",
+      subheading: "Streamline cash visibility, automated bank reconciliation, and tax readiness with CFO AI.",
+      note: "7-day free trial • No credit card required • Instant workspace setup"
     },
     about_page: {
       badge: "OUR MISSION",
@@ -305,12 +317,21 @@ const translations = {
       about_text: "AI-powered financial operating system engineered for Indonesian PT and PT PMA companies. Real-time multi-currency cash visibility, Indonesian tax invoice OCR, automated bank reconciliation, and regulatory compliance intelligence.",
       app_link: "app.cfo-ai.site",
       footprint: "Footprint: Jakarta • Denpasar, Bali • Operating across Indonesia",
-      security_notice: "Security: AES-256 Encryption • Isolated Tenant Schemas • Zero AI Training on Customer Data",
+      security_notice: "Bank-Grade AES-256 • Row-Level Tenant Isolation • Zero AI Training on Customer Data",
       col_platform: "Platform",
       col_hub: "Knowledge Hub",
       col_legal: "Company & Legal",
       copyright: "© 2026 CFO AI Indonesia. All rights reserved.",
-      disclaimer: "CFO AI is an operational financial management system. It does not issue statutory audit opinions or replace a licensed Indonesian Konsultan Pajak."
+      disclaimer: "CFO AI is an operational financial management system. It does not issue statutory audit opinions or replace a licensed Indonesian Konsultan Pajak.",
+      link_overview: "Platform Overview",
+      link_features: "Product Features",
+      link_contact: "Contact Inquiries",
+      link_privacy: "Privacy Policy (UU PDP)",
+      link_terms: "Terms of Service",
+      link_tax_guides: "PT PMA Tax Guide 2026",
+      link_pph21: "PPh 21 TER Formulas",
+      link_coretax: "CoreTax Transition Guide",
+      back_to_top: "Back to Top"
     },
     lightbox: {
       authentic_badge: "AUTHENTIC V2 SCREEN",
@@ -321,9 +342,10 @@ const translations = {
 
   id: {
     nav: {
+      home: "Beranda",
       platform: "Platform",
-      doc_intelligence: "Intelijen Dokumen",
-      compliance: "Pajak & Kepatuhan",
+      doc_intelligence: "Dokumen",
+      compliance: "Pajak",
       hub: "Pusat Panduan",
       pricing: "Harga",
       about: "Tentang Kami",
@@ -599,9 +621,20 @@ const translations = {
       limits_sub: "Setiap batasan diberlakukan secara transparan tanpa denda tersembunyi.",
       features_title: "Perbandingan Matriks Fitur",
       features_sub: "Rincian modul lengkap antara paket Starter, Control, dan Pro.",
+      cat_financial_core: "Inti Keuangan",
+      cat_operations: "Operasional & Kontrol Biaya",
+      cat_ai_automation: "AI & Otomasi",
+      cat_tax_compliance: "Pajak & Kepatuhan",
+      cat_team_organization: "Tim & Organisasi",
+      cat_integrations_usage: "Integrasi & Platform",
       custom_enterprise_title: "Membutuhkan implementasi khusus multi-entitas?",
       custom_enterprise_desc: "Untuk grup dengan lebih dari 5 entitas di Indonesia, perusahaan holding, atau integrasi ERP CoreTax khusus.",
       custom_enterprise_btn: "Hubungi Tim Penasihat Enterprise"
+    },
+    cta_section: {
+      heading: "Siap mengontrol keuangan bisnis Anda secara menyeluruh?",
+      subheading: "Kelola arus kas, rekonsiliasi bank otomatis, dan kepatuhan pajak bersama CFO AI.",
+      note: "Uji coba 7 hari gratis • Tanpa kartu kredit • Pengaturan instan"
     },
     about_page: {
       badge: "MISI KAMI",
@@ -619,12 +652,21 @@ const translations = {
       about_text: "Sistem operasi keuangan bertenaga AI untuk PT dan PT PMA di Indonesia. Visibilitas arus kas multi-valuta real-time, OCR faktur pajak, rekonsiliasi bank otomatis, dan kepatuhan regulasi terpadu.",
       app_link: "app.cfo-ai.site",
       footprint: "Kantor: Jakarta • Denpasar, Bali • Melayani seluruh Indonesia",
-      security_notice: "Keamanan: Enkripsi AES-256 • Skema Terisolasi • Tanpa Pelatihan AI dari Data Pelanggan",
+      security_notice: "Standar Perbankan AES-256 • Isolasi Skema Tingkat Baris • Tanpa Pelatihan AI dari Data Pelanggan",
       col_platform: "Platform",
       col_hub: "Pusat Panduan",
       col_legal: "Perusahaan & Hukum",
       copyright: "© 2026 CFO AI Indonesia. Hak cipta dilindungi undang-undang.",
-      disclaimer: "CFO AI adalah sistem manajemen keuangan operasional. Kami tidak menerbitkan opini audit resmi atau menggantikan Konsultan Pajak terdaftar."
+      disclaimer: "CFO AI adalah sistem manajemen keuangan operasional. Kami tidak menerbitkan opini audit resmi atau menggantikan Konsultan Pajak terdaftar.",
+      link_overview: "Ringkasan Platform",
+      link_features: "Fitur Produk",
+      link_contact: "Kontak & Layanan",
+      link_privacy: "Kebijakan Privasi (UU PDP)",
+      link_terms: "Syarat & Ketentuan",
+      link_tax_guides: "Panduan Pajak PT PMA 2026",
+      link_pph21: "Rumus PPh 21 TER",
+      link_coretax: "Panduan Transisi CoreTax",
+      back_to_top: "Kembali ke Atas"
     },
     lightbox: {
       authentic_badge: "TAMPILAN NYATA V2",
@@ -635,6 +677,7 @@ const translations = {
 
   ru: {
     nav: {
+      home: "Главная",
       platform: "Платформа",
       doc_intelligence: "Документы",
       compliance: "Налоги",
@@ -915,7 +958,18 @@ const translations = {
       features_sub: "Полное распределение возможностей между тарифами Starter, Control и Pro.",
       custom_enterprise_title: "Нужна кастомная корпоративная конфигурация?",
       custom_enterprise_desc: "Для холдингов с более чем 5 юридическими лицами в Индонезии или интеграции со сложными ERP-системами CoreTax.",
-      custom_enterprise_btn: "Связаться с Enterprise отделом"
+      custom_enterprise_btn: "Связаться с Enterprise отделом",
+      cat_financial_core: "Финансовое ядро",
+      cat_operations: "Операции и контроль расходов",
+      cat_ai_automation: "ИИ и автоматизация",
+      cat_tax_compliance: "Налоги и комплаенс",
+      cat_team_organization: "Команда и структура",
+      cat_integrations_usage: "Интеграции и платформа"
+    },
+    cta_section: {
+      heading: "Готовы взять финансы бизнеса под полный контроль?",
+      subheading: "Управляйте ликвидностью, автоматизируйте банковскую сверку и соблюдайте налоги вместе с CFO AI.",
+      note: "7 дней бесплатно • Банковская карта не требуется • Мгновенный запуск"
     },
     about_page: {
       badge: "НАША МИССИЯ",
@@ -933,12 +987,21 @@ const translations = {
       about_text: "Финансовая операционная система на базе ИИ для индонезийских компаний PT и PT PMA. Мультивалютная ликвидность в реальном времени, распознавание налоговых счетов, автосверка банка и комплаенс.",
       app_link: "app.cfo-ai.site",
       footprint: "Присутствие: Джакарта • Бали (Денпасар) • Работаем по всей Индонезии",
-      security_notice: "Безопасность: Шифрование AES-256 • Изолированные схемы • Без обучения ИИ на данных клиента",
+      security_notice: "Банковский стандарт AES-256 • Изоляция схем уровня строк • Без обучения ИИ на данных клиента",
       col_platform: "Платформа",
       col_hub: "База Знаний",
       col_legal: "О компании и законы",
       copyright: "© 2026 CFO AI Indonesia. Все права защищены.",
-      disclaimer: "CFO AI является операционной финансовой системой. Сервис не выдает официальных аудиторских заключений и не заменяет лицензированного Konsultan Pajak."
+      disclaimer: "CFO AI является операционной финансовой системой. Сервис не выдает официальных аудиторских заключений и не заменяет лицензированного Konsultan Pajak.",
+      link_overview: "Обзор платформы",
+      link_features: "Функции продукта",
+      link_contact: "Контакты и запросы",
+      link_privacy: "Политика конфиденциальности (UU PDP)",
+      link_terms: "Условия обслуживания",
+      link_tax_guides: "Гайд по налогам PT PMA 2026",
+      link_pph21: "Формулы PPh 21 TER",
+      link_coretax: "Переход на CoreTax DJP",
+      back_to_top: "Наверх"
     },
     lightbox: {
       authentic_badge: "РЕАЛЬНЫЙ ИНТЕРФЕЙС V2",
