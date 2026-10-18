@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-10-18T06:37:09.506Z",
+  "generated_at": "2026-10-18T09:59:17.657Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://achieving-identified-sophisticated-atm.trycloudflare.com",
-      "english_homepage": "https://achieving-identified-sophisticated-atm.trycloudflare.com/en",
-      "indonesian_homepage": "https://achieving-identified-sophisticated-atm.trycloudflare.com/id",
-      "pricing_url": "https://achieving-identified-sophisticated-atm.trycloudflare.com/en/pricing",
-      "hub_url": "https://achieving-identified-sophisticated-atm.trycloudflare.com/en/blog",
+      "https_url": "https://myrtle-healing-dist-smart.trycloudflare.com",
+      "english_homepage": "https://myrtle-healing-dist-smart.trycloudflare.com/en",
+      "indonesian_homepage": "https://myrtle-healing-dist-smart.trycloudflare.com/id",
+      "pricing_url": "https://myrtle-healing-dist-smart.trycloudflare.com/en/pricing",
+      "hub_url": "https://myrtle-healing-dist-smart.trycloudflare.com/en/blog",
       "verified_https": false,
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://endorsement-zealand-mounted-equipment.trycloudflare.com",
-      "admin_login_url": "https://endorsement-zealand-mounted-equipment.trycloudflare.com/admin/",
+      "https_url": "https://thereof-cap-trustee-note.trycloudflare.com",
+      "admin_login_url": "https://thereof-cap-trustee-note.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
         "username": "cfo-admin",

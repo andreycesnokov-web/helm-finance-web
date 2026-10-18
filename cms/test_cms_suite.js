@@ -77,6 +77,34 @@ async function runTestSuite() {
     assert(ruPricingHtml.includes('РЕКОМЕНДУЕМЫЙ'), 'RU pricing displays recommended badge');
     assert(ruPricingHtml.includes('data-faq-index="11"'), 'RU pricing renders all 12 FAQs');
 
+    // Multilingual Phase A Launch Locales (FR, DE, ES, IT)
+    const phaseALocales = [
+      { code: 'fr', badge: 'RECOMMANDÉ', label: 'French' },
+      { code: 'de', badge: 'EMPFOHLEN', label: 'German' },
+      { code: 'es', badge: 'RECOMENDADO', label: 'Spanish' },
+      { code: 'it', badge: 'CONSIGLIATO', label: 'Italian' }
+    ];
+
+    for (const item of phaseALocales) {
+      const pRes = await fetch(`${baseUrl}/${item.code}/pricing`);
+      assert(pRes.status === 200, `Pricing /${item.code}/pricing (${item.label}) returns HTTP 200`);
+      const pHtml = await pRes.text();
+      assert(!pHtml.includes('undefined'), `Pricing /${item.code}/pricing contains 0 undefined strings`);
+      assert(!pHtml.includes('null'), `Pricing /${item.code}/pricing contains 0 null strings`);
+      assert(pHtml.includes('$59') && pHtml.includes('$149') && pHtml.includes('$249'), `Pricing /${item.code}/pricing displays exact commercial pricing $59, $149, $249`);
+      assert(pHtml.includes(item.badge), `Pricing /${item.code}/pricing displays correct recommended badge: ${item.badge}`);
+    }
+
+    // Staged Draft Locales (ZH-CN, JA, TH, VI)
+    const stagedLocales = ['zh-cn', 'ja', 'th', 'vi'];
+    for (const code of stagedLocales) {
+      const sRes = await fetch(`${baseUrl}/${code}`);
+      assert(sRes.status === 200, `Staged draft /${code} returns HTTP 200`);
+      assert(sRes.headers.get('x-robots-tag') === 'noindex, nofollow', `Staged draft /${code} sends X-Robots-Tag: noindex, nofollow`);
+      const sHtml = await sRes.text();
+      assert(sHtml.includes('name="robots" content="noindex, nofollow"'), `Staged draft /${code} includes noindex robots meta tag`);
+    }
+
     // Test platform, document-intelligence, compliance, about, privacy, terms
     const platformRes = await fetch(`${baseUrl}/en/platform`);
     assert(platformRes.status === 200, 'Platform /en/platform returns HTTP 200');
@@ -131,9 +159,14 @@ async function runTestSuite() {
     const sitemapRes = await fetch(`${baseUrl}/sitemap.xml`);
     assert(sitemapRes.status === 200, 'sitemap.xml returns HTTP 200');
     const sitemapXml = await sitemapRes.text();
-    assert(sitemapXml.includes('<loc>https://cfo-ai.site/en</loc>'), 'Sitemap contains English homepage');
-    assert(sitemapXml.includes('<loc>https://cfo-ai.site/id</loc>'), 'Sitemap contains Indonesian homepage');
-    assert(sitemapXml.includes('<loc>https://cfo-ai.site/ru</loc>'), 'Sitemap contains Russian homepage');
+    const phaseACodes = ['en', 'id', 'ru', 'fr', 'de', 'es', 'it'];
+    for (const c of phaseACodes) {
+      assert(sitemapXml.includes(`<loc>https://cfo-ai.site/${c}</loc>`), `Sitemap contains published ${c} homepage`);
+    }
+    const stagedCheckCodes = ['zh-cn', 'ja', 'th', 'vi'];
+    for (const sc of stagedCheckCodes) {
+      assert(!sitemapXml.includes(`<loc>https://cfo-ai.site/${sc}</loc>`), `Sitemap excludes staged draft ${sc} homepage`);
+    }
     assert(sitemapXml.includes('hreflang="x-default"'), 'Sitemap contains x-default hreflang tags');
 
     const robotsRes = await fetch(`${baseUrl}/robots.txt`);
@@ -223,15 +256,21 @@ async function runTestSuite() {
     const rolledBackHtml = await rolledBackRes.text();
     assert(rolledBackHtml.includes('Know your numbers. Control your business.'), 'Live site restored original headline after rollback');
 
-    // 7. TRANSLATION ENGINE & 16 LOCALES
-    console.log('\n[Suite 7: 16 Locales Engine & Status Matrix]');
+    // 7. TRANSLATION ENGINE & 11 LOCALES
+    console.log('\n[Suite 7: 11 Locales Engine & Status Matrix]');
     const matrixRes = await fetch(`${baseUrl}/api/cms/translations/matrix`, {
       headers: { 'Authorization': `Bearer ${ownerToken}` }
     });
     const matrix = await matrixRes.json();
-    assert(matrix.length === 16, 'Translation matrix tracks all 16 requested locales');
+    assert(matrix.length === 11, 'Translation matrix tracks all 11 launch locales');
     const publishedCodes = matrix.filter(m => m.status === 'published').map(m => m.code);
-    assert(publishedCodes.includes('en') && publishedCodes.includes('id') && publishedCodes.includes('ru'), 'EN, ID, RU marked published');
+    assert(publishedCodes.length === 7, 'Exactly 7 Phase A locales marked published');
+    const expectedPublished = ['en', 'id', 'ru', 'fr', 'de', 'es', 'it'];
+    expectedPublished.forEach(c => assert(publishedCodes.includes(c), `Locale ${c} is published`));
+    const stagedCodesInMatrix = matrix.filter(m => m.status === 'staged').map(m => m.code);
+    assert(stagedCodesInMatrix.length === 4, 'Exactly 4 Phase B locales marked staged');
+    const expectedStaged = ['zh-cn', 'ja', 'th', 'vi'];
+    expectedStaged.forEach(sc => assert(stagedCodesInMatrix.includes(sc), `Locale ${sc} is staged draft`));
 
     console.log(`\n==============================================`);
     console.log(`ALL TESTS PASSED! (${passedTests} / ${totalTests} assertions)`);

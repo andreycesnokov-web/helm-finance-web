@@ -24,17 +24,49 @@
     "direction": "ltr"
   },
   {
-    "code": "fil",
-    "name": "Filipino",
-    "nativeName": "Filipino",
+    "code": "fr",
+    "name": "French",
+    "nativeName": "Français",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "de",
+    "name": "German",
+    "nativeName": "Deutsch",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "es",
+    "name": "Spanish",
+    "nativeName": "Español",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "it",
+    "name": "Italian",
+    "nativeName": "Italiano",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "zh-cn",
+    "name": "Simplified Chinese",
+    "nativeName": "简体中文",
     "status": "staged",
     "isDefault": false,
     "direction": "ltr"
   },
   {
-    "code": "en-SG",
-    "name": "English (Singapore)",
-    "nativeName": "English (Singapore)",
+    "code": "ja",
+    "name": "Japanese",
+    "nativeName": "日本語",
     "status": "staged",
     "isDefault": false,
     "direction": "ltr"
@@ -51,78 +83,6 @@
     "code": "vi",
     "name": "Vietnamese",
     "nativeName": "Tiếng Việt",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "km",
-    "name": "Khmer",
-    "nativeName": "ភាសាខ្មែរ",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "lo",
-    "name": "Lao",
-    "nativeName": "ພາສາລາວ",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "zh-HK",
-    "name": "Traditional Chinese (Hong Kong)",
-    "nativeName": "繁體中文 (香港)",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "ms",
-    "name": "Malay",
-    "nativeName": "Bahasa Melayu",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "uk",
-    "name": "Ukrainian",
-    "nativeName": "Українська",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "it",
-    "name": "Italian",
-    "nativeName": "Italiano",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "fr",
-    "name": "French",
-    "nativeName": "Français",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "de",
-    "name": "German",
-    "nativeName": "Deutsch",
-    "status": "staged",
-    "isDefault": false,
-    "direction": "ltr"
-  },
-  {
-    "code": "es",
-    "name": "Spanish",
-    "nativeName": "Español",
     "status": "staged",
     "isDefault": false,
     "direction": "ltr"

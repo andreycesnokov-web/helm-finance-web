@@ -45,6 +45,20 @@ function createPublicRoutes(contentStore) {
     next();
   });
 
+  // Middleware: Protect staged draft locales with noindex headers
+  router.use((req, res, next) => {
+    const parts = req.path.split('/').filter(Boolean);
+    if (parts.length > 0) {
+      const locCode = parts[0];
+      const locales = contentStore.getLocales();
+      const loc = locales.find(l => l.code === locCode);
+      if (loc && loc.status !== 'published') {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      }
+    }
+    next();
+  });
+
   // --- XML SITEMAP & ROBOTS.TXT ---
   router.get('/sitemap.xml', (req, res) => {
     const seo = contentStore.getSeo();
@@ -81,7 +95,14 @@ function createPublicRoutes(contentStore) {
     const t = getT(locale);
     const currentLocaleObj = locales.find(l => l.code === locale) || { code: locale, name: 'English', nativeName: 'English' };
 
-    const hreflangTags = hreflangs.map(h => `<link rel="alternate" hreflang="${h.lang}" href="${h.url}" />`).join('\n  ');
+    const activeHreflangs = [...hreflangs];
+    if (activeHreflangs.length > 0 && !activeHreflangs.some(h => h.lang === 'x-default')) {
+      const enMatch = activeHreflangs.find(h => h.lang === 'en');
+      if (enMatch) {
+        activeHreflangs.push({ lang: 'x-default', url: enMatch.url });
+      }
+    }
+    const hreflangTags = activeHreflangs.map(h => `<link rel="alternate" hreflang="${h.lang}" href="${h.url}" />`).join('\n  ');
 
     const localeDropdownOptions = locales.map(l => {
       const isPub = l.status === 'published';
@@ -99,7 +120,7 @@ function createPublicRoutes(contentStore) {
   <title>${title}</title>
   <meta name="description" content="${description}">
   <link rel="canonical" href="${canonical}">
-  <link rel="icon" type="image/x-icon" href="/assets/brand/favicon.ico">
+  ${currentLocaleObj.status !== 'published' ? '<meta name="robots" content="noindex, nofollow">\n  ' : ''}<link rel="icon" type="image/x-icon" href="/assets/brand/favicon.ico">
   ${hreflangTags}
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${description}">
@@ -1799,7 +1820,7 @@ function createPublicRoutes(contentStore) {
                 </div>
                 <div>
                   <div class="font-bold text-[#06366B]">${article.author?.name}</div>
-                  <div class="text-[11px] text-slate-500">${article.author?.title}</div>
+                  <div class="text-[11px] text-slate-500">${article.author?.title || article.author?.role || 'Senior Tax Advisor'}</div>
                 </div>
               </div>
               <div class="text-right">
@@ -1811,15 +1832,17 @@ function createPublicRoutes(contentStore) {
 
           <!-- BODY CONTENT -->
           <div class="prose prose-slate max-w-none text-slate-700 text-sm leading-relaxed space-y-6">
-            ${(trans.body_markdown || '').split('\n\n').map(p => {
+            ${(trans.content_markdown || trans.body_markdown || '').split('\n\n').map(p => {
+              if (p.startsWith('# ')) return '';
               if (p.startsWith('## ')) return `<h2 class="text-2xl font-black text-[#06366B] pt-6 pb-2 border-b border-slate-100">${p.replace('## ', '')}</h2>`;
               if (p.startsWith('### ')) return `<h3 class="text-lg font-bold text-[#06366B] pt-4 pb-1">${p.replace('### ', '')}</h3>`;
               if (p.startsWith('- ')) {
                 const items = p.split('\n').map(li => `<li>${li.replace(/^- /, '')}</li>`).join('');
                 return `<ul class="list-disc pl-5 space-y-1">${items}</ul>`;
               }
-              return `<p>${p}</p>`;
-            }).join('')}
+              const formattedP = p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+              return `<p>${formattedP}</p>`;
+            }).filter(Boolean).join('')}
           </div>
 
           <!-- AUTHOR BOX & CTA FOOTER -->
