@@ -18,10 +18,12 @@ const { verifyCmsToken } = require('./server/auth');
 const PUBLIC_PORT = process.env.PUBLIC_PORT || 3002;
 const ADMIN_PORT = process.env.ADMIN_PORT || 3003;
 
-const STAGING_BASIC_USER = 'cfo-admin';
-const STAGING_BASIC_PASS = 'cfo-staging-pass-2026';
+const STAGING_BASIC_USER = process.env.CMS_BASIC_AUTH_USER || process.env.STAGING_BASIC_USER || 'admin';
+const STAGING_BASIC_PASS = process.env.CMS_BASIC_AUTH_PASS || process.env.STAGING_BASIC_PASS;
+const RUNTIME_GENERATED_PASS = !STAGING_BASIC_PASS ? crypto.randomBytes(16).toString('hex') : null;
+const EFFECTIVE_BASIC_PASS = STAGING_BASIC_PASS || RUNTIME_GENERATED_PASS;
 const GATEWAY_COOKIE_NAME = 'cfo_staging_gate';
-const GATEWAY_SECRET = process.env.CMS_GATEWAY_SECRET || 'cfo_ai_staging_secret_key_2026';
+const GATEWAY_SECRET = process.env.CMS_GATEWAY_SECRET || crypto.randomBytes(32).toString('hex');
 
 function parseCookies(req) {
   const list = {};
@@ -39,7 +41,7 @@ function parseCookies(req) {
 
 function createGatewayToken() {
   const timestamp = Date.now().toString();
-  const hmac = crypto.createHmac('sha256', GATEWAY_SECRET).update(`cfo-admin:${timestamp}`).digest('hex');
+  const hmac = crypto.createHmac('sha256', GATEWAY_SECRET).update(`${STAGING_BASIC_USER}:${timestamp}`).digest('hex');
   return `${timestamp}.${hmac}`;
 }
 
@@ -50,7 +52,7 @@ function verifyGatewayToken(token) {
   const [timestamp, hash] = parts;
   const time = parseInt(timestamp, 10);
   if (isNaN(time) || Date.now() - time > 7 * 24 * 60 * 60 * 1000) return false;
-  const expectedHash = crypto.createHmac('sha256', GATEWAY_SECRET).update(`cfo-admin:${timestamp}`).digest('hex');
+  const expectedHash = crypto.createHmac('sha256', GATEWAY_SECRET).update(`${STAGING_BASIC_USER}:${timestamp}`).digest('hex');
   try {
     return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
   } catch {
@@ -96,10 +98,14 @@ function createAdminApp(contentStore) {
       if (credentials) {
         const decoded = Buffer.from(credentials, 'base64').toString('utf8');
         const [user, pass] = decoded.split(':');
-        if (user === STAGING_BASIC_USER && pass === STAGING_BASIC_PASS) {
-          const token = createGatewayToken();
-          res.setHeader('Set-Cookie', `${GATEWAY_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
-          return next();
+        if (user === STAGING_BASIC_USER && pass && EFFECTIVE_BASIC_PASS) {
+          const passBuffer = Buffer.from(pass);
+          const effectiveBuffer = Buffer.from(EFFECTIVE_BASIC_PASS);
+          if (passBuffer.length === effectiveBuffer.length && crypto.timingSafeEqual(passBuffer, effectiveBuffer)) {
+            const token = createGatewayToken();
+            res.setHeader('Set-Cookie', `${GATEWAY_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
+            return next();
+          }
         }
       }
       res.setHeader('WWW-Authenticate', 'Basic realm="CFO AI Staging Admin"');
@@ -192,7 +198,8 @@ async function startStagingPreview() {
   console.log('  STARTING CFO AI DUAL STAGING PREVIEW SURFACES     ');
   console.log('====================================================');
 
-  const contentStore = new ContentStore(path.join(__dirname, 'data'));
+  const dataDir = process.env.CMS_DATA_DIR || path.join(__dirname, 'data');
+  const contentStore = new ContentStore(dataDir);
 
   // 1. Start Public App
   const publicApp = createPublicApp(contentStore);
@@ -267,7 +274,7 @@ async function startStagingPreview() {
         staging_gateway_protection: {
           auth_type: 'HTTP Basic Auth',
           username: STAGING_BASIC_USER,
-          password: STAGING_BASIC_PASS
+          password: STAGING_BASIC_PASS ? '[CONFIGURED_VIA_ENV]' : '[EPHEMERAL_RUNTIME_GENERATED_DO_NOT_EXPOSE]'
         },
         cms_application_accounts: [
           { role: 'Owner', email: 'owner@cfo-ai.site', permissions: 'Full publishing & rollback, pricing edit, SEO, block editor' },
@@ -289,7 +296,7 @@ async function startStagingPreview() {
   console.log(`PUBLIC WEBSITE : ${publicTunnel.assignedUrl}/en`);
   console.log(`CMS STUDIO     : ${adminTunnel.assignedUrl}/admin/`);
   console.log(`GATEWAY USER   : ${STAGING_BASIC_USER}`);
-  console.log(`GATEWAY PASS   : ${STAGING_BASIC_PASS}`);
+  console.log(`GATEWAY AUTH   : [PROTECTED - Environment Variable / Staging Secret]`);
   console.log('====================================================\n');
 }
 

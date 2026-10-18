@@ -257,8 +257,7 @@ Two secure Cloudflare Quick Tunnels are currently active and serving the latest 
 
 - **CMS Studio Administration:**  
   `https://thereof-cap-trustee-note.trycloudflare.com/admin/`  
-  - **Gateway User:** `cfo-admin`  
-  - **Gateway Password:** `cfo-staging-pass-2026`  
+  - **Gateway Auth:** Protected by HTTP Basic Auth (Credentials set via secure environment variables `CMS_BASIC_AUTH_USER` / `CMS_BASIC_AUTH_PASS`)  
   - **Owner Account:** `owner@cfo-ai.site`
 
 ---

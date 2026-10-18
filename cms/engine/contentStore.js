@@ -43,8 +43,7 @@ class ContentStore {
       // Create initial baseline release
       this.createRelease({
         author: 'system',
-        notes: 'Initial Baseline Release Candidate v1.0.0',
-        ignorePricingDiscrepancy: true
+        notes: 'Initial Baseline Release Candidate v1.0.0'
       });
     }
   }
@@ -228,12 +227,12 @@ class ContentStore {
     return releases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
-  createRelease({ author = 'owner', notes = 'Commercial Website Release', ignorePricingDiscrepancy = false }) {
-    // 1. Guard check on pricing
+  createRelease({ author = 'owner', notes = 'Commercial Website Release' }) {
+    // 1. Mandatory Guard check on pricing (cannot be bypassed)
     const pricing = this.getPricing();
     const pricingValidation = this.pricingGuard.validatePricing(pricing);
 
-    if (!pricingValidation.isValid && !ignorePricingDiscrepancy) {
+    if (!pricingValidation.isValid) {
       throw new Error(`Atomic publish blocked by Pricing Discrepancy Guard. Discrepancies found: ${pricingValidation.discrepancies.map(d => d.message).join('; ')}`);
     }
 

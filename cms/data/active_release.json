@@ -2,7 +2,7 @@
   "release_id": "rel-1792317542231-1ff0eff2",
   "version": "v202610180959",
   "hash": "1ff0eff2",
-  "activated_at": "2026-10-18T09:59:02.231Z",
-  "activated_by": "system",
-  "notes": "Production Launch Release Candidate: 11 Locales, Multilingual SEO & Cloudflare Hybrid Architecture"
+  "activated_at": "2026-10-18T10:18:49.893Z",
+  "activated_by": "test-runner",
+  "notes": "Rolled back to v202610180959 (Production Launch Release Candidate: 11 Locales, Multilingual SEO & Cloudflare Hybrid Architecture)"
 }

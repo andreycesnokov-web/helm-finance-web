@@ -190,6 +190,12 @@ async function runTestSuite() {
     const unauthRes = await fetch(`${baseUrl}/api/cms/dashboard`);
     assert(unauthRes.status === 401, 'Unauthenticated request to /api/cms/dashboard is rejected with 401');
 
+    // Test forged/invalid token access
+    const invalidTokenRes = await fetch(`${baseUrl}/api/cms/dashboard`, {
+      headers: { 'Authorization': 'Bearer forged_tampered_jwt_token_12345' }
+    });
+    assert(invalidTokenRes.status === 401, 'Request with forged or invalid token is rejected with 401');
+
     // Test authenticated dashboard access
     const authDashRes = await fetch(`${baseUrl}/api/cms/dashboard`, {
       headers: { 'Authorization': `Bearer ${ownerToken}` }
@@ -199,29 +205,82 @@ async function runTestSuite() {
     assert(dashData.stats.pagesCount >= 5, 'Dashboard returns accurate page count');
     assert(dashData.stats.articlesCount >= 3, 'Dashboard returns accurate article count');
 
+    // Test Editor role cannot publish release (RBAC enforcement)
+    const editorLoginRes = await fetch(`${baseUrl}/api/cms/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'editor@cfo-ai.site', password: 'any' })
+    });
+    const editorData = await editorLoginRes.json();
+    assert(editorData.token && editorData.user.role === 'editor', 'Editor login succeeds with role=editor');
+    const editorPublishRes = await fetch(`${baseUrl}/api/cms/releases/publish`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${editorData.token}`
+      },
+      body: JSON.stringify({ notes: 'Unauthorized publish attempt by editor' })
+    });
+    assert(editorPublishRes.status === 403, 'Editor role is blocked from publishing release with HTTP 403 Forbidden');
+
+    // Test that public routes never leak CMS secrets
+    assert(!enHomeHtml.includes('cfo_ai_cms') && !enHomeHtml.includes('secret') && !enHomeHtml.includes('JWT'), 'Public HTML does not leak CMS secrets');
+
     // 5. PRICING DISCREPANCY GUARD
     console.log('\n[Suite 5: Pricing Discrepancy Guard]');
     const currentPricing = contentStore.getPricing();
     const validCheck = contentStore.pricingGuard.validatePricing(currentPricing);
     assert(validCheck.isValid === true, 'Current reconciled pricing has 0 discrepancies with catalog');
 
-    // Mutate pricing with an unauthorized limit change (e.g. Pro seats = 100 instead of 30)
+    // Regression 1: Unauthorized price alteration (e.g. Starter price altered from $59 to $49)
+    const badPriceData = JSON.parse(JSON.stringify(currentPricing));
+    badPriceData.plans.find(p => p.id === 'starter').price_monthly = 49; // Catalog specifies 59
+    const badPriceCheck = contentStore.pricingGuard.validatePricing(badPriceData);
+    assert(badPriceCheck.isValid === false, 'Pricing Guard detects unauthorized Starter price mutation');
+    assert(badPriceCheck.discrepancies.some(d => d.field === 'price_monthly'), 'Discrepancy lists monthly price error');
+    try {
+      contentStore.updatePricing(badPriceData, 'test-runner');
+      contentStore.createRelease({ author: 'test-runner', notes: 'Should fail price' });
+      assert(false, 'Release creation should have failed for altered price');
+    } catch (err) {
+      assert(err.message.includes('Pricing Discrepancy Guard'), 'createRelease throws on altered price');
+    }
+
+    // Regression 2: Unauthorized trial duration alteration (e.g. 72 hours instead of 168)
+    const badTrialData = JSON.parse(JSON.stringify(currentPricing));
+    badTrialData.trial = { duration_hours: 72, duration_days: 3 }; // Catalog specifies 168h / 7d
+    const badTrialCheck = contentStore.pricingGuard.validatePricing(badTrialData);
+    assert(badTrialCheck.isValid === false, 'Pricing Guard detects unauthorized trial hours mutation');
+    assert(badTrialCheck.discrepancies.some(d => d.field === 'duration_hours'), 'Discrepancy lists trial hours error');
+    try {
+      contentStore.updatePricing(badTrialData, 'test-runner');
+      contentStore.createRelease({ author: 'test-runner', notes: 'Should fail trial' });
+      assert(false, 'Release creation should have failed for altered trial hours');
+    } catch (err) {
+      assert(err.message.includes('Pricing Discrepancy Guard'), 'createRelease throws on altered trial hours');
+    }
+
+    // Regression 3: Unauthorized quota change (e.g. Pro seats = 100 instead of 30)
     const badPricing = JSON.parse(JSON.stringify(currentPricing));
     const userRow = badPricing.usage_limits_table.find(r => r.key === 'users');
     userRow.pro = '100'; // Violates catalog limit of 30
-
     const badCheck = contentStore.pricingGuard.validatePricing(badPricing);
     assert(badCheck.isValid === false, 'Pricing Discrepancy Guard detects unauthorized Pro seats mutation');
     assert(badCheck.discrepancies.length > 0, 'Discrepancy list populated with specific explanation');
 
-    // Verify atomic publish is blocked when pricing has discrepancies
-    try {
-      contentStore.updatePricing(badPricing, 'test-runner');
-      contentStore.createRelease({ author: 'test-runner', notes: 'Should fail' });
-      assert(false, 'Release creation should have been blocked');
-    } catch (err) {
-      assert(err.message.includes('Pricing Discrepancy Guard'), 'Atomic publish blocked when pricing contradicts catalog');
-    }
+    // Regression 4: Attempt bypass via HTTP POST to /api/cms/releases/publish with ignorePricingDiscrepancy: true
+    contentStore.updatePricing(badPricing, 'test-runner');
+    const bypassRes = await fetch(`${baseUrl}/api/cms/releases/publish`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ownerToken}`
+      },
+      body: JSON.stringify({ notes: 'Bypass attempt', ignorePricingDiscrepancy: true })
+    });
+    assert(bypassRes.status === 400, 'HTTP publish rejects ignorePricingDiscrepancy bypass attempt with HTTP 400');
+    const bypassData = await bypassRes.json();
+    assert(bypassData.error && bypassData.error.includes('Pricing Discrepancy Guard'), 'Error response explicitly states Pricing Discrepancy Guard block');
 
     // Restore valid pricing
     contentStore.updatePricing(currentPricing, 'test-runner');

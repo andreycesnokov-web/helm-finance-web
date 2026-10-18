@@ -195,11 +195,10 @@ function createCmsRoutes(contentStore) {
 
   router.post('/releases/publish', requireCmsAuth, requireCmsRole(['owner']), (req, res) => {
     try {
-      const { notes, ignorePricingDiscrepancy } = req.body;
+      const { notes } = req.body;
       const release = contentStore.createRelease({
         author: req.cmsUser.email,
-        notes: notes || 'Production website release',
-        ignorePricingDiscrepancy: !!ignorePricingDiscrepancy
+        notes: notes || 'Production website release'
       });
       res.json({
         success: true,

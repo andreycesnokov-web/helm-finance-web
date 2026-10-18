@@ -136,7 +136,7 @@ Both surfaces are running live and accessible:
 
 - **CMS Studio Preview (HTTPS):**  
   `https://participants-louise-bras-emerging.trycloudflare.com/admin/`  
-  *(Gateway: `cfo-admin` / `cfo-staging-pass-2026`)*
+  *(Gateway protected via HTTP Basic Auth)*
 
 ---
 

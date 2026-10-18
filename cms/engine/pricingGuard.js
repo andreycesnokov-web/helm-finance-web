@@ -62,6 +62,44 @@ class PricingGuard {
             message: `Price discrepancy for ${catalogPlan.name || proposedPlan.name}: Proposed $${proposedPlan.price_monthly}/mo vs. Catalog $${catalogPlan.price_monthly}/mo.`
           });
         }
+
+        if (proposedPlan.trial_days !== undefined && proposedPlan.trial_days !== catalogPlan.trial_days) {
+          discrepancies.push({
+            plan: proposedPlan.id,
+            field: 'trial_days',
+            level: 'error',
+            message: `Trial days mismatch for ${proposedPlan.id}: Proposed ${proposedPlan.trial_days} days vs. Catalog ${catalogPlan.trial_days} days.`
+          });
+        }
+
+        if (proposedPlan.trial_hours !== undefined && proposedPlan.trial_hours !== catalogPlan.trial_hours) {
+          discrepancies.push({
+            plan: proposedPlan.id,
+            field: 'trial_hours',
+            level: 'error',
+            message: `Trial hours mismatch for ${proposedPlan.id}: Proposed ${proposedPlan.trial_hours} hours vs. Catalog ${catalogPlan.trial_hours} hours.`
+          });
+        }
+      }
+    }
+
+    // 2. Validate Global Trial Presentation if specified
+    if (proposedPricing.trial) {
+      if (proposedPricing.trial.duration_hours !== undefined && proposedPricing.trial.duration_hours !== 168) {
+        discrepancies.push({
+          plan: 'all',
+          field: 'duration_hours',
+          level: 'error',
+          message: `Global trial duration mismatch: Proposed ${proposedPricing.trial.duration_hours}h vs. Catalog 168h.`
+        });
+      }
+      if (proposedPricing.trial.duration_days !== undefined && proposedPricing.trial.duration_days !== 7) {
+        discrepancies.push({
+          plan: 'all',
+          field: 'duration_days',
+          level: 'error',
+          message: `Global trial duration mismatch: Proposed ${proposedPricing.trial.duration_days} days vs. Catalog 7 days.`
+        });
       }
     }
 

@@ -12,7 +12,8 @@ const createPublicRoutes = require('./publicRoutes');
 
 function createApp() {
   const app = express();
-  const contentStore = new ContentStore(path.join(__dirname, '../data'));
+  const dataDirectory = process.env.CMS_DATA_DIR || path.join(__dirname, '../data');
+  const contentStore = new ContentStore(dataDirectory);
 
   app.use(cors());
   app.use(express.json());

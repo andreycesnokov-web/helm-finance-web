@@ -50,11 +50,11 @@ async function runBrowserVerification() {
     results.auth.basicChallenge = challengeReceived;
     console.log(`  ✓ Unauthenticated GET /admin/ receives HTTP 401 Basic challenge: ${challengeReceived}`);
 
-    // 1b. Authenticated context with rotated credentials (cfo-admin / cfo-staging-pass-2026)
+    // 1b. Authenticated context with environment credentials
     const authContext = await browser.newContext({
       httpCredentials: {
-        username: 'cfo-admin',
-        password: 'cfo-staging-pass-2026'
+        username: process.env.CMS_BASIC_AUTH_USER || process.env.STAGING_BASIC_USER || 'admin',
+        password: process.env.CMS_BASIC_AUTH_PASS || process.env.STAGING_BASIC_PASS || 'test-staging-pass'
       },
       viewport: { width: 1440, height: 900 }
     });

@@ -36,7 +36,7 @@ Both private staging preview surfaces are running and accessible for owner revie
 | **Public Platform Page (ID)** | [https://phi-ser-practical-holding.trycloudflare.com/id/platform](https://phi-ser-practical-holding.trycloudflare.com/id/platform) | `http://localhost:3002/id/platform` | *Public preview* |
 | **Public Platform Page (RU)** | [https://phi-ser-practical-holding.trycloudflare.com/ru/platform](https://phi-ser-practical-holding.trycloudflare.com/ru/platform) | `http://localhost:3002/ru/platform` | *Public preview* |
 | **Public Website Homepage** | [https://phi-ser-practical-holding.trycloudflare.com/en](https://phi-ser-practical-holding.trycloudflare.com/en) | `http://localhost:3002/en` | *Public preview* |
-| **CMS Studio Surface** | [https://says-pentium-robot-study.trycloudflare.com/admin/](https://says-pentium-robot-study.trycloudflare.com/admin/) | `http://localhost:3003/admin/` | User: `cfo-admin`<br>Pass: `cfo-staging-pass-2026` |
+| **CMS Studio Surface** | [https://says-pentium-robot-study.trycloudflare.com/admin/](https://says-pentium-robot-study.trycloudflare.com/admin/) | `http://localhost:3003/admin/` | Protected by Basic Auth |
 
 ---
 
