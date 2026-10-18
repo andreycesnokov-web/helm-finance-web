@@ -176,21 +176,21 @@ function createPublicRoutes(contentStore) {
           <img src="/assets/brand/logo_main_navy_transparent.svg" alt="CFO AI Financial OS" class="h-12 sm:h-13 w-auto object-contain">
         </a>
 
-        <nav class="hidden lg:flex items-center gap-6 text-sm font-semibold text-[#06366B]">
-          <a href="/${locale}/platform" class="hover:text-[#318FF4] transition-colors ${activeTab === 'platform' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.platform}</a>
-          <a href="/${locale}/document-intelligence" class="hover:text-[#318FF4] transition-colors ${activeTab === 'doc' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.doc_intelligence}</a>
-          <a href="/${locale}/compliance" class="hover:text-[#318FF4] transition-colors ${activeTab === 'compliance' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.compliance}</a>
-          <a href="/${locale}/blog" class="hover:text-[#318FF4] transition-colors ${activeTab === 'blog' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.hub}</a>
-          <a href="/${locale}/pricing" class="hover:text-[#318FF4] transition-colors ${activeTab === 'pricing' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.pricing}</a>
-          <a href="/${locale}/about" class="hover:text-[#318FF4] transition-colors ${activeTab === 'about' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.about}</a>
+        <nav class="hidden lg:flex items-center gap-5 xl:gap-6 text-sm font-semibold text-[#06366B]">
+          <a href="/${locale}/platform" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'platform' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.platform}</a>
+          <a href="/${locale}/document-intelligence" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'doc' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.doc_intelligence}</a>
+          <a href="/${locale}/compliance" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'compliance' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.compliance}</a>
+          <a href="/${locale}/blog" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'blog' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.hub}</a>
+          <a href="/${locale}/pricing" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'pricing' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.pricing}</a>
+          <a href="/${locale}/about" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'about' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.about}</a>
         </nav>
       </div>
 
-      <div class="flex items-center gap-3">
-        <a href="https://app.cfo-ai.site/login" class="hidden sm:inline-block text-sm font-bold text-[#06366B] hover:text-[#318FF4] px-3 py-2 transition-colors">
+      <div class="flex items-center gap-3 shrink-0">
+        <a href="https://app.cfo-ai.site/login" class="hidden sm:inline-block text-sm font-bold text-[#06366B] hover:text-[#318FF4] px-3 py-2 transition-colors whitespace-nowrap">
           ${t.nav.login}
         </a>
-        <a href="https://app.cfo-ai.site/login" class="text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-sm transition-all min-h-[44px] flex items-center justify-center">
+        <a href="https://app.cfo-ai.site/login" class="text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-sm transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap">
           ${t.nav.trial_cta}
         </a>
         <!-- Mobile Menu Toggle Button -->
@@ -666,7 +666,7 @@ function createPublicRoutes(contentStore) {
       { id: 'ai-accountant', key: 'ai_accountant', img: '/assets/screens/AccountantPackages.png' },
       { id: 'compliance', key: 'compliance', img: '/assets/screens/AccountantTaxes.png' },
       { id: 'payroll', key: 'payroll', img: '/assets/screens/Payroll.png' },
-      { id: 'multi-company', key: 'multi_company', img: '/assets/screens/AdminCompanies.png' }
+      { id: 'multi-company', key: 'multi_company', img: '/assets/screens/MultiEntity.png' }
     ];
 
     const contentHtml = `

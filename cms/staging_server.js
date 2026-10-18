@@ -12,11 +12,51 @@ const ContentStore = require('./engine/contentStore');
 const createCmsRoutes = require('./server/cmsRoutes');
 const createPublicRoutes = require('./server/publicRoutes');
 
+const crypto = require('crypto');
+const { verifyCmsToken } = require('./server/auth');
+
 const PUBLIC_PORT = process.env.PUBLIC_PORT || 3002;
 const ADMIN_PORT = process.env.ADMIN_PORT || 3003;
 
-const STAGING_BASIC_USER = 'cfo-owner';
-const STAGING_BASIC_PASS = 'cfo-preview-2026';
+const STAGING_BASIC_USER = 'cfo-admin';
+const STAGING_BASIC_PASS = 'cfo-staging-pass-2026';
+const GATEWAY_COOKIE_NAME = 'cfo_staging_gate';
+const GATEWAY_SECRET = process.env.CMS_GATEWAY_SECRET || 'cfo_ai_staging_secret_key_2026';
+
+function parseCookies(req) {
+  const list = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(';').forEach(cookie => {
+      const parts = cookie.split('=');
+      const name = parts.shift().trim();
+      const val = decodeURIComponent(parts.join('='));
+      list[name] = val;
+    });
+  }
+  return list;
+}
+
+function createGatewayToken() {
+  const timestamp = Date.now().toString();
+  const hmac = crypto.createHmac('sha256', GATEWAY_SECRET).update(`cfo-admin:${timestamp}`).digest('hex');
+  return `${timestamp}.${hmac}`;
+}
+
+function verifyGatewayToken(token) {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const [timestamp, hash] = parts;
+  const time = parseInt(timestamp, 10);
+  if (isNaN(time) || Date.now() - time > 7 * 24 * 60 * 60 * 1000) return false;
+  const expectedHash = crypto.createHmac('sha256', GATEWAY_SECRET).update(`cfo-admin:${timestamp}`).digest('hex');
+  try {
+    return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
+  } catch {
+    return false;
+  }
+}
 
 // 1. PUBLIC WEBSITE APP (Port 3002)
 function createPublicApp(contentStore) {
@@ -38,26 +78,52 @@ function createAdminApp(contentStore) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Basic Auth for Staging Protection
+  // Gateway Protection Middleware
   app.use((req, res, next) => {
     if (req.path === '/healthz') return next();
-    const authHeader = req.headers['authorization'];
-    if (!authHeader) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="CFO AI Staging Admin"');
-      return res.status(401).send('Staging authentication required.');
-    }
-    const [scheme, credentials] = authHeader.split(' ');
-    if (scheme !== 'Basic' || !credentials) {
-      res.setHeader('WWW-Authenticate', 'Basic realm="CFO AI Staging Admin"');
-      return res.status(401).send('Invalid authentication format.');
-    }
-    const decoded = Buffer.from(credentials, 'base64').toString('utf8');
-    const [user, pass] = decoded.split(':');
-    if (user === STAGING_BASIC_USER && pass === STAGING_BASIC_PASS) {
+
+    // Check Gateway Cookie
+    const cookies = parseCookies(req);
+    const gateCookie = cookies[GATEWAY_COOKIE_NAME];
+    if (gateCookie && verifyGatewayToken(gateCookie)) {
       return next();
     }
+
+    // Check Basic Auth
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Basic ')) {
+      const credentials = authHeader.split(' ')[1];
+      if (credentials) {
+        const decoded = Buffer.from(credentials, 'base64').toString('utf8');
+        const [user, pass] = decoded.split(':');
+        if (user === STAGING_BASIC_USER && pass === STAGING_BASIC_PASS) {
+          const token = createGatewayToken();
+          res.setHeader('Set-Cookie', `${GATEWAY_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
+          return next();
+        }
+      }
+      res.setHeader('WWW-Authenticate', 'Basic realm="CFO AI Staging Admin"');
+      return res.status(401).send('Invalid staging credentials.');
+    }
+
+    // For API calls (/api/cms/...) without cookie or basic auth:
+    if (req.path.startsWith('/api/cms')) {
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const cmsJwt = authHeader.substring(7);
+        if (verifyCmsToken(cmsJwt)) {
+          return next();
+        }
+      }
+      if (req.path === '/api/cms/auth/login') {
+        return next();
+      }
+      // Return 401 JSON without WWW-Authenticate: Basic header to prevent browser dialog
+      return res.status(401).json({ error: 'Staging session required.' });
+    }
+
+    // For non-API requests (HTML/static), prompt HTTP Basic Auth
     res.setHeader('WWW-Authenticate', 'Basic realm="CFO AI Staging Admin"');
-    return res.status(401).send('Invalid staging credentials.');
+    return res.status(401).send('Staging authentication required.');
   });
 
   app.get('/healthz', (req, res) => res.json({ status: 'ok', surface: 'admin', timestamp: new Date().toISOString() }));

@@ -245,8 +245,8 @@ const translations = {
           desc: "Staff payroll calculation module applying government-mandated TER Categories A, B, and C tables per PP 58/2023 and PMK 168/2023."
         },
         multi_company: {
-          title: "Multi-Entity Group Management",
-          desc: "Manage holding structures, parent-subsidiary intercompany balances, and entity switching with consolidated and segregated financial views."
+          title: "Multi-Entity Workspace Switching",
+          desc: "Switch seamlessly between separate company entities (e.g. PT and PT PMA operations). Each business maintains isolated relational ledgers, independent bank accounts, and dedicated permissions."
         }
       }
     },
@@ -559,8 +559,8 @@ const translations = {
           desc: "Modul perhitungan gaji staf menerapkan tabel TER Kategori A, B, dan C pemerintah sesuai PP 58/2023 dan PMK 168/2023."
         },
         multi_company: {
-          title: "Manajemen Grup Multi-Entitas",
-          desc: "Kelola struktur holding, saldo antar-perusahaan induk-anak, dan pergantian entitas dengan tampilan keuangan konsolidasi maupun terpisah."
+          title: "Pergantian Ruang Kerja Multi-Entitas",
+          desc: "Beralih secara instan antara entitas bisnis yang berbeda (operasi PT dan PT PMA). Setiap perusahaan memiliki buku besar terisolasi, rekening bank independen, dan hak akses khusus."
         }
       }
     },
@@ -636,13 +636,13 @@ const translations = {
   ru: {
     nav: {
       platform: "Платформа",
-      doc_intelligence: "Распознавание Документов",
-      compliance: "Налоги и Комплаенс",
-      hub: "База Знаний",
+      doc_intelligence: "Документы",
+      compliance: "Налоги",
+      hub: "База знаний",
       pricing: "Тарифы",
-      about: "О компании",
-      login: "Вход",
-      trial_cta: "Попробовать бесплатно (7 дней)",
+      about: "О нас",
+      login: "Войти",
+      trial_cta: "Попробовать бесплатно",
       app_link: "Открыть приложение CFO AI"
     },
     announcement: {
@@ -873,8 +873,8 @@ const translations = {
           desc: "Расчет налогов с фонда оплаты труда по государственным таблицам TER категорий A, B и C согласно PP 58/2023 и PMK 168/2023."
         },
         multi_company: {
-          title: "Управление Группой Компаний",
-          desc: "Поддержка холдинговых структур, внутригрупповых расчетов между материнской и дочерними компаниями и мгновенное переключение юрлиц."
+          title: "Переключение Между Юрлицами (Multi-Entity)",
+          desc: "Быстрое переключение между независимыми юридическими лицами (PT и PT PMA). Каждая компания работает в изолированном защищенном контуре со своими счетами, правами и отчетностью."
         }
       }
     },

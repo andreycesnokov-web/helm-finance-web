@@ -11,14 +11,81 @@ let currentTab = 'dashboard';
 // --- AUTHENTICATION & INITIALIZATION ---
 async function initApp() {
   if (!currentToken || !currentUser) {
-    // Auto-login as Owner for easy local verification
-    await loginUser('owner@cfo-ai.site', 'password123');
+    // If no stored credentials, attempt auto-login as Owner or show modal
+    const autoSuccess = await loginUser('owner@cfo-ai.site', 'password123');
+    if (!autoSuccess) {
+      showLoginModal();
+      return;
+    }
   }
 
-  updateUserHeader();
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialTab = urlParams.get('tab') || window.location.hash.substring(1) || 'dashboard';
-  switchTab(initialTab);
+  // Verify current token validity
+  try {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: { 'Authorization': `Bearer ${currentToken}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      currentUser = data.user;
+      localStorage.setItem('cfo_cms_user', JSON.stringify(currentUser));
+      hideLoginModal();
+      updateUserHeader();
+      const urlParams = new URLSearchParams(window.location.search);
+      const initialTab = urlParams.get('tab') || window.location.hash.substring(1) || 'dashboard';
+      switchTab(initialTab);
+    } else {
+      showLoginModal('Session expired. Please sign in to continue.');
+    }
+  } catch (err) {
+    console.warn('Auth verification network issue, falling back to cached profile:', err);
+    updateUserHeader();
+    switchTab('dashboard');
+  }
+}
+
+function showLoginModal(msg = '') {
+  const modal = document.getElementById('cms-login-modal');
+  if (modal) modal.classList.remove('hidden');
+  const errEl = document.getElementById('login-error-msg');
+  if (errEl) {
+    if (msg) {
+      errEl.innerText = msg;
+      errEl.classList.remove('hidden');
+    } else {
+      errEl.classList.add('hidden');
+    }
+  }
+}
+
+function hideLoginModal() {
+  const modal = document.getElementById('cms-login-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function quickFillLogin(email) {
+  const emailInput = document.getElementById('login-email');
+  const passInput = document.getElementById('login-password');
+  if (emailInput) emailInput.value = email;
+  if (passInput) passInput.value = 'password123';
+}
+
+async function handleFormLogin(event) {
+  if (event) event.preventDefault();
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-submit-btn');
+  if (btn) btn.innerText = 'Signing In...';
+
+  const ok = await loginUser(email, password);
+  if (btn) btn.innerText = 'Sign In to Studio';
+
+  if (ok) {
+    hideLoginModal();
+    updateUserHeader();
+    switchTab(currentTab || 'dashboard');
+  } else {
+    showLoginModal('Invalid credentials. Please verify your email and password.');
+  }
 }
 
 async function loginUser(email, password) {
@@ -28,8 +95,8 @@ async function loginUser(email, password) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    const data = await res.json();
     if (res.ok) {
+      const data = await res.json();
       currentToken = data.token;
       currentUser = data.user;
       localStorage.setItem('cfo_cms_token', currentToken);
@@ -46,7 +113,11 @@ async function loginUser(email, password) {
 function handleLogout() {
   localStorage.removeItem('cfo_cms_token');
   localStorage.removeItem('cfo_cms_user');
-  location.reload();
+  currentToken = '';
+  currentUser = null;
+  document.getElementById('top-user-name').innerText = 'Signed Out';
+  document.getElementById('top-user-role').innerText = 'NO ACTIVE SESSION';
+  showLoginModal('You have been signed out. Please sign in again.');
 }
 
 function updateUserHeader() {
@@ -63,7 +134,7 @@ async function apiFetch(endpoint, options = {}) {
   
   const res = await fetch(`${API_BASE}${endpoint}`, options);
   if (res.status === 401) {
-    handleLogout();
+    showLoginModal('Session expired. Please sign in to continue.');
     throw new Error('Session expired');
   }
   return res.json();

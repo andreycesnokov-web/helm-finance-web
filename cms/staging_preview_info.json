@@ -1,24 +1,23 @@
 {
-  "generated_at": "2026-10-18T00:41:23.511Z",
+  "generated_at": "2026-10-18T01:16:42.335Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://car-forwarding-elegant-established.trycloudflare.com",
-      "english_homepage": "https://car-forwarding-elegant-established.trycloudflare.com/en",
-      "indonesian_homepage": "https://car-forwarding-elegant-established.trycloudflare.com/id",
-      "pricing_url": "https://car-forwarding-elegant-established.trycloudflare.com/en/pricing",
-      "hub_url": "https://car-forwarding-elegant-established.trycloudflare.com/en/blog",
-      "verified_https": true,
-      "cloudflare_cf_ray": "a4c38026cdb92c28-CGK",
+      "https_url": "https://bon-reflection-pending-examining.trycloudflare.com",
+      "english_homepage": "https://bon-reflection-pending-examining.trycloudflare.com/en",
+      "indonesian_homepage": "https://bon-reflection-pending-examining.trycloudflare.com/id",
+      "pricing_url": "https://bon-reflection-pending-examining.trycloudflare.com/en/pricing",
+      "hub_url": "https://bon-reflection-pending-examining.trycloudflare.com/en/blog",
+      "verified_https": false,
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://liabilities-polymer-key-explore.trycloudflare.com",
-      "admin_login_url": "https://liabilities-polymer-key-explore.trycloudflare.com/admin/",
+      "https_url": "https://curve-textiles-thru-tongue.trycloudflare.com",
+      "admin_login_url": "https://curve-textiles-thru-tongue.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
-        "username": "cfo-owner",
-        "password": "cfo-preview-2026"
+        "username": "cfo-admin",
+        "password": "cfo-staging-pass-2026"
       },
       "cms_application_accounts": [
         {
@@ -37,8 +36,7 @@
           "permissions": "Read-only preview, audit inspect"
         }
       ],
-      "verified_https": true,
-      "cloudflare_cf_ray": "a4c3805b298e4b1b-CGK",
+      "verified_https": false,
       "local_port": 3003
     }
   }
