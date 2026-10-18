@@ -242,10 +242,6 @@ function createPublicRoutes(contentStore) {
           <p class="text-xs text-slate-300 leading-relaxed max-w-xs">
             ${t.footer.about_text}
           </p>
-          <div class="text-[11px] text-slate-400 space-y-0.5 pt-0.5">
-            <div>SaaS Application: <a href="https://app.cfo-ai.site" class="text-blue-300 hover:text-white underline font-mono">${t.footer.app_link}</a></div>
-            <div>${t.footer.footprint}</div>
-          </div>
         </div>
 
         <!-- Col 2: Platform -->
@@ -624,23 +620,24 @@ function createPublicRoutes(contentStore) {
         </div>
       </section>
 
-      <!-- COMPACT FINAL CTA SECTION (Target 180-210px at 1440px) -->
-      <section class="py-5 sm:py-5 px-4 sm:px-6 lg:px-8 bg-navy-brand text-white text-center relative overflow-hidden shadow-inner">
-        ${renderWatermark({ color: '#FFFFFF', opacity: '0.035', size: 'w-64 h-64', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
-        <div class="max-w-3xl mx-auto relative z-10">
-          <h2 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight mb-1.5 text-white">${t.cta_section.heading}</h2>
-          <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-3.5 leading-normal sm:leading-relaxed">${t.cta_section.subheading}</p>
-          <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
-              ${t.hero.primary_cta} &rarr;
-            </a>
+      <!-- FLOATING FINAL CTA SECTION (Centered 1200px Floating Banner on Ice Blue Canvas) -->
+      <section class="bg-ice-light pt-6 sm:pt-8 pb-[30px] px-4 sm:px-6 lg:px-8">
+        <div class="max-w-[1200px] mx-auto">
+          <div class="bg-navy-brand text-white text-center relative overflow-hidden rounded-[20px] py-5 sm:py-5 px-6 sm:px-8 shadow-xl border border-white/10" style="background: linear-gradient(90deg, #021B36 0%, #042C53 25%, #063D72 50%, #042C53 75%, #021B36 100%);">
+            ${renderWatermark({ color: '#FFFFFF', opacity: '0.035', size: 'w-64 h-64', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
+            <div class="max-w-3xl mx-auto relative z-10">
+              <h2 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight mb-1.5 text-white">${t.cta_section.heading}</h2>
+              <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-3.5 leading-normal sm:leading-relaxed">${t.cta_section.subheading}</p>
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
+                  ${t.hero.primary_cta} &rarr;
+                </a>
+              </div>
+              <div class="text-[11px] text-slate-400 mt-2 font-medium">${t.cta_section.note}</div>
+            </div>
           </div>
-          <div class="text-[11px] text-slate-400 mt-2 font-medium">${t.cta_section.note}</div>
         </div>
       </section>
-
-      <!-- SUBTLE LUMINOUS VISUAL SEPARATOR BETWEEN CTA AND FOOTER -->
-      <div class="w-full h-px bg-gradient-to-r from-transparent via-[#318FF4]/50 to-transparent border-t border-slate-700/80" aria-hidden="true"></div>
     `;
 
     res.send(renderLayout({
