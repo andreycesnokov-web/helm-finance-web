@@ -34,6 +34,7 @@ async function capture() {
     { url: 'http://localhost:3002/en/blog', name: 'hub-directory-desktop', width: 1440, height: 900, fullPage: false },
     { url: 'http://localhost:3002/en/blog/pt-pma-tax-compliance-guide-2026', name: 'hub-article-desktop', width: 1440, height: 900, fullPage: false },
     { url: 'http://localhost:3002/en/about', name: 'about-desktop', width: 1440, height: 900, fullPage: false },
+    { url: 'http://localhost:3002/ru/platform', name: 'platform-ru-desktop', width: 1440, height: 900, fullPage: false },
     { url: 'http://localhost:3003/admin/', name: 'cms-studio-desktop', width: 1440, height: 900, fullPage: false, auth: { user: 'cfo-owner', pass: 'cfo-preview-2026' } }
   ];
 
@@ -56,6 +57,28 @@ async function capture() {
     } finally {
       await context.close();
     }
+  }
+
+  // Capture Lightbox modal demonstration
+  console.log('Capturing platform-lightbox-desktop...');
+  const lbContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const lbPage = await lbContext.newPage();
+  try {
+    await lbPage.goto('http://localhost:3002/en/platform', { waitUntil: 'networkidle' });
+    await lbPage.waitForTimeout(800);
+    // Click on the first showcase image button to trigger lightbox
+    const trigger = await lbPage.$('button[onclick*="openLightbox"]');
+    if (trigger) {
+      await trigger.click();
+      await lbPage.waitForTimeout(500);
+      const lbPath = path.join(SHOTS_DIR, 'platform-lightbox-desktop.png');
+      await lbPage.screenshot({ path: lbPath });
+      console.log(`✓ Saved ${lbPath}`);
+    }
+  } catch (err) {
+    console.error('Failed to capture lightbox:', err.message);
+  } finally {
+    await lbContext.close();
   }
 
   await browser.close();

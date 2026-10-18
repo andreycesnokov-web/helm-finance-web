@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-10-17T23:58:11.787Z",
+  "generated_at": "2026-10-18T00:41:23.511Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://environment-pepper-reload-theatre.trycloudflare.com",
-      "english_homepage": "https://environment-pepper-reload-theatre.trycloudflare.com/en",
-      "indonesian_homepage": "https://environment-pepper-reload-theatre.trycloudflare.com/id",
-      "pricing_url": "https://environment-pepper-reload-theatre.trycloudflare.com/en/pricing",
-      "hub_url": "https://environment-pepper-reload-theatre.trycloudflare.com/en/blog",
+      "https_url": "https://car-forwarding-elegant-established.trycloudflare.com",
+      "english_homepage": "https://car-forwarding-elegant-established.trycloudflare.com/en",
+      "indonesian_homepage": "https://car-forwarding-elegant-established.trycloudflare.com/id",
+      "pricing_url": "https://car-forwarding-elegant-established.trycloudflare.com/en/pricing",
+      "hub_url": "https://car-forwarding-elegant-established.trycloudflare.com/en/blog",
       "verified_https": true,
-      "cloudflare_cf_ray": "a4c340774be59a10-CGK",
+      "cloudflare_cf_ray": "a4c38026cdb92c28-CGK",
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://sizes-gym-excluding-diff.trycloudflare.com",
-      "admin_login_url": "https://sizes-gym-excluding-diff.trycloudflare.com/admin/",
+      "https_url": "https://liabilities-polymer-key-explore.trycloudflare.com",
+      "admin_login_url": "https://liabilities-polymer-key-explore.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
         "username": "cfo-owner",
@@ -38,6 +38,7 @@
         }
       ],
       "verified_https": true,
+      "cloudflare_cf_ray": "a4c3805b298e4b1b-CGK",
       "local_port": 3003
     }
   }
