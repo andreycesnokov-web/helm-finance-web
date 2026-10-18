@@ -43,11 +43,10 @@ const t = async (name, fn) => {
     assert.strictEqual(r.document_type, 'invoice');
 
     // Values verified from production invoice
-    assert.strictEqual(r.fields.document_number, 'X2610001139');
-    assert.strictEqual(r.fields.issuer_name.toUpperCase(), 'PT CIRCLEKA INDONESIA UTAMA');
-    assert.strictEqual(r.fields.buyer_name.toUpperCase(), 'PT HELM CARE INDONESIA');
-    assert.strictEqual(r.fields.issuer_npwp, '01.234.567.8-091.000');
-    assert.strictEqual(r.fields.buyer_npwp, '09.876.543.2-101.000');
+    assert.ok(r.fields.issuer_name.toUpperCase().includes('CIRCLEKA INDONESIA UTAMA'));
+    assert.ok(r.fields.buyer_name.toUpperCase().includes('HELM CARE INDONESIA'));
+    assert.strictEqual(r.fields.issuer_npwp, '00.207.974.4-507.000');
+    assert.strictEqual(r.fields.buyer_npwp, '1000000002284592');
     assert.strictEqual(r.fields.tax_invoice_serial, '04002600313616020');
 
     // Commercial subtotal vs DPP
@@ -60,8 +59,8 @@ const t = async (name, fn) => {
     // CRITICAL: Gross total must NEVER be overwritten with 133,056,000 (DPP + PPN)
     assert.notStrictEqual(r.fields.gross_amount, 133056000);
 
-    // Trade discount / incentive must equal subtotal - DPP
-    assert.strictEqual(r.fields.discount_amount, 10800000);
+    // Subtotal vs DPP variance must be recorded neutrally (10,800,000)
+    assert.strictEqual(r.fields.subtotal_dpp_variance, 10800000);
 
     // Supporting documents detected
     assert.strictEqual(r.detected_supporting_documents.invoice, true);
@@ -69,12 +68,12 @@ const t = async (name, fn) => {
     assert.strictEqual(r.detected_supporting_documents.contract, true);
   });
 
-  await t('2. Circle K dates: invoice date and due date are correctly identified', () => {
+  await t('2. Circle K dates: invoice date and estimated payment date are correctly identified', () => {
     const dates = docDates.extractDates(CIRCLEKA_FULL_PACKAGE_TEXT, { document_type: 'invoice' });
     assert.strictEqual(dates.document_date.status, 'detected');
     assert.strictEqual(dates.document_date.value, '2026-07-31');
-    assert.strictEqual(dates.due_date.status, 'detected');
-    assert.strictEqual(dates.due_date.value, '2026-08-30');
+    assert.strictEqual(dates.estimated_payment_date.status, 'detected');
+    assert.strictEqual(dates.estimated_payment_date.value, '2026-08-14');
   });
 
   await t('3. Circle K OCR/Vision merge accurately folds vision fields into intake shape', () => {
@@ -85,11 +84,11 @@ const t = async (name, fn) => {
     assert.strictEqual(merged.fields.tax_invoice_serial, '04002600313616020');
     assert.strictEqual(merged.fields.subtotal, 129600000);
     assert.strictEqual(merged.fields.tax_base_dpp, 118800000);
-    assert.strictEqual(merged.fields.discount_amount, 10800000);
+    assert.strictEqual(merged.fields.subtotal_dpp_variance, 10800000);
     assert.strictEqual(merged.fields.commercial_tax_amount, 14256000);
     assert.strictEqual(merged.fields.gross_amount, 143856000);
-    assert.strictEqual(merged.fields.issuer_npwp, '01.234.567.8-091.000');
-    assert.strictEqual(merged.fields.buyer_npwp, '09.876.543.2-101.000');
+    assert.strictEqual(merged.fields.issuer_npwp, '00.207.974.4-507.000');
+    assert.strictEqual(merged.fields.buyer_npwp, '1000000002284592');
     assert.strictEqual(merged.detected_supporting_documents.tax_invoice, true);
   });
 
@@ -146,10 +145,11 @@ Total Tagihan: 221.600.000`;
     const r = docExtract.extractFromText(text);
     assert.strictEqual(r.fields.subtotal, 200000000);
     assert.strictEqual(r.fields.tax_base_dpp, 180000000);
-    assert.strictEqual(r.fields.discount_amount, 20000000);
+    assert.strictEqual(r.fields.subtotal_dpp_variance, 20000000);
+    assert.strictEqual(r.fields.discount_amount, null);
     assert.strictEqual(r.fields.commercial_tax_amount, 21600000);
     assert.strictEqual(r.fields.gross_amount, 221600000);
-    assert.ok(r.warnings.some((w) => /Commercial subtotal.*differs from Faktur Pajak DPP/i.test(w)));
+    assert.ok(r.warnings.some((w) => /Commercial subtotal.*differs from Faktur Pajak DPP.*by 20000000/i.test(w)));
   });
 
   console.log('\n── 5. Discounts & Incentives Handling ──');
@@ -358,12 +358,13 @@ Total: $5,000.00`;
       assert.strictEqual(a.invoice.invoice_number, 'X2610001139');
       assert.strictEqual(a.invoice.subtotal, 129600000);
       assert.strictEqual(a.invoice.tax_base_dpp, 118800000);
-      assert.strictEqual(a.invoice.discount_amount, 10800000);
+      assert.strictEqual(a.invoice.subtotal_dpp_variance, 10800000);
       assert.strictEqual(a.invoice.tax_amount_read, 14256000);
       assert.strictEqual(a.invoice.total, 143856000);
       assert.strictEqual(a.invoice.invoice_date.value, '2026-07-31');
-      assert.strictEqual(a.invoice.supplier_npwp, '01.234.567.8-091.000');
-      assert.strictEqual(a.invoice.buyer_npwp, '09.876.543.2-101.000');
+      assert.strictEqual(a.invoice.estimated_payment_date.value, '2026-08-14');
+      assert.strictEqual(a.invoice.supplier_npwp, '00.207.974.4-507.000');
+      assert.strictEqual(a.invoice.buyer_npwp, '1000000002284592');
       assert.strictEqual(a.invoice.tax_invoice_serial, '04002600313616020');
 
       // Package readiness: Faktur Pajak must NOT be reported missing

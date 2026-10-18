@@ -101,6 +101,8 @@ function parseDate(raw) {
 const LABELS = {
   due_date: [/jatuh\s*tempo/i, /\bdue\s*date\b/i, /batas\s*(?:waktu\s*)?pembayaran/i,
     /tanggal\s*jatuh\s*tempo/i, /\bpayment\s*due\b/i],
+  estimated_payment_date: [/est(?:imated)?\.?\s*pay(?:ment)?\s*(?:date)?/i,
+    /estimasi\s*(?:tanggal\s*)?(?:pembayaran|bayar)/i, /rencana\s*(?:tanggal\s*)?bayar/i],
   payment_date: [/tanggal\s*(?:pembayaran|bayar|transfer|setor)/i, /\bpayment\s*date\b/i,
     /\bpaid\s*(?:on|date)\b/i, /tgl\s*transfer/i],
   document_date: [
@@ -150,13 +152,14 @@ function extractDates(text = '', opts = {}) {
     const parsedDue = parseDate(opts.due_date);
     if (parsedDue) due = { ...parsedDue, label: 'provided_due_date', note: 'Due date from structured fields fallback.' };
   }
+  const estPay = findLabelled(t, LABELS.estimated_payment_date);
   const paid = findLabelled(t, LABELS.payment_date);
 
   // The document's own date, taken from a label that is NOT one of the others. The
-  // due and payment matches are removed from consideration first so a single
-  // "Jatuh Tempo: 04-09-2026" cannot also answer as the issue date.
+  // due, estimated pay, and payment matches are removed from consideration first so a single
+  // date cannot also answer as the issue date.
   let docText = t;
-  for (const found of [due, paid]) {
+  for (const found of [due, estPay, paid]) {
     if (found?.original) docText = docText.replace(found.original, ' ');
   }
   let doc = findLabelled(docText, LABELS.document_date);
@@ -191,6 +194,7 @@ function extractDates(text = '', opts = {}) {
   return {
     document_date: doc || NOT_FOUND,
     due_date: due || NOT_FOUND,
+    estimated_payment_date: estPay || NOT_FOUND,
     payment_date: paid || (paymentBearing ? NOT_FOUND
       : notApplicable('This kind of document does not record a payment date.')),
   };

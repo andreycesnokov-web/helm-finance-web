@@ -94,8 +94,10 @@ fields (use null for anything not printed on the document — never guess):
 
 FINANCIAL RECONCILIATION RULE:
 - NEVER confuse Dasar Pengenaan Pajak (DPP, tax base) with commercial Subtotal or Total.
-  In Indonesian retail/trade terms, Subtotal (129,600,000) minus discount/incentive (10,800,000) = DPP (118,800,000).
-  PPN is 14,256,000. Commercial total payable is 143,856,000.
+  In Indonesian retail/consignment invoices, the commercial Subtotal and Faktur Pajak DPP may differ
+  due to fee calculations, trade incentives, or statutory tax base adjustments.
+  Keep Subtotal, DPP, and Gross Total strictly separate as printed.
+  Do NOT assume a difference between Subtotal and DPP is a discount unless explicitly stated on the document.
   Read the explicit total printed on the commercial invoice for gross_amount.
   Never calculate Gross Total as DPP + PPN if an explicit commercial total is printed.
 - Amounts: digits only, no separators. "Rp 143.856.000" -> 143856000.

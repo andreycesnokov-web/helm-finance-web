@@ -266,6 +266,7 @@ function extractInvoiceFields(text) {
   const REF = String.raw`(?=[A-Z\/\-]*\d)[A-Z0-9][A-Z0-9\/\-.]{3,30}[A-Z0-9]`;
   f.document_number =
     afterLabel(text, /\b(?:no\.?\s*)?invoice\s*(?:no\.?|number|#|nomor)\s*/i, REF)
+    || afterLabel(text, /\b(?:customer\s+account|referensi|reference|ref\.?)\s*[:.]?/i, REF)
     || afterLabel(text, /\b(?:nomor|no\.?)\s*(?:invoice|dokumen|tagihan|referensi|faktur)?\s*:/i, REF)
     || afterLabel(text, /\b(?:no\.?\s*)?invoice\b/i, REF)
     || (/\b([A-Z]\d{9,12})\b/.exec(text) || [])[1]
@@ -306,16 +307,17 @@ function extractInvoiceFields(text) {
     f.payee_account_name = trimName(afterLabel(text, /\b(?:atas\s+nama|a\.n\.|account\s+name)\b/i, String.raw`[^\r\n]{3,80}`));
   }
 
-  const issuerNpwp = afterLabel(text, /pengusaha\s+kena\s+pajak[\s\S]{0,80}?npwp/i, String.raw`\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}`)
-    || afterLabel(text, /\b(?:npwp\s+(?:penjual|vendor|issuer)|npwp)\b/i, String.raw`\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}`);
-  const buyerNpwp = afterLabel(text, /pembeli\s+barang\s+kena\s+pajak[\s\S]{0,80}?npwp/i, String.raw`\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}`)
-    || afterLabel(text, /\b(?:npwp\s+(?:pembeli|buyer|customer|lawan\s*transaksi))\b/i, String.raw`\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}`);
+  const npwpPattern = String.raw`\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}|\d{16}`;
+  const issuerNpwp = afterLabel(text, /pengusaha\s+kena\s+pajak[\s\S]{0,80}?npwp/i, npwpPattern)
+    || afterLabel(text, /\b(?:npwp\s+(?:penjual|vendor|issuer)|npwp)\b/i, npwpPattern);
+  const buyerNpwp = afterLabel(text, /pembeli\s+barang\s+kena\s+pajak[\s\S]{0,80}?npwp/i, npwpPattern)
+    || afterLabel(text, /\b(?:npwp\s+(?:pembeli|buyer|customer|lawan\s*transaksi))\b/i, npwpPattern);
 
   if (issuerNpwp) f.issuer_npwp = issuerNpwp;
   if (buyerNpwp) f.buyer_npwp = buyerNpwp;
 
   if (!f.issuer_npwp || !f.buyer_npwp) {
-    const npwps = [...String(text).matchAll(/\b(\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3})\b/g)].map((m) => m[1]);
+    const npwps = [...String(text).matchAll(/\b(\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}|\d{16})\b/g)].map((m) => m[1]);
     if (!f.issuer_npwp && npwps[0]) f.issuer_npwp = npwps[0];
     if (!f.buyer_npwp && npwps[1]) f.buyer_npwp = npwps[1];
   }
@@ -359,11 +361,12 @@ function extractInvoiceFields(text) {
   const x = f.commercial_tax_amount;
   const g = f.gross_amount;
 
-  // If subtotal and DPP both exist and differ, record the discount/incentive variance
+  // If subtotal and DPP both exist and differ, record the documentary variance neutrally.
+  // Do NOT assume it is a discount or incentive unless explicitly stated on the document.
   if (subtotal != null && dpp != null && Math.abs(subtotal - dpp) > 0.5) {
     const variance = Math.round((subtotal - dpp) * 100) / 100;
-    if (f.discount_amount == null) f.discount_amount = variance;
-    warnings.push(`Commercial subtotal (${subtotal}) differs from Faktur Pajak DPP (${dpp}) with variance/discount of ${variance}.`);
+    f.subtotal_dpp_variance = variance;
+    warnings.push(`Commercial subtotal (${subtotal}) differs from Faktur Pajak DPP (${dpp}) by ${variance}.`);
   }
 
   if (g != null) {
@@ -449,7 +452,7 @@ const EMPTY_FIELDS = {
   period_start: null, period_end: null, period_start_text: null, period_end_text: null,
   currency: 'IDR',
   subtotal: null, commercial_base_amount: null, tax_base_dpp: null, discount_amount: null,
-  commercial_tax_amount: null, gross_amount: null,
+  subtotal_dpp_variance: null, commercial_tax_amount: null, gross_amount: null,
   payment_reference_number: null, payment_status: null, bank_name: null,
   transfer_date_text: null, document_date: null, amount: null, fee: null, payment_method: null,
   from_account_number: null, from_account_name: null,
