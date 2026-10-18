@@ -52,6 +52,41 @@ async function runTestSuite() {
     assert(pricingHtml.includes('50'), 'Pricing table displays 50 Pro accounts');
     assert(pricingHtml.includes('50,000'), 'Pricing table displays 50,000 bank rows');
 
+    // Test platform, document-intelligence, compliance, about, privacy, terms
+    const platformRes = await fetch(`${baseUrl}/en/platform`);
+    assert(platformRes.status === 200, 'Platform /en/platform returns HTTP 200');
+    const platformHtml = await platformRes.text();
+    assert(platformHtml.includes('Pulse Command Center'), 'Platform page displays Pulse module');
+
+    const docRes = await fetch(`${baseUrl}/en/document-intelligence`);
+    assert(docRes.status === 200, 'Document Intelligence /en/document-intelligence returns HTTP 200');
+    const docHtml = await docRes.text();
+    assert(docHtml.includes('Faktur Pajak'), 'Document intelligence mentions Faktur Pajak OCR');
+
+    const compRes = await fetch(`${baseUrl}/en/compliance`);
+    assert(compRes.status === 200, 'Tax & Compliance /en/compliance returns HTTP 200');
+    const compHtml = await compRes.text();
+    assert(compHtml.includes('PPh 21 TER'), 'Tax & Compliance displays PPh 21 TER Engine');
+
+    const aboutRes = await fetch(`${baseUrl}/en/about`);
+    assert(aboutRes.status === 200, 'About /en/about returns HTTP 200');
+
+    const privRes = await fetch(`${baseUrl}/en/privacy`);
+    assert(privRes.status === 200, 'Privacy Policy /en/privacy returns HTTP 200');
+    const privHtml = await privRes.text();
+    assert(privHtml.includes('Law No. 27/2022'), 'Privacy Policy cites UU PDP Law No. 27/2022');
+    assert(privHtml.includes('Strict Zero-Sharing Guarantee'), 'Privacy Policy includes strict zero-sharing guarantee');
+
+    const termsRes = await fetch(`${baseUrl}/en/terms`);
+    assert(termsRes.status === 200, 'Terms of Service /en/terms returns HTTP 200');
+
+    // Check emoji absence across all pages
+    const emojiRegex = /[\uD83C-\uDBFF\uDC00-\uDFFF]/;
+    assert(!emojiRegex.test(enHomeHtml), 'Homepage contains 0 emojis');
+    assert(!emojiRegex.test(pricingHtml), 'Pricing page contains 0 emojis');
+    assert(!emojiRegex.test(platformHtml), 'Platform page contains 0 emojis');
+    assert(!emojiRegex.test(privHtml), 'Privacy page contains 0 emojis');
+
     // 2. KNOWLEDGE HUB & ARTICLES
     console.log('\n[Suite 2: Knowledge Hub & Tax Authority]');
     const blogRes = await fetch(`${baseUrl}/en/blog`);

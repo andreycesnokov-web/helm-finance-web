@@ -149,7 +149,7 @@ async function renderDashboardView(container) {
       ` : `
         <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span>🛡️</span>
+            <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
             <span><strong>Pricing Discrepancy Guard Active:</strong> All 11 commercial limits and 12 feature entitlements match billing catalog <strong>${data.pricingStatus.catalogVersion}</strong> with 100% mathematical fidelity.</span>
           </div>
           <button onclick="switchTab('pricing')" class="text-xs font-bold text-[#1565C0] hover:underline">Inspect Matrix →</button>
@@ -691,8 +691,9 @@ async function renderReleasesView(container) {
           <h1 class="text-2xl font-black text-[#003366]">Publishing &amp; Versioned Releases</h1>
           <p class="text-xs text-[#5A6E82]">Publish atomic production releases or roll back to any prior snapshot with zero downtime.</p>
         </div>
-        <button onclick="publishNewRelease()" class="text-xs font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-6 py-3 rounded-xl shadow-md">
-          🚀 Publish New Production Release
+        <button onclick="publishNewRelease()" class="text-xs font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-6 py-3 rounded-xl shadow-md flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          Publish New Production Release
         </button>
       </div>
 
