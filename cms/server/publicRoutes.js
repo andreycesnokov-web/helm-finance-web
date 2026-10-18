@@ -239,7 +239,7 @@ function createPublicRoutes(contentStore) {
           <div class="flex items-center gap-2.5">
             <img src="/assets/brand/logo_dark_bg_white_text.svg" alt="CFO AI Indonesia" class="h-7 w-auto rounded">
           </div>
-          <p class="text-xs text-slate-300 leading-snug max-w-xs line-clamp-3">
+          <p class="text-xs text-slate-300 leading-relaxed max-w-xs">
             ${t.footer.about_text}
           </p>
           <div class="text-[11px] text-slate-400 space-y-0.5 pt-0.5">
@@ -583,10 +583,10 @@ function createPublicRoutes(contentStore) {
         </div>
       </section>
 
-      <!-- KNOWLEDGE HUB PREVIEW SECTION -->
-      <section class="py-20 px-4 sm:px-6 lg:px-8 bg-ice-light border-b border-[#CBD5E1]">
+      <!-- KNOWLEDGE HUB PREVIEW SECTION (Refined compact bottom padding) -->
+      <section class="pt-14 pb-8 sm:pt-16 sm:pb-10 px-4 sm:px-6 lg:px-8 bg-ice-light border-b border-[#CBD5E1]">
         <div class="max-w-7xl mx-auto">
-          <div class="flex flex-col sm:flex-row items-baseline justify-between mb-12">
+          <div class="flex flex-col sm:flex-row items-baseline justify-between mb-8 sm:mb-10">
             <div>
               <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">KNOWLEDGE HUB</span>
               <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-1">Authoritative Indonesian Tax &amp; Finance Guides</h2>
@@ -624,20 +624,23 @@ function createPublicRoutes(contentStore) {
         </div>
       </section>
 
-      <!-- COMPACT FINAL CTA SECTION -->
-      <section class="py-8 sm:py-10 px-4 sm:px-6 lg:px-8 bg-navy-brand text-white text-center relative overflow-hidden border-b border-slate-700/60 shadow-inner">
-        ${renderWatermark({ color: '#FFFFFF', opacity: '0.04', size: 'w-72 h-72', className: 'absolute -right-12 -bottom-12 pointer-events-none select-none z-0' })}
+      <!-- COMPACT FINAL CTA SECTION (Target 180-210px at 1440px) -->
+      <section class="py-5 sm:py-5 px-4 sm:px-6 lg:px-8 bg-navy-brand text-white text-center relative overflow-hidden shadow-inner">
+        ${renderWatermark({ color: '#FFFFFF', opacity: '0.035', size: 'w-64 h-64', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
         <div class="max-w-3xl mx-auto relative z-10">
-          <h2 class="text-xl sm:text-2xl font-black tracking-tight mb-2 text-white">${t.cta_section.heading}</h2>
-          <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-5 leading-relaxed">${t.cta_section.subheading}</p>
+          <h2 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight mb-1.5 text-white">${t.cta_section.heading}</h2>
+          <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-3.5 leading-normal sm:leading-relaxed">${t.cta_section.subheading}</p>
           <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-7 py-3 rounded-xl shadow-md transition-all min-h-[44px]">
+            <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
               ${t.hero.primary_cta} &rarr;
             </a>
           </div>
-          <div class="text-[11px] text-slate-400 mt-3 font-medium">${t.cta_section.note}</div>
+          <div class="text-[11px] text-slate-400 mt-2 font-medium">${t.cta_section.note}</div>
         </div>
       </section>
+
+      <!-- SUBTLE LUMINOUS VISUAL SEPARATOR BETWEEN CTA AND FOOTER -->
+      <div class="w-full h-px bg-gradient-to-r from-transparent via-[#318FF4]/50 to-transparent border-t border-slate-700/80" aria-hidden="true"></div>
     `;
 
     res.send(renderLayout({

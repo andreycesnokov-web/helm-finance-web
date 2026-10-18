@@ -314,7 +314,7 @@ const translations = {
       privacy_desc: "Fully aligned with Indonesia's Personal Data Protection Law (Law No. 27/2022). Customer financial entries are never used to train public commercial AI models."
     },
     footer: {
-      about_text: "Financial Operating System engineered for Indonesian PT & PT PMA companies. Real-time cash visibility, tax invoice OCR, and automated bank reconciliation.",
+      about_text: "CFO AI helps Indonesian businesses manage finances, documents, and tax readiness in one platform.",
       app_link: "app.cfo-ai.site",
       footprint: "Jakarta • Denpasar, Bali • Operating across Indonesia",
       col_platform: "Platform",
@@ -648,7 +648,7 @@ const translations = {
       privacy_desc: "Sepenuhnya selaras dengan Undang-Undang Perlindungan Data Pribadi (UU No. 27/2022). Data pembukuan pelanggan tidak pernah dipakai untuk melatih model AI komersial publik."
     },
     footer: {
-      about_text: "Sistem Operasi Keuangan terintegrasi untuk PT & PT PMA di Indonesia. Visibilitas arus kas real-time, OCR faktur pajak, dan rekonsiliasi bank otomatis.",
+      about_text: "CFO AI membantu bisnis Indonesia mengelola keuangan, dokumen, dan kesiapan pajak dalam satu platform.",
       app_link: "app.cfo-ai.site",
       footprint: "Jakarta • Denpasar, Bali • Melayani seluruh Indonesia",
       col_platform: "Platform",
@@ -982,7 +982,7 @@ const translations = {
       privacy_desc: "Полное соблюдение Закона Индонезии о защите персональных данных (UU No. 27/2022). Данные бухгалтерского учета клиентов никогда не используются для обучения публичных моделей ИИ."
     },
     footer: {
-      about_text: "Финансовая ОС на базе ИИ для индонезийских компаний PT и PT PMA. Контроль денежных потоков, OCR счетов и автосверка выписок.",
+      about_text: "CFO AI помогает бизнесу в Индонезии управлять финансами, документами и налогами на единой платформе.",
       app_link: "app.cfo-ai.site",
       footprint: "Джакарта • Бали (Денпасар) • Работаем по всей Индонезии",
       col_platform: "Платформа",
