@@ -186,6 +186,101 @@ const translations = {
       badge: "PLATFORM ARCHITECTURE",
       heading: "A Complete Financial Operating System",
       subheading: "Discover how CFO AI replaces fragmented software with a unified, high-integrity financial operations workspace engineered for Indonesia.",
+      connected_workspace: {
+        eyebrow: "CONNECTED FINANCIAL WORKSPACE",
+        heading: "Your Financial Data. One Intelligent System.",
+        subheading: "Connect your team, documents, and AI assistants to a unified financial workspace.",
+        footnote: "Conceptual architecture visualization. All ledger modifications and financial disbursements require authenticated role permissions and human confirmation.",
+        transition: "However your financial information enters CFO AI, it becomes part of connected, controlled financial workflows.",
+        channels: [
+          {
+            id: "whatsapp",
+            name: "WhatsApp",
+            subtitle: "Messaging & Receipt Intake",
+            status: "Planned",
+            status_type: "planned",
+            example: "Send a receipt or invoice directly from a conversation.",
+            description: "Employee captures an expense receipt on mobile and sends it to the finance inbox. (Conceptual workflow — WhatsApp integration is on the product roadmap).",
+            flow_desc: "Direct photo capture → AI parsing draft → Approval queue"
+          },
+          {
+            id: "telegram",
+            name: "Telegram",
+            subtitle: "Summaries & Approvals",
+            status: "Available",
+            status_type: "available",
+            example: "Request financial information and approve authorized actions.",
+            description: "Finance managers check cash runway, inspect overdue debts, and approve or reject expenses via authenticated bot tokens with full role verification.",
+            flow_desc: "Bot commands & notifications → Inline one-tap approval → Instant audit record"
+          },
+          {
+            id: "chatgpt",
+            name: "ChatGPT",
+            subtitle: "Conversational Queries (MCP)",
+            status: "In Development",
+            status_type: "in_dev",
+            example: "Ask financial questions through a connected AI assistant.",
+            description: "Connect via Model Context Protocol (MCP) for authorized read-only financial inquiries and runway analysis. No automatic posting without user confirmation.",
+            flow_desc: "Natural language query → Authorized MCP endpoint → Scoped ledger insight"
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            subtitle: "Context & Analysis (MCP)",
+            status: "In Development",
+            status_type: "in_dev",
+            example: "Access authorized financial context using MCP.",
+            description: "Leverage Claude's reasoning with scoped, read-only financial data and voucher citations. Write operations require explicit pending draft creation.",
+            flow_desc: "Deep financial analysis → MCP schema isolation → Verified voucher citations"
+          },
+          {
+            id: "webapp",
+            name: "CFO AI Web App",
+            subtitle: "Direct Upload & Ops",
+            status: "Available",
+            status_type: "available",
+            example: "Upload invoices, documents, and bank statements directly.",
+            description: "Full-featured web application supporting PDF/JPG/PNG document intake, corporate bank statement reconciliation (CSV, MT940), and multi-currency billing.",
+            flow_desc: "Drag-and-drop file upload → OCR intake workbench → Reconciled General Ledger"
+          }
+        ],
+        intelligence_engine: {
+          badge: "CFO AI FINANCIAL INTELLIGENCE",
+          title: "CFO AI — Financial Intelligence",
+          subtitle: "All channels connect to one central processing engine",
+          capabilities: [
+            {
+              title: "Document Intelligence",
+              desc: "Multimodal OCR extracts vendor, date, DPP, and PPN 11% tax data"
+            },
+            {
+              title: "Data Validation & Human Review",
+              desc: "Human-in-the-loop workbench: AI suggests, user confirms"
+            },
+            {
+              title: "Approvals & Financial Workflows",
+              desc: "Threshold-based routing and strict segregation of duties"
+            },
+            {
+              title: "Reconciliation & Financial Insights",
+              desc: "Multi-signal bank matching and 30/60/90-day predictive cash radar"
+            }
+          ]
+        },
+        workspace_destinations: {
+          badge: "UNIFIED FINANCIAL WORKSPACE",
+          title: "Authorized Information Flows Into One Operating Environment",
+          subtitle: "Clean, reconciled financial records populate isolated operational domains",
+          items: [
+            { name: "Transactions", desc: "Reconciled bank records & feeds" },
+            { name: "Documents", desc: "Digital receipts, invoices & proofs" },
+            { name: "Invoices & Bills", desc: "Receivables aging & payable queue" },
+            { name: "Approvals", desc: "Decision trail & limits" },
+            { name: "Financial Reports", desc: "Balanced P&L & tax schedules" },
+            { name: "Audit Trail", desc: "Activity logs & compliance history" }
+          ]
+        }
+      },
       how_it_works_badge: "END-TO-END BUSINESS WORKFLOWS",
       how_it_works_heading: "One Financial System. From Action to Decision.",
       how_it_works_subheading: "See how CFO AI connects everyday financial activities with the information business owners need to stay in control.",
@@ -648,6 +743,101 @@ const translations = {
       badge: "ARSITEKTUR PLATFORM",
       heading: "Sistem Operasi Keuangan Menyeluruh",
       subheading: "Ketahui bagaimana CFO AI menggantikan perangkat lunak yang terpisah-pisah dengan ruang kerja operasional keuangan terpadu berintegritas tinggi untuk Indonesia.",
+      connected_workspace: {
+        eyebrow: "RUANG KERJA KEUANGAN TERPADU",
+        heading: "Data Keuangan Anda. Satu Sistem Cerdas.",
+        subheading: "Hubungkan tim, dokumen, dan asisten AI Anda ke dalam satu ruang kerja keuangan terintegrasi.",
+        footnote: "Visualisasi arsitektur konseptual. Seluruh perubahan buku besar dan pengeluaran dana memerlukan hak akses terotentikasi dan konfirmasi manusia.",
+        transition: "Bagaimanapun data keuangan Anda masuk ke CFO AI, seluruhnya menjadi bagian dari alur kerja keuangan yang terhubung dan terkendali.",
+        channels: [
+          {
+            id: "whatsapp",
+            name: "WhatsApp",
+            subtitle: "Pesan & Penerimaan Bukti",
+            status: "Direncanakan",
+            status_type: "planned",
+            example: "Kirim kuitansi atau faktur langsung dari ruang percakapan.",
+            description: "Karyawan memfoto kuitansi pengeluaran di ponsel dan mengirimkannya ke kontak keuangan. (Alur kerja konseptual — integrasi WhatsApp berada dalam rencana pengembangan).",
+            flow_desc: "Pengambilan foto langsung → Draf ekstraksi AI → Antrean persetujuan"
+          },
+          {
+            id: "telegram",
+            name: "Telegram",
+            subtitle: "Ringkasan & Persetujuan",
+            status: "Tersedia",
+            status_type: "available",
+            example: "Minta ringkasan keuangan dan setujui tindakan berwenang.",
+            description: "Manajer keuangan memantau runway kas, memeriksa tagihan tertunda, serta menyetujui atau menolak pengeluaran via token bot terotentikasi.",
+            flow_desc: "Perintah & notifikasi bot → Persetujuan satu ketukan → Catatan audit instan"
+          },
+          {
+            id: "chatgpt",
+            name: "ChatGPT",
+            subtitle: "Pertanyaan Percakapan (MCP)",
+            status: "Dalam Pengembangan",
+            status_type: "in_dev",
+            example: "Ajukan pertanyaan keuangan melalui asisten AI terhubung.",
+            description: "Terhubung melalui Model Context Protocol (MCP) untuk analisis keuangan dan proyeksi kas mode baca saja. Tidak ada posting otomatis tanpa konfirmasi pengguna.",
+            flow_desc: "Kueri bahasa alami → Endpoint MCP terotorisasi → Wawasan buku besar terisolasi"
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            subtitle: "Konteks & Analisis (MCP)",
+            status: "Dalam Pengembangan",
+            status_type: "in_dev",
+            example: "Akses konteks keuangan terotorisasi menggunakan MCP.",
+            description: "Manfaatkan penalaran Claude dengan data keuangan mode baca saja yang aman dan sitasi bukti nyata. Tindakan penulisan dibatasi pada draf tertunda.",
+            flow_desc: "Analisis keuangan mendalam → Isolasi skema MCP → Sitasi bukti terverifikasi"
+          },
+          {
+            id: "webapp",
+            name: "CFO AI Web App",
+            subtitle: "Unggah Langsung & Operasional",
+            status: "Tersedia",
+            status_type: "available",
+            example: "Unggah faktur, dokumen, dan rekening koran secara langsung.",
+            description: "Aplikasi web lengkap mendukung penerimaan dokumen PDF/JPG/PNG, rekonsiliasi rekening koran bank perusahaan (CSV, MT940), dan penagihan multi-valuta.",
+            flow_desc: "Unggah seret-lepas berkas → Meja kerja OCR → Buku Besar terekonsiliasi"
+          }
+        ],
+        intelligence_engine: {
+          badge: "INTI PEMROSESAN PUSAT",
+          title: "CFO AI — Intelijen Keuangan",
+          subtitle: "Semua saluran terhubung ke satu mesin pemrosesan pusat",
+          capabilities: [
+            {
+              title: "Intelijen Dokumen",
+              desc: "OCR multimodal membaca vendor, tanggal, DPP, dan pajak PPN 11%"
+            },
+            {
+              title: "Validasi Data & Tinjauan Manusia",
+              desc: "Meja kerja konfirmasi manusia: AI mengusulkan, pengguna memastikan"
+            },
+            {
+              title: "Alur Persetujuan & Tata Kelola",
+              desc: "Perutean berbasis batas ambang dan pemisahan wewenang yang ketat"
+            },
+            {
+              title: "Rekonsiliasi & Wawasan Keuangan",
+              desc: "Pencocokan multi-sinyal bank dan radar arus kas prediktif 30/60/90 hari"
+            }
+          ]
+        },
+        workspace_destinations: {
+          badge: "RUANG KERJA KEUANGAN TERPADU",
+          title: "Informasi Resmi Mengalir ke Satu Lingkungan Operasional",
+          subtitle: "Catatan keuangan bersih dan terekonsiliasi mengisi domain operasional yang terisolasi",
+          items: [
+            { name: "Transaksi", desc: "Mutasi bank terekonsiliasi & umpan langsung" },
+            { name: "Dokumen", desc: "Kuitansi digital, Faktur Pajak & bukti bayar" },
+            { name: "Faktur & Tagihan", desc: "Umur piutang penjualan & jadwal utang vendor" },
+            { name: "Persetujuan", desc: "Jejak keputusan manajemen & batas otorisasi" },
+            { name: "Laporan Keuangan", desc: "Laba rugi seimbang & jadwal pajak" },
+            { name: "Jejak Audit", desc: "Log aktivitas anti-manipulasi & riwayat kepatuhan" }
+          ]
+        }
+      },
       how_it_works_badge: "ALUR KERJA BISNIS TERPADU",
       how_it_works_heading: "Satu Sistem Keuangan. Dari Tindakan hingga Keputusan.",
       how_it_works_subheading: "Ketahui bagaimana CFO AI menghubungkan aktivitas keuangan harian dengan informasi yang dibutuhkan pemilik bisnis untuk tetap memegang kendali.",
@@ -1110,6 +1300,101 @@ const translations = {
       badge: "АРХИТЕКТУРА ПЛАТФОРМЫ",
       heading: "Единая финансовая операционная система",
       subheading: "Узнайте, как CFO AI заменяет разрозненный софт целостной финансовой средой, спроектированной под требования бизнеса в Индонезии.",
+      connected_workspace: {
+        eyebrow: "ЕДИНОЕ ФИНАНСОВОЕ ПРОСТРАНСТВО",
+        heading: "Ваши финансовые данные. Единый интеллект.",
+        subheading: "Объедините команду, первичные документы и AI-ассистентов в единой финансовой рабочей среде.",
+        footnote: "Концептуальная визуализация архитектуры. Любые проводки в главной книге и выплаты требуют авторизованных прав доступа и подтверждения человеком.",
+        transition: "Каким бы путем данные ни поступали в CFO AI, они становятся частью сквозных контролируемых финансовых процессов.",
+        channels: [
+          {
+            id: "whatsapp",
+            name: "WhatsApp",
+            subtitle: "Сообщения и прием чеков",
+            status: "Запланировано",
+            status_type: "planned",
+            example: "Отправляйте квитанцию или счет прямо из чата.",
+            description: "Сотрудник фотографирует чек и отправляет в рабочий чат бухгалтерии. (Концептуальный сценарий — интеграция WhatsApp находится в плане разработки).",
+            flow_desc: "Фото с камеры → Черновик распознавания AI → Очередь согласования"
+          },
+          {
+            id: "telegram",
+            name: "Telegram",
+            subtitle: "Сводки и согласование",
+            status: "Доступно",
+            status_type: "available",
+            example: "Запрашивайте финансовые сводки и согласовывайте платежи.",
+            description: "Руководители проверяют остатки и запас прочности, просматривают счета и акцептуют платежи через безопасный бот с проверкой прав доступа.",
+            flow_desc: "Команды и алерты бота → Акцепт в один клик → Мгновенный аудиторский след"
+          },
+          {
+            id: "chatgpt",
+            name: "ChatGPT",
+            subtitle: "Диалоговые запросы (MCP)",
+            status: "В разработке",
+            status_type: "in_dev",
+            example: "Задавайте вопросы по финансам через подключенного AI-ассистента.",
+            description: "Подключение по протоколу Model Context Protocol (MCP) для аналитических запросов в режиме чтения. Никаких автоматических проводок без подтверждения.",
+            flow_desc: "Вопрос на естественном языке → Авторизованный MCP-эндпоинт → Анализ главной книги"
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            subtitle: "Контекст и анализ (MCP)",
+            status: "В разработке",
+            status_type: "in_dev",
+            example: "Получайте финансовый контекст компании через MCP.",
+            description: "Используйте логику Claude с защищенным доступом к финансовым данным в режиме чтения и цитированием первичных документов.",
+            flow_desc: "Глубокий финансовый анализ → Изоляция схемы MCP → Проверенные ссылки на ордера"
+          },
+          {
+            id: "webapp",
+            name: "Веб-приложение CFO AI",
+            subtitle: "Прямая загрузка и учет",
+            status: "Доступно",
+            status_type: "available",
+            example: "Загружайте счета, документы и банковские выписки напрямую.",
+            description: "Полнофункциональное веб-приложение: загрузка файлов PDF/JPG/PNG, сверка корпоративных выписок (CSV, MT940) и мультивалютный биллинг.",
+            flow_desc: "Загрузка файлов drag-and-drop → Рабочий стол верификации OCR → Главная книга"
+          }
+        ],
+        intelligence_engine: {
+          badge: "CFO AI ФИНАНСОВЫЙ ИНТЕЛЛЕКТ",
+          title: "CFO AI — Финансовый Интеллект",
+          subtitle: "Все каналы подключаются к единому центральному ядру обработки",
+          capabilities: [
+            {
+              title: "Распознавание Документов",
+              desc: "Мультимодальный OCR: считывание поставщика, даты, базы DPP и НДС (PPN 11%)"
+            },
+            {
+              title: "Проверка Данных и Верификация",
+              desc: "Контроль человеком: AI предлагает варианты, оператор подтверждает"
+            },
+            {
+              title: "Согласования и Маршруты Контроля",
+              desc: "Разграничение полномочий и маршрутизация по финансовым лимитам"
+            },
+            {
+              title: "Сверка и Финансовая Аналитика",
+              desc: "Многофакторное сопоставление выписок и радар прогноза ликвидности на 30-90 дней"
+            }
+          ]
+        },
+        workspace_destinations: {
+          badge: "ЕДИНОЕ РАБОЧЕЕ ПРОСТРАНСТВО",
+          title: "Авторизованные данные поступают в единую рабочую среду",
+          subtitle: "Чистые сверенные записи формируют изолированные операционные контуры",
+          items: [
+            { name: "Транзакции", desc: "Сверенные банковские проводки и выписки" },
+            { name: "Документы", desc: "Электронные чеки, Faktur Pajak и квитанции" },
+            { name: "Счета и Накладные", desc: "Старение дебиторки и график кредиторки" },
+            { name: "Согласования", desc: "Журнал решений руководства и лимиты" },
+            { name: "Отчетность", desc: "Главная книга, баланс и налоговые регистры" },
+            { name: "Аудиторский След", desc: "Неизменяемый протокол действий и комплаенс" }
+          ]
+        }
+      },
       how_it_works_badge: "СКВОЗНЫЕ БИЗНЕС-ПРОЦЕССЫ",
       how_it_works_heading: "Единая финансовая система. От действия к решению.",
       how_it_works_subheading: "Посмотрите, как CFO AI связывает повседневные финансовые операции с информацией, необходимой руководителю для полного контроля.",

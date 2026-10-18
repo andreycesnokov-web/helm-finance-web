@@ -651,6 +651,315 @@ function createPublicRoutes(contentStore) {
     }));
   });
 
+  // Helpers for Connected Financial Workspace
+  function renderChannelBrandIcon(id) {
+    if (id === 'whatsapp') {
+      return `<svg class="w-5 h-5 text-[#25D366] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2ZM12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.8 13.47 3.8 11.91C3.8 7.37 7.5 3.67 12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15ZM16.56 14.36C16.31 14.24 15.09 13.64 14.86 13.56C14.64 13.47 14.47 13.43 14.31 13.68C14.14 13.92 13.66 14.49 13.51 14.66C13.37 14.82 13.22 14.85 12.97 14.72C12.72 14.6 11.92 14.34 10.97 13.49C10.23 12.83 9.73 12.01 9.58 11.77C9.44 11.52 9.56 11.39 9.69 11.26C9.8 11.15 9.94 10.97 10.06 10.83C10.19 10.68 10.23 10.58 10.31 10.42C10.39 10.25 10.35 10.11 10.29 9.99C10.23 9.86 9.73 8.64 9.53 8.13C9.33 7.64 9.12 7.71 8.97 7.7C8.82 7.69 8.66 7.69 8.49 7.69C8.33 7.69 8.06 7.75 7.84 7.99C7.61 8.24 6.98 8.83 6.98 10.02C6.98 11.22 7.85 12.38 7.97 12.54C8.09 12.7 9.7 15.18 12.16 16.24C12.74 16.5 13.2 16.65 13.55 16.76C14.14 16.95 14.68 16.92 15.11 16.86C15.58 16.79 16.56 16.27 16.76 15.69C16.97 15.12 16.97 14.63 16.91 14.52C16.85 14.42 16.81 14.48 16.56 14.36Z"/></svg>`;
+    }
+    if (id === 'telegram') {
+      return `<svg class="w-5 h-5 text-[#229ED9] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>`;
+    }
+    if (id === 'chatgpt') {
+      return `<svg class="w-5 h-5 text-[#10A37F] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M22.28 9.37a5.98 5.98 0 0 0-.52-4.94 6.08 6.08 0 0 0-6.19-2.91 6.01 6.01 0 0 0-4.59-2.02A6.08 6.08 0 0 0 5.1 2.91a5.99 5.99 0 0 0-4.08 4.41 6.08 6.08 0 0 0 1.08 6.85 5.98 5.98 0 0 0 .52 4.94 6.08 6.08 0 0 0 6.19 2.91 6.01 6.01 0 0 0 4.59 2.02 6.08 6.08 0 0 0 5.88-3.41 5.99 5.99 0 0 0 4.08-4.41 6.08 6.08 0 0 0-1.08-6.85zM12 21.08a4.57 4.57 0 0 1-2.9-1.03l.14-.08 4.83-2.79a.78.78 0 0 0 .39-.68v-6.83l2.06 1.19a.07.07 0 0 1 .04.06v5.59a4.59 4.59 0 0 1-4.56 4.57zm-8.5-4.9a4.58 4.58 0 0 1-.54-3.03l.14.09 4.83 2.79c.24.14.39.4.39.68v2.37l-2.06-1.19a.07.07 0 0 1-.04-.06v-1.65zm-.96-8.91a4.58 4.58 0 0 1 2.36-2.01l-.01.17v5.58a.78.78 0 0 0 .39.68l5.92 3.42-2.06 1.19a.07.07 0 0 1-.07 0l-4.84-2.79a4.59 4.59 0 0 1-1.69-6.24zm14.38 3.12l-5.92-3.42 2.06-1.19a.07.07 0 0 1 .07 0l4.84 2.79a4.59 4.59 0 0 1 .84 7.66l-.14-.09-4.83-2.79a.78.78 0 0 0-.92.04v-2.98zm2.46-3.83l-.14-.08-4.83-2.79a.78.78 0 0 0-.78 0l-5.92 3.42 2.06 1.19a.07.07 0 0 1 .04.06v5.59l2.06-1.19a.07.07 0 0 0 .04-.06v-5.59a4.59 4.59 0 0 1 7.47-.64zm-8.38 6.42l-2.65-1.53 2.65-1.53 2.65 1.53-2.65 1.53z"/></svg>`;
+    }
+    if (id === 'claude') {
+      return `<svg class="w-5 h-5 text-[#D97706] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L14.4 8.6L21 11L14.4 13.4L12 20L9.6 13.4L3 11L9.6 8.6L12 2Z"/></svg>`;
+    }
+    return `<svg class="w-5 h-5 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/><path d="M8 21h8M12 17v4" stroke-width="2" stroke-linecap="round"/></svg>`;
+  }
+
+  function renderDestinationIcon(idx) {
+    const icons = [
+      `<svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>`,
+      `<svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>`,
+      `<svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>`,
+      `<svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>`,
+      `<svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>`,
+      `<svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>`
+    ];
+    return icons[idx] || icons[0];
+  }
+
+  function renderConnectedWorkspaceSection(t, locale) {
+    const cw = t.platform.connected_workspace;
+    if (!cw) return '';
+
+    return `
+      <!-- CONNECTED FINANCIAL WORKSPACE ARCHITECTURE -->
+      <section class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-ice-primary border-b border-[#CBD5E1] relative overflow-hidden" id="connected-workspace">
+        ${renderWatermark({ color: '#06366B', opacity: '0.03', size: 'w-[540px] h-[540px]', className: 'absolute -left-28 -top-20 pointer-events-none select-none z-0' })}
+        <div class="max-w-7xl mx-auto relative z-10">
+          <!-- Section Heading -->
+          <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
+            <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${cw.eyebrow}</span>
+            <h2 class="text-2xl sm:text-4xl font-black text-[#06366B] mt-2 mb-3 tracking-tight">${cw.heading}</h2>
+            <p class="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto leading-relaxed">${cw.subheading}</p>
+          </div>
+
+          <!-- LEVEL 1: INPUT & INTERACTION CHANNELS -->
+          <div class="mb-4">
+            <div class="flex items-center justify-between mb-3 px-1">
+              <div class="inline-flex items-center gap-2">
+                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL 1</span>
+                <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">Input &amp; Interaction Channels</span>
+              </div>
+              <span class="text-[11px] text-slate-500 hidden sm:inline">Click any channel to inspect pipeline and governance</span>
+            </div>
+
+            <!-- 5 Channels Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5" role="tablist" aria-label="Input channels">
+              ${cw.channels.map(ch => {
+                const badgeClass = ch.status_type === 'available'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : ch.status_type === 'in_dev'
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-slate-100 text-slate-700 border-slate-300';
+
+                return `
+                  <div 
+                    id="cw-channel-${ch.id}"
+                    role="tab"
+                    tabindex="0"
+                    aria-selected="${ch.id === 'webapp' ? 'true' : 'false'}"
+                    onclick="selectPlatformChannel('${ch.id}')"
+                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectPlatformChannel('${ch.id}');}"
+                    class="cw-channel-card bento-card p-4 bg-white border border-[#CBD5E1] rounded-xl cursor-pointer hover:border-[#1768C9] transition-all duration-150 flex flex-col justify-between select-none min-h-[140px] group ${ch.id === 'webapp' ? 'border-[#1768C9] bg-blue-50/30 ring-2 ring-[#1768C9]/20 shadow-sm' : ''}"
+                  >
+                    <div>
+                      <div class="flex items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center gap-2">
+                          <div class="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 group-hover:bg-blue-50/50 transition-colors">
+                            ${renderChannelBrandIcon(ch.id)}
+                          </div>
+                          <span class="font-bold text-sm text-[#06366B]">${ch.name}</span>
+                        </div>
+                        <span class="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${badgeClass}">
+                          ${ch.status}
+                        </span>
+                      </div>
+                      <div class="text-[11px] font-medium text-slate-500 mb-2">${ch.subtitle}</div>
+                      <p class="text-xs text-slate-600 line-clamp-2 leading-snug">${ch.example}</p>
+                    </div>
+                    <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-[#1768C9]">
+                      <span>Inspect flow</span>
+                      <span>&rarr;</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- CONNECTOR: DOWNWARD FLOW INDICATOR -->
+          <div class="flex justify-center py-2 sm:py-3 relative">
+            <div class="inline-flex items-center gap-2 text-xs font-mono font-bold text-slate-400 bg-white/70 backdrop-blur-xs px-3 py-1 rounded-full border border-slate-200">
+              <svg class="w-3.5 h-3.5 text-[#1768C9] animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+              <span>Secure Ingestion &amp; API Integration</span>
+            </div>
+          </div>
+
+          <!-- LEVEL 2: CFO AI INTELLIGENCE ENGINE (Central Component) -->
+          <div class="mb-4">
+            <div class="bento-card p-6 sm:p-8 bg-white border-2 border-[#1768C9]/30 rounded-2xl shadow-md relative overflow-hidden">
+              ${renderWatermark({ color: '#06366B', opacity: '0.035', size: 'w-72 h-72', className: 'absolute -right-12 -top-12 pointer-events-none select-none z-0' })}
+              
+              <!-- Engine Header -->
+              <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-6 border-b border-slate-100 gap-4 relative z-10">
+                <div class="flex items-start sm:items-center gap-3.5">
+                  <div class="w-11 h-11 rounded-xl bg-[#06366B] flex items-center justify-center shrink-0 shadow-xs p-2">
+                    <svg viewBox="0 0 200 200" fill="none" class="w-full h-full">
+                      <path d="M 12.97,127.48 L 73.25,188.00 L 98.67,187.03 L 149.75,135.71 L 167.66,135.71 L 124.33,179.77 L 131.59,187.03 L 187.03,131.59 L 184.85,126.27 L 145.88,126.27 L 93.83,177.59 L 77.12,178.56 L 20.23,121.43 Z M 187.03,66.47 L 133.77,12.00 L 103.03,12.00 L 29.43,86.08 L 36.69,92.13 L 110.05,18.54 L 125.78,18.54 L 167.91,59.45 L 148.78,60.42 L 113.92,26.53 L 107.87,33.79 L 144.91,70.83 L 184.85,70.83 Z M 69.13,12.00 L 13.94,67.44 L 12.00,92.86 L 88.02,170.57 L 94.07,162.34 L 21.44,88.98 L 21.44,74.22 L 78.57,17.33 L 75.67,12.00 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+                      <circle cx="101.57" cy="98.67" r="17.91" fill="#318FF4"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="inline-flex items-center gap-2 mb-1">
+                      <span class="text-[10px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL 2 • CENTRAL CORE</span>
+                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">AI Suggests • User Confirms</span>
+                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-[#06366B] tracking-tight">${cw.intelligence_engine.title}</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">${cw.intelligence_engine.subtitle}</p>
+                  </div>
+                </div>
+                <div class="shrink-0 flex items-center gap-2">
+                  <span class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Centralized Validation Core
+                  </span>
+                </div>
+              </div>
+
+              <!-- 4 Central Capabilities Grid -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 relative z-10">
+                ${cw.intelligence_engine.capabilities.map((cap, capIdx) => `
+                  <div class="bg-slate-50/80 rounded-xl border border-slate-200/80 p-4 hover:bg-slate-50 transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="w-6 h-6 rounded-full bg-[#1768C9] text-white font-mono font-bold text-xs flex items-center justify-center shrink-0">0${capIdx + 1}</span>
+                      <h4 class="text-xs font-bold text-[#06366B] leading-tight">${cap.title}</h4>
+                    </div>
+                    <p class="text-[11px] text-slate-600 leading-relaxed">${cap.desc}</p>
+                  </div>
+                `).join('')}
+              </div>
+
+              <!-- Dynamic Channel Flow Inspector & Governance Callout -->
+              <div id="cw-inspector" class="bg-gradient-to-r from-blue-50/70 via-slate-50 to-blue-50/40 rounded-xl border border-blue-200/80 p-5 relative z-10">
+                <div class="flex flex-col md:flex-row md:items-center justify-between pb-3 mb-3 border-b border-blue-100 gap-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-[10px] font-mono font-bold text-[#1768C9] bg-white px-2 py-0.5 rounded border border-blue-200">ACTIVE CHANNEL INSPECTOR</span>
+                    <span id="cw-insp-title" class="text-sm font-black text-[#06366B]">${cw.channels[4].name}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span id="cw-insp-badge" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-800 border-emerald-200">
+                      ${cw.channels[4].status}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
+                  <!-- Col 1: Business Scenario -->
+                  <div class="space-y-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Business Scenario</span>
+                    <div id="cw-insp-example" class="font-medium text-[#06366B] italic bg-white/70 p-2.5 rounded-lg border border-slate-200/60 leading-snug">
+                      "${cw.channels[4].example}"
+                    </div>
+                  </div>
+
+                  <!-- Col 2: Pipeline Data Flow -->
+                  <div class="space-y-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">End-to-End Pipeline</span>
+                    <div class="bg-white/70 p-2.5 rounded-lg border border-slate-200/60">
+                      <div id="cw-insp-flow" class="font-mono text-[11px] text-[#1768C9] font-bold leading-snug">
+                        ${cw.channels[4].flow_desc}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Col 3: Governance & Technical Boundary -->
+                  <div class="space-y-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Governance &amp; Controls</span>
+                    <div id="cw-insp-desc" class="text-slate-600 bg-white/70 p-2.5 rounded-lg border border-slate-200/60 leading-snug">
+                      ${cw.channels[4].description}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONNECTOR: DOWNWARD FLOW INDICATOR -->
+          <div class="flex justify-center py-2 sm:py-3 relative">
+            <div class="inline-flex items-center gap-2 text-xs font-mono font-bold text-slate-400 bg-white/70 backdrop-blur-xs px-3 py-1 rounded-full border border-slate-200">
+              <svg class="w-3.5 h-3.5 text-[#1768C9] animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+              <span>Verified Ledger Posting &amp; Tenant Isolation</span>
+            </div>
+          </div>
+
+          <!-- LEVEL 3: UNIFIED FINANCIAL WORKSPACE -->
+          <div class="mb-8">
+            <div class="flex items-center justify-between mb-3 px-1">
+              <div class="inline-flex items-center gap-2">
+                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL 3</span>
+                <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">${cw.workspace_destinations.badge}</span>
+              </div>
+              <span class="text-[11px] text-slate-500 hidden sm:inline">${cw.workspace_destinations.title}</span>
+            </div>
+
+            <!-- 6 Domains Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              ${cw.workspace_destinations.items.map((it, itIdx) => `
+                <div class="bento-card p-3.5 bg-white border border-[#CBD5E1] rounded-xl hover:border-[#1768C9] transition-colors flex flex-col justify-between">
+                  <div>
+                    <div class="w-7 h-7 rounded-lg bg-blue-50/70 border border-blue-100 flex items-center justify-center mb-2.5">
+                      ${renderDestinationIcon(itIdx)}
+                    </div>
+                    <h5 class="text-xs font-black text-[#06366B] mb-1">${it.name}</h5>
+                    <p class="text-[10px] text-slate-600 leading-tight">${it.desc}</p>
+                  </div>
+                  <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center gap-1 text-[9px] font-bold text-emerald-700">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>Reconciled</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- TRANSITION BANNER (Seamlessly bridges to Workflows) -->
+          <div class="bg-gradient-to-r from-[#021B36] via-[#042C53] to-[#021B36] text-white rounded-xl p-5 sm:p-6 text-center max-w-4xl mx-auto shadow-sm border border-white/10 relative overflow-hidden">
+            ${renderWatermark({ color: '#FFFFFF', opacity: '0.03', size: 'w-48 h-48', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
+            <div class="relative z-10 max-w-2xl mx-auto">
+              <span class="text-[10px] font-mono font-bold uppercase tracking-widest text-blue-300 block mb-1">END-TO-END FLOW ARCHITECTURE</span>
+              <p class="text-xs sm:text-sm font-semibold text-slate-100 leading-relaxed mb-3">
+                ${cw.transition}
+              </p>
+              <div class="inline-flex items-center gap-2 text-xs font-bold text-blue-300 hover:text-white transition-colors">
+                <span>Explore the 3 end-to-end workflows below</span>
+                <svg class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- FOOTNOTE DISCLAIMER -->
+          <div class="text-center mt-4">
+            <p class="text-[11px] text-slate-500 max-w-3xl mx-auto leading-normal">
+              ${cw.footnote}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- CLIENT SCRIPT FOR CONNECTED WORKSPACE CHANNEL SELECTION -->
+      <script>
+        (function() {
+          const channelData = ${JSON.stringify(cw.channels)};
+          
+          window.selectPlatformChannel = function(id) {
+            const channel = channelData.find(function(c) { return c.id === id; });
+            if (!channel) return;
+
+            // Update card selected states
+            channelData.forEach(function(c) {
+              const card = document.getElementById('cw-channel-' + c.id);
+              if (!card) return;
+              const isCurrent = (c.id === id);
+              card.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+              if (isCurrent) {
+                card.classList.remove('border-[#CBD5E1]', 'bg-white');
+                card.classList.add('border-[#1768C9]', 'bg-blue-50/30', 'ring-2', 'ring-[#1768C9]/20', 'shadow-sm');
+              } else {
+                card.classList.remove('border-[#1768C9]', 'bg-blue-50/30', 'ring-2', 'ring-[#1768C9]/20', 'shadow-sm');
+                card.classList.add('border-[#CBD5E1]', 'bg-white');
+              }
+            });
+
+            // Update Inspector elements
+            const titleEl = document.getElementById('cw-insp-title');
+            const badgeEl = document.getElementById('cw-insp-badge');
+            const flowEl = document.getElementById('cw-insp-flow');
+            const descEl = document.getElementById('cw-insp-desc');
+            const exampleEl = document.getElementById('cw-insp-example');
+
+            if (titleEl) titleEl.textContent = channel.name;
+            if (exampleEl) exampleEl.textContent = '"' + channel.example + '"';
+            if (flowEl) flowEl.textContent = channel.flow_desc;
+            if (descEl) descEl.textContent = channel.description;
+
+            if (badgeEl) {
+              badgeEl.textContent = channel.status;
+              var badgeClass = channel.status_type === 'available'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : channel.status_type === 'in_dev'
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-slate-100 text-slate-700 border-slate-300';
+              badgeEl.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ' + badgeClass;
+            }
+          };
+        })();
+      </script>
+    `;
+  }
+
   // --- LOCALIZED PLATFORM PAGE (/:locale/platform) ---
   router.get('/:locale/platform', (req, res) => {
     const locale = req.params.locale;
@@ -700,6 +1009,9 @@ function createPublicRoutes(contentStore) {
           <p class="text-sm text-slate-700 max-w-2xl mx-auto mb-10">${t.platform.subheading}</p>
         </div>
       </section>
+
+      <!-- CONNECTED FINANCIAL WORKSPACE -->
+      ${renderConnectedWorkspaceSection(t, locale)}
 
       <!-- HOW CFO AI WORKS (Cross-Functional Business Workflows) -->
       <section class="py-16 px-4 sm:px-6 lg:px-8 bg-ice-light border-b border-[#CBD5E1] relative">
