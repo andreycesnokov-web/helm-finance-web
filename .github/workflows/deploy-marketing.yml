@@ -9,8 +9,34 @@ on:
       - 'cms/**'
       - 'website-design/**'
       - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-marketing.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'cms/**'
+      - 'website-design/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/deploy-marketing.yml'
   workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Target Cloudflare Pages branch (main = production, other = preview)'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-marketing-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy-marketing:
@@ -19,20 +45,62 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install dependencies (reproducible)
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Run CMS Validation & Pricing Parity Tests
+        run: node cms/test_cms_suite.js
 
       - name: Build Marketing Website (SSG + Pricing Guard)
         run: npm run build:marketing
 
+      - name: Evaluate Cloudflare Deployment Credentials & Guard Production
+        id: credentials-check
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "has_token=false" >> $GITHUB_OUTPUT
+            echo "::warning title=Deployment Skipped::CLOUDFLARE_API_TOKEN secret is not configured in GitHub repository. Test suite and SSG build passed successfully, but Cloudflare Pages deployment was skipped."
+          else
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Production deployments can ONLY originate when the commit is on the approved production branch (refs/heads/main).
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.target_branch }}" = "main" ]; then
+              if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+                echo "::error title=Production Deployment Prohibited::Manual workflow_dispatch cannot deploy feature branch '${{ github.ref_name }}' to production. Production deployments are strictly restricted to refs/heads/main."
+                exit 1
+              fi
+              echo "cf_branch=main" >> $GITHUB_OUTPUT
+              echo "deploy_type=production" >> $GITHUB_OUTPUT
+            else
+              # Explicit preview deployment request
+              if [ "${{ github.ref_name }}" = "main" ]; then
+                echo "cf_branch=preview-main" >> $GITHUB_OUTPUT
+              else
+                echo "cf_branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+              fi
+              echo "deploy_type=preview" >> $GITHUB_OUTPUT
+            fi
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "cf_branch=main" >> $GITHUB_OUTPUT
+            echo "deploy_type=production" >> $GITHUB_OUTPUT
+          else
+            echo "cf_branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "deploy_type=preview" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deploy to Cloudflare Pages
+        if: github.event_name != 'pull_request' && steps.credentials-check.outputs.has_token == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || 'acaf2dcdb56ee1f7b39f950507822757' }}
-          command: pages deploy dist_marketing --project-name=cfo-ai-marketing --branch=main
+          command: pages deploy dist_marketing --project-name=cfo-ai-marketing --branch=${{ steps.credentials-check.outputs.cf_branch }}
+
