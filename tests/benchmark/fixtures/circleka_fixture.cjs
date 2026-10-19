@@ -1,0 +1,91 @@
+'use strict';
+
+/**
+ * Case A — PT Circleka Indonesia Utama 3-Page Package Fixture
+ * Matches verified production document cd850fe1-c214-43e3-8353-23c471dd8567
+ */
+
+const CIRCLEKA_PAGE_1_INVOICE = `PT. Circleka Indonesia Utama
+NPWP : 00.207.974.4-507.000
+Jl. Jatinegara Barat No.124, Bali Mester, Jatinegara, Jakarta Timur, DKI Jakarta 13320
+
+INVOICE
+Document Date   : 31/07/2026
+Est. Pay Date   : 14/08/2026
+Customer Account: X2610001139
+
+Bill To:
+PT. HELM CARE INDONESIA
+NPWP : 1000000002284592
+Jl. Dharmawangsa No. 43, Benoa, Kuta Selatan
+
+Description                                        Amount (IDR)
+Rent space / penempatan unit mesin helm care       129.600.000
+di 36 toko Circle K (Periode 15/04/2026 - 14/07/2026)
+
+Sub Total                                          129.600.000
+PPN 12% (Pajak Pertambahan Nilai)                   14.256.000
+Total Tagihan                                      143.856.000
+
+Terbilang: Seratus Empat Puluh Tiga Juta Delapan Ratus Lima Puluh Enam Ribu Rupiah
+
+Payment Instructions:
+Mohon transfer pembayaran ke rekening:
+Bank Central Asia (BCA) KCP Kuta
+Rekening No : 040.184.5111
+Atas Nama   : PT CIRCLEKA INDONESIA UTAMA
+`;
+
+const CIRCLEKA_PAGE_2_TAC = `TRADE ACTIVITY CONFIRMATION (TAC)
+PT. HELM CARE INDONESIA
+Rent space 36 Store Circle K
+Periode: 15 April 2026 - 14 Juli 2026
+
+Nilai Kegiatan: Rp 129.600.000
+Invoice will be issued according to information from TAC & agreed by both parties.
+Signed and agreed by both parties.
+`;
+
+const CIRCLEKA_PAGE_3_FAKTUR_PAJAK = `Faktur Pajak
+Kode dan Nomor Seri Faktur Pajak: 04002600313616020
+
+Pengusaha Kena Pajak:
+Nama  : CIRCLEKA INDONESIA UTAMA
+Alamat: JL JATINEGARA BARAT NO.124, RT 000, RW 000, KAMPUNG MELAYU, JATINEGARA, KOTA ADM. JAKARTA TIMUR, DKI JAKARTA 13320
+NPWP  : 00.207.974.4-507.000
+
+Pembeli Barang Kena Pajak / Penerima Jasa Kena Pajak:
+Nama  : HELM CARE INDONESIA
+Alamat: Pertokoan Soho Dharmawangsa No. 43, Jl Dharmawangsa RT 000 RW 000, BENOA KUTA SELATAN, KAB. BADUNG, BALI 80363
+NPWP  : 1000000002284592
+
+No.  Nama Barang Kena Pajak / Jasa Kena Pajak      Harga Jual / Penggantian
+1.   HELM CARE INDONESIA PT - RENT SPACE           129.600.000
+     PENEMPATAN UNIT MESIN HELM CARE DI 36 TOKO
+     CIRCLE K PERIODE 15 APRIL 2026 - 14 JULI 2026
+     Rp 129.600.000,00 x 1,00 Kegiatan
+     Potongan Harga = Rp 0,00
+     PPnBM (0.00%)  = Rp 0,00
+
+Harga Jual / Penggantian / Uang Muka / Termin      129.600.000
+Dikurangi Potongan Harga                                     0
+Dikurangi Uang Muka yang telah diterima                      0
+Dasar Pengenaan Pajak                              118.800.000
+Jumlah PPN (Pajak Pertambahan Nilai)                14.256.000
+Jumlah PPnBM (Pajak Penjualan atas Barang Mewah)             0
+
+Sesuai dengan ketentuan yang berlaku, Direktorat Jenderal Pajak mengatur bahwa
+Faktur Pajak ini telah ditandatangani secara elektronik sehingga tidak diperlukan tanda tangan basah.
+KOTA ADM. JAKARTA TIMUR, 31 Juli 2026
+HENDRI WIBOWO
+(Referensi: X2610001139)
+`;
+
+const CIRCLEKA_FULL_PACKAGE_TEXT = `${CIRCLEKA_PAGE_1_INVOICE}\n\f\n${CIRCLEKA_PAGE_2_TAC}\n\f\n${CIRCLEKA_PAGE_3_FAKTUR_PAJAK}`;
+
+module.exports = {
+  CIRCLEKA_PAGE_1_INVOICE,
+  CIRCLEKA_PAGE_2_TAC,
+  CIRCLEKA_PAGE_3_FAKTUR_PAJAK,
+  CIRCLEKA_FULL_PACKAGE_TEXT
+};

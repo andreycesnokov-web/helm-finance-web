@@ -1,0 +1,80 @@
+{
+  "$schema": "../schemas/ground_truth_schema.json",
+  "case_id": "CASE_D_PRIMA_SENTRAL",
+  "title": "PT Prima Sentral Distribusi 1-Page Commercial Bill",
+  "document_type": "commercial_invoice",
+  "verification_status": "verified_production_ground_truth",
+  "missing_artifacts": {
+    "original_pdf_missing": false,
+    "nanonets_json_missing": true,
+    "notes": "Verified from original document photograph media_1792380812990_4a9bf849.jpg. No Nanonets export provided for this specific document."
+  },
+  "physical_pages": [
+    {
+      "page_number": 1,
+      "content_type": "commercial_invoice",
+      "document_number": "PSD - 0926002"
+    }
+  ],
+  "financials": {
+    "currency": "IDR",
+    "invoice_subtotal": 5000000,
+    "commercial_discount": 0,
+    "faktur_pajak_dpp": null,
+    "subtotal_dpp_variance": null,
+    "ppn_rate": 0,
+    "ppn_amount": 0,
+    "withholding_tax_type": null,
+    "withholding_tax_base": null,
+    "withholding_tax_amount": null,
+    "receipt_total": null,
+    "gross_payable_total": 5000000,
+    "settled_amount": null
+  },
+  "parties": {
+    "issuer": {
+      "name": "PT. PRIMA SENTRAL DISTRIBUSI",
+      "npwp_raw": null,
+      "npwp_15": null,
+      "npwp_16": null
+    },
+    "buyer": {
+      "name": "HELMCARE",
+      "npwp_raw": null,
+      "npwp_15": null,
+      "npwp_16": null
+    }
+  },
+  "dates": {
+    "document_date": "2026-09-18",
+    "due_date": null,
+    "estimated_payment_date": null,
+    "settlement_date": null
+  },
+  "tax_identifiers": {
+    "nsfp_serial": null,
+    "document_number": "PSD - 0926002"
+  },
+  "banking": {
+    "bank_name": "BCA",
+    "account_number": "7460512667",
+    "account_holder": "PT PRIMA SENTRAL DISTRIBUSI",
+    "reference_number": "PSD - 0926002"
+  },
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Hifi Air 75GB 30 Hari",
+      "quantity": 50,
+      "unit_price": 100000,
+      "total_price": 5000000,
+      "is_taxable": false
+    }
+  ],
+  "reconciliation_invariants": {
+    "zero_posting_guard": true,
+    "needs_review_flag": false,
+    "kwitansi_direction_inverted": false,
+    "subtotal_dpp_reconciliation_required": false
+  }
+}

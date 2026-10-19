@@ -1,0 +1,80 @@
+{
+  "$schema": "../schemas/ground_truth_schema.json",
+  "case_id": "CASE_B_BCA_CONFIRMATION",
+  "title": "BCA Outward Remittance / Payment Confirmation (LMX Advance Remittance)",
+  "document_type": "payment_proof",
+  "verification_status": "synthetic_candidate_pending_raw_files",
+  "missing_artifacts": {
+    "original_pdf_missing": true,
+    "nanonets_json_missing": true,
+    "notes": "Original BCA payment confirmation slip / PDF and Nanonets JSON export are pending upload from user. Scenario modeled from documented advance remittance test specifications."
+  },
+  "physical_pages": [
+    {
+      "page_number": 1,
+      "content_type": "bank_remittance_slip",
+      "document_number": "BCA-REM-20260928-0914"
+    }
+  ],
+  "financials": {
+    "currency": "USD",
+    "invoice_subtotal": null,
+    "commercial_discount": null,
+    "faktur_pajak_dpp": null,
+    "subtotal_dpp_variance": null,
+    "ppn_rate": null,
+    "ppn_amount": null,
+    "withholding_tax_type": null,
+    "withholding_tax_base": null,
+    "withholding_tax_amount": null,
+    "receipt_total": null,
+    "gross_payable_total": 472.00,
+    "settled_amount": 472.00
+  },
+  "parties": {
+    "issuer": {
+      "name": "PT. HELM CARE INDONESIA",
+      "npwp_raw": "1000000002284592",
+      "npwp_15": null,
+      "npwp_16": "1000000002284592"
+    },
+    "buyer": {
+      "name": "Location Media Xchange Pte Ltd",
+      "npwp_raw": null,
+      "npwp_15": null,
+      "npwp_16": null
+    }
+  },
+  "dates": {
+    "document_date": "2026-09-28",
+    "due_date": null,
+    "estimated_payment_date": null,
+    "settlement_date": "2026-09-28"
+  },
+  "tax_identifiers": {
+    "nsfp_serial": null,
+    "document_number": "BCA-REM-20260928-0914"
+  },
+  "banking": {
+    "bank_name": "Bank Central Asia (BCA)",
+    "account_number": "040.184.9921",
+    "account_holder": "PT HELM CARE INDONESIA",
+    "reference_number": "BCA-REM-20260928-0914"
+  },
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Outward Remittance to Location Media Xchange Pte Ltd",
+      "quantity": 1,
+      "unit_price": 472.00,
+      "total_price": 472.00,
+      "is_taxable": false
+    }
+  ],
+  "reconciliation_invariants": {
+    "zero_posting_guard": true,
+    "needs_review_flag": true,
+    "kwitansi_direction_inverted": false,
+    "subtotal_dpp_reconciliation_required": false
+  }
+}

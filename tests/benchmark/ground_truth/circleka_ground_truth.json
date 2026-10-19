@@ -1,0 +1,90 @@
+{
+  "$schema": "../schemas/ground_truth_schema.json",
+  "case_id": "CASE_A_CIRCLEKA",
+  "title": "Circle K Indonesia 3-Page Commercial Invoice & Tax Package",
+  "document_type": "multi_document_package",
+  "verification_status": "verified_production_ground_truth",
+  "missing_artifacts": {
+    "original_pdf_missing": false,
+    "nanonets_json_missing": false,
+    "notes": "Verified against production document cd850fe1-c214-43e3-8353-23c471dd8567 and Nanonets export b028393d-ec39-4500-9193-172173f1d6c7-invoice-ar-bali-x2610001139-pt-helm-care-indonesia_0001.pdf."
+  },
+  "physical_pages": [
+    {
+      "page_number": 1,
+      "content_type": "commercial_invoice",
+      "document_number": "X2610001139"
+    },
+    {
+      "page_number": 2,
+      "content_type": "trade_activity_confirmation",
+      "document_number": null
+    },
+    {
+      "page_number": 3,
+      "content_type": "faktur_pajak",
+      "document_number": "04002600313616020"
+    }
+  ],
+  "financials": {
+    "currency": "IDR",
+    "invoice_subtotal": 129600000,
+    "commercial_discount": null,
+    "faktur_pajak_dpp": 118800000,
+    "subtotal_dpp_variance": 10800000,
+    "ppn_rate": 0.12,
+    "ppn_amount": 14256000,
+    "withholding_tax_type": null,
+    "withholding_tax_base": null,
+    "withholding_tax_amount": null,
+    "receipt_total": null,
+    "gross_payable_total": 143856000,
+    "settled_amount": null
+  },
+  "parties": {
+    "issuer": {
+      "name": "PT. Circleka Indonesia Utama",
+      "npwp_raw": "00.207.974.4-507.000",
+      "npwp_15": "002079744507000",
+      "npwp_16": "002079744507000"
+    },
+    "buyer": {
+      "name": "PT. HELM CARE INDONESIA",
+      "npwp_raw": "1000000002284592",
+      "npwp_15": null,
+      "npwp_16": "1000000002284592"
+    }
+  },
+  "dates": {
+    "document_date": "2026-07-31",
+    "due_date": null,
+    "estimated_payment_date": "2026-08-14",
+    "settlement_date": null
+  },
+  "tax_identifiers": {
+    "nsfp_serial": "04002600313616020",
+    "document_number": "X2610001139"
+  },
+  "banking": {
+    "bank_name": "Bank Central Asia (BCA)",
+    "account_number": "040.184.5111",
+    "account_holder": "PT CIRCLEKA INDONESIA UTAMA",
+    "reference_number": null
+  },
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Rent space / penempatan unit mesin helm care di 36 toko Circle K (Periode 15/04/2026 - 14/07/2026)",
+      "quantity": 1,
+      "unit_price": 129600000,
+      "total_price": 129600000,
+      "is_taxable": true
+    }
+  ],
+  "reconciliation_invariants": {
+    "zero_posting_guard": true,
+    "needs_review_flag": true,
+    "kwitansi_direction_inverted": false,
+    "subtotal_dpp_reconciliation_required": true
+  }
+}
