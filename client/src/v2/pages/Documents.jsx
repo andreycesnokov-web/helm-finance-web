@@ -20,7 +20,7 @@ import { useWorkspace } from '../../shell/WorkspaceProvider'
 import I from '../icons'
 import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
-import { useApi, useInvalidate } from '../data'
+import { useApi, useInvalidate, usePagedBusinessTransactions } from '../data'
 import { money, shortDate } from '../lib/format'
 import { monthOptions, defaultCloseMonth } from '../lib/accounting'
 import { detailPath } from './Bills'
@@ -98,12 +98,17 @@ export default function Documents() {
   const [limit, setLimit] = useState(LIMIT)
   const docs = useApi('/documents?limit=200')
   const debts = useApi('/debts')
-  const txs = useApi('/transactions?period=all')
+  const txs = usePagedBusinessTransactions()
   const walletsApi = useApi('/wallets')
   const cpsApi = useApi('/counterparties')
   const list = docs.data?.documents || []
   const debtList = Array.isArray(debts.data) ? debts.data : []
-  const txList = Array.isArray(txs.data) ? txs.data : []
+  const txList = txs.data
+  const linkedTransactionIds = useMemo(() => new Set(list.flatMap(d => (d.links || [])
+    .filter(l => l.target_type === 'transaction').map(l => String(l.target_id)))), [list])
+  // The document endpoint is capped at 200; a partial or role-filtered list cannot prove absence.
+  const linkStatusComplete = !!docs.data && list.length < 200
+    && ['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(active?.role)
   const debtsById = useMemo(() => new Map(debtList.map((d) => [String(d.id), d])), [debtList])
   const txById = useMemo(() => new Map(txList.map((x) => [String(x.id), x])), [txList])
   const { evidence, vault } = useMemo(() => partitionDocuments(list), [list])
@@ -234,7 +239,12 @@ export default function Documents() {
       )}
       {openDoc && <DocumentDrawer doc={openDoc} debts={debtList} transactions={txList}
         wallets={(walletsApi.data?.wallets || []).filter((w) => w.is_active !== false)}
-        counterparties={Array.isArray(cpsApi.data) ? cpsApi.data : (cpsApi.data?.counterparties || [])} onClose={closeDoc} onChanged={changed} />}
+        transactionWallets={walletsApi.data?.wallets || []}
+        counterparties={Array.isArray(cpsApi.data) ? cpsApi.data : (cpsApi.data?.counterparties || [])}
+        linkedTransactionIds={linkedTransactionIds} linkStatusComplete={linkStatusComplete}
+        txLoading={txs.loading} txError={txs.error} txHasMore={txs.hasMore}
+        reloadTransactions={txs.reload} loadMoreTransactions={txs.loadMore}
+        onClose={closeDoc} onChanged={changed} />}
       {modal}
     </div>
   )

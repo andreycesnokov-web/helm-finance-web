@@ -26,6 +26,7 @@ const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } cat
 // existing server-side role check; it is listed in the batch report. All of them live in
 // client/src/v2/lib/actions.js — no other v2 file may write.
 export const WRITE_ALLOW = [
+  { method: 'POST', path: '`/account/integrations/ai-assistants/' }, // Existing account-owner grant revocation (baseline).
   { method: 'POST', path: "'/billing/plan'" },
   { method: 'POST', path: "'/billing/trial'" },
   { method: 'POST', path: "'/admin/billing/catalog/'" },

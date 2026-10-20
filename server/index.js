@@ -8176,15 +8176,23 @@ app.post('/api/team/onboarding/training-submission', async (req, res) => {
 app.get('/api/transactions', auth, async (req, res) => {
   const { scope, period = 'month', type } = req.query;
   const now = new Date();
-
   const biz = await requireBusiness(req, res);
   if (!biz) return;
   if (!canViewBusinessFinance(biz.role))
     return res.status(403).json({ error: 'Your role does not allow viewing business transactions' });
 
+  // Opt-in, bounded pagination for the V2 document picker. The legacy array
+  // response and unpaged callers keep their existing contract.
+  const paged = req.query.limit !== undefined || req.query.before_id !== undefined;
+  const pageLimit = Number(req.query.limit);
+  const beforeId = req.query.before_id === undefined ? null : Number(req.query.before_id);
+  if (paged && (!Number.isSafeInteger(pageLimit) || pageLimit < 1 || pageLimit > 500
+    || (beforeId !== null && (!Number.isSafeInteger(beforeId) || beforeId < 1))))
+    return res.status(400).json({ error: 'invalid_transaction_page' });
+
   let query = supabase.from('transactions').select('*')
     .or(bizOrFilter(biz))
-    .order('created_at', { ascending: false });
+    .order(paged ? 'id' : 'created_at', { ascending: false });
 
   // Period filter — 'all' skips date filter entirely (used by Payroll page)
   if (period !== 'all') {
@@ -8200,6 +8208,10 @@ app.get('/api/transactions', auth, async (req, res) => {
 
   // Type filter — allows Payroll page to fetch only payroll transactions
   if (type && type !== 'all') query = query.eq('type', type);
+  if (paged) {
+    if (beforeId !== null) query = query.lt('id', beforeId);
+    query = query.limit(pageLimit);
+  }
 
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });

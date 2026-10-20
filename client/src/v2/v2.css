@@ -778,6 +778,42 @@
 .v2-doclinks { list-style: none; margin: 0; padding: 0; }
 .v2-doclinks li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
 .v2-doclinks li:first-child { border-top: 0; }
+.v2-txp { min-width: 0; display: grid; gap: var(--space-2); }
+.v2-txp > .v2-btn { justify-self: start; }
+.v2-txp-panel { min-width: 0; padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-page); display: grid; gap: var(--space-2); }
+.v2-txp-filter-toggle { display: none; justify-self: start; }
+.v2-txp-filter-body { display: grid; gap: var(--space-2); }
+.v2-txp-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.v2-txp-filters .v2-field { min-width: 0; margin: 0; }
+.v2-txp-filters .v2-input, .v2-txp-filters .v2-select { width: 100%; min-width: 0; }
+.v2-txp-check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.v2-txp-results { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.v2-txp-result + .v2-txp-result { border-top: 1px solid var(--border-subtle); }
+.v2-txp-option { width: 100%; display: grid; gap: 4px; text-align: left; padding: var(--space-3); color: var(--text-primary); background: transparent; border: 0; cursor: pointer; font: inherit; min-width: 0; }
+.v2-txp-option:hover, .v2-txp-option:focus-visible, .v2-txp-option[aria-pressed="true"] { background: var(--surface-page); }
+.v2-txp-option:disabled { opacity: .65; cursor: default; }
+.v2-txp-main, .v2-txp-secondary { display: flex; flex-wrap: wrap; gap: 4px var(--space-2); align-items: baseline; }
+.v2-txp-main strong { margin-left: auto; }
+.v2-txp-secondary, .v2-txp-status { color: var(--text-secondary); font-size: 12px; }
+.v2-txp-description { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 100%; }
+.v2-txp-description.is-full { white-space: pre-wrap; overflow-wrap: anywhere; text-overflow: clip; }
+.v2-txp-details { padding: 0 var(--space-3) var(--space-3); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.v2-txp-details summary { color: var(--action-primary); cursor: pointer; }
+.v2-txp-details p { white-space: pre-wrap; margin: var(--space-2) 0 0; }
+.v2-txp-picked { padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); display: grid; gap: 4px; min-width: 0; }
+.v2-txp-compare { display: grid; gap: var(--space-3); border: 1px solid var(--action-primary); border-radius: var(--radius-md); padding: var(--space-3); min-width: 0; }
+.v2-txp-compare > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.v2-txp-compare .v2-txp-comparison { grid-column: 1 / -1; display: grid; gap: var(--space-2); border-top: 1px solid var(--border-subtle); padding-top: var(--space-2); }
+.v2-txp-comparison-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.v2-txp-compare > .v2-txp-caution { background: var(--warning-soft); color: var(--warning-ink); border-radius: var(--radius-md); padding: var(--space-2); }
+.v2-txp-compare > p { grid-column: 1 / -1; margin: 0; color: var(--text-secondary); font-size: var(--text-sm); }
+@media (min-width: 640px) { .v2-txp-compare { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) {
+  .v2-txp-filter-toggle { display: inline-flex; }
+  .v2-txp-filter-body:not(.is-open) { display: none; }
+  .v2-txp-filters { grid-template-columns: minmax(0, 1fr); }
+  .v2-txp-main strong { margin-left: 0; }
+}
 .v2-docdrawer-archive { color: var(--danger); }
 .v2-docpv { flex: 1 1 auto; min-height: 60vh; display: flex; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-page); overflow: hidden; }
 @media (min-width: 1025px) { .v2-docpv { min-height: 0; } }
