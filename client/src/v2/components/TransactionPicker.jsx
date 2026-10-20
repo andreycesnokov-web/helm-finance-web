@@ -28,7 +28,7 @@ export function TransactionSummary({ tx, wallets = [], fullDescription = false }
 
 export default function TransactionPicker({ doc, transactions = [], wallets = [], counterparties = [],
   linkedIds = new Set(), linkedToCurrent = new Set(), statusComplete = false, loading = false, error = null,
-  hasMore = false, onRetry, onLoadMore, value, onSelect, disabled = false }) {
+  hasMore = false, onRetry, onLoadMore, value, onSelect, disabled = false, linkedHereLabel = null, linkedLabel = null }) {
   const t = useT()
   const listId = useId()
   const trigger = useRef(null)
@@ -102,8 +102,8 @@ export default function TransactionPicker({ doc, transactions = [], wallets = []
                   disabled={linkedToCurrent.has(String(tx.id))} aria-pressed={String(value) === String(tx.id)}
                   onKeyDown={e => move(e, i)} onClick={() => choose(tx)}>
                   <TransactionSummary tx={tx} wallets={wallets} />
-                  <span className="v2-txp-status">{linkedToCurrent.has(String(tx.id)) ? t('docs.txPicker.linkedHere')
-                    : linkedIds.has(String(tx.id)) ? t('docs.txPicker.linked')
+                  <span className="v2-txp-status">{linkedToCurrent.has(String(tx.id)) ? (linkedHereLabel || t('docs.txPicker.linkedHere'))
+                    : linkedIds.has(String(tx.id)) ? (linkedLabel || t('docs.txPicker.linked'))
                       : statusComplete ? t('docs.txPicker.unlinked') : t('docs.txPicker.unknownStatus')}</span>
                 </button>
                 {tx.description && <details className="v2-txp-details"><summary>{t('docs.txPicker.fullDescription')}</summary><p>{tx.description}</p></details>}

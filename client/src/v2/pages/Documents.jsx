@@ -104,11 +104,14 @@ export default function Documents() {
   const list = docs.data?.documents || []
   const debtList = Array.isArray(debts.data) ? debts.data : []
   const txList = txs.data
-  const linkedTransactionIds = useMemo(() => new Set(list.flatMap(d => (d.links || [])
-    .filter(l => l.target_type === 'transaction').map(l => String(l.target_id)))), [list])
-  // The document endpoint is capped at 200; a partial or role-filtered list cannot prove absence.
-  const linkStatusComplete = !!docs.data && list.length < 200
-    && ['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(active?.role)
+  const linkedTransactionIds = useMemo(() => new Set([...list.flatMap(d => (d.links || [])
+    .filter(l => l.target_type === 'transaction').map(l => String(l.target_id))),
+    ...txList.filter(tx=>tx.document_link_status_known&&tx.document_link_count>0).map(tx=>String(tx.id))]), [list,txList])
+  // New page metadata is authoritative for absence; explicitly failed reads
+  // must not fall back to a partial document list. Retain older-server support.
+  const hasLinkMetadata = txList.some(tx=>typeof tx.document_link_status_known==='boolean')
+  const linkStatusComplete = ['owner', 'ceo', 'admin', 'cfo', 'accountant', 'auditor'].includes(active?.role)
+    && (hasLinkMetadata ? txList.every(tx=>tx.document_link_status_known===true) : !!docs.data && list.length<200)
   const debtsById = useMemo(() => new Map(debtList.map((d) => [String(d.id), d])), [debtList])
   const txById = useMemo(() => new Map(txList.map((x) => [String(x.id), x])), [txList])
   const { evidence, vault } = useMemo(() => partitionDocuments(list), [list])

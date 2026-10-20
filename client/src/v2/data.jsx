@@ -84,14 +84,14 @@ export function useApi(path) {
 /** Read the Business ledger in bounded pages for document matching. A fresh
  * workspace or invalidation discards every page before any old row can render.
  * Each batch stops after 5,000 rows; the user can request the next batch. */
-export function usePagedBusinessTransactions() {
+export function usePagedBusinessTransactions(enabled = true) {
   const ctx = useContext(Ctx)
   const [nonce, setNonce] = useState(0)
   const [pageBudget, setPageBudget] = useState(10)
-  const key = `${ctx?.wsId}|${ctx?.gen}|${nonce}|${pageBudget}`
+  const key = `${ctx?.wsId}|${ctx?.gen}|${nonce}|${pageBudget}|${enabled}`
   const [st, setSt] = useState({ key: null, getRef: null, data: [], loading: true, error: null, hasMore: false })
   useEffect(() => {
-    if (!ctx?.get || ctx.wsId == null) { setSt({ key, getRef: ctx?.get, data: [], loading: false, error: null, hasMore: false }); return }
+    if (!enabled || !ctx?.get || ctx.wsId == null) { setSt({ key, getRef: ctx?.get, data: [], loading: false, error: null, hasMore: false }); return }
     let current = true
     setSt({ key, getRef: ctx.get, data: [], loading: true, error: null, hasMore: false })
     const read = async () => {
@@ -101,7 +101,7 @@ export function usePagedBusinessTransactions() {
       try {
         for (let page = 0; page < pageBudget; page++) {
           const cursor = beforeId == null ? '' : `&before_id=${beforeId}`
-          const result = await ctx.get(`/transactions?period=all&limit=${size}${cursor}`, { force: nonce > 0 })
+          const result = await ctx.get(`/transactions?period=all&include_document_status=true&limit=${size}${cursor}`, { force: nonce > 0 })
           if (!current) return
           const pageResult = appendTransactionPage(rows, result, beforeId, size)
           rows = pageResult.rows
@@ -121,7 +121,7 @@ export function usePagedBusinessTransactions() {
   const reload = useCallback(() => setNonce(n => n + 1), [])
   const loadMore = useCallback(() => setPageBudget(n => n + 10), [])
   return st.key === key && st.getRef === ctx?.get ? { ...st, reload, loadMore }
-    : { data: [], loading: !!ctx?.wsId, error: null, hasMore: false, reload, loadMore }
+    : { data: [], loading: enabled && !!ctx?.wsId, error: null, hasMore: false, reload, loadMore }
 }
 
 /** Drop the whole workspace read cache (call after a successful write). */

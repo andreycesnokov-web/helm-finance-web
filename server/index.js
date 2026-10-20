@@ -8217,6 +8217,8 @@ app.get('/api/transactions', auth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
 
   // Enrich bank-statement linking metadata for returned transactions
+  if(paged && req.query.include_document_status==='true' && Array.isArray(data))
+    await require('./lib/transactionDocumentStatus').enrich(supabase,biz.business.id,data);
   if (Array.isArray(data) && data.length > 0) {
     const txIds = data.map(t => t.id).filter(Boolean);
     if (txIds.length > 0) {

@@ -4,12 +4,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { start } from './serve.mjs'
+import { installFixtureTransport } from './fixtureTransport.mjs'
 const { chromium } = await import(process.env.PLAYWRIGHT ? pathToFileURL(process.env.PLAYWRIGHT).href : 'playwright-core')
 
 const dir = process.env.SHOTS_DIR || path.resolve('reports/transaction-picker-preview')
 fs.mkdirSync(dir, { recursive: true })
-const server = await start(4332)
+const inProcess = process.env.UI_IN_PROCESS === 'true'
+const server = inProcess ? {close(){}} : await start(4332)
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM })
+if(inProcess){const create=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await create(...args);await installFixtureTransport(context);return context}}
 try {
   for (const [width, height, name] of [[1440, 900, 'desktop'], [390, 844, 'mobile']]) {
     const context = await browser.newContext({ viewport: { width, height } })
@@ -78,7 +81,7 @@ try {
   const loadingPage = await loadingContext.newPage()
   let releaseTransactions
   const transactionsReady = new Promise(resolve => { releaseTransactions = resolve })
-  await loadingPage.route('**/api/transactions?*', async route => { await transactionsReady; await route.continue() })
+  await loadingPage.route('**/api/transactions?*', async route => { await transactionsReady; await route.fallback() })
   try {
     await loadingPage.goto('http://127.0.0.1:4332/business/documents?doc=doc1', { waitUntil: 'domcontentloaded' })
     await loadingPage.getByRole('button', { name: 'Find a transaction' }).click()
