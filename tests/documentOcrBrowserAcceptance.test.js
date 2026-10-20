@@ -19,7 +19,7 @@ const assert = require('assert');
 const { chromium } = require('playwright-core');
 
 // Require the live acceptance server (starts Express on 5611 + storage on 5613)
-const serverEnv = require('../scratch/test_live_acceptance_server');
+const serverEnv = require('./integration/test_live_acceptance_server');
 const ROOT = path.resolve(__dirname, '..');
 const mem = require(path.join(ROOT, 'tests/integration/_memorySupabase'));
 
