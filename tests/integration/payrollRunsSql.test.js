@@ -119,3 +119,21 @@ test('employee CRUD is company-scoped, validates bank account and preserves audi
  assert.equal((await employee('archive',r.employee.id,{expected_updated_at:next.employee.updated_at})).employee.status,'archived');
  assert.equal((await counts(f)).transactions,0);
 });
+test('CFO actor attribution stays separate from owner and private receipts are hidden after role downgrade',async()=>{
+ const f=await fixture(),actor=++uid,key=randomUUID();
+ await db.query('INSERT INTO users(id) VALUES($1)',[actor]);
+ await db.query("INSERT INTO business_members(business_id,user_id,role,status) VALUES($1,$2,'cfo','active')",[f.b,actor]);
+ const saved=await act(f,f.body,key,actor),p=(await payments(saved.run.id))[0];
+ assert.equal(p.user_id,f.owner);assert.equal(p.created_by_user_id,actor);assert.equal(saved.run.created_by_user_id,actor);
+ const audit=(await db.query('SELECT actor_user_id,actor_role FROM audit_events WHERE id=$1',[saved.audit_id])).rows[0];
+ assert.equal(audit.actor_user_id,actor);assert.equal(audit.actor_role,'cfo');
+ const own=(await db.query("SELECT rpc_list_own_financial_receipts($1,$2,'payroll_run') r",[f.b,actor])).rows[0].r;
+ const owners=(await db.query("SELECT rpc_list_own_financial_receipts($1,$2,'payroll_run') r",[f.b,f.owner])).rows[0].r;
+ assert.equal(own.rows.length,1);assert.equal(owners.rows.length,0);
+ for(const role of ['accountant','auditor','manager','employee']){
+  await db.query('UPDATE business_members SET role=$1 WHERE business_id=$2 AND user_id=$3',[role,f.b,actor]);
+  await assert.rejects(act(f,f.body,key,actor),/payroll_forbidden/);
+  await assert.rejects(db.query("SELECT rpc_list_own_financial_receipts($1,$2,'payroll_run') r",[f.b,actor]),/business_write_forbidden/);
+ }
+ assert.equal((await counts(f)).transactions,0);
+});
