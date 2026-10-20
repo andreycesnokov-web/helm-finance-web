@@ -120,7 +120,7 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: "'/payroll/employees'" },                        // POST   /api/payroll/employees
   { method: 'PATCH', path: "'/payroll/employees/' + encodeURIComponent" },  // PATCH  /api/payroll/employees/:id
   { method: 'DELETE', path: "'/payroll/employees/' + encodeURIComponent" }, // DELETE /api/payroll/employees/:id (archive)
-  { method: 'POST', path: "'/payroll/payments'" },                         // POST   /api/payroll/payments
+  { method: 'POST', path: "'/payroll/runs/action'" },                      // Accrual/approval/bank linking; never sends money.
   // Money windows (2026-10-10): v2 replacements of the v1 transfer and payment modals.
   { method: 'POST', path: "'/wallets/transfer'" },                         // POST /api/wallets/transfer (atomic RPC)
   { method: 'POST', path: "'/decisions/debts/' + encodeURIComponent" },    // POST /api/decisions/debts/:id/payment (simulation)
@@ -206,7 +206,8 @@ t('v2 makes no mutating request outside the reviewed allow-list', () => {
 t('every allowed write exists on the server (batch 8 routes are the approved ones only)', () => {
   const entry=read(path.join(ROOT,'server/index.js'))
   assert.ok(/registerBusinessProfileOperations\(app,/.test(entry),'profile module must be registered on the real app')
-  const server = entry + read(path.join(ROOT, 'server/lib/companyCreation.js')) + read(path.join(ROOT, 'server/lib/teamOperations.js')) + read(path.join(ROOT,'server/lib/businessProfile.js')) + read(path.join(ROOT,'server/lib/passwordAuth.js'))
+  assert.ok(entry.includes("require('./lib/payrollRuns').install(app,"),'audited payroll module must be installed on the real app')
+  const server = entry + read(path.join(ROOT, 'server/lib/companyCreation.js')) + read(path.join(ROOT, 'server/lib/teamOperations.js')) + read(path.join(ROOT,'server/lib/businessProfile.js')) + read(path.join(ROOT,'server/lib/passwordAuth.js')) + read(path.join(ROOT,'server/lib/payrollRuns.js'))
   for (const r of [/app\.patch\('\/api\/debts\/:id\/approve'/, /app\.patch\('\/api\/debts\/:id\/reject'/,
     /app\.post\('\/api\/debts\/:id\/request-info'/, /app\.patch\('\/api\/transactions\/:id'/, /app\.post\('\/api\/counterparties'/,
     /app\.patch\('\/api\/counterparties\/:id'/, /app\.patch\('\/api\/business\/targets'/, /app\.patch\('\/api\/debts\/:id\/checklist'/,

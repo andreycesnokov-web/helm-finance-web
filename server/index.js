@@ -945,6 +945,7 @@ async function replayFinancialCreate(req, res, biz, operation, rawIntent) {
   return financialRecovery.replay(supabase,req,res,biz,operation,req.body.request_key,canonical);
 }
 financialRecovery.install(app,{auth,requireBusiness,supabase});
+require('./lib/payrollRuns').install(app,{auth,requireBusiness,supabase,canManage:canManagePayroll});
 bankImportReview.install(app,{auth,requireBusiness,supabase});
 openingAnchor.install(app,{auth,requireBusiness,supabase,fx,canView:canViewBusinessFinance,canWrite:canManageWallets});
 
@@ -6681,7 +6682,7 @@ app.post('/api/bank-imports/:batchId/suggest', auth, async (req, res) => {
 
     // Payroll payments for matching (by amount + close date).
     const { data: payrolls } = await supabase.from('payroll_payments')
-      .select('id, employee_name, amount, payment_date').eq('user_id', biz.ownerUserId);
+      .select('id, employee_name, amount, payment_date, status').or(bizOrFilter(biz)).in('status', ['scheduled','paid']);
     const findPayroll = (date, amt) => (payrolls || []).find(p => {
       if (Math.abs(Number(p.amount) - amt) >= 1) return false;
       if (!p.payment_date || !date) return true;
@@ -13794,95 +13795,7 @@ app.get('/api/payroll/employees', auth, async (req, res) => {
   }
 });
 
-// POST /api/payroll/employees
-app.post('/api/payroll/employees', auth, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { name, role, default_salary, currency, pay_day, default_wallet_id, notes } = req.body;
-    if (!name || !name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
-
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canManagePayroll(biz.role))
-      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
-
-    // Validate wallet belongs to the business if supplied
-    if (default_wallet_id) {
-      const { data: w } = await supabase.from('wallets').select('id').eq('id', default_wallet_id).or(bizOrFilter(biz)).limit(1);
-      if (!w?.length) return res.status(400).json({ error: 'Invalid wallet.' });
-    }
-
-    const { data, error } = await supabase.from('payroll_employees').insert({
-      ...bizWriteFields(biz, userId),
-      name: name.trim(),
-      role: role?.trim() || null,
-      default_salary: default_salary ? Number(default_salary) : null,
-      currency: currency || 'IDR',
-      pay_day: pay_day ? Number(pay_day) : null,
-      default_wallet_id: default_wallet_id || null,
-      notes: notes?.trim() || null,
-    }).select().single();
-    if (error) throw error;
-    res.json({ employee: data });
-  } catch (e) {
-    if (balanceFailure(res, e)) return;
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// PATCH /api/payroll/employees/:id
-app.patch('/api/payroll/employees/:id', auth, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { id } = req.params;
-    const { name, role, default_salary, currency, pay_day, default_wallet_id, status, notes } = req.body;
-
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canManagePayroll(biz.role))
-      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
-
-    const { data: exRows } = await supabase.from('payroll_employees').select('id').eq('id', id).or(bizOrFilter(biz)).limit(1);
-    if (!exRows?.length) return res.status(404).json({ error: 'Employee not found.' });
-
-    const updates = { updated_at: new Date().toISOString() };
-    if (name !== undefined)              updates.name              = name.trim();
-    if (role !== undefined)              updates.role              = role?.trim() || null;
-    if (default_salary !== undefined)    updates.default_salary    = default_salary ? Number(default_salary) : null;
-    if (currency !== undefined)          updates.currency          = currency;
-    if (pay_day !== undefined)           updates.pay_day           = pay_day ? Number(pay_day) : null;
-    if (default_wallet_id !== undefined) updates.default_wallet_id = default_wallet_id || null;
-    if (status !== undefined)            updates.status            = status;
-    if (notes !== undefined)             updates.notes             = notes?.trim() || null;
-
-    const { data, error } = await supabase.from('payroll_employees').update(updates).eq('id', id).select().single();
-    if (error) throw error;
-    res.json({ employee: data });
-  } catch (e) {
-    if (balanceFailure(res, e)) return;
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// DELETE /api/payroll/employees/:id  — soft delete
-app.delete('/api/payroll/employees/:id', auth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canManagePayroll(biz.role))
-      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
-    const { data: exRows } = await supabase.from('payroll_employees').select('id').eq('id', id).or(bizOrFilter(biz)).limit(1);
-    if (!exRows?.length) return res.status(404).json({ error: 'Employee not found.' });
-
-    const { error } = await supabase.from('payroll_employees').update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (e) {
-    if (balanceFailure(res, e)) return;
-    res.status(500).json({ error: e.message });
-  }
-});
+// Employee writes are installed by payrollRuns: atomic fresh-role checks + audit.
 
 // GET /api/payroll/payments
 app.get('/api/payroll/payments', auth, async (req, res) => {
@@ -13913,7 +13826,7 @@ app.get('/api/payroll/overview', auth, async (req, res) => {
     const bizOr = bizOrFilter(biz);
 
     const [empRes, payRes] = await Promise.all([
-      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day, default_wallet_id').or(bizOr).neq('status', 'archived').order('name'),
+      supabase.from('payroll_employees').select('id, name, role, default_salary, currency, pay_day, default_wallet_id, status, updated_at').or(bizOr).neq('status', 'archived').order('name'),
       supabase.from('payroll_payments').select('*, payroll_payment_items(*)').or(bizOr).order('payment_date', { ascending: false }),
     ]);
 
@@ -13946,139 +13859,15 @@ app.get('/api/payroll/overview', auth, async (req, res) => {
   }
 });
 
-// POST /api/payroll/payments
-// TODO (Telegram): When Telegram bot parses "зарплата Kevin 12M + бонус 2M - штраф 300k с BCA",
-//   it should call this same endpoint with the items array. No separate Telegram payroll logic.
-//
-// Creates payroll_payment + payroll_payment_items + linked transaction (net amount only).
+// Retained callers fail closed: recording a payroll run is not a bank transfer.
 app.post('/api/payroll/payments', auth, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const {
-      employee_id,
-      employee_name,
-      currency = 'IDR',
-      period_month,
-      payment_date,
-      wallet_id,
-      notes,
-      items = [],   // NEW: array of { item_type, label, amount, direction }
-      // Legacy single-amount fallback (V1 compatibility)
-      amount: legacyAmount,
-      payment_type: legacyType = 'salary',
-    } = req.body;
-
-    if (!employee_name || !employee_name.trim()) return res.status(400).json({ error: 'Employee name is required.' });
-
-    // ── Build items ──────────────────────────────────────────────────────────
-    // If items array provided (V1.1), use it. Otherwise fall back to legacy single amount.
-    let resolvedItems = [];
-    if (items && items.length > 0) {
-      // Validate each item
-      for (const item of items) {
-        if (!item.label || !item.label.trim())            return res.status(400).json({ error: 'Each item must have a label.' });
-        if (!Number(item.amount) || Number(item.amount) <= 0) return res.status(400).json({ error: `Amount for "${item.label}" must be positive.` });
-        if (!['addition', 'deduction'].includes(item.direction)) return res.status(400).json({ error: `Invalid direction for "${item.label}".` });
-      }
-      resolvedItems = items;
-    } else if (legacyAmount && Number(legacyAmount) > 0) {
-      // Legacy V1 fallback: single salary amount
-      resolvedItems = [{ item_type: legacyType, label: 'Salary', amount: Number(legacyAmount), direction: 'addition' }];
-    } else {
-      return res.status(400).json({ error: 'No payroll items provided.' });
-    }
-
-    // ── Calculate gross / deductions / net ───────────────────────────────────
-    const grossAmount     = resolvedItems.filter(i => i.direction === 'addition').reduce((s, i) => s + Number(i.amount), 0);
-    const deductionAmount = resolvedItems.filter(i => i.direction === 'deduction').reduce((s, i) => s + Number(i.amount), 0);
-    const netAmount       = grossAmount - deductionAmount;
-
-    if (netAmount <= 0) return res.status(400).json({ error: `Net amount must be positive. Gross: ${grossAmount}, Deductions: ${deductionAmount}.` });
-
-    const biz = await requireBusiness(req, res);
-    if (!biz) return;
-    if (!canManagePayroll(biz.role))
-      return res.status(403).json({ error: 'Your role does not allow managing payroll' });
-
-    // ── Validate wallet (must belong to same business) ───────────────────────
-    let wallet = null;
-    if (wallet_id) {
-      const { data: wRows } = await supabase.from('wallets').select('id, name, scope, currency, type').eq('id', wallet_id).or(bizOrFilter(biz)).limit(1);
-      if (!wRows?.length) return res.status(400).json({ error: 'Invalid or inaccessible wallet.' });
-      wallet = wRows[0];
-    }
-    if (await refuseNegativeOutflow(res, biz, wallet, netAmount)) return;
-
-    const payDate     = payment_date || new Date().toISOString().slice(0, 10);
-    const periodLabel = period_month ? ` — ${period_month}` : '';
-    const description = `Payroll payment for ${employee_name.trim()}${periodLabel}`;
-
-    const payCur = (wallet?.currency || currency || 'IDR').toUpperCase();
-    const fxRes = await fx.toIdr(netAmount, payCur, payDate);
-
-    // ── 1. Create transaction (net paid only — single cash impact) ───────────
-    const transactionRow = {
-      ...bizWriteFields(biz, userId),
-      type:              'payroll',
-      amount_original:   netAmount,
-      amount_idr:        fxRes.amount_idr,
-      booked_rate:       fxRes.booked_rate,
-      rate_source:       fxRes.rate_source,
-      currency_original: payCur,
-      description,
-      source:            wallet ? wallet.name : null,
-      wallet_id:         wallet_id || null,
-      scope:             wallet ? (wallet.scope || 'business') : 'business',
-      category:          'payroll',
-      transaction_date:  payDate,
-    };
-
-    // ── 2. Create payroll_payment ─────────────────────────────────────────────
-    const paymentRow = {
-      ...bizWriteFields(biz, userId),
-      employee_id:      employee_id || null,
-      employee_name:    employee_name.trim(),
-      amount:           netAmount,
-      gross_amount:     grossAmount,
-      deduction_amount: deductionAmount,
-      net_amount:       netAmount,
-      currency,
-      payment_type:     resolvedItems[0]?.item_type || legacyType,
-      period_month:     period_month || null,
-      payment_date:     payDate,
-      wallet_id:        wallet_id || null,
-      status:           'paid',
-      notes:            notes?.trim() || null,
-    };
-
-    // ── 3. Create payroll_payment_items ───────────────────────────────────────
-    const itemRows = resolvedItems.map(item => ({
-        user_id:            biz.ownerUserId,
-        business_id:        biz.business.id,
-        item_type:          item.item_type || 'other',
-        label:              item.label.trim(),
-        amount:             Number(item.amount),
-        direction:          item.direction,
-        notes:              item.notes?.trim() || null,
-      }));
-    if (typeof supabase.rpc !== 'function')
-      return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic payroll recording requires migration 070' });
-    const { data, error } = await supabase.rpc('rpc_record_business_payroll', {
-      p_business_id: biz.business.id, p_user_id: userId,
-      p_transaction: transactionRow, p_payment: paymentRow, p_items: itemRows,
-    });
-    if (error) {
-      if (balanceFailure(res, error)) return;
-      if (error.code === 'PGRST202' || /function.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
-        return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic payroll recording requires migration 070' });
-      throw error;
-    }
-    if (!data?.transaction || !data?.payment) return res.status(500).json({ error: 'atomic_payroll_failed' });
-    res.json(data);
-  } catch (e) {
-    if (balanceFailure(res, e)) return;
-    res.status(500).json({ error: e.message });
-  }
+ try {
+  const biz = await requireBusiness(req, res);
+  if (!biz) return;
+  if (!canManagePayroll(biz.role)) return res.status(403).json({error:'payroll_forbidden'});
+  return res.status(409).json({error:'payroll_bank_link_required', automatic_retry:false,
+    message:'Save a payroll run, approve it, then link an existing bank debit. This endpoint cannot create cash movements.'});
+ } catch { return res.status(503).json({error:'payroll_unavailable',automatic_retry:false}); }
 });
 
 // GET /api/payroll/by-transaction/:transactionId

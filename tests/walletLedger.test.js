@@ -81,5 +81,6 @@ test('every manual outflow route checks the balance — a transfer too, even wit
   assert.doesNotMatch(xfer, /!req\.body\.transfer_id && await refuseNegativeOutflow/);
   assert.ok(xfer.indexOf('is_replay: true') < xfer.indexOf('refuseNegativeOutflow'), 'a replay is answered before the check');
   assert.match(route("app.post('/api/debts/:id/pay'"), /refuseNegativeOutflow/);
-  assert.match(route("app.post('/api/payroll/payments'"), /refuseNegativeOutflow/);
+  assert.match(route("app.post('/api/payroll/payments'"), /payroll_bank_link_required/);
+  assert.doesNotMatch(route("app.post('/api/payroll/payments'"), /rpc_record_business_payroll/);
 });

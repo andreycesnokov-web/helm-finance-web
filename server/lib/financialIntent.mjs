@@ -1,6 +1,6 @@
 // Pure shared identity contract. Credentials, generated FX output and UI field
 // order are not operation identity. It never rewrites the body sent to a writer.
-export const RECOVERY_OPERATIONS = Object.freeze(['wallet_create', 'transaction_batch', 'wallet_adjust', 'debt_payment', 'wallet_transfer', 'bill_create'])
+export const RECOVERY_OPERATIONS = Object.freeze(['wallet_create', 'transaction_batch', 'wallet_adjust', 'debt_payment', 'wallet_transfer', 'bill_create', 'payroll_run'])
 const numeric = new Set(['amount','opening_balance','target_balance','expected_balance','target_amount','rate','booked_rate','amount_idr','sort_order'])
 export function decimalIdentity(value) {
   const s = String(value).trim()
@@ -19,6 +19,7 @@ export function canonicalJson(value) {
   return value
 }
 export function requestDescription(path) {
+  if (path === '/payroll/runs/action') return { operation: 'payroll_run', field: 'request_key' }
   if (path === '/debts') return { operation: 'bill_create', field: 'request_key' }
   if (path === '/wallets') return { operation: 'wallet_create', field: 'request_key' }
   if (path === '/transactions/batch') return { operation: 'transaction_batch', field: 'request_key' }
