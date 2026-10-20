@@ -193,6 +193,32 @@ const client = {
       table('document_audit').push({ id: crypto.randomUUID(), document_id: doc.id, action: 'uploaded' });
       return { data: doc, error: null };
     }
+    if (name === 'rpc_document_update_metadata') {
+      const doc = table('financial_documents').find((d) => d.id === args?.p_document_id && d.business_id === args?.p_business_id);
+      if (!doc) return { data: null, error: { message: 'document ' + args?.p_document_id + ' not found' } };
+      if (doc.archived_at) return { data: null, error: { message: 'archived document cannot be modified' } };
+      const p = args?.p_patch || {};
+      if (p.document_type !== undefined) doc.document_type = p.document_type;
+      if (p.document_number !== undefined) doc.document_number = p.document_number;
+      if (p.document_date !== undefined) doc.document_date = p.document_date;
+      if (p.period_start !== undefined) doc.period_start = p.period_start;
+      if (p.period_end !== undefined) doc.period_end = p.period_end;
+      if (p.currency !== undefined) doc.currency = p.currency;
+      if (p.gross_amount !== undefined) doc.gross_amount = p.gross_amount;
+      if (p.issuer_counterparty_id !== undefined) doc.issuer_counterparty_id = p.issuer_counterparty_id;
+      if (p.extracted_json !== undefined) doc.extracted_json = p.extracted_json;
+      doc.updated_at = new Date().toISOString();
+      table('document_audit').push({
+        id: crypto.randomUUID(),
+        business_id: args?.p_business_id,
+        document_id: doc.id,
+        actor_user_id: args?.p_actor,
+        channel: args?.p_channel || 'web',
+        action: 'metadata_changed',
+        created_at: new Date().toISOString(),
+      });
+      return { data: doc, error: null };
+    }
     if (name === 'rpc_document_archive') {
       const doc = table('financial_documents').find((d) => d.id === args?.p_document_id && d.business_id === args?.p_business_id);
       if (!doc) return { data: { message: 'probe' }, error: null };
