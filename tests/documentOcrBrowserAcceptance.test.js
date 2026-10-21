@@ -179,6 +179,12 @@ async function runBrowserAcceptance() {
     await docRowEl.locator('button.v2-docrow-act').click();
     await drawer.waitFor({ state: 'visible', timeout: 10000 });
 
+    await page.waitForFunction(
+      () => document.querySelector('form input[maxlength="200"]')?.value === 'INV-ARYS-PILOT-OK',
+      null,
+      { timeout: 5000 }
+    ).catch(() => {});
+
     const reloadedNumberVal = await drawer.locator('form input[maxlength="200"]').inputValue();
     console.log(`      Reloaded Document Number Input: "${reloadedNumberVal}" (Expected: "INV-ARYS-PILOT-OK")`);
     assert.strictEqual(reloadedNumberVal, 'INV-ARYS-PILOT-OK', 'Updated document number must persist after reload');

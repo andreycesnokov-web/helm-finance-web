@@ -15074,12 +15074,13 @@ app.patch('/api/documents/:id', auth, async (req, res) => {
     // Build the safe patch (whitelist only); the RPC writes it + audit atomically.
     const patch = {};
     if (b.document_type != null) patch.document_type = b.document_type;
-    if (b.title != null) patch.document_number = String(b.title).slice(0, 200);
+    if (b.title != null || b.document_number != null) patch.document_number = String(b.title != null ? b.title : b.document_number).slice(0, 200);
     if (b.document_date !== undefined && b.document_date) patch.document_date = b.document_date;
     if (b.period_start !== undefined && b.period_start) patch.period_start = b.period_start;
     if (b.period_end !== undefined && b.period_end) patch.period_end = b.period_end;
     if (b.currency != null) patch.currency = b.currency;
-    if (b.amount !== undefined && b.amount != null && isFinite(Number(b.amount))) patch.gross_amount = Number(b.amount);
+    const grossAmt = b.amount !== undefined && b.amount !== null ? b.amount : b.gross_amount;
+    if (grossAmt !== undefined && grossAmt != null && isFinite(Number(grossAmt))) patch.gross_amount = Number(grossAmt);
     if (b.counterparty_id) patch.issuer_counterparty_id = b.counterparty_id;
     if (b.description !== undefined) patch.extracted_json = { ...(doc.extracted_json || {}), notes: b.description ? String(b.description).slice(0, 2000) : null };
     const { data, error } = await supabase.rpc('rpc_document_update_metadata',
