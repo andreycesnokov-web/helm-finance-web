@@ -3132,6 +3132,9 @@ app.get('/api/accountant/tax-knowledge/cards', auth, async (req, res) => {
 
 
 // ── Advanced Financial Insights V1 ───────────────────────────────────────────
+// Isolated read-only P&L contribution model. Existing cash/forecast endpoints stay intact.
+require('./lib/profitLossRoutes').install(app, { auth, requireBusiness, canViewBusinessFinance, supabase });
+
 // GET /api/pulse/advanced-insights — cash-basis estimates over the transaction ledger.
 //
 // Read-only. Business-scoped through requireBusiness + bizOrFilter, exactly like every

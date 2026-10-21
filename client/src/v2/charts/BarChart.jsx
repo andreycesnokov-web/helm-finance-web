@@ -23,7 +23,7 @@ function barPath(x, y0, w, y1, r = 4) {
     : `M${x},${y0}V${y1 - rr}Q${x},${y1} ${x + rr},${y1}H${x + w - rr}Q${x + w},${y1} ${x + w},${y1 - rr}V${y0}Z`
 }
 
-export default function BarChart({ rows, series, height = 220, caption, highlight }) {
+export default function BarChart({ rows, series, height = 220, caption, highlight, currency = 'IDR' }) {
   const t = useT()
   const [asTable, setAsTable] = useState(false)
   const [hover, setHover] = useState(null)
@@ -54,7 +54,7 @@ export default function BarChart({ rows, series, height = 220, caption, highligh
   const h = hover != null ? rows[hover] : null
   const tipRows = h?.empty && series.every((s) => !Number(h.values[s.key])) ? [{ label: 'none', note: t('chart.noData') }] : h ? series.map((s, j) => {
     const v = h.values[s.key]
-    return { label: s.label, value: v == null ? '—' : money(v), color: SERIES[j % SERIES.length], box: true, tone: Number(v) < 0 ? 'neg' : null }
+    return { label: s.label, value: v == null ? '—' : money(v, { currency }), color: SERIES[j % SERIES.length], box: true, tone: Number(v) < 0 ? 'neg' : null }
   }) : []
   const focusKey = hover != null ? rows[hover].key : highlight
 
@@ -65,7 +65,7 @@ export default function BarChart({ rows, series, height = 220, caption, highligh
           <table className="v2-table">
             {caption && <caption className="v2-sr">{caption}</caption>}
             <thead><tr><th scope="col">{t('perf.col.month')}</th>{series.map((s) => <th key={s.key} scope="col" className="v2-r">{s.label}</th>)}</tr></thead>
-            <tbody>{rows.map((r) => <tr key={r.key}><td>{r.label}</td>{series.map((s) => <td key={s.key} className={`v2-r v2-num${Number(r.values[s.key]) < 0 ? ' v2-neg' : ''}`}>{r.values[s.key] == null ? '—' : money(r.values[s.key])}</td>)}</tr>)}</tbody>
+            <tbody>{rows.map((r) => <tr key={r.key}><td>{r.label}</td>{series.map((s) => <td key={s.key} className={`v2-r v2-num${Number(r.values[s.key]) < 0 ? ' v2-neg' : ''}`}>{r.values[s.key] == null ? '—' : money(r.values[s.key], { currency })}</td>)}</tr>)}</tbody>
           </table>
         </div>
       ) : (
