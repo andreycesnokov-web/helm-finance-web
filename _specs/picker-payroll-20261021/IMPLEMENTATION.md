@@ -1,4 +1,4 @@
-# Transaction Picker V2 + Payroll V2 — local review candidate
+# Transaction Picker V2 + Payroll V2 â€” local review candidate
 
 Business workspace only. No deployment, push, merge, production writes, OCR branch edits, paid AI calls or staging mutations.
 
@@ -22,10 +22,10 @@ Business workspace only. No deployment, push, merge, production writes, OCR bran
 
 ## Data paths and impact
 
-- Documents → DocumentDrawer → TransactionPicker/model → existing `linkDocument` action → authenticated Documents route → `rpc_document_link` → document_transaction_links + document_audit. Unlink uses the retained inverse route/RPC. No accounting writer is invoked by selection/linking.
-- Bills/vendor/customer/AP/AR evidence → existing document deep link → same drawer/picker. Bank import preserves its review/confirm mechanism; operation-folder/reconciliation flows already know the transaction and select a supporting document instead.
-- Payroll → existing EmployeeDialog / replacement F2 PayrollRunDialog → savePayrollRun → existing apiFetch financial-intent manager → `/payroll/runs/action` → `rpc_payroll_run_action` → payroll_runs + existing payroll_payments/items + audit_events + existing financial_write_requests, atomically.
-- PayrollRunHistory → same picker → explicit amount/account/currency comparison → action `link` → confirmed imported/matched bank debit. No INSERT/UPDATE to ledger amounts or balances. Already allocated debit, mismatched company/account/currency/net, debt payment and transfer are refused.
+- Documents â†’ DocumentDrawer â†’ TransactionPicker/model â†’ existing `linkDocument` action â†’ authenticated Documents route â†’ `rpc_document_link` â†’ document_transaction_links + document_audit. Unlink uses the retained inverse route/RPC. No accounting writer is invoked by selection/linking.
+- Bills/vendor/customer/AP/AR evidence â†’ existing document deep link â†’ same drawer/picker. Bank import preserves its review/confirm mechanism; operation-folder/reconciliation flows already know the transaction and select a supporting document instead.
+- Payroll â†’ existing EmployeeDialog / replacement F2 PayrollRunDialog â†’ savePayrollRun â†’ existing apiFetch financial-intent manager â†’ `/payroll/runs/action` â†’ `rpc_payroll_run_action` â†’ payroll_runs + existing payroll_payments/items + audit_events + existing financial_write_requests, atomically.
+- PayrollRunHistory â†’ same picker â†’ explicit amount/account/currency comparison â†’ action `link` â†’ confirmed imported/matched bank debit. No INSERT/UPDATE to ledger amounts or balances. Already allocated debit, mismatched company/account/currency/net, debt payment and transfer are refused.
 - Employee CRUD keeps the existing URLs but now delegates to `rpc_payroll_employee_action`; no unaudited fallback. Existing manager-role policy is retained (owner/ceo/admin/cfo). Accountant-supplied tax input is not accountant approval.
 - Existing commercial payroll feature admission is reused through its `/payroll/.+` rule. Billing/pricing files and flags are untouched; accrual/link actions do not consume newly fabricated bank transactions.
 - OCR overlap: `server/index.js` is also changed by the separately retained OCR branch. This candidate changes payroll routes, installation and opt-in transaction reads; it does not edit OCR/extraction modules or merge OCR. Integration must review these hunks explicitly. Old settlement-allocation document-link side effects are an existing separate flow, not rewritten here.
@@ -34,7 +34,7 @@ Business workspace only. No deployment, push, merge, production writes, OCR bran
 
 Final targeted command is recorded in `TEST_COMMANDS.md`. Node test totals include legacy scripts as single test files; Documents/Bills also report 76 internal checks, V2 guards 16, Document access 16. Embedded PostgreSQL executes the real full-schema SQL, constraints and RPC bodies, but is single-session: it is **not** native race, PostgREST, GoTrue, Storage or production RLS proof. Browser fixtures use the actual built V2 frontend with synthetic routed APIs and are UI evidence only.
 
-Native independent-session tests are prepared in `tests/integration/postgresPayrollRunRaces.test.js`. They refuse a missing/nonlocal/shared database and have no embedded fallback. They have not passed here: Windows loopback TCP times out, including Chrome→local fixture server and pg_isready→the retained local PG17 cluster. Its identifier was `7695158167404558200`, different from the protected production/Kamatera identifiers. No database migration was applied to that cluster.
+Native independent-session tests are prepared in `tests/integration/postgresPayrollRunRaces.test.js`. They refuse a missing/nonlocal/shared database and have no embedded fallback. They have not passed here: Windows loopback TCP times out, including Chromeâ†’local fixture server and pg_isreadyâ†’the retained local PG17 cluster. Its identifier was `7695158167404558200`, different from the protected production/Kamatera identifiers. No database migration was applied to that cluster.
 
 ## Migration, release and rollback
 

@@ -31,3 +31,8 @@ node --test tests/integration/postgresPayrollRunRaces.test.js
 ```
 
 This suite creates/drops only its own database after the existing shared-cluster guard. No production connection or fallback is accepted. Real PostgREST/Auth/private Storage acceptance remains a separate required gate.
+
+
+## Verified native follow-up
+
+The native suite above has now passed3 cases on real PostgreSQL17.6. The actual HTTP/browser runner scripts and guarded execution order are in `tests/integration/rcAcceptance/README.md`; final results and qualification are in `NATIVE_ACCEPTANCE.md`. Do not reuse private runner configuration for another target. Current targeted total is53 after decimal search coverage.
