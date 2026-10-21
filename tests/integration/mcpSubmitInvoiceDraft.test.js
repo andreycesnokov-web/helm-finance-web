@@ -106,9 +106,15 @@ async function connect(ctx) {
 const body = (r) => JSON.parse(r.content[0].text);
 const writes = (s) => s.calls.filter((c) => c[0] === 'createPendingPayableDraft');
 async function call(services, args, { enabled = true } = {}) {
+  const finalArgs = { ...args };
+  if (!('request_key' in finalArgs)) {
+    finalArgs.request_key = crypto.randomUUID();
+  } else if (finalArgs.request_key === undefined) {
+    delete finalArgs.request_key;
+  }
   const { client, close } = await connect({ mcpUser: { userId: OWNER }, services, writeToolsEnabled: enabled,
     webAppUrl: 'https://cfo.example' });
-  try { return await client.callTool({ name: 'submit_invoice_draft', arguments: args }); } finally { await close(); }
+  try { return await client.callTool({ name: 'submit_invoice_draft', arguments: finalArgs }); } finally { await close(); }
 }
 
 test('flag OFF: submit_invoice_draft is not registered (Phase-1 stays read-only)', async () => {
@@ -233,4 +239,52 @@ test('stored document path uses the business-scoped document', async () => {
   assert.strictEqual(writes(s)[0][3].raw_input_text, null);
   const r2 = await call(fakeServices(), { document_id: 'doc-of-other-company' });
   assert.strictEqual(body(r2).error, 'document_not_found');
+});
+
+test('request_key contract: missing key is refused before any write', async () => {
+  const s = fakeServices();
+  const r = await call(s, { invoice_text: SAMPLE_INVOICE, request_key: undefined });
+  assert.ok(r.isError, 'expected error on missing request_key');
+  assert.match(r.content[0].text, /request_key/);
+  assert.strictEqual(writes(s).length, 0);
+});
+
+test('request_key contract: same key and payload returns one result idempotently', async () => {
+  const s = fakeServices();
+  const key = crypto.randomUUID();
+  const r = await call(s, { invoice_text: SAMPLE_INVOICE, request_key: key });
+  assert.ok(!r.isError, JSON.stringify(body(r)));
+  assert.strictEqual(writes(s).length, 1);
+  assert.strictEqual(writes(s)[0][3].request_key, key);
+});
+
+test('request_key contract: payload conflict with same key is refused', async () => {
+  const s = fakeServices({
+    createPendingPayableDraft: async () => ({ error: 'bill_request_conflict' })
+  });
+  const key = crypto.randomUUID();
+  const r = await call(s, { invoice_text: SAMPLE_INVOICE, request_key: key });
+  assert.ok(r.isError, 'expected error on payload conflict');
+  assert.strictEqual(body(r).error, 'bill_request_conflict');
+});
+
+test('request_key contract: commit-loss receipt recovery returns confirmed draft', async () => {
+  const recoveredDraft = {
+    id: 'debt-recovered-1',
+    counterparty: 'PT ABC Indonesia',
+    amount: 18500000,
+    currency: 'IDR',
+    approval_status: 'pending_approval'
+  };
+  const s = fakeServices({
+    createPendingPayableDraft: async () => ({
+      debt: recoveredDraft,
+      telegram_notified: 0,
+      recovered: true
+    })
+  });
+  const key = crypto.randomUUID();
+  const r = await call(s, { invoice_text: SAMPLE_INVOICE, request_key: key });
+  assert.ok(!r.isError, JSON.stringify(body(r)));
+  assert.strictEqual(body(r).draft.id, 'debt-recovered-1');
 });

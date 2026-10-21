@@ -800,7 +800,7 @@ function writeTools(ctx) {
           + 'reimbursement) that an owner, admin or CFO must approve.',
         inputSchema: {
           company_id: COMPANY_ID,
-          request_key: z.string().uuid().default(() => crypto.randomUUID())
+          request_key: z.string().uuid()
             .describe('Stable UUID for this reviewed create. Reuse after response loss; a different payload with this key is refused.'),
           document_id: z.string().min(1).max(64).optional()
             .describe('Id of a document already stored in CFO Finance for this company'),

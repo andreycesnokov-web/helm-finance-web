@@ -374,6 +374,7 @@ Total: $5,000.00`;
       const sRes = await client.callTool({
         name: 'submit_invoice_draft',
         arguments: {
+          request_key: crypto.randomUUID(),
           invoice_text: CIRCLEKA_FULL_PACKAGE_TEXT,
           amount: 143856000,
         },
