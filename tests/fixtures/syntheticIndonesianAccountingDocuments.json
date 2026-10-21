@@ -1,0 +1,122 @@
+{
+  "description": "CFO AI Synthetic Indonesian Accounting Documents Test Suite",
+  "version": "1.0.0",
+  "date": "2026-10-21",
+  "documents": [
+    {
+      "id": "doc-synth-01-invoice",
+      "type": "invoice",
+      "title": "Commercial Invoice - PT Solusi Prima Digital",
+      "ground_truth": {
+        "document_type": "invoice",
+        "issuer_name": "PT Solusi Prima Digital",
+        "issuer_npwp": "01.234.567.8-012.000",
+        "buyer_name": "PT Helm Care Indonesia",
+        "buyer_npwp": "02.987.654.3-987.000",
+        "document_number": "INV/2026/SPD-0881",
+        "date": "2026-10-15",
+        "due_date": "2026-10-30",
+        "currency": "IDR",
+        "subtotal": 5000000,
+        "tax_base_dpp": 5000000,
+        "tax_amount": 550000,
+        "tax_rate": 0.11,
+        "gross_amount": 5550000,
+        "line_items_count": 1
+      },
+      "raw_text": "PT SOLUSI PRIMA DIGITAL\nNPWP: 01.234.567.8-012.000\nGedung Bursa Efek Indonesia Tower 2 Lt. 17, Jl. Jend. Sudirman Kav. 52-53, Jakarta Selatan 12190\n\nTAGIHAN / INVOICE\nNomor: INV/2026/SPD-0881\nTanggal: 15 Oktober 2026\nJatuh Tempo: 30 Oktober 2026\n\nDitagihkan Kepada:\nPT HELM CARE INDONESIA\nNPWP: 02.987.654.3-987.000\nJl. Sunset Road No. 88, Seminyak, Kuta, Badung, Bali 80361\n\nDeskripsi: Layanan Cloud Server & ERP Integration Periode Oktober 2026\nSubtotal (DPP): Rp 5.000.000\nPPN (11%): Rp 550.000\nTotal Tagihan: Rp 5.550.000\n\nPembayaran ditransfer ke:\nBank Central Asia (BCA) Rek: 001-8899771 a/n PT Solusi Prima Digital"
+    },
+    {
+      "id": "doc-synth-02-receipt",
+      "type": "receipt",
+      "title": "Thermal Store Receipt - Circle K Indonesia",
+      "ground_truth": {
+        "document_type": "receipt",
+        "issuer_name": "PT Circleka Indonesia Utama",
+        "issuer_npwp": "01.324.567.8-061.000",
+        "buyer_name": null,
+        "buyer_npwp": null,
+        "document_number": "CK-DPS-20261018-0912",
+        "date": "2026-10-18",
+        "due_date": "2026-10-18",
+        "currency": "IDR",
+        "subtotal": 45045,
+        "tax_base_dpp": 45045,
+        "tax_amount": 4955,
+        "tax_rate": 0.11,
+        "gross_amount": 50000,
+        "line_items_count": 2
+      },
+      "raw_text": "CIRCLE K SUNSET ROAD\nPT CIRCLEKA INDONESIA UTAMA\nNPWP: 01.324.567.8-061.000\nJL. SUNSET ROAD NO. 101 KUTA BALI\n========================================\nSTRUK PENJUALAN\nNo: CK-DPS-20261018-0912\nTanggal: 18/10/2026 14:22:10\nKasir: Wayan\n----------------------------------------\n1 KOPI SUSU GULA AREN           35.000\n1 AIR MINERAL 600ML             15.000\n----------------------------------------\nSubtotal                        50.000\nDPP                             45.045\nPPN 11%                          4.955\nTOTAL                           50.000\nBAYAR (QRIS BCA)                50.000\nKEMBALI                              0\n========================================\nTerima kasih atas kunjungan Anda"
+    },
+    {
+      "id": "doc-synth-03-kwitansi",
+      "type": "kwitansi",
+      "title": "Traditional Cash Kwitansi - Sewa Gudang Canggu",
+      "ground_truth": {
+        "document_type": "kwitansi",
+        "issuer_name": "I Wayan Sudarta",
+        "issuer_npwp": null,
+        "buyer_name": "PT Helm Care Indonesia",
+        "buyer_npwp": "02.987.654.3-987.000",
+        "document_number": "KWT/2026/X-14",
+        "date": "2026-10-10",
+        "due_date": "2026-10-10",
+        "currency": "IDR",
+        "subtotal": 4500000,
+        "tax_base_dpp": 4500000,
+        "tax_amount": 0,
+        "tax_rate": 0.0,
+        "gross_amount": 4500000,
+        "line_items_count": 1
+      },
+      "raw_text": "KWITANSI PEMBAYARAN\nNomor: KWT/2026/X-14\n\nSudah Terima Dari : PT HELM CARE INDONESIA (NPWP: 02.987.654.3-987.000)\nUang Sejumlah     : Empat Juta Lima Ratus Ribu Rupiah\nUntuk Pembayaran  : Pelunasan Sewa Gudang Operasional Canggu Periode Bulan Oktober 2026\n\nTerbilang : Rp 4.500.000,-\n\nDenpasar, 10 Oktober 2026\nYang Menerima,\n[METERAI 10000]\n(I Wayan Sudarta)"
+    },
+    {
+      "id": "doc-synth-04-faktur-pajak",
+      "type": "faktur_pajak",
+      "title": "DJP e-Faktur Pajak Elektronik 2026",
+      "ground_truth": {
+        "document_type": "faktur_pajak",
+        "issuer_name": "PT Solusi Prima Digital",
+        "issuer_npwp": "01.234.567.8-012.000",
+        "buyer_name": "PT Helm Care Indonesia",
+        "buyer_npwp": "02.987.654.3-987.000",
+        "document_number": "010.026-26.00000881",
+        "date": "2026-10-15",
+        "due_date": null,
+        "currency": "IDR",
+        "subtotal": 5000000,
+        "tax_base_dpp": 5000000,
+        "tax_amount": 550000,
+        "tax_rate": 0.11,
+        "gross_amount": 5550000,
+        "line_items_count": 1
+      },
+      "raw_text": "FAKTUR PAJAK\nKode dan Nomor Seri Faktur Pajak: 010.026-26.00000881\n\nPengusaha Kena Pajak\nNama : PT SOLUSI PRIMA DIGITAL\nAlamat : GEDUNG BURSA EFEK INDONESIA TOWER 2 LT 17, JAKARTA SELATAN\nNPWP : 01.234.567.8-012.000\n\nPembeli BKP / Penerima JKP\nNama : PT HELM CARE INDONESIA\nAlamat : JL SUNSET ROAD NO 88 SEMINYAK KUTA BADUNG BALI\nNPWP : 02.987.654.3-987.000\n\nNo. Nama Barang Kena Pajak / Jasa Kena Pajak            Harga Jual / Penggantian\n1.  Jasa Integrasi Sistem & Cloud Server Oktober 2026   Rp 5.000.000\n--------------------------------------------------------------------------------\nHarga Jual / Penggantian                                Rp 5.000.000\nDikurangi Potongan Harga                                Rp 0\nDasar Pengenaan Pajak (DPP)                             Rp 5.000.000\nJumlah PPN yang Terutang (11%)                          Rp 550.000\nJumlah PPnBM (Pajak Penjualan Barang Mewah)             Rp 0\n\nTanggal Faktur: 15 Oktober 2026\nStatus: APPROVAL SUKSES"
+    },
+    {
+      "id": "doc-synth-05-bank-statement",
+      "type": "bank_statement",
+      "title": "BCA Corporate Account Statement (Rekening Koran)",
+      "ground_truth": {
+        "document_type": "bank_statement",
+        "issuer_name": "PT Bank Central Asia Tbk",
+        "issuer_npwp": "01.000.088.5-092.000",
+        "buyer_name": "PT HELM CARE INDONESIA",
+        "buyer_npwp": "02.987.654.3-987.000",
+        "document_number": "035-3123456",
+        "date": "2026-10-31",
+        "due_date": null,
+        "currency": "IDR",
+        "subtotal": 0,
+        "tax_base_dpp": null,
+        "tax_amount": 0,
+        "tax_rate": 0.0,
+        "gross_amount": 174900000,
+        "line_items_count": 3
+      },
+      "raw_text": "BANK CENTRAL ASIA\nREKENING KORAN / ACCOUNT STATEMENT\n\nNama Rekening : PT HELM CARE INDONESIA\nNomor Rekening: 035-3123456\nPeriode       : 01/10/2026 - 31/10/2026\nMata Uang     : IDR\n\nSALDO AWAL : Rp 125.450.000,00\n\nTGL   KETERANGAN                              CBG   MUTASI (DB/CR)      SALDO\n15/10 TRSF E-BANKING DB INV/2026/SPD-0881     0010  5.550.000,00 DB     119.900.000,00\n      PT SOLUSI PRIMA DIGITAL\n20/10 TRSF E-BANKING CR PAYMENT CLIENT        0010  60.000.000,00 CR    179.900.000,00\n      BALI CLINIC CARE\n25/10 BIAYA ADM REKENING                      0010  50.000,00 DB        179.850.000,00\n31/10 PAJAK BUNGA                             0010  5.000,00 DB         174.900.000,00\n\nTOTAL MUTASI DEBET  : Rp 5.605.000,00\nTOTAL MUTASI KREDIT : Rp 60.000.000,00\nSALDO AKHIR         : Rp 174.900.000,00"
+    }
+  ]
+}
