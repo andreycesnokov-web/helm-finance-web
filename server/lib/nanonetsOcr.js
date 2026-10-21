@@ -15,6 +15,8 @@
 // 6. Confidence is capped at 'medium' to ensure mandatory human review.
 'use strict';
 
+const documentDates = require('./documentDates');
+
 const nanonetsEnabled = () => process.env.DOCUMENT_OCR_NANONETS_ENABLED === 'true';
 
 const MAX_OCR_BYTES = 8 * 1024 * 1024; // 8 MB ceiling
@@ -87,6 +89,14 @@ const asString = (v, cap = 200) => {
   // Collapse whitespace (multiple spaces/tabs into a single space)
   const s = String(v).replace(/\s+/g, ' ').trim();
   return s && !/^(null|n\/a|-|unknown|undefined)$/i.test(s) ? s.slice(0, cap) : null;
+};
+
+const asDate = (v) => {
+  if (v === null || v === undefined) return null;
+  const s = asString(v, 100);
+  if (!s) return null;
+  const parsed = documentDates.parseDate(s);
+  return parsed?.value || s;
 };
 
 const extractValue = (v) => {
@@ -228,29 +238,30 @@ function normalizeNanonetsResponse(raw) {
       if ((label === 'table' || p.type === 'table') && Array.isArray(p.cells)) {
         tableCells = p.cells;
       } else if (label === 'invoice_number' || label === 'invoice_no' || label === 'document_number' || label === 'bill_number') {
-        fields.document_number = asString(text);
+        const rawNum = asString(text);
+        fields.document_number = rawNum ? rawNum.replace(/\s*([/-])\s*/g, '$1') : null;
       } else if (label === 'tax_invoice_number' || label === 'tax_invoice_serial' || label === 'faktur_pajak_number' || label === 'faktur_pajak_serial') {
         fields.tax_invoice_serial = asString(text);
       } else if (label === 'seller_name' || label === 'vendor_name' || label === 'supplier_name' || label === 'biller_name') {
         fields.issuer_name = asString(text);
       } else if (label === 'buyer_name' || label === 'customer_name' || label === 'client_name' || label === 'recipient_name') {
         fields.buyer_name = asString(text);
-      } else if (label === 'seller_tax_id' || label === 'vendor_npwp' || label === 'seller_npwp') {
+      } else if (label === 'seller_tax_id' || label === 'vendor_npwp' || label === 'seller_npwp' || label === 'seller_vat_number') {
         fields.issuer_npwp = asString(text);
-      } else if (label === 'buyer_tax_id' || label === 'customer_npwp' || label === 'buyer_npwp') {
+      } else if (label === 'buyer_tax_id' || label === 'customer_npwp' || label === 'buyer_npwp' || label === 'buyer_vat_number') {
         fields.buyer_npwp = asString(text);
       } else if (label === 'invoice_date' || label === 'date' || label === 'bill_date') {
-        fields.invoice_date = asString(text);
+        fields.invoice_date = asDate(text);
         fields.date = fields.invoice_date;
       } else if (label === 'due_date' || label === 'payment_due_date') {
-        fields.due_date = asString(text);
+        fields.due_date = asDate(text);
       } else if (label === 'currency' || label === 'currency_code') {
         fields.currency = asString(text);
       } else if (label === 'subtotal' || label === 'sub_total' || label === 'subtotal_amount') {
         fields.subtotal = asNumber(text);
       } else if (label === 'tax_base' || label === 'dpp' || label === 'tax_base_dpp' || label === 'subtotal_dpp') {
         fields.tax_base_dpp = asNumber(text);
-      } else if (label === 'tax_amount' || label === 'ppn' || label === 'vat' || label === 'tax' || label === 'ppn_tax_amount') {
+      } else if (label === 'tax_amount' || label === 'ppn' || label === 'vat' || label === 'tax' || label === 'ppn_tax_amount' || label === 'total_tax' || label === 'subtax_amount') {
         fields.commercial_tax_amount = asNumber(text);
       } else if (
         label === 'total_amount' ||
@@ -616,6 +627,9 @@ const FILL_FROM_NANONETS = {
   payment_reference_number: (f) => f.reference_number,
   transfer_date_text: (f) => f.date,
   document_date: (f) => f.invoice_date ?? f.date,
+  invoice_date: (f) => f.invoice_date ?? f.date,
+  due_date: (f) => f.due_date,
+  date: (f) => f.date ?? f.invoice_date,
 };
 
 function mergeIntoExtraction(base, ocr) {

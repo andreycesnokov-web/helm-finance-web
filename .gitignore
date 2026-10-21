@@ -11,8 +11,14 @@ supabase/.branches/
 
 client/.env
 client/.env.local
+.nanonets_request_dispatched.lock
+tests/fixtures/*.lock
+tests/fixtures/nanonets_synthetic_invoice_live_response.json
 client/.env.*.local
 .env.local
+.nanonets_request_dispatched.lock
+tests/fixtures/*.lock
+tests/fixtures/nanonets_synthetic_invoice_live_response.json
 
 # FX cache files (transient runtime cache, never tracked in git)
 server/data/*.json

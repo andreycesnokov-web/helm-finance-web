@@ -14,11 +14,13 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const nanonetsOcr = require('../server/lib/nanonetsOcr');
 
 const ROOT = path.resolve(__dirname, '..');
 const PDF_PATH = path.join(ROOT, 'tests', 'fixtures', 'synthetic_invoice_pure_image_scan.pdf');
 const RAW_RESPONSE_CACHE = path.join(ROOT, 'tests', 'fixtures', 'nanonets_synthetic_invoice_live_response.json');
+const DISPATCH_LOCK_FILE = path.join(ROOT, 'tests', 'fixtures', '.nanonets_request_dispatched.lock');
 const TARGET_MODEL_ID = 'a80d8b72-f30c-46b4-ab6b-9a0de779815b';
 
 // Ground Truth for Synthetic Invoice
@@ -101,13 +103,25 @@ async function main() {
   }
   console.log(`[3/5] API Key Verified: Configured (${apiKey.length} characters, secret preserved)\n`);
 
-  // 4. Check Cache Guard
+  // 4. Check Cache Guard & Dispatch Lock
   if (fs.existsSync(RAW_RESPONSE_CACHE) && !process.argv.includes('--force-paid-reupload')) {
     console.log('[GUARD] Real live response already exists in cache:', RAW_RESPONSE_CACHE);
     console.log('        Reading cached live response to PREVENT DUPLICATE BILLING.');
     console.log('        (To bypass and incur another paid request, pass --force-paid-reupload)\n');
     const rawData = JSON.parse(fs.readFileSync(RAW_RESPONSE_CACHE, 'utf8'));
     return evaluateResponse(rawData, 0);
+  }
+
+  if (fs.existsSync(DISPATCH_LOCK_FILE) && !process.argv.includes('--force-paid-reupload')) {
+    let lockData = {};
+    try { lockData = JSON.parse(fs.readFileSync(DISPATCH_LOCK_FILE, 'utf8')); } catch {}
+    console.error('[CRITICAL LOCK GUARD] A paid request was ALREADY DISPATCHED previously:');
+    console.error(`                       Timestamp : ${lockData.dispatched_at || 'unknown'}`);
+    console.error(`                       Model ID  : ${lockData.model_id || 'unknown'}`);
+    console.error(`                       File SHA  : ${lockData.file_sha256 || 'unknown'}`);
+    console.error('                       Zero duplicate requests permitted under $0.30 budget.');
+    console.error('                       If response was lost, inspect Nanonets Dashboard before retrying.');
+    process.exit(1);
   }
 
   // 5. Execute EXACTLY ONE Paid Request
@@ -118,6 +132,17 @@ async function main() {
   const formData = new FormData();
   const blob = new Blob([fileBytes], { type: 'application/pdf' });
   formData.append('file', blob, 'synthetic_invoice_pure_image_scan.pdf');
+
+  // Set atomic dispatch lock BEFORE sending network bytes
+  const fileSha256 = crypto.createHash('sha256').update(fileBytes).digest('hex');
+  fs.writeFileSync(DISPATCH_LOCK_FILE, JSON.stringify({
+    dispatched_at: new Date().toISOString(),
+    model_id: modelId,
+    file_name: path.basename(PDF_PATH),
+    file_size: fileBytes.length,
+    file_sha256: fileSha256,
+    status: 'dispatched'
+  }, null, 2), 'utf8');
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000); // 60s hard ceiling
@@ -159,6 +184,19 @@ async function main() {
   // Cache response immediately so subsequent runs never re-upload
   fs.writeFileSync(RAW_RESPONSE_CACHE, JSON.stringify(rawJson, null, 2), 'utf8');
   console.log(`      [PERSISTED] Cached live response to: ${RAW_RESPONSE_CACHE}\n`);
+
+  try {
+    fs.writeFileSync(DISPATCH_LOCK_FILE, JSON.stringify({
+      dispatched_at: new Date().toISOString(),
+      model_id: modelId,
+      file_name: path.basename(PDF_PATH),
+      file_size: fileBytes.length,
+      file_sha256: fileSha256,
+      status: 'completed',
+      duration_ms: duration,
+      http_status: res.status
+    }, null, 2), 'utf8');
+  } catch {}
 
   return evaluateResponse(rawJson, duration);
 }
