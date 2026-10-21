@@ -5,6 +5,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { start } from './serve.mjs'
 import { installFixtureTransport } from './fixtureTransport.mjs'
+import { routes } from './fixtures.mjs'
 const { chromium } = await import(process.env.PLAYWRIGHT ? pathToFileURL(process.env.PLAYWRIGHT).href : 'playwright-core')
 
 const dir = process.env.SHOTS_DIR || path.resolve('reports/transaction-picker-preview')
@@ -102,5 +103,44 @@ try {
     'search reaches a transaction beyond the usual 1000-row API cap')
   await largeContext.close()
   delete process.env.FIXTURE_TX_COUNT
+  // Keyboard regression: existing links are visible but disabled. Navigation
+  // skips them at both edges and in the middle, including a filtered all-disabled list.
+  for (const width of [1440, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 } })
+    await context.addInitScript(tk => { localStorage.setItem('hf_token', tk); localStorage.setItem('hf_lang', 'en') }, token)
+    const page = await context.newPage()
+    let posts = 0
+    page.on('request', req => { if (req.method() === 'POST') posts++ })
+    const blocked = [901, 903, 905]
+    await page.route(/\/api\/documents(?:\?.*)?$/, route => {
+      const data = routes['GET /api/documents']()
+      data.documents.find(d => d.id === 'doc1').links = blocked.map(id => ({ id: `l-${id}`, target_type: 'transaction', target_id: String(id) }))
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) })
+    })
+    await page.route('**/api/transactions?*', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(
+      [905, 904, 903, 902, 901].map(id => ({ id, type: 'expense', amount_original: 100000, currency_original: 'IDR', transaction_date: '2026-08-20', wallet_id: 'w1', description: `Keyboard ${id}` }))) }))
+    await page.goto('http://127.0.0.1:4332/business/documents?doc=doc1', { waitUntil: 'networkidle' })
+    posts = 0 // Ignore normal application bootstrap requests; observe keyboard interaction only.
+    await page.getByRole('button', { name: 'Find a transaction' }).click()
+    const options = page.locator('.v2-txp-option'), search = page.getByRole('searchbox', { name: 'Search transactions' })
+    assert.equal(await options.count(), 5)
+    assert.equal(await options.nth(0).isDisabled(), true)
+    await search.press('ArrowDown')
+    assert.equal(await options.nth(1).evaluate(el => document.activeElement === el), true)
+    await options.nth(1).press('ArrowDown')
+    assert.equal(await options.nth(3).evaluate(el => document.activeElement === el), true)
+    await options.nth(3).press('ArrowUp')
+    assert.equal(await options.nth(1).evaluate(el => document.activeElement === el), true)
+    await options.nth(1).press('End')
+    assert.equal(await options.nth(3).evaluate(el => document.activeElement === el), true)
+    await options.nth(3).press('Home')
+    assert.equal(await options.nth(1).evaluate(el => document.activeElement === el), true)
+    await search.fill('Keyboard 903')
+    await search.press('ArrowDown')
+    assert.equal(await search.evaluate(el => document.activeElement === el), true)
+    assert.equal(await options.first().isDisabled(), true)
+    assert.equal(posts, 0, 'keyboard browsing must not create links or any other records')
+    await context.close()
+  }
   console.log('Transaction picker browser: desktop/mobile, loading/empty/error and 1205-row pagination PASS')
 } finally { await browser.close(); server.close() }

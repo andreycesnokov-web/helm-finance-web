@@ -52,11 +52,21 @@ export default function TransactionPicker({ doc, transactions = [], wallets = []
   const selected = transactions.find(tx => String(tx.id) === String(value))
   const close = () => { setOpen(false); trigger.current?.focus() }
   const choose = tx => { if (linkedToCurrent.has(String(tx.id))) return; onSelect(String(tx.id)); close() }
+  // Disabled rows remain visible as evidence, but must not trap arrow-key navigation.
+  const focusOption = (start, step) => {
+    for (let i = start; i >= 0 && i < visible.length; i += step) {
+      const option = optionsRef.current[i]
+      if (option && !option.disabled) { option.focus(); return }
+    }
+  }
   const move = (event, index) => {
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return }
     const next = event.key === 'ArrowDown' ? index + 1 : event.key === 'ArrowUp' ? index - 1
       : event.key === 'Home' ? 0 : event.key === 'End' ? visible.length - 1 : null
-    if (next != null && visible.length) { event.preventDefault(); optionsRef.current[Math.max(0, Math.min(next, visible.length - 1))]?.focus() }
+    if (next != null && visible.length) {
+      event.preventDefault()
+      focusOption(next, event.key === 'ArrowUp' || event.key === 'End' ? -1 : 1)
+    }
   }
   return <div className="v2-txp">
     <button ref={trigger} type="button" className="v2-btn v2-btn-secondary" disabled={disabled}
@@ -70,7 +80,7 @@ export default function TransactionPicker({ doc, transactions = [], wallets = []
       <label className="v2-field"><span className="v2-field-label">{t('docs.txPicker.search')}</span>
         <input ref={searchRef} className="v2-input" type="search" value={search} placeholder={t('docs.txPicker.searchHint')}
           onChange={e => { setSearch(e.target.value); setLimit(60) }}
-          onKeyDown={e => { if (e.key === 'ArrowDown' && visible.length) { e.preventDefault(); optionsRef.current[0]?.focus() } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close() } }} /></label>
+          onKeyDown={e => { if (e.key === 'ArrowDown' && visible.length) { e.preventDefault(); focusOption(0, 1) } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close() } }} /></label>
       <button type="button" className="v2-btn-link v2-txp-filter-toggle" aria-expanded={filtersOpen}
         aria-controls={`${listId}-filters`} onClick={() => setFiltersOpen(open => !open)}>
         {t('docs.txPicker.filters')}{activeFilterCount ? ` · ${activeFilterCount}` : ''}
