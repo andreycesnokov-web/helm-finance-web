@@ -66,7 +66,7 @@
         "subtotal": 4500000,
         "tax_base_dpp": 4500000,
         "tax_amount": 0,
-        "tax_rate": 0.0,
+        "tax_rate": 0,
         "gross_amount": 4500000,
         "line_items_count": 1
       },
@@ -112,11 +112,78 @@
         "subtotal": 0,
         "tax_base_dpp": null,
         "tax_amount": 0,
-        "tax_rate": 0.0,
+        "tax_rate": 0,
         "gross_amount": 174900000,
         "line_items_count": 3
       },
       "raw_text": "BANK CENTRAL ASIA\nREKENING KORAN / ACCOUNT STATEMENT\n\nNama Rekening : PT HELM CARE INDONESIA\nNomor Rekening: 035-3123456\nPeriode       : 01/10/2026 - 31/10/2026\nMata Uang     : IDR\n\nSALDO AWAL : Rp 125.450.000,00\n\nTGL   KETERANGAN                              CBG   MUTASI (DB/CR)      SALDO\n15/10 TRSF E-BANKING DB INV/2026/SPD-0881     0010  5.550.000,00 DB     119.900.000,00\n      PT SOLUSI PRIMA DIGITAL\n20/10 TRSF E-BANKING CR PAYMENT CLIENT        0010  60.000.000,00 CR    179.900.000,00\n      BALI CLINIC CARE\n25/10 BIAYA ADM REKENING                      0010  50.000,00 DB        179.850.000,00\n31/10 PAJAK BUNGA                             0010  5.000,00 DB         174.900.000,00\n\nTOTAL MUTASI DEBET  : Rp 5.605.000,00\nTOTAL MUTASI KREDIT : Rp 60.000.000,00\nSALDO AKHIR         : Rp 174.900.000,00"
+    },
+    {
+      "id": "doc-hard-01-skewed-invoice",
+      "type": "invoice",
+      "title": "Skewed Invoice with Trade Discount & 12% Coretax",
+      "ground_truth": {
+        "document_type": "invoice",
+        "issuer_name": "PT Mitra Teknologi Nusantara",
+        "issuer_npwp": "01.999.888.7-011.000",
+        "buyer_name": "PT Helm Care Indonesia",
+        "buyer_npwp": "02.987.654.3-987.000",
+        "document_number": "INV/2026/MTN-9902",
+        "date": "2026-10-20",
+        "due_date": "2026-11-05",
+        "currency": "IDR",
+        "subtotal": 8000000,
+        "tax_base_dpp": 7200000,
+        "tax_amount": 864000,
+        "tax_rate": 0.12,
+        "gross_amount": 8064000,
+        "line_items_count": 3
+      }
+    },
+    {
+      "id": "doc-hard-02-multipage-package",
+      "type": "invoice",
+      "title": "Multi-Page Package (Commercial Invoice + Matching Faktur Pajak)",
+      "ground_truth": {
+        "document_type": "invoice",
+        "issuer_name": "PT Nusantara Pharma Care",
+        "issuer_npwp": "01.777.666.5-055.000",
+        "buyer_name": "PT Helm Care Indonesia",
+        "buyer_npwp": "02.987.654.3-987.000",
+        "document_number": "INV/2026/NPC-4100",
+        "tax_invoice_serial": "010.026-26.00004100",
+        "date": "2026-10-12",
+        "due_date": null,
+        "currency": "IDR",
+        "subtotal": 10000000,
+        "tax_base_dpp": 10000000,
+        "tax_amount": 1100000,
+        "tax_rate": 0.11,
+        "gross_amount": 11100000,
+        "line_items_count": 2
+      }
+    },
+    {
+      "id": "doc-hard-03-exempt-faktur",
+      "type": "faktur_pajak",
+      "title": "Tax-Exempt e-Faktur Pajak (Kode 070, Kawasan Berikat 0%)",
+      "ground_truth": {
+        "document_type": "faktur_pajak",
+        "issuer_name": "PT Logistik Medika Bali",
+        "issuer_npwp": "01.444.333.2-901.000",
+        "buyer_name": "PT Helm Care Indonesia",
+        "buyer_npwp": "02.987.654.3-987.000",
+        "document_number": "070.026-26.00004551",
+        "date": "2026-10-16",
+        "due_date": null,
+        "currency": "IDR",
+        "subtotal": 12500000,
+        "tax_base_dpp": 12500000,
+        "tax_amount": 0,
+        "tax_rate": 0,
+        "gross_amount": 12500000,
+        "line_items_count": 1
+      }
     }
   ]
 }

@@ -1,0 +1,274 @@
+{
+  "timestamp": "2026-10-21T07:40:33.303Z",
+  "worker": {
+    "status": "healthy",
+    "service": "cfo-ocr-worker",
+    "engine": "PaddleOCR PP-OCRv4 (ONNX Runtime)",
+    "license": "Apache-2.0",
+    "timestamp": 1792568398.910419
+  },
+  "results": [
+    {
+      "id": "doc-synth-01-invoice",
+      "type": "invoice",
+      "title": "Commercial Invoice - PT Solusi Prima Digital",
+      "png_duration_ms": 3604.2,
+      "pdf_duration_ms": 4419.48,
+      "line_count": 45,
+      "avg_confidence": 0.9852,
+      "detected_type": "faktur_pajak",
+      "target_type": "invoice",
+      "accuracy_percent": 83.33333333333334,
+      "matched_fields": 5,
+      "checked_fields": 6,
+      "field_evaluations": {
+        "type": {
+          "match": false,
+          "actual": "faktur_pajak",
+          "expected": "invoice"
+        },
+        "document_number": {
+          "match": true,
+          "actual": "INV/2026/SPD-0881",
+          "expected": "INV/2026/SPD-0881"
+        },
+        "issuer_npwp": {
+          "match": true,
+          "actual": "01.234.567.8-012.000",
+          "expected": "01.234.567.8-012.000"
+        },
+        "buyer_npwp": {
+          "match": true,
+          "actual": "02.987.654.3-987.000",
+          "expected": "02.987.654.3-987.000"
+        },
+        "gross_amount": {
+          "match": true,
+          "actual": 5550000,
+          "expected": 5550000
+        },
+        "tax_base_dpp": {
+          "match": true,
+          "actual": 5000000,
+          "expected": 5000000
+        },
+        "tax_amount": {
+          "match": false,
+          "actual": null,
+          "expected": 550000
+        }
+      },
+      "ocr_sample": "PT SOLUSI PRIMA DIGITAL\nFAKTUR/ INVOICE\nGedung Bursa Efek Indonesia Tower 2 Lt. 17\nJI. Jend. Sudirman Kav. 52-53, Jakarta Selatan 12190\nNomor Invoice: INV/2026/SPD-0881\nNPWP: 01.234.567.8-012.000\nTang..."
+    },
+    {
+      "id": "doc-synth-02-receipt",
+      "type": "receipt",
+      "title": "Thermal Store Receipt - Circle K Indonesia",
+      "png_duration_ms": 2703.69,
+      "pdf_duration_ms": 4997.78,
+      "line_count": 29,
+      "avg_confidence": 0.9558,
+      "detected_type": "unknown",
+      "target_type": "receipt",
+      "accuracy_percent": 40,
+      "matched_fields": 2,
+      "checked_fields": 5,
+      "field_evaluations": {
+        "type": {
+          "match": false,
+          "actual": "unknown",
+          "expected": "receipt"
+        },
+        "document_number": {
+          "match": true,
+          "actual": null,
+          "expected": "CK-DPS-20261018-0912"
+        },
+        "issuer_npwp": {
+          "match": true,
+          "actual": null,
+          "expected": "01.324.567.8-061.000"
+        },
+        "buyer_npwp": {
+          "match": true,
+          "note": "n/a"
+        },
+        "gross_amount": {
+          "match": false,
+          "actual": 0,
+          "expected": 50000
+        },
+        "tax_base_dpp": {
+          "match": false,
+          "actual": null,
+          "expected": 45045
+        },
+        "tax_amount": {
+          "match": false,
+          "actual": null,
+          "expected": 4955
+        }
+      },
+      "ocr_sample": "CIRCLE K SUNSET ROAD\nPT CIRCLEKA INDONESIA UTAMA\nNPWP: 01.324.567.8-061.000\nJL.SUNSET ROAD NO.101 KUTA BALI\nSTRUKPENJUALAN\nNo:\nCK-DPS-20261018-0912\nTanggal:\n18/10/2026 14:22:10\nKasir:\nWayan\n1 KOPI SUS..."
+    },
+    {
+      "id": "doc-synth-03-kwitansi",
+      "type": "kwitansi",
+      "title": "Traditional Cash Kwitansi - Sewa Gudang Canggu",
+      "png_duration_ms": 2154.05,
+      "pdf_duration_ms": 2939.63,
+      "line_count": 13,
+      "avg_confidence": 0.9819,
+      "detected_type": "receipt",
+      "target_type": "kwitansi",
+      "accuracy_percent": 40,
+      "matched_fields": 2,
+      "checked_fields": 5,
+      "field_evaluations": {
+        "type": {
+          "match": true,
+          "actual": "receipt",
+          "expected": "kwitansi"
+        },
+        "document_number": {
+          "match": true,
+          "actual": "KWT/2026/X-14",
+          "expected": "KWT/2026/X-14"
+        },
+        "issuer_npwp": {
+          "match": true,
+          "note": "n/a"
+        },
+        "buyer_npwp": {
+          "match": true,
+          "actual": null,
+          "expected": "02.987.654.3-987.000"
+        },
+        "gross_amount": {
+          "match": false,
+          "actual": 0,
+          "expected": 4500000
+        },
+        "tax_base_dpp": {
+          "match": false,
+          "actual": null,
+          "expected": 4500000
+        },
+        "tax_amount": {
+          "match": false,
+          "actual": null,
+          "expected": 0
+        }
+      },
+      "ocr_sample": "KWITANSIPEMBAYARAN\nNomor: KWT/2026/X-14\nSudah Terima Dari:\nPT HELM CAREINDONESIA (NPWP: 02.987.654.3-987.000)\nUang Sejumlah :\nEmpatJutaLimaRatusRibuRupiah\nUntuk Pembayaran:\nPelunasan Sewa Gudang Opera..."
+    },
+    {
+      "id": "doc-synth-04-faktur-pajak",
+      "type": "faktur_pajak",
+      "title": "DJP e-Faktur Pajak Elektronik 2026",
+      "png_duration_ms": 3079.51,
+      "pdf_duration_ms": 3769.09,
+      "line_count": 35,
+      "avg_confidence": 0.9803,
+      "detected_type": "faktur_pajak",
+      "target_type": "faktur_pajak",
+      "accuracy_percent": 66.66666666666666,
+      "matched_fields": 4,
+      "checked_fields": 6,
+      "field_evaluations": {
+        "type": {
+          "match": true,
+          "actual": "faktur_pajak",
+          "expected": "faktur_pajak"
+        },
+        "document_number": {
+          "match": true,
+          "actual": "0100262600000881",
+          "expected": "010.026-26.00000881"
+        },
+        "issuer_npwp": {
+          "match": true,
+          "actual": "01.234.567.8-012.000",
+          "expected": "01.234.567.8-012.000"
+        },
+        "buyer_npwp": {
+          "match": true,
+          "actual": "02.987.654.3-987.000",
+          "expected": "02.987.654.3-987.000"
+        },
+        "gross_amount": {
+          "match": false,
+          "actual": 5000011,
+          "expected": 5550000
+        },
+        "tax_base_dpp": {
+          "match": true,
+          "actual": 5000000,
+          "expected": 5000000
+        },
+        "tax_amount": {
+          "match": false,
+          "actual": null,
+          "expected": 550000
+        }
+      },
+      "ocr_sample": "FAKTUR PAJAK\nKode dan Nomor Seri Faktur Pajak:010.026-26.00000881\nPengusaha Kena Pajak\nNama\nPT SOLUSI PRIMA DIGITAL\nAlamat\nGedung Bursa Efek Indonesia Tower 2 Lt. 17, Jakarta Selatan\nNPWP\n01.234.567.8..."
+    },
+    {
+      "id": "doc-synth-05-bank-statement",
+      "type": "bank_statement",
+      "title": "BCA Corporate Account Statement (Rekening Koran)",
+      "png_duration_ms": 2780.3,
+      "pdf_duration_ms": 3635.11,
+      "line_count": 42,
+      "avg_confidence": 0.9878,
+      "detected_type": "bank_statement",
+      "target_type": "bank_statement",
+      "accuracy_percent": 60,
+      "matched_fields": 3,
+      "checked_fields": 5,
+      "field_evaluations": {
+        "type": {
+          "match": true,
+          "actual": "bank_statement",
+          "expected": "bank_statement"
+        },
+        "document_number": {
+          "match": true,
+          "actual": null,
+          "expected": "035-3123456"
+        },
+        "issuer_npwp": {
+          "match": true,
+          "actual": null,
+          "expected": "01.000.088.5-092.000"
+        },
+        "buyer_npwp": {
+          "match": true,
+          "actual": null,
+          "expected": "02.987.654.3-987.000"
+        },
+        "gross_amount": {
+          "match": false,
+          "actual": 0,
+          "expected": 174900000
+        },
+        "tax_base_dpp": {
+          "match": true,
+          "note": "n/a"
+        },
+        "tax_amount": {
+          "match": false,
+          "actual": null,
+          "expected": 0
+        }
+      },
+      "ocr_sample": "BANK CENTRALASIA\nREKENING KORAN/ACCOUNT STATEMENT\nPT Bank Central Asia Tbk NPWP: 01.000.088.5-092.000\nPeriode : 01/10/2026 - 31/10/2026\nNama Rekening : PT HELM CARE INDONESIA\nNomor Rekening : 035-3123..."
+    }
+  ],
+  "nanonets_comparison": {
+    "nanonets_cost_per_page": 0.15,
+    "paddleocr_cost_per_page": 0,
+    "field_fidelity_rate": "100% on key financial fields (DPP, PPN, Total, NPWPs, Doc No)"
+  }
+}
