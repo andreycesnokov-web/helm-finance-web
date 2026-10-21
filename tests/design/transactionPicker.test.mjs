@@ -48,6 +48,17 @@ test('searches formatted amounts and explicit counterparty or bank text', () => 
   assert.deepEqual(filterAndRankTransactions(txs, doc, { ...base, search: 'Incoming 8500000' }).map(x => x.id), [])
 })
 
+test('amount search accepts decimal zeroes and Indonesian/English separators without rewriting money', () => {
+  for (const search of ['8500000.00', '8500000,00', 'Rp 8.500.000,00', 'IDR 8,500,000.00', '8500000.0000000000']) {
+    assert.deepEqual(filterAndRankTransactions(txs, doc, { ...base, search }).map(x => x.id).sort(), [1, 2, 3, 4], search)
+  }
+  const row = { ...txs[0], amount_original: 100003.5 }
+  assert.equal(filterAndRankTransactions([row], doc, { ...base, search: '100,003.50' }).length, 1)
+  assert.equal(filterAndRankTransactions([row], doc, { ...base, search: 'Rp 100.003,50' }).length, 1)
+  assert.equal(row.amount_original, 100003.5)
+  assert.equal(filterAndRankTransactions(txs, doc, { ...base, search: '8500001.00' }).length, 0)
+})
+
 test('date, debit/credit, account and unmatched filters compose without writing links', () => {
   const filters = { ...base, from: '2026-08-01', to: '2026-08-31', direction: 'out', wallet: 'bca', unmatched: true }
   assert.deepEqual(filterAndRankTransactions(txs, doc, filters, [], new Set(['1'])).map(x => x.id), [4])

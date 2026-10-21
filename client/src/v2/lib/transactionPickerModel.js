@@ -67,6 +67,18 @@ export function filterAndRankTransactions(transactions, doc, filters, counterpar
   const q = clean(filters.search)
   // Numbers inside a description must not also match unrelated amounts.
   const digits = /^(?:(?:[a-z]{3}|rp)\s*)?[+-]?[\d.,\s]+$/.test(q) ? q.replace(/\D/g, '') : ''
+  // Search-only normalization: tolerate native/Indonesian decimal notation and
+  // trailing zeroes from copied bank amounts. Never changes recorded money.
+  const amountQueries = new Set(digits ? [digits] : [])
+  if (digits) {
+    const numberText = q.replace(/^(?:[a-z]{3}|rp)\s*/, '').replace(/\s/g, '')
+    const last = Math.max(numberText.lastIndexOf('.'), numberText.lastIndexOf(','))
+    const fraction = last >= 0 ? numberText.slice(last + 1) : ''
+    if (last >= 0 && fraction.length !== 3) {
+      const normalized = Number(numberText.slice(0, last).replace(/[.,]/g, '') + '.' + fraction)
+      if (Number.isFinite(normalized)) amountQueries.add(String(Math.abs(normalized)).replace(/\D/g, ''))
+    }
+  }
   return transactions.filter(tx => {
     const date = transactionDate(tx)
     if ((filters.from || filters.to) && dayNumber(date) == null) return false
@@ -80,7 +92,7 @@ export function filterAndRankTransactions(transactions, doc, filters, counterpar
       tx.reference, tx.bank_reference, tx.reference_number, tx.external_reference].join(' '))
     const amount = transactionAmount(tx)
     const amountDigits = Number.isFinite(amount) ? String(Math.abs(amount)).replace(/\D/g, '') : ''
-    return text.includes(q) || !!(digits && amountDigits.includes(digits))
+    return text.includes(q) || [...amountQueries].some(value => value && amountDigits.includes(value))
   }).sort((a, b) => transactionMatchScore(b, doc, counterparties) - transactionMatchScore(a, doc, counterparties)
     || transactionDate(b).localeCompare(transactionDate(a)) || String(a.id).localeCompare(String(b.id)))
 }
