@@ -1,11 +1,11 @@
 'use strict';
 const crypto = require('node:crypto');
 const shared = import('./financialIntent.mjs');
-const operations = new Set(['wallet_create','transaction_batch','wallet_adjust','debt_payment','wallet_transfer','bill_create']);
+const operations = new Set(['wallet_create','transaction_batch','wallet_adjust','debt_payment','wallet_transfer','bill_create','payroll_run']);
 const managers = new Set(['owner','ceo','admin','cfo']);
 const writers = new Set([...managers,'accountant']);
 const keyValid = key => typeof key === 'string' && key.length >= 1 && key.length <= 128 && key === key.trim() && !/[\u0000-\u001f]/.test(key);
-const permitted = (role, operation) => operation==='bill_create' ? [...writers,'manager','employee'].includes(role) : (['wallet_create','wallet_adjust'].includes(operation) ? managers : writers).has(role);
+const permitted = (role, operation) => operation==='bill_create' ? [...writers,'manager','employee'].includes(role) : (['wallet_create','wallet_adjust','payroll_run'].includes(operation) ? managers : writers).has(role);
 async function intent(operation, body, target) { return (await shared).canonicalFinancialIntent(operation, body, target); }
 async function storedIntent(operation, value, target) {
   return value?.version === 1 && value?.operation === operation && value?.scope === 'business' ? value : intent(operation, value, target);
@@ -44,8 +44,8 @@ async function publicReceipt(supabase,business,actor,row,detail=true) {
     currentObjects.push({kind:'wallet',state:!data?'removed':data.is_active===false?'archived':'active'});
   }
   const payload=row.intent?.version===1 ? row.intent.payload : row.intent;
-  const summary={name:payload?.name || null,description:payload?.reason || payload?.description || (Array.isArray(payload)?payload[0]?.description:null) || null,
-    currency:payload?.currency || result?.wallet?.currency || result?.debt?.currency || result?.source_currency || null,amount:payload?.opening_balance ?? payload?.amount ?? payload?.target_balance ?? null,
+  const summary={name:payload?.name || (row.operation==='payroll_run'?result?.run?.period_month:null) || null,description:payload?.reason || payload?.description || (Array.isArray(payload)?payload[0]?.description:null) || null,
+    currency:payload?.currency || result?.wallet?.currency || result?.debt?.currency || result?.run?.currency || result?.source_currency || null,amount:payload?.opening_balance ?? payload?.amount ?? payload?.target_balance ?? null,
     saved:result?.saved ?? null};
   return {scope:'business',operation:row.operation,request_key:row.request_key,receipt_ref:ref,state:'confirmed',
     confirmed_at:row.created_at,result_is_historical:true,not_current_balance:true,summary,current_objects:currentObjects,
@@ -53,6 +53,9 @@ async function publicReceipt(supabase,business,actor,row,detail=true) {
 }
 async function replay(supabase,req,res,biz,operation,key,canonical) {
   if(!keyValid(key)) return false;
+  // Commercial admission may check a receipt before reaching the route handler.
+  // Losing a role must not make this early historical replay a privilege bypass.
+  if(!permitted(biz.role,operation)) {res.status(403).json({error:'financial_recovery_forbidden',automatic_retry:false});return true;}
   const row=await findReceipt(supabase,biz.business.id,req.user.userId,operation,key);
   if(!row) return false;
   let prior;

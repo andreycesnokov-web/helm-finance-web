@@ -8,13 +8,14 @@ import I from '../icons'
 import { PageHead, Card, Btn, Skeleton, ErrorBox, Empty, Pill, Locked } from '../ui'
 import { useAccess } from '../../hooks/useAccess'
 import { useT, useLang } from '../i18n'
-import { useApi } from '../data'
+import { useApi, useInvalidate } from '../data'
 import { money, shortDate } from '../lib/format'
 import { latestPayrollRun } from '../lib/obligations'
 import { flowOf } from '../lib/pulseModel'
 import { AskButton } from '../ai/AskPanel'
 import { useAskContext } from '../ai/AskContext'
 import { EmployeeDialog, PayrollRunDialog } from '../components/PayrollDialogs'
+import PayrollRunHistory from '../components/PayrollRunHistory'
 
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 
@@ -22,6 +23,7 @@ export default function Payroll() {
   const t = useT()
   const lang = useLang()
   const ov = useApi('/payroll/overview')
+  const invalidate = useInvalidate()
   const wallets = useApi('/wallets')
   const ins = useApi(`/pulse/advanced-insights?from=${daysAgo(30)}&to=${daysAgo(0)}`)
   const { hasFeature, loading: accessLoading } = useAccess()
@@ -29,12 +31,12 @@ export default function Payroll() {
   const [dlg, setDlg] = useState(null) // { kind: 'person', employee? } | { kind: 'run' }
   const walletList = wallets.data?.wallets || []
   const people = ov.data?.employees || []
-  const reload = () => { ov.reload(); wallets.reload?.() }
+  const reload = () => invalidate()
   const dialog = dlg?.kind === 'person' ? <EmployeeDialog employee={dlg.employee || null} wallets={walletList} onClose={() => setDlg(null)} onSaved={reload} />
-    : dlg?.kind === 'run' ? <PayrollRunDialog employees={people} wallets={walletList} payments={ov.data?.payments || []} onClose={() => setDlg(null)} onSaved={reload} /> : null
+    : dlg?.kind === 'run' ? <PayrollRunDialog employees={people} wallets={walletList} initialRun={dlg.run || null} onClose={() => setDlg(null)} onSaved={reload} /> : null
   const head = (
     <PageHead title={t('nav.payroll')} sub={t('pay.sub')}
-      actions={<><Btn onClick={() => setDlg({ kind: 'person' })} data-pay-add>{t('pay.addPerson')}</Btn>{people.some((e) => e.status !== 'archived') && <Btn variant="primary" onClick={() => setDlg({ kind: 'run' })} data-pay-run>{t('pay.runMonth')}</Btn>}</>} />
+      actions={<><Btn onClick={() => setDlg({ kind: 'person' })} data-pay-add>{t('pay.addPerson')}</Btn>{people.some((e) => e.status !== 'archived') && <Btn variant="primary" onClick={() => setDlg({ kind: 'run' })} data-pay-run>{t('payr.new')}</Btn>}</>} />
   )
   // Same plan gate as the legacy Payroll page (review 8.2 #10).
   if (!accessLoading && !hasFeature('payroll_enabled')) return <>{head}<Locked title={t('lock.payrollTitle')} text={t('lock.text')} /></>
@@ -44,9 +46,10 @@ export default function Payroll() {
   const employees = (ov.data?.employees || []).filter((e) => e.status !== 'archived')
   const run = latestPayrollRun(ov.data)
   const flow = flowOf(ins.data?.metrics)
+  const history = <PayrollRunHistory wallets={walletList} onChanged={reload} onEdit={run => setDlg({kind:'run',run})}/>
   if (!employees.length && !run) {
     return <>{head}<Card><Empty icon={<I.payroll size={28} />} title={t('pay.emptyTitle')} text={t('pay.emptyText')}
-      action={<Btn variant="primary" onClick={() => setDlg({ kind: 'person' })}>{t('pay.addPerson')}</Btn>} /></Card>{dialog}</>
+      action={<Btn variant="primary" onClick={() => setDlg({ kind: 'person' })}>{t('pay.addPerson')}</Btn>} /></Card>{history}{dialog}</>
   }
   const lines = new Map((run?.people || []).map((p) => [String(p.employee_id || p.name), p]))
   const rows = employees.map((e) => ({ e, p: lines.get(String(e.id)) || lines.get(String(e.name)) || null }))
@@ -58,6 +61,7 @@ export default function Payroll() {
     <div className="v2-page">
       {head}
       {dialog}
+      {history}
       {run && (
         <Card>
           <div className="v2-pay-hero">

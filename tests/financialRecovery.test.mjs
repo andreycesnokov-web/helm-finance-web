@@ -45,6 +45,20 @@ test('bill response loss and independent equivalent callers recover the original
  await assert.rejects(api.apiFetch('/debts',jwt(-1,'first'),{method:'POST',body:{...bill,amount:31,request_key:key}}),e=>e.code==='idempotency_key_mismatch');
  assert.equal(posts.length,1);
 });
+test('payroll committed response loss recovers the same audited draft with no second submission',async()=>{
+ const draft={action:'create',period_month:'2026-08',payment_date:'2026-08-25',wallet_id:'wallet',tax_confirmed:true,lines:[]};
+ let committed;
+ globalThis.fetch=async(url,options={})=>{
+  if(url.endsWith('/financial-operations/recent'))return json({operations:[]});
+  if(url.includes('/financial-operations/payroll_run/')){reads.push(url);return json({state:'confirmed',result:committed});}
+  posts.push(JSON.parse(options.body));committed={ok:true,run:{id:'original-run'},audit_id:'audit',cash_changed:false};throw Error('synthetic payroll response loss');
+ };
+ await assert.rejects(api.apiFetch('/payroll/runs/action',jwt(-1,'one'),{method:'POST',body:draft}),e=>e.code==='financial_outcome_unknown');
+ const r=await api.apiFetch('/payroll/runs/action',jwt(-1,'reload'),{method:'POST',body:draft});
+ assert.equal(r.run.id,'original-run');assert.equal(r.cash_changed,false);assert.equal(posts.length,1);assert.equal(reads.length,1);
+ await assert.rejects(api.apiFetch('/payroll/runs/action',jwt(-1,'reload'),{method:'POST',body:{...draft,payment_date:'2026-08-26',request_key:posts[0].request_key}}),e=>e.code==='idempotency_key_mismatch');
+});
+
 test('canonical wallet meaning is equal across Classic/V2 ordering, decimals and omitted defaults; other target/money stays distinct',()=>{
   assert.equal(stableJson(canonicalFinancialIntent('wallet_create',body)),stableJson(canonicalFinancialIntent('wallet_create',{scope:'business',opening_balance:'10.00',entity_name:null,currency:'IDR',name:'Wallet',type:'bank'})))
   assert.notDeepEqual(canonicalFinancialIntent('wallet_create',body),canonicalFinancialIntent('wallet_create',{...body,opening_balance:11}))

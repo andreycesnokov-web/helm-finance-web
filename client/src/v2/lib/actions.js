@@ -343,11 +343,11 @@ export const createEmployee = (token, body) =>
 export const updateEmployee = (token, id, body) =>
   apiFetch('/payroll/employees/' + encodeURIComponent(id), token, { method: 'PATCH', body })
 
-export const archiveEmployee = (token, id) =>
-  apiFetch('/payroll/employees/' + encodeURIComponent(id), token, { method: 'DELETE' })
+export const archiveEmployee = (token, id, body = {}) =>
+  apiFetch('/payroll/employees/' + encodeURIComponent(id), token, { method: 'DELETE', body })
 
-export const recordPayrollPayment = (token, body) =>
-  apiFetch('/payroll/payments', token, { method: 'POST', body })
+export const savePayrollRun = (token, body) =>
+  apiFetch('/payroll/runs/action', token, { method: 'POST', body })
 
 // Money windows (2026-10-10, v2 replacements of the v1 transfer and payment modals).
 //   POST /api/wallets/transfer                 move money between two of the company's accounts

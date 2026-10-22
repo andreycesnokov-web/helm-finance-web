@@ -222,7 +222,9 @@ export function statementFreshness(batches = []) {
 
 /** Payroll: the latest pay period and its per-person lines from /api/payroll/overview. */
 export function latestPayrollRun(overview) {
-  const pays = Array.isArray(overview?.payments) ? overview.payments : []
+  // Drafts and cancelled runs are not scheduled/paid salary. New durable runs
+  // have their own complete history view, rather than a truncated legacy month.
+  const pays = Array.isArray(overview?.payments) ? overview.payments.filter(p=>!p.run_id && ['paid','scheduled'].includes(p.status)) : []
   if (!pays.length) return null
   const period = pays.map((p) => p.period_month || String(p.payment_date || '').slice(0, 7)).filter(Boolean).sort().pop()
   const inRun = pays.filter((p) => (p.period_month || String(p.payment_date || '').slice(0, 7)) === period)

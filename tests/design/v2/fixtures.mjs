@@ -186,6 +186,7 @@ export const routes = {
       { id: 'p2', employee_id: 'e2', employee_name: 'Employee Two', period_month: iso(-5).slice(0, 7), payment_date: iso(-5), status: 'paid', gross_amount: 4000000, net_amount: 3920000,
         payroll_payment_items: [{ direction: 'addition', amount: 4000000, label: 'Salary' }, { direction: 'deduction', amount: 80000, label: 'BPJS' }] },
     ], summary: {} }),
+  'GET /api/payroll/runs': () => ({ runs: [], limit: 100, cash_changed: false }),
   'GET /api/pulse/advanced-insights': (u) => ({ ok: true, needs_review_count: 2, series: Array.from({ length: 12 }, (_, i) => {
     const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 11 + i)
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`

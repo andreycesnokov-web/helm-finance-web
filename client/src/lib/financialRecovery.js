@@ -57,6 +57,7 @@ function failure(code, message, status = 409) {
   return e
 }
 function confirmsResult(operation, result) {
+  if (operation === 'payroll_run') return result?.ok === true && !!result.run?.id && !!result.audit_id && result.cash_changed === false
   if (operation === 'bill_create') return !!result?.debt?.id && !!result.audit_id
   if (operation === 'wallet_create') return !!result?.wallet?.id
   if (operation === 'transaction_batch') return Number.isInteger(result?.saved) && result.saved >= 0

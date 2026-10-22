@@ -279,7 +279,7 @@ test('real Express HTTP plus real PostgreSQL: PATCH, RPC absence, permissions, r
     r=await api('POST','/api/wallets/transfer',{from_wallet_id:W,to_wallet_id:V,amount:20,transfer_id:transferId,date:'2026-10-10'});assert.equal(r.status,409);assert.equal(r.data.error,'idempotency_key_mismatch');
     await reset();r=await api('POST','/api/debts/1/pay',{wallet_id:W,amount:70,date:'2026-10-10',idempotency_key:'complete'});assert.equal(r.status,200,JSON.stringify(r));const completed=await snapshot();
     r=await api('POST','/api/debts/1/pay',{wallet_id:W,amount:70,date:'2026-10-10',idempotency_key:'complete'});assert.equal(r.status,200,JSON.stringify(r));assert.equal(r.data.is_replay,true);assert.deepEqual(await snapshot(),completed);
-    await reset();r=await api('POST','/api/payroll/payments',{employee_name:'Synthetic',wallet_id:W,currency:'IDR',amount:20,payment_date:'2026-10-10'});assert.equal(r.status,200,JSON.stringify(r));assert.equal(await balance(),'80.00');
+    await reset();r=await api('POST','/api/payroll/payments',{employee_name:'Synthetic',wallet_id:W,currency:'IDR',amount:20,payment_date:'2026-10-10'});assert.equal(r.status,409,JSON.stringify(r));assert.equal(r.data.error,'payroll_bank_link_required');assert.equal(await balance(),'100.00');
     await reset();r=await api('POST','/api/transactions/batch',{request_key:'full-http-batch',transactions:[{type:'expense',amount:20,wallet_id:W,currency:'IDR',scope:'business',transaction_date:'2026-10-10'}]});assert.equal(r.status,200,JSON.stringify(r));assert.equal(r.data.saved,1);assert.equal(await balance(),'80.00');
   } finally {
     Module._load=load;http.Server.prototype.listen=listen;
