@@ -83,6 +83,18 @@ test('large exact decimals and thousands of entries preserve sums and inputs',()
  assert.equal(exact('99999999999999999999.123456789012345678'),'99999999999999999999.123456789012345678');
 });
 test('duplicate source ID aborts rather than counting twice',()=>{const f=fixture();f.transactions.push(f.transactions[0]);assert.throws(()=>run(f),/duplicate_transaction_read/);});
+test('malformed dates cannot disappear as if they were outside the reporting period',()=>{
+ const f=fixture();f.transactions=[tx(1,'income','1','Product sales',{transaction_date:'bad-date'}),tx(2,'income','2','Product sales',{transaction_date:''}),tx(3,'income','3','Product sales',{transaction_date:'2026-02-30'}),tx(4,'income','100','Product sales',{transaction_date:'2026-09-01'})]
+ const r=run(f);assert.equal(r.entries.length,0);assert.deepEqual(r.exceptions.map(e=>e.transaction_id),['1','2','3']);assert.ok(r.exceptions.every(e=>e.reason==='missing_transaction_date'))
+})
+test('legacy bank-import opening source is excluded even without its newer boolean marker',()=>{
+ const f=fixture();f.transactions=[tx(1,'income','9999999','Product sales',{source:'bank_import_opening',is_opening_balance:false})]
+ const r=run(f);assert.equal(r.periods['2026-08'].totals.revenue,'0');assert.equal(r.excluded[0].reason,'opening_or_correction')
+})
+test('full refund reversals net to zero; FX/network/bank fees remain exact mapped cash costs',()=>{
+ const f=fixture();f.transactions=[tx(1,'income','1.234567890123456789','Product sales'),tx(2,'expense','1.234567890123456789','Product sales'),...['fx_fee','network_fee','bank_fee'].map((type,i)=>tx(i+3,type,'0.000000000000000001','Rent')),tx(8,'fx_transfer_in','999','Product sales'),tx(9,'fx_transfer_out','999','Rent')]
+ const r=run(f);assert.equal(r.periods['2026-08'].totals.revenue,'0');assert.equal(r.periods['2026-08'].totals.operating_cost,'0.000000000000000003');assert.equal(r.excluded.length,2)
+})
 test('invalid filters and unsupported accrual rejected, never fallback',()=>{
  for(const q of [{month:'2026-13'},{month:['2026-08']},{month:'2026-08',currency:['IDR']},{month:'2026-08',compare:'2026-08'},{month:'2026-08',compare:'2024-08'},{month:'2026-08',currency:'idr'},{month:'2026-08',basis:'accrual'}])assert.throws(()=>options(q));
 });

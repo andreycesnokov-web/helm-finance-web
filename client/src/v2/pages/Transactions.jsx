@@ -60,9 +60,12 @@ export default function Transactions() {
   // Every row of this company, whatever its scope label (lib/performance.js, isBizIdr).
   const all = Array.isArray(tx.data) ? tx.data : []
   const selectedId = sp.get('tx')
+  const inList = all.find((x) => String(x.id) === selectedId)
+  const lookup = useApi(selectedId && !tx.loading && !tx.error && !inList ? '/transactions?period=all&id=' + encodeURIComponent(selectedId) : null)
+  const selected = inList || (Array.isArray(lookup.data) ? lookup.data.find((x) => String(x.id) === selectedId) : null)
   useEffect(() => {
-    if (selectedId && !tx.loading && !tx.error) setOpenTx(all.find((x) => String(x.id) === selectedId) || null)
-  }, [selectedId, tx.data, tx.loading, tx.error])
+    if (selectedId) setOpenTx(selected || null)
+  }, [selectedId, selected])
   const close = () => {
     setOpenTx(null)
     if (selectedId) setSp((old) => { const n = new URLSearchParams(old); n.delete('tx'); n.delete('category'); return n }, { replace: true })
@@ -88,7 +91,7 @@ export default function Transactions() {
   return (
     <div className="v2-page">
       {head}
-      {selectedId && !all.some((x) => String(x.id) === selectedId) && <ErrorBox error={t('route.transactionUnavailable')} />}
+      {selectedId && !selected && (lookup.loading ? <Card><Skeleton rows={3} /></Card> : <ErrorBox error={lookup.error || t('route.transactionUnavailable')} onRetry={lookup.reload} />)}
       {review > 0 && (
         <div className="v2-banner v2-tone-warn" role="status">
           <I.warn size={18} />

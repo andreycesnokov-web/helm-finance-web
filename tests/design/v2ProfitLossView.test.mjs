@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {exactMoney,difference,sourceLinks,copy,metricDetail,metricTotal,reportSeries,expenseBreakdown,reportCsv,chartMoneyScale,monthlyReportCsv} from '../../client/src/v2/lib/profitLossView.js'
+import {exactMoney,difference,sourceLinks,copy,metricDetail,metricTotal,reportSeries,expenseBreakdown,reportCsv,chartMoneyScale,monthlyReportCsv,percentChange,compareAmounts,reportHistory,filterError,periodEvidence} from '../../client/src/v2/lib/profitLossView.js'
 import {createRequire} from 'node:module'
 import {safeTarget} from '../../client/src/v2/lib/aiLinks.js'
 const require=createRequire(import.meta.url),{B,fixture}=require('../fixtures/profitLoss.cjs'),{buildReport}=require('../../server/lib/profitLoss.js')
@@ -8,6 +8,29 @@ test('money presentation and comparison never round huge or fractional decimals'
  assert.equal(exactMoney('9007199254740993.000000000000000001'),'Rp 9,007,199,254,740,993.000000000000000001')
  assert.equal(difference('0.3','0.2'),'0.1');assert.equal(difference('0','0.000000000000000001'),'-0.000000000000000001')
  assert.equal(exactMoney(null),'—');assert.equal(exactMoney('bad'),'—');assert.equal(difference(null,'0'),null)
+})
+test('historical report months never fall back to the current calendar or break the comparison window',()=>{
+ assert.deepEqual(reportHistory('2024-01',''),['2023-02','2023-03','2023-04','2023-05','2023-06','2023-07','2023-08','2023-09','2023-10','2023-11','2023-12','2024-01'])
+ for(const compare of ['2023-01','2024-02','2025-01']){
+  const months=reportHistory('2024-01',compare);assert.ok(months.includes('2024-01'))
+  assert.doesNotThrow(()=>require('../../server/lib/profitLoss.js').options({month:'2024-01',compare,months}))
+ }
+ assert.equal(filterError('2026-13','','IDR'),'invalidPeriod');assert.equal(filterError('2026-08','2026-08','IDR'),'invalidPeriod');assert.equal(filterError('2026-08','2024-08','IDR'),'invalidPeriod');assert.equal(filterError('2026-08','','idr'),'invalidCurrency');assert.equal(filterError('2024-01','2025-01','USDT'),null)
+})
+test('percent direction, ranking and half rounding use exact decimals, not floating point',()=>{
+ assert.deepEqual(percentChange('100.5','100'),{direction:'up',percent:'1'});assert.deepEqual(percentChange('99.5','100'),{direction:'down',percent:'1'})
+ assert.deepEqual(percentChange('9007199254740992.000000000000000001','9007199254740992.000000000000000002'),{direction:'down',percent:'0'})
+ assert.equal(percentChange('1','0'),null);assert.equal(percentChange('1','-1'),null)
+ assert.equal(compareAmounts('99999999999999999999.000000000000000001','99999999999999999999'),1)
+})
+test('coverage and detail export follow selected periods and signed metric, not every chart month',()=>{
+ const f=fixture();f.transactions.push({...f.transactions[0],id:'history',transaction_date:'2026-06-01',description:'HISTORY MUST NOT EXPORT'})
+ const r=buildReport(f,{businessId:B,month:'2026-08',months:'2026-06,2026-07,2026-08'})
+ const scope=periodEvidence(r,['2026-08']);assert.equal(scope.coverage.included,9);assert.equal(scope.coverage.exceptions,2)
+ const csv=reportCsv(r,{metric:'operating_cost'});assert.ok(!csv.includes('HISTORY MUST NOT EXPORT'));assert.ok(!csv.includes('2026-07-31'))
+ assert.ok(csv.includes('2026-08-10,IDR,-100.3,100.30,operating_cost'));assert.ok(csv.includes('SYN-RENT'))
+ const compareCsv=reportCsv(r,{metric:'operating_cost',compare:'2026-07'});assert.ok(compareCsv.includes('2026-07-31'))
+ assert.equal(metricDetail(r,'2026-08','__proto__'),null);assert.equal(metricDetail(r,'2026-08','constructor'),null)
 })
 test('P&L money uses full native units while approximate chart axes declare their divisor',()=>{
  for(const [value,expected]of [['0','Rp 0'],['100000000','Rp 100,000,000'],['-100000000.01','Rp −100,000,000.01'],['0.000000000000000001','Rp 0.000000000000000001']])assert.equal(exactMoney(value),expected)
@@ -39,7 +62,8 @@ test('existing AI note link preserves report currency and a strictly read-only m
  assert.equal(safeTarget('/business/performance?currency=USD%29,other'),null)
 })
 test('supported languages explicitly distinguish cash estimate and unsupported accrual',()=>{
- for(const lang of ['en','ru','id']){const c=copy(lang);assert.ok(c.cash);assert.ok(c.accrual);assert.ok(c.netNote);assert.ok(c.missing)}
+ for(const lang of ['en','ru','id']){const c=copy(lang);assert.ok(c.cash);assert.ok(c.accrual);assert.ok(c.netNote);assert.ok(c.missing);assert.equal(c.cashHow.length,5)}
+ assert.ok(copy('en').cashHow[0].includes('transaction date'));assert.ok(!copy('en').cashHow.join(' ').includes('when you invoice'))
 })
 test('all clickable waterfall totals equal the signed records inside their panel',()=>{
  const r=buildReport(fixture(),{businessId:B,month:'2026-08',compare:'2026-07'})

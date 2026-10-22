@@ -12,8 +12,8 @@ const {buildReport}=require('../../../server/lib/profitLoss.js')
 const FININ=require('../../../server/lib/financialInsights.js')
 const stage=process.env.PNL_REVIEW_STAGE||'after'
 assert.ok(['baseline','before','after'].includes(stage))
-const out=path.resolve('reports/pnl-final-review-20261022',stage);fs.mkdirSync(out,{recursive:true})
-const root=path.resolve(stage==='baseline'?'reports/interactive-pnl-20261021/before-dist':stage==='before'?'reports/interactive-pnl-20261021/after-dist':'reports/pnl-final-review-20261022/after-dist')
+const out=path.resolve(process.env.PNL_BROWSER_OUT||'reports/pnl-final-review-20261022/'+stage);fs.mkdirSync(out,{recursive:true})
+const root=path.resolve(process.env.PNL_BUILD_ROOT||(stage==='baseline'?'reports/interactive-pnl-20261021/before-dist':stage==='before'?'reports/interactive-pnl-20261021/after-dist':'reports/pnl-final-review-20261022/after-dist'))
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM||'C:/Program Files/Google/Chrome/Application/chrome.exe'})
 const results=[]
 const scale=v=>{const [i,f='']=String(v).split('.'),n=BigInt(i+f.padEnd(18,'0'))*1000000n,frac=(n%10n**18n).toString().padStart(18,'0').replace(/0+$/,'');return (n/10n**18n).toString()+(frac?'.'+frac:'')}

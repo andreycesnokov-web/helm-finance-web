@@ -64,7 +64,8 @@ function buildReport(input, { businessId, ...query }) {
     if (seen.has(String(t.id))) throw Error('duplicate_transaction_read');
     seen.add(String(t.id));
     if (t.is_training) continue;
-    if (t.transaction_date && !periods.includes(String(t.transaction_date).slice(0,7))) continue;
+    // Invalid dates cannot be silently treated as outside the selected period.
+    if (dateOK(t.transaction_date) && !periods.includes(t.transaction_date.slice(0,7))) continue;
     if (CURRENCY.test(t.currency_original||'')) currencies.add(t.currency_original);
     const ds=[...new Map([...(debtByTx.get(String(t.id))||[]),debtById.get(String(t.debt_payment_id))].filter(Boolean).map(d=>[String(d.id),d])).values()];
     const docIds = new Set([...(docsByTx.get(String(t.id))||[]), ...ds.flatMap(d=>docsByDebt.get(String(d.id))||[])].map(l=>String(l.document_id)));
@@ -84,7 +85,7 @@ function buildReport(input, { businessId, ...query }) {
     if (!CURRENCY.test(t.currency_original || '')) {except('missing_currency');continue;}
     if (t.currency_original !== opt.currency) {exclude('other_currency');continue;}
     const econ=M.getTransactionEconomicClass(t.type);
-    if (t.is_opening_balance || /^(wallet_opening_balance|opening_reanchor(?:_reversal)?)$/.test(t.source||'') || t.type==='correction') {exclude('opening_or_correction');continue;}
+    if (t.is_opening_balance || /^(wallet_opening_balance|bank_import_opening|opening_reanchor(?:_reversal)?)$/.test(t.source||'') || t.type==='correction') {exclude('opening_or_correction');continue;}
     if(t.transfer_id || econ==='internal_transfer' || /^(transfer:|transfer_)/.test(t.source||'')) {exclude('own_account_transfer');continue;}
     if(econ==='financing'||econ==='investing'||fundingTx.has(String(t.id))) {exclude('financing');continue;}
     if(repayments.has(String(t.id))) {except('repayment_split_not_verified');continue;}

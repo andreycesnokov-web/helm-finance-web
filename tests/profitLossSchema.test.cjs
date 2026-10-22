@@ -12,8 +12,13 @@ test('all read columns exist in baseline schema and numeric casts preserve text'
   }
   // Existing baseline 070 / 20261013114500, test fixture adaptation ONLY.
   await db.exec(`ALTER TABLE transactions ADD COLUMN debt_payment_id bigint, ADD COLUMN is_opening_balance boolean, ADD COLUMN bank_import_row_id uuid, ADD COLUMN balance_version bigint;
-    ALTER TABLE debts ADD COLUMN invoice_number text;`);
+    ALTER TABLE debts ADD COLUMN invoice_number text, ADD COLUMN bill_version bigint;`);
   for(const key of Object.keys(TABLES))await db.query(`SELECT ${TABLES[key]} FROM public.${NAMES[key]||key} WHERE business_id=$1 ORDER BY id LIMIT 500`,['b0000000-0000-4000-8000-000000000001']);
+  const sourceRead=require('../server/lib/sourceRecordRead');
+  for(const table of ['transactions','debts']){
+   const columns=sourceRead.select(table,'1').replace(/exact_(\w+):(\w+)::text/g,'$2::text AS exact_$1');
+   await db.query(`SELECT ${columns} FROM public.${table} WHERE business_id=$1 AND id=$2 LIMIT 1`,['b0000000-0000-4000-8000-000000000001','1']);
+  }
   const r=await db.query(`SELECT 9007199254740993::numeric::text AS value`);assert.equal(r.rows[0].value,'9007199254740993');
   const v=await db.query('SELECT version()');console.log('Embedded SQL engine:',v.rows[0].version.split(' on ')[0]);
  }finally{await db.close();}

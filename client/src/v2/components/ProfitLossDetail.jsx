@@ -3,7 +3,7 @@ import {useEffect,useMemo,useRef,useState} from 'react'
 import {Link,useSearchParams} from 'react-router-dom'
 import {useLang} from '../i18n'
 import {Pill,Btn,Skeleton,ErrorBox} from '../ui'
-import {copy,exactMoney,difference,sourceLinks,metricDetail,downloadReport} from '../lib/profitLossView'
+import {copy,exactMoney,difference,sourceLinks,metricDetail,downloadReport,periodEvidence} from '../lib/profitLossView'
 import Modal from './Modal'
 import '../pages/profitLoss.css'
 function Source({to,children,c}){return <Link to={to} target="_blank" rel="noopener noreferrer" title={c.newTab}>{children}<span className="v2-sr"> · {c.newTab}</span></Link>}
@@ -49,8 +49,8 @@ export default function ProfitLossDetail({data,metric,month,onClose,onChange,onR
    back?.focus()
   }
  },[])
- const exceptions=(data?.exceptions||[]).filter(e=>!e.date||[month,compare].includes(e.date.slice(0,7)))
- const excluded=(data?.excluded||[]).filter(e=>e.date&&[month,compare].includes(e.date.slice(0,7)))
+ const evidence=useMemo(()=>data?periodEvidence(data,[month,compare]):{exceptions:[],excluded:[],coverage:{}},[data,month,compare])
+ const {exceptions,excluded,coverage}=evidence
  const groups=current?.groups.map(g=>({...g,categories:[...new Map([...(prior?.groups.find(x=>x.key===g.key)?.categories||[]).map(c=>({...c,total:'0',entries:[]})),...g.categories].map(c=>[c.id,c])).values()]}))||[]
  const cats=groups.flatMap(g=>g.categories.map(x=>x.id))
  return <Modal wide className="pnl-modal-scrim" preventBackdropFocus title={<>{c[metric]||metric} · <span className="pnl-month-label">{month}</span></>} onClose={onClose}><div ref={body} className="pnl-detail">
@@ -63,13 +63,14 @@ export default function ProfitLossDetail({data,metric,month,onClose,onChange,onR
    {loading?<Skeleton rows={6}/>:error?<ErrorBox error={error} onRetry={onReload}/>:current?<>
     <div className="pnl-summary"><strong className="v2-num pnl-money" tabIndex={0} data-pnl-total>{exactMoney(current.total,currency)}</strong>{prior&&<span>{compare}: <span className="pnl-money" tabIndex={0}>{exactMoney(prior.total,currency)}</span> · {c.change}: <span className="pnl-money" tabIndex={0}>{exactMoney(difference(current.total,prior.total),currency)}</span></span>}</div>
     {metric==='net_profit'?<p role="status">{c.netNote}</p>:<>
-      <div className="pnl-toolbar"><Btn onClick={()=>onChange('categories',cats.join(','))}>{c.expand}</Btn><Btn onClick={()=>onChange('categories','')}>{c.collapse}</Btn><Btn onClick={()=>downloadReport(data)}>{c.export}</Btn></div>
+      <div className="pnl-toolbar"><Btn onClick={()=>onChange('categories',cats.join(','))}>{c.expand}</Btn><Btn onClick={()=>onChange('categories','')}>{c.collapse}</Btn><Btn onClick={()=>downloadReport(data,{metric,month,compare})}>{c.export}</Btn></div>
       {groups.map(g=><section key={g.key} className="pnl-metric-group"><h3>{c[g.key]} <span className="v2-num pnl-money" tabIndex={0}>{exactMoney(g.total,currency)}</span></h3>{!g.categories.length&&<p>{c.noEntries}</p>}{g.categories.map(cat=><section key={cat.id} className="pnl-category"><button type="button" className="pnl-category-toggle" aria-expanded={expanded.has(cat.id)} aria-controls={`pnl-cat-${cat.id}`} onClick={()=>toggle(cat.id)}><span>{expanded.has(cat.id)?'▾':'▸'} {cat.name} ({cat.entries.length})</span><strong className="v2-num pnl-money">{exactMoney(cat.total,currency)}</strong></button>{expanded.has(cat.id)&&<div id={`pnl-cat-${cat.id}`}><p><strong>{month}</strong></p><Entries key={month+currency+cat.id} entries={cat.entries} c={c} currency={currency}/>{prior&&<details><summary>{compare}</summary><Entries entries={prior.groups.find(x=>x.key===g.key)?.categories.find(x=>x.id===cat.id)?.entries||[]} c={c} currency={currency}/></details>}</div>}</section>)}</section>)}
     </>}
-    <p className="v2-small">{c.coverage}: {data.coverage.included} {c.included} · {data.coverage.missing_documents} {c.missingCount} · {data.coverage.exceptions} {c.reviewCount}</p>
+    <p className="v2-small">{c.coverage}: {coverage.included} {c.included} · {coverage.missing_documents} {c.missingCount} · {coverage.exceptions} {c.reviewCount}</p>
+    {exceptions.some(e=>e.reason==='missing_transaction_date')&&<p className="v2-small v2-muted">{c.undated}</p>}
     <details><summary>{c.exceptions} ({exceptions.length})</summary><Entries key={month+currency+'exception'} entries={exceptions} c={c} currency={currency} exception/></details>
     <details><summary>{c.excluded} ({excluded.length})</summary><Entries key={month+currency+'excluded'} entries={excluded} c={c} currency={currency} exception/></details>
     <p className="v2-small v2-muted">{c.observed}: {data.read_started_at||'—'} → {data.read_finished_at||'—'}. {c.notSnapshot}</p>
-   </>:null}
+   </>:<><p role="alert">{c.invalidMetric}</p><Btn onClick={onClose}>{c.backReport}</Btn></>}
   </div></Modal>
 }
