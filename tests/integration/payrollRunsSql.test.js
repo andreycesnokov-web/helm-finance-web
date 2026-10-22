@@ -13,7 +13,10 @@ before(async()=>{
  await db.exec(fs.readFileSync(path.join(root,'tests/fixtures/schema/prod_public_schema_2026-10-08.sql'),'utf8'));
  await db.exec('GRANT USAGE ON SCHEMA public TO anon,authenticated,service_role;GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;');
  for(const file of require('./_d4Harness').CHAIN)await db.exec(fs.readFileSync(path.join(root,'migrations',file),'utf8'));
- await db.exec(fs.readFileSync(path.join(root,'migrations/20261020163121_payroll_runs_no_cash.sql'),'utf8'));
+ const productionCompat=process.env.CFO_PAYROLL_PRODUCTION_COMPAT==='true';
+ if(productionCompat)await db.exec(fs.readFileSync(path.join(root,'migrations',require('./_d4Harness').D4),'utf8'));
+ const migration=productionCompat?'supabase/migrations/20261022165230_payroll_runs_receipt_contract_compat.sql':'migrations/20261020163121_payroll_runs_no_cash.sql';
+ await db.exec(fs.readFileSync(path.join(root,migration),'utf8'));
  await db.exec('SET search_path=public,pg_catalog');
  console.log('Qualification: full-schema embedded PostgreSQL; no independent-session/HTTP/Auth/Storage proof');
 });
