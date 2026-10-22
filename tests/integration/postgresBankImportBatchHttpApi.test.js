@@ -44,6 +44,7 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
     try {
       await pgClient.connect();
     } catch (err) {
+      if (process.env.CI) throw new Error(`Real PostgreSQL is required in CI: ${err.message}`);
       console.warn(`[SKIP] Real PostgreSQL not reachable (${err.message}). Test skipped or runs in CI.`);
       skipped = true;
       return;
@@ -52,6 +53,12 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
 
     // 1. Ensure initial tables exist in PostgreSQL WITHOUT migration 068
     await pgClient.query(`
+      -- The real session guard reads the actor row before entering a business route.
+      CREATE TABLE IF NOT EXISTS public.users (
+        id bigint PRIMARY KEY,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
       CREATE TABLE IF NOT EXISTS public.businesses (
         id uuid PRIMARY KEY,
         name text NOT NULL,
@@ -166,6 +173,7 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
     `);
 
     // 2. Seed business, member, wallet, and document in PostgreSQL
+    await pgClient.query('INSERT INTO public.users(id) VALUES($1),($2) ON CONFLICT(id) DO NOTHING', [USER_A, 9999]);
     await pgClient.query(`
       INSERT INTO public.businesses (id, name, type, owner_user_id) VALUES
         ($1, 'Company Alpha', 'business', $3),
@@ -349,6 +357,22 @@ describe('HTTP API End-to-End: POST /api/bank-import/batches over Real PostgreSQ
     }
     if (pgClient) {
       try { await pgClient.end(); } catch {}
+    }
+  });
+
+  it('HTTP API: missing actor and foreign company remain denied before any batch write', async (t) => {
+    if (skipped) return t.skip('PostgreSQL unavailable');
+    for (const [userId, expected] of [[899999, 401], [9999, 403]]) {
+      const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '1h' });
+      const response = await fetch(`${BASE}/api/bank-import/batches`, {
+        method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'x-business-id': BIZ_A },
+        body: JSON.stringify({ wallet_id: WALLET_A, rows: [{ tx_date: '2026-09-05', amount: 1, direction: 'in' }] }),
+      });
+      assert.strictEqual(response.status, expected, `Actor ${userId} must remain denied`);
+    }
+    for (const table of ['bank_import_batches', 'bank_import_rows']) {
+      const count = await pgClient.query(`SELECT count(*)::int AS n FROM public.${table} WHERE business_id=$1`, [BIZ_A]);
+      assert.strictEqual(count.rows[0].n, 0, 'Authentication/tenant denial must not write '+table);
     }
   });
 

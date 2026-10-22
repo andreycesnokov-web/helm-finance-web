@@ -1,5 +1,10 @@
 name: CI
 
+# Test-only opt-outs. No provider credentials or production environments are used.
+env:
+  DOCUMENT_OCR_NANONETS_ENABLED: 'false'
+  DOCUMENT_OCR_VISION_ENABLED: 'false'
+
 on:
   pull_request:
     branches: [main, develop]
@@ -71,6 +76,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
         run: node --test tests/integration/postgresBankImportBatchHttpApi.test.js
+
+      - name: Verify session and revoked-token authorization guards
+        run: node --test tests/sessionUser.test.js tests/revokedTokens.test.js
 
       - name: Run PostgreSQL Real Bank Reconciliation & Transaction Linking Flow Tests
         env:

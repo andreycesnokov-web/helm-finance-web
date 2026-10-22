@@ -60,6 +60,12 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
 
     // 1. Initialize complete schema
     await pgClient.query(`
+      -- Preserve the real session check; provide its actual PostgreSQL actor row.
+      CREATE TABLE IF NOT EXISTS public.users (
+        id bigint PRIMARY KEY,
+        created_at timestamptz NOT NULL DEFAULT now()
+      );
+
       CREATE TABLE IF NOT EXISTS public.businesses (
         id uuid PRIMARY KEY,
         name text NOT NULL,
@@ -287,6 +293,7 @@ describe('Real PostgreSQL Integration: Bank Reconciliation & Transaction Linking
     await pgClient.query(m68);
 
     // 3. Seed business & members
+    await pgClient.query('INSERT INTO public.users(id) VALUES($1) ON CONFLICT(id) DO NOTHING', [USER_A]);
     await pgClient.query(`
       INSERT INTO public.businesses (id, name, type, owner_user_id) VALUES
         ($1, 'PT Solusi Utama', 'business', $3),
