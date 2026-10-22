@@ -18,4 +18,4 @@ function run(name,file){const r=spawnSync(process.execPath,[file],{cwd:'/candida
  }
  fs.writeFileSync(path.join(evidence,'SESSION_RESULTS.json'),JSON.stringify({sha:process.env.CFO_RC_SHA,node:process.version,finished:true,paid_providers_disabled:true,jobs,ok:jobs.every(x=>x.ok)},null,2));
  process.exitCode=jobs.every(x=>x.ok)?0:1;
-})().catch(e=>{fs.writeFileSync(path.join(evidence,'SESSION_FATAL.json'),JSON.stringify({error:redact(e.message),jobs}));process.exitCode=1;}).finally(()=>{child.kill('SIGTERM');setTimeout(()=>child.kill('SIGKILL'),1500).unref();log.end();});
+})().catch(e=>{fs.writeFileSync(path.join(evidence,'SESSION_FATAL.json'),JSON.stringify({error:redact(e.message),jobs}));process.exitCode=1;}).finally(()=>{child.once('close',()=>log.end());child.kill('SIGTERM');setTimeout(()=>child.kill('SIGKILL'),1500).unref();});

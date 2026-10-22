@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),{randomUUID,createHash}=require('node:crypto'),{Client}=require('pg');
 const C=JSON.parse(fs.readFileSync('/tmp/acceptance-session.json')),BASE=process.env.BASE_URL,results=[];
 const db=new Client({connectionString:process.env.DATABASE_URL,connectionTimeoutMillis:4000});
-const save=()=>fs.writeFileSync('/evidence/PICKER_HTTP.json',JSON.stringify({candidate:'fd82b8d',mock_api:false,cluster:C.cluster,results},null,2));
+const save=()=>fs.writeFileSync('/evidence/PICKER_HTTP.json',JSON.stringify({candidate:process.env.CFO_RC_SHA||'unrecorded',mock_api:false,cluster:C.cluster,results},null,2));
 const pass=(name,detail={})=>{results.push({case:name,status:'PASS',...detail});save();console.log('PASS '+name)};
 async function api(path,{method='GET',body,actor=C.owner,biz=C.biz}={}){
  const r=await fetch(BASE+'/api'+path,{method,headers:{authorization:'Bearer '+actor.token,'x-business-id':biz,...(body?{'content-type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(20000)});let data;try{data=await r.json()}catch{data={error:'non_json'}}return {status:r.status,data};
