@@ -60,8 +60,8 @@ describe('Real PostgreSQL: bank reconciliation and transaction linking HTTP flow
     biz = await seed.company({ owner: OWNER, name: 'Synthetic Reconciliation A' });
     otherBiz = await seed.company({ owner: OTHER, name: 'Synthetic Reconciliation B' });
     wallet = await seed.wallet(biz, OWNER, { opening: 45000000, date: '2026-08-31', createdAt: '2026-08-31T00:00:00Z' });
-    otherWallet = await seed.wallet(otherBiz, OTHER, { opening: 0, date: '2026-08-31' });
-    wrongWallet = await seed.wallet(biz, OWNER, { opening: 0, date: '2026-08-31', name: 'Other account' });
+    otherWallet = await seed.wallet(otherBiz, OTHER, { opening: 10000000, date: '2026-08-31' });
+    wrongWallet = await seed.wallet(biz, OWNER, { opening: 10000000, date: '2026-08-31', name: 'Other account' });
     // Account used only for refusal; exclude from active-bank readiness checks.
     await admin.query('UPDATE public.wallets SET is_active=false WHERE id=$1', [wrongWallet.id]);
     const file = crypto.randomUUID(); doc = crypto.randomUUID();
