@@ -13,6 +13,8 @@ import I from '../icons'
 import { Pill } from '../ui'
 import DocumentPreview from './DocumentPreview'
 import DocumentIdentity from './DocumentIdentity'
+import TransactionPicker, { TransactionSummary } from './TransactionPicker'
+import { compareDocumentTransaction } from '../lib/transactionPickerModel'
 import { previewKind } from '../../lib/documentPreview'
 import { useT, useLang } from '../i18n'
 import { money, shortDate } from '../lib/format'
@@ -34,6 +36,12 @@ const errKey = (e) => {
   return ['docs.dr.err.generic', { msg: code || e?.message || '—' }]
 }
 const amt = (x) => Number(x?.original_amount ?? x?.amount ?? 0)
+const comparisonTone = { matches: 'good', differs: 'warn', unknown: 'neutral' }
+
+function ComparisonStatus({ field, state, t }) {
+  return <div className="v2-txp-comparison-row"><span>{t(`docs.txPicker.comparison.${field}.label`)}</span>
+    <Pill tone={comparisonTone[state]}>{t(`docs.txPicker.comparison.${field}.${state}`)}</Pill></div>
+}
 
 export function txLabel(tx, lang) {
   if (!tx) return null
@@ -42,13 +50,16 @@ export function txLabel(tx, lang) {
     tx.description || tx.category].filter(Boolean).join(' · ')
 }
 
-export default function DocumentDrawer({ doc, debts = [], transactions = [], wallets = [], counterparties = [], onClose, onChanged }) {
+export default function DocumentDrawer({ doc, debts = [], transactions = [], wallets = [], transactionWallets = wallets, counterparties = [],
+  linkedTransactionIds = new Set(), linkStatusComplete = false, txLoading = false, txError = null, txHasMore = false,
+  reloadTransactions, loadMoreTransactions, onClose, onChanged }) {
   const t = useT()
   const lang = useLang()
   const { token } = useAuth()
   const { active } = useWorkspace()
   const ref = useRef(null)
   const closeRef = useRef(null)
+  const linkPendingRef = useRef(false)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
   const [busy, setBusy] = useState(false)
@@ -105,10 +116,10 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
   const debtOptions = useMemo(() => debts.filter((d) => !linkedKeys.has(`debt:${d.id}`))
     .sort((a, b) => near(amt(a)) - near(amt(b)) || String(b.created_at || '').localeCompare(String(a.created_at || ''))).slice(0, 150),
   [debts, links, docAmount]) // eslint-disable-line react-hooks/exhaustive-deps
-  const txOptions = useMemo(() => transactions.filter((x) => !linkedKeys.has(`transaction:${x.id}`))
-    .sort((a, b) => near(Number(a.amount_original ?? a.amount ?? 0)) - near(Number(b.amount_original ?? b.amount ?? 0))
-      || String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 150),
-  [transactions, links, docAmount]) // eslint-disable-line react-hooks/exhaustive-deps
+  const selectedTx = target.startsWith('transaction:') ? txById.get(target.slice('transaction:'.length)) : null
+  const comparison = selectedTx ? compareDocumentTransaction(doc, selectedTx) : null
+  const linkedToCurrent = new Set(links.filter(l => l.target_type === 'transaction').map(l => String(l.target_id)))
+  const issuer = counterparties.find(cp => String(cp.id) === String(doc?.issuer_counterparty_id))?.name
 
   if (!doc) return null
   const verdict = vaultVerdictOf(doc)
@@ -117,8 +128,8 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
 
   const run = async (fn, okNote = null, close = false) => {
     setBusy(true); setErr(null); setNote(null)
-    try { await fn(); if (okNote) setNote(okNote); onChanged?.(); if (close) onClose?.() }
-    catch (e) { const [k, v] = errKey(e); setErr(t(k, v)) }
+    try { await fn(); if (okNote) setNote(okNote); onChanged?.(); if (close) onClose?.(); return true }
+    catch (e) { const [k, v] = errKey(e); setErr(t(k, v)); return false }
     finally { setBusy(false) }
   }
   const openFile = async (mode) => {
@@ -135,10 +146,12 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
     if (form.amount !== '' && isFinite(Number(form.amount))) body.amount = Number(form.amount)
     run(() => updateDocument(token, doc.id, body), t('docs.dr.saved'))
   }
-  const doLink = () => {
+  const doLink = async () => {
     const [type, id] = target.split(':')
-    if (!type || !id) return
-    run(() => linkDocument(token, doc.id, type, id)).then(() => setTarget(''))
+    if (!type || !id || busy || linkPendingRef.current || linkedKeys.has(target)) return
+    linkPendingRef.current = true
+    try { if (await run(() => linkDocument(token, doc.id, type, id))) setTarget('') }
+    finally { linkPendingRef.current = false }
   }
   const linkText = (l) => {
     if (l.target_type === 'debt') {
@@ -246,19 +259,36 @@ export default function DocumentDrawer({ doc, debts = [], transactions = [], wal
                   </select></label>
                 {mode === 'record' && (
                   <>
-                    <label className="v2-field"><span className="v2-field-label">{t('docs.dr.linkTo')}{docAmount != null ? ` · ${t('docs.dr.byAmount')}` : ''}</span>
-                      <select className="v2-select" value={target} disabled={busy} onChange={(e) => setTarget(e.target.value)} aria-label={t('docs.dr.linkTo')}>
+                    <label className="v2-field"><span className="v2-field-label">{t('docs.dr.linkBill')}</span>
+                      <select className="v2-select" value={target.startsWith('debt:') ? target : ''} disabled={busy} onChange={(e) => setTarget(e.target.value)} aria-label={t('docs.dr.linkBill')}>
                         <option value="">{t('docs.dr.choose')}</option>
-                        {debtOptions.length > 0 && <optgroup label={t('docs.dr.linkBill')}>
-                          {debtOptions.map((d) => <option key={d.id} value={`debt:${d.id}`}>
+                        {debtOptions.map((d) => <option key={d.id} value={`debt:${d.id}`}>
                             {[t(`docs.linkedTo.${d.type === 'receivable' ? 'receivable' : 'payable'}`, { who: d.counterparty || t('bills.noName') }), money(amt(d)), d.due_date ? shortDate(d.due_date, lang) : null].filter(Boolean).join(' · ')}
                           </option>)}
-                        </optgroup>}
-                        {txOptions.length > 0 && <optgroup label={t('docs.dr.linkTx')}>
-                          {txOptions.map((x) => <option key={x.id} value={`transaction:${x.id}`}>{txLabel(x, lang)}</option>)}
-                        </optgroup>}
                       </select></label>
-                    <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !target} onClick={doLink}>{t('docs.dr.link')}</button>
+                    <div className="v2-field"><span className="v2-field-label">{t('docs.dr.linkTx')}</span>
+                      <TransactionPicker key={doc.id} doc={doc} transactions={transactions} wallets={transactionWallets} counterparties={counterparties}
+                        linkedIds={linkedTransactionIds} linkedToCurrent={linkedToCurrent} statusComplete={linkStatusComplete}
+                        loading={txLoading} error={txError} hasMore={txHasMore} onRetry={reloadTransactions}
+                        onLoadMore={loadMoreTransactions} disabled={busy}
+                        value={selectedTx?.id || ''} onSelect={id => setTarget(`transaction:${id}`)} />
+                    </div>
+                    {selectedTx && <div className="v2-txp-compare" role="group" aria-label={t('docs.txPicker.compare')}>
+                      <div><strong>{t('docs.txPicker.document')}</strong><span>{name}</span>
+                        <span>{doc.document_date ? shortDate(doc.document_date, lang) : t('docs.txPicker.unknownDate')} · {docAmount == null ? t('docs.txPicker.unknownAmount')
+                          : doc.currency ? money(docAmount, { currency: doc.currency, full: true })
+                            : `${docAmount.toLocaleString('en-US')} · ${t('docs.txPicker.unknownCurrency')}`}</span>
+                        <span>{issuer || t('docs.txPicker.unknownCounterparty')}</span>
+                        <span>{t('docs.txPicker.reviewStatus')}: {t(`docs.txPicker.review.${['confirmed', 'needs_review'].includes(doc.review_status) ? doc.review_status : 'unknown'}`)}</span>
+                      </div>
+                      <div><strong>{t('docs.txPicker.transaction')}</strong><TransactionSummary tx={selectedTx} wallets={transactionWallets} fullDescription /></div>
+                      <div className="v2-txp-comparison">
+                        {['amount', 'date', 'counterparty'].map(field => <ComparisonStatus key={field} field={field} state={comparison[field]} t={t} />)}
+                      </div>
+                      {comparison.insufficientDocumentData && <p className="v2-txp-caution" role="alert">{t('docs.txPicker.insufficientDocumentData')}</p>}
+                      <p>{t('docs.txPicker.reviewBeforeLink')}</p>
+                    </div>}
+                    <button type="button" className="v2-btn v2-btn-secondary" disabled={busy || !target || linkedKeys.has(target)} onClick={doLink}>{t('docs.dr.link')}</button>
                   </>
                 )}
                 {mode === 'bank' && (

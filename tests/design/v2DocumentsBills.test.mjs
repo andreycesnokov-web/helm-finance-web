@@ -127,7 +127,7 @@ ok('AI filing suggestion is applied only on Accept', /onClick=\{acceptFiling\}/.
 
 console.log('\n--- review panel and company tab text: same keys in RU / EN / ID')
 const flat = (o, pre = '') => Object.entries(o || {}).flatMap(([k, v]) => (v && typeof v === 'object' ? flat(v, `${pre}${k}.`) : [`${pre}${k}`])).sort().join(',')
-for (const sub of ['dr', 'company', 'vault', 'pv', 'id', 'kind', 'fl']) {
+for (const sub of ['dr', 'txPicker', 'company', 'vault', 'pv', 'id', 'kind', 'fl']) {
   ok(`docs.${sub}: ru = en`, flat(ru.docs[sub]) === flat(en.docs[sub]) && flat(en.docs[sub]).length > 0)
   ok(`docs.${sub}: id = en`, flat(id.docs[sub]) === flat(en.docs[sub]))
 }

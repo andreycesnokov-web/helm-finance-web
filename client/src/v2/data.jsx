@@ -17,6 +17,7 @@ import { apiFetch } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
 import { useWorkspace } from '../shell/WorkspaceProvider'
 import { scrubMarkers } from './lib/markers'
+import { appendTransactionPage } from './lib/transactionPages'
 
 const Ctx = createContext(null)
 export const FRESH_MS = 2000
@@ -78,6 +79,49 @@ export function useApi(path) {
   }, [ctx?.get, ctx?.gen, path, nonce]) // eslint-disable-line react-hooks/exhaustive-deps
   const reload = useCallback(() => { forceRef.current = true; setNonce((n) => n + 1) }, [])
   return { ...st, reload }
+}
+
+/** Read the Business ledger in bounded pages for document matching. A fresh
+ * workspace or invalidation discards every page before any old row can render.
+ * Each batch stops after 5,000 rows; the user can request the next batch. */
+export function usePagedBusinessTransactions(enabled = true) {
+  const ctx = useContext(Ctx)
+  const [nonce, setNonce] = useState(0)
+  const [pageBudget, setPageBudget] = useState(10)
+  const key = `${ctx?.wsId}|${ctx?.gen}|${nonce}|${pageBudget}|${enabled}`
+  const [st, setSt] = useState({ key: null, getRef: null, data: [], loading: true, error: null, hasMore: false })
+  useEffect(() => {
+    if (!enabled || !ctx?.get || ctx.wsId == null) { setSt({ key, getRef: ctx?.get, data: [], loading: false, error: null, hasMore: false }); return }
+    let current = true
+    setSt({ key, getRef: ctx.get, data: [], loading: true, error: null, hasMore: false })
+    const read = async () => {
+      let rows = []
+      const size = 500
+      let beforeId = null
+      try {
+        for (let page = 0; page < pageBudget; page++) {
+          const cursor = beforeId == null ? '' : `&before_id=${beforeId}`
+          const result = await ctx.get(`/transactions?period=all&include_document_status=true&limit=${size}${cursor}`, { force: nonce > 0 })
+          if (!current) return
+          const pageResult = appendTransactionPage(rows, result, beforeId, size)
+          rows = pageResult.rows
+          beforeId = pageResult.beforeId
+          const hasMore = pageResult.hasMore
+          const loading = hasMore && page + 1 < pageBudget
+          setSt({ key, getRef: ctx.get, data: [...rows], loading, error: null, hasMore })
+          if (!hasMore) return
+        }
+      } catch (error) {
+        if (current) setSt({ key, getRef: ctx.get, data: [...rows], loading: false, error, hasMore: rows.length > 0 })
+      }
+    }
+    read()
+    return () => { current = false }
+  }, [ctx?.get, ctx?.gen, ctx?.wsId, key, nonce, pageBudget]) // eslint-disable-line react-hooks/exhaustive-deps
+  const reload = useCallback(() => setNonce(n => n + 1), [])
+  const loadMore = useCallback(() => setPageBudget(n => n + 10), [])
+  return st.key === key && st.getRef === ctx?.get ? { ...st, reload, loadMore }
+    : { data: [], loading: enabled && !!ctx?.wsId, error: null, hasMore: false, reload, loadMore }
 }
 
 /** Drop the whole workspace read cache (call after a successful write). */

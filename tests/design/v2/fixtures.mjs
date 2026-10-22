@@ -93,7 +93,20 @@ export const routes = {
   'GET /api/debts': () => debts,
   'GET /api/wallets': () => ({ wallets }),
   'GET /api/counterparties': () => ({ counterparties }),
-  'GET /api/transactions': (u) => (u.searchParams.get('type') === 'transfer' ? transactions.filter((t) => t.type === 'transfer') : transactions),
+  'GET /api/transactions': (u) => {
+    const count = Number(process.env.FIXTURE_TX_COUNT || 0)
+    const extra = count > transactions.length ? Array.from({ length: count - transactions.length }, (_, i) => ({
+      id: 1000 + i, type: 'expense', description: `Archive sample ${i + transactions.length + 1}`,
+      amount_original: 100000 + i, currency_original: 'IDR', wallet_id: 'w1',
+      transaction_date: '2025-12-01', scope: 'business',
+    })) : []
+    const all = transactions.concat(extra)
+    const filtered = u.searchParams.get('type') === 'transfer' ? all.filter(t => t.type === 'transfer') : all
+    const limit = Number(u.searchParams.get('limit'))
+    const before = u.searchParams.get('before_id')
+    return limit > 0 ? filtered.filter(t => before == null || Number(t.id) < Number(before))
+      .sort((a, b) => Number(b.id) - Number(a.id)).slice(0, limit) : filtered
+  },
   // P-10: three categories confirmed, one not — Profit shows the accrual view and the coverage line.
   'GET /api/cashflow-categories': () => ({ categories: pnlCats }),
   'GET /api/pnl-mapping': () => ({ available: true, can_edit: true, confirmed: true, kbli: ['81210', '47999'], tax_regime: 'pph_final_umkm',
