@@ -1466,9 +1466,14 @@ app.get('/api/debts', auth, async (req, res) => {
   const { type } = req.query;
   const biz = await requireBusiness(req, res);
   if (!biz) return;
+  const sourceRead = require('./lib/sourceRecordRead');
+  let recordId;
+  try { recordId = sourceRead.lookupId(req.query); }
+  catch { return res.status(400).json({ error: 'invalid_record_id' }); }
   let query = supabase.from('debts')
-    .select('*').or(bizOrFilter(biz))
+    .select(sourceRead.select('debts', recordId)).or(bizOrFilter(biz))
     .order('due_date', { ascending: true });
+  query = sourceRead.scope(query, recordId, biz.business.id);
   // Training (tutorial) records excluded by default; ?include_training=1 opts in
   if (req.query.include_training !== '1') {
     query = query.or('is_training.is.null,is_training.eq.false');
@@ -1482,7 +1487,7 @@ app.get('/api/debts', auth, async (req, res) => {
   // By default include all (not just unsettled) so UI can show paid history
   const { data, error } = await query;
   if (error) { if (balanceFailure(res, error)) return; return res.status(500).json({ error: error.message }); };
-  res.json(await enrichDebtsFor(biz.business.id, data));
+  res.json(await enrichDebtsFor(biz.business.id, sourceRead.decode(data, 'debts', recordId)));
 });
 
 // Existing access policy, with its native count serialized by the common gate.
@@ -3133,6 +3138,9 @@ app.get('/api/accountant/tax-knowledge/cards', auth, async (req, res) => {
 
 
 // ── Advanced Financial Insights V1 ───────────────────────────────────────────
+// Isolated read-only P&L contribution model. Existing cash/forecast endpoints stay intact.
+require('./lib/profitLossRoutes').install(app, { auth, requireBusiness, canViewBusinessFinance, supabase });
+
 // GET /api/pulse/advanced-insights — cash-basis estimates over the transaction ledger.
 //
 // Read-only. Business-scoped through requireBusiness + bizOrFilter, exactly like every
@@ -8192,18 +8200,27 @@ app.get('/api/transactions', auth, async (req, res) => {
   if (!canViewBusinessFinance(biz.role))
     return res.status(403).json({ error: 'Your role does not allow viewing business transactions' });
 
+  const sourceRead = require('./lib/sourceRecordRead');
+  let recordId;
+  try { recordId = sourceRead.lookupId(req.query); }
+  catch { return res.status(400).json({ error: 'invalid_record_id' }); }
   // Opt-in, bounded pagination for the V2 document picker. The legacy array
   // response and unpaged callers keep their existing contract.
   const paged = req.query.limit !== undefined || req.query.before_id !== undefined;
+  // A targeted source read and a cursor page are different contracts. Never let
+  // a later page limit override the one-record bound or silently ignore a cursor.
+  if (recordId && paged)
+    return res.status(400).json({ error: 'invalid_transaction_query' });
   const pageLimit = Number(req.query.limit);
   const beforeId = req.query.before_id === undefined ? null : Number(req.query.before_id);
   if (paged && (!Number.isSafeInteger(pageLimit) || pageLimit < 1 || pageLimit > 500
     || (beforeId !== null && (!Number.isSafeInteger(beforeId) || beforeId < 1))))
     return res.status(400).json({ error: 'invalid_transaction_page' });
 
-  let query = supabase.from('transactions').select('*')
+  let query = supabase.from('transactions').select(sourceRead.select('transactions', recordId))
     .or(bizOrFilter(biz))
     .order(paged ? 'id' : 'created_at', { ascending: false });
+  query = sourceRead.scope(query, recordId, biz.business.id);
 
   // Period filter — 'all' skips date filter entirely (used by Payroll page)
   if (period !== 'all') {
@@ -8224,8 +8241,9 @@ app.get('/api/transactions', auth, async (req, res) => {
     query = query.limit(pageLimit);
   }
 
-  const { data, error } = await query;
+  const { data: sourceData, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
+  const data = sourceRead.decode(sourceData, 'transactions', recordId);
 
   // Enrich bank-statement linking metadata for returned transactions
   if(paged && req.query.include_document_status==='true' && Array.isArray(data))

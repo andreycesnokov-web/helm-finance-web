@@ -35,6 +35,8 @@ const ROUTES = new Set(Object.values(LINK_PAGES))
 const PARAMS = Object.assign(Object.create(null), {
   month: /^\d{4}-(0[1-9]|1[0-2])$/,
   compare: /^\d{4}-(0[1-9]|1[0-2])$/,
+  currency: /^[A-Z][A-Z0-9]{2,9}$/,
+  detail: /^(revenue|direct_cost|gross|operating_cost|ebitda|net_profit|other_income|interest|tax)$/,
   focus: /^[a-z0-9][a-z0-9-]{0,39}$/,
   tab: /^[a-z]{1,20}$/,
   filter: /^[a-z]{1,20}$/,

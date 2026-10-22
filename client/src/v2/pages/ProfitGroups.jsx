@@ -6,7 +6,7 @@
 // says so. Business only; the server refuses Personal.
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT } from '../i18n'
 import { useApi, useInvalidate } from '../data'
@@ -17,7 +17,7 @@ import { catLabel } from '../lib/categoryLabel'
 
 export default function ProfitGroups() {
   const t = useT()
-  const { token } = useAuth()
+  const request = useBusinessRequest()
   const invalidate = useInvalidate()
   const q = useApi('/pnl-mapping')
   const cats = q.data?.categories || []
@@ -25,6 +25,7 @@ export default function ProfitGroups() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
   useEffect(() => { setForm(Object.fromEntries(cats.map((c) => [c.id, c.pnl_group || '']))) }, [q.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setMsg(null); setBusy(false) }, [request.businessId])
 
   const changed = useMemo(() => cats.filter((c) => (form[c.id] ?? '') !== (c.pnl_group || '')), [cats, form])
   const withSuggestion = cats.filter((c) => c.suggestion && !form[c.id])
@@ -41,13 +42,15 @@ export default function ProfitGroups() {
   const save = async () => {
     setBusy(true); setMsg(null)
     try {
-      await updatePnlMapping(token, { mappings: changed.map((c) => ({ category_id: c.id, pnl_group: form[c.id] || null })) })
+      await updatePnlMapping(request, { mappings: changed.map((c) => ({ category_id: c.id, pnl_group: form[c.id] || null })) })
+      if (!request.isCurrent()) return
       setMsg({ ok: true, text: t('perf.groups.saved', { n: changed.length }) })
       invalidate()
     } catch (e) {
+      if (!request.isCurrent()) return
       const code = actionError(e)
       setMsg({ ok: false, text: code === 'forbidden' ? t('perf.groups.forbidden') : code === 'notApplied' ? t('perf.groups.notApplied') : code })
-    } finally { setBusy(false) }
+    } finally { if (request.isCurrent()) setBusy(false) }
   }
 
   return (

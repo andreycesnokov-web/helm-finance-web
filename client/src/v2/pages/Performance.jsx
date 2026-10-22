@@ -1,9 +1,9 @@
 // Performance (designs/Performance, PerformanceCash, PerformanceForecast, PerformanceMobile,
 // PerformanceApril) — /business/performance, /performance/cash, /performance/forecast.
 // Read-only. Spec: specs/PERFORMANCE_METRICS.md; what the data allows today is explained in
-// lib/performance.js. Profit is an ESTIMATE and says so — until the business confirms its
-// category → group mapping (P-10, /business/performance/groups); then Profit is the accrual
-// view from lib/pnl.js. Cash and Forecast are cash view.
+// lib/performance.js. Profit now has read-only category/record drill-down over one
+// exact cash contribution model. Accrual and Net Profit stay explicitly unavailable.
+// Cash and Forecast retain their existing model; no accounting records are written.
 // The two views are never mixed in one figure.
 //
 // Drill-down (DESIGN_SPEC rule 6): ?month=YYYY-MM&compare=YYYY-MM&focus=<key> shows a filter
@@ -23,7 +23,9 @@ import { txDate } from '../lib/obligations'
 import {
   lastMonths, profitRows, cashRows, burn3, runwayFrom, weekBuckets, cashOutDate, threeMonths, monthCompare, prevMonth, rowsCsv,
 } from '../lib/performance'
-import { mappingConfirmed, accrualRows, taxLabelKey } from '../lib/pnl'
+import ProfitLossDetail from '../components/ProfitLossDetail'
+import {copy,exactMoney,difference,reportSeries,expenseBreakdown,metricTotal,chartMoneyScale,monthlyReportCsv,percentChange,compareAmounts,reportHistory,filterError,periodEvidence} from '../lib/profitLossView'
+import {useWorkspace} from '../../shell/WorkspaceProvider'
 import { AskButton } from '../ai/AskPanel'
 import { useAskContext } from '../ai/AskContext'
 import AiText from '../ai/AiText'
@@ -102,95 +104,56 @@ function Drill({ drill, tx, t, lang, clear }) {
   )
 }
 
-function ProfitTab({ rows, sel, t, lang, needsReview, tx, accrual = null }) {
-  const cur = rows.find((r) => r.month === sel) || rows[rows.length - 1]
-  const prev = rows.find((r) => r.month === prevMonth(cur.month))
-  const chartRows = rows.map((r) => ({ key: r.month, empty: r.empty, label: mName(r.month, lang), short: mName(r.month, lang, 'short'), values: { revenue: r.revenue, gross: r.gross, ebitda: r.ebitda, net: r.net } }))
-  const cmp = monthCompare(tx, cur.month, prevMonth(cur.month))
-  const noteLink = drillLink('performance', { month: cur.month, compare: prevMonth(cur.month), focus: 'costs' })
-  const note = t('perf.profit.note', { m: mName(cur.month, lang), c: mName(prevMonth(cur.month), lang), costs: money(cmp.costsNow - cmp.costsBefore, { sign: true }), link: noteLink })
-  return (
-    <>
-      {accrual ? (
-        <div className="v2-banner v2-tone-good" role="note">
-          <Pill tone="good">{t('perf.accrual')}</Pill>
-          <span className="v2-banner-text">{t('perf.accrualNote')} {t('perf.coverage', { n: accrual.coverage.categorised, m: accrual.coverage.total })}</span>
-          <Btn to="/business/performance/groups">{t('perf.groups.open')}</Btn>
+function FinancialRow({metric,label,strong=false,total,onDetail}) {
+ return <button type="button" className={`pnl-financial-row${strong?' is-total':''}`} data-pnl-metric={metric} aria-haspopup="dialog" onClick={()=>onDetail(metric)}><span>{label}</span><span className="v2-num">{total(metric)} <span aria-hidden="true">›</span></span></button>
+}
+
+function ProfitTab({ rows, sel, t, lang, report, onDetail, compare }) {
+  const c=copy(lang),cur=rows.find(r=>r.month===sel)||rows.at(-1),prev=rows.find(r=>r.month===(compare||prevMonth(cur.month)))
+  const cmp=expenseBreakdown(report,cur.month,prev?.month)
+  const chartRows=rows.map(r=>({key:r.month,empty:r.empty,label:mName(r.month,lang),short:mName(r.month,lang,'short'),values:{revenue:r.revenue,gross:r.gross,ebitda:r.ebitda,net:r.net}}))
+  const revScale=chartMoneyScale(rows.flatMap(r=>[r.revenue,r.gross]),report.currency),profitScale=chartMoneyScale(rows.flatMap(r=>[r.ebitda,r.net]),report.currency)
+  const formatValue=v=>exactMoney(v,report.currency)
+  const total=(metric)=>exactMoney(metricTotal(report,cur.month,metric),report.currency)
+  const before=prev?report.periods[prev.month].totals:null,now=report.periods[cur.month].totals
+  const revenueChange=prev?percentChange(cur.revenue,prev.revenue):null,coverage=periodEvidence(report,[cur.month,compare]).coverage
+  const noteLink='/business/performance?'+new URLSearchParams({month:cur.month,...(prev?{compare:prev.month}:{}),currency:report.currency,detail:'operating_cost'})
+  const note=t('perf.profit.note',{m:mName(cur.month,lang),c:prev?mName(prev.month,lang):'—',costs:exactMoney(prev?difference(now.operating_cost,before.operating_cost):null,report.currency),link:noteLink})
+
+  return <>
+    <div className="v2-banner v2-tone-info" role="note"><Pill tone="info">{t('perf.estimate')}</Pill><span className="v2-banner-text">{c.note}</span><Btn to="/business/performance/groups">{t('perf.groups.open')}</Btn></div>
+    <p className="v2-small v2-muted">{report.currency} · {c.moneyFormat}</p>
+    <div className="v2-tiles">
+      <Kpi label={t('perf.revenue',{m:mName(cur.month,lang,'short')})} value={total('revenue')} sub={revenueChange?`≈ ${t(revenueChange.direction==='down'?'perf.downOn':'perf.upOn',{n:revenueChange.percent,m:mName(prev.month,lang,'short')})}`:null}/>
+      <Kpi label={t('perf.gross')} value={total('gross')}/>
+      <Kpi label="EBITDA" value={total('ebitda')} tone={Number(cur.ebitda)<0?'v2-neg':''}/>
+      <Kpi label={t('perf.net')} value={total('net_profit')} sub={c.netNote}/>
+    </div>
+    <Card><p className="v2-sec v2-note-ai"><AiText text={note}/></p><AskButton question={t('perf.profit.askQ',{m:mName(cur.month,lang)})}>{t('perf.askCfo')}</AskButton></Card>
+    <div className="v2-grid-2">
+      <Card title={t('perf.chart.revGross')}><BarChart rows={chartRows} caption={t('perf.chart.revGross')} highlight={cur.month} currency={report.currency} formatValue={formatValue} {...revScale} series={[{key:'revenue',label:t('perf.revenueShort')},{key:'gross',label:t('perf.gross')}]}/></Card>
+      <Card title={t('perf.chart.ebitdaNet')}><BarChart rows={chartRows} caption={t('perf.chart.ebitdaNet')} highlight={cur.month} currency={report.currency} formatValue={formatValue} {...profitScale} series={[{key:'ebitda',label:'EBITDA'},{key:'net',label:t('perf.net')}]}/><p className="v2-small v2-muted">{c.netNote}</p></Card>
+    </div>
+    <div className="v2-grid-detail">
+      <Card title={t('perf.waterfall',{m:mName(cur.month,lang)})} aside={<Pill tone="info">{t('perf.estimate')}</Pill>} className="v2-col">
+        <div className="v2-dl v2-dl-tight v2-waterfall pnl-financial-lines">
+          <FinancialRow total={total} onDetail={onDetail} metric="revenue" label={t('perf.revenueShort')}/><FinancialRow total={total} onDetail={onDetail} metric="direct_cost" label={t('perf.direct')}/><FinancialRow total={total} onDetail={onDetail} metric="gross" label={t('perf.gross')} strong/>
+          <FinancialRow total={total} onDetail={onDetail} metric="operating_cost" label={t('perf.opex')}/><FinancialRow total={total} onDetail={onDetail} metric="ebitda" label="EBITDA" strong/>
+          <div className="pnl-static-row"><span>{t('perf.depreciation')}</span><span className="v2-muted">{c.unknown}</span></div>
+          <FinancialRow total={total} onDetail={onDetail} metric="other_income" label={t('perf.otherIncome')}/><FinancialRow total={total} onDetail={onDetail} metric="interest" label={t('perf.interest')}/><FinancialRow total={total} onDetail={onDetail} metric="tax" label={c.tax}/>
+          <FinancialRow total={total} onDetail={onDetail} metric="cash_result" label={c.cashResult} strong/>
+          <FinancialRow total={total} onDetail={onDetail} metric="net_profit" label={t('perf.net')} strong/>
         </div>
-      ) : (
-        <div className="v2-banner v2-tone-info" role="note">
-          <Pill tone="info">{t('perf.estimate')}</Pill>
-          <span className="v2-banner-text">{t('perf.estimateNote')}{needsReview > 0 && ` ${t('perf.needsReview', { n: needsReview })}`}</span>
-          <Btn to="/business/accountant">{t('acct.tab.close')}</Btn>
-        </div>
-      )}
-      <div className="v2-tiles">
-        <Kpi label={t('perf.revenue', { m: mName(cur.month, lang, 'short') })} value={money(cur.revenue)} sub={prev && pct(cur.revenue, prev.revenue) != null ? t(cur.revenue >= prev.revenue ? 'perf.upOn' : 'perf.downOn', { n: Math.abs(pct(cur.revenue, prev.revenue)), m: mName(prev.month, lang, 'short') }) : null} />
-        <Kpi label={t('perf.gross')} value={money(cur.gross, { sign: cur.gross < 0 })} sub={cur.margin != null ? t('perf.margin', { n: Math.round(cur.margin * 100) }) : null} />
-        <Kpi label="EBITDA" value={money(cur.ebitda, { sign: cur.ebitda < 0 })} tone={cur.ebitda < 0 ? 'v2-neg' : ''} />
-        <Kpi label={t('perf.net')} value={money(cur.net, { sign: cur.net < 0 })} tone={cur.net < 0 ? 'v2-neg' : ''} sub={accrual?.hasRegister ? t('perf.afterDepreciation') : t('perf.noDepreciation')} />
-      </div>
-      <Card>
-        <p className="v2-sec v2-note-ai"><AiText text={note} /></p>
-        <AskButton question={t('perf.profit.askQ', { m: mName(cur.month, lang) })}>{t('perf.askCfo')}</AskButton>
       </Card>
-      <div className="v2-grid-2">
-        <Card title={t('perf.chart.revGross')}><BarChart rows={chartRows} caption={t('perf.chart.revGross')} highlight={cur.month}
-          series={[{ key: 'revenue', label: t('perf.revenueShort') }, { key: 'gross', label: t('perf.gross') }]} /></Card>
-        <Card title={t('perf.chart.ebitdaNet')}><BarChart rows={chartRows} caption={t('perf.chart.ebitdaNet')} highlight={cur.month}
-          series={[{ key: 'ebitda', label: 'EBITDA' }, { key: 'net', label: t('perf.net') }]} /></Card>
-      </div>
-      <div className="v2-grid-detail">
-        <Card title={t('perf.waterfall', { m: mName(cur.month, lang) })} aside={accrual ? <Pill tone="good">{t('perf.accrual')}</Pill> : <Pill tone="info">{t('perf.estimate')}</Pill>} className="v2-col">
-          <dl className="v2-dl v2-dl-tight v2-waterfall">
-            <dt>{t('perf.revenueShort')}</dt><dd className="v2-num v2-r">{money(cur.revenue)}</dd>
-            <dt>{t('perf.direct')}</dt><dd className="v2-num v2-r">{money(-cur.direct, { sign: true })}</dd>
-            <dt><strong>{t('perf.gross')}</strong>{cur.margin != null && <span className="v2-muted"> · {t('perf.margin', { n: Math.round(cur.margin * 100) })}</span>}</dt><dd className="v2-num v2-r"><strong>{money(cur.gross)}</strong></dd>
-            <dt>{t('perf.opex')}</dt><dd className="v2-num v2-r">{money(-cur.opex, { sign: true })}</dd>
-            <dt><strong>EBITDA</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.ebitda)}</strong></dd>
-            <dt>{t('perf.depreciation')}</dt>{accrual?.hasRegister
-              ? <dd className="v2-num v2-r">{money(-cur.depreciation, { sign: cur.depreciation > 0 })}</dd>
-              : <dd className="v2-r v2-muted">{t('perf.needsAssets')}</dd>}
-            {accrual && <><dt><strong>{t('perf.operatingProfit')}</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.operating)}</strong></dd>
-              <dt>{t('perf.otherIncome')}<span className="v2-muted"> · {t('perf.otherIncomeNet')}</span></dt><dd className="v2-num v2-r">{money(cur.otherIncome, { sign: cur.otherIncome !== 0 })}</dd></>}
-            <dt>{accrual ? t('perf.loanInterest') : t('perf.interest')}</dt><dd className="v2-num v2-r">{money(-cur.interest, { sign: cur.interest > 0 })}</dd>
-            {accrual
-              ? <><dt>{t(`perf.tax.${accrual.taxKey}`)}</dt><dd className="v2-num v2-r">{money(-cur.tax, { sign: cur.tax !== 0 })}</dd></>
-              : <><dt>{t('perf.incomeTax')}</dt><dd className="v2-num v2-r">{cur.ebitda - cur.interest > 0 ? money(-cur.tax, { sign: true }) : t('perf.lossNoTax')}</dd></>}
-            <dt><strong>{t('perf.net')}</strong></dt><dd className="v2-num v2-r"><strong>{money(cur.net)}</strong></dd>
-          </dl>
+      <aside className="v2-col">
+        <Card title={t('perf.where')} aside={<Link to="/business/transactions">{t('nav.transactions')}</Link>}>
+          {!cmp.changes.length?<p className="v2-muted">—</p>:<ul className="v2-changes">{[...cmp.changes].sort((a,b)=>compareAmounts(b.now,a.now)).slice(0,8).map(x=><li key={x.id}><span className="v2-dec-title">{x.category}</span><span className="v2-num">{exactMoney(x.now,report.currency)}</span><span className="v2-muted v2-small v2-num">{t('perf.was',{v:exactMoney(x.before,report.currency)})}</span></li>)}</ul>}
         </Card>
-        <aside className="v2-col">
-          <Card title={t('perf.where')} aside={<Link to="/business/transactions">{t('nav.transactions')}</Link>}>
-            {cmp.changes.length === 0 && cmp.costsNow === 0 ? <p className="v2-muted">—</p> : (
-              <ul className="v2-changes">
-                {[...cmp.changes].sort((a, b) => b.now - a.now).slice(0, 8).map((x) => (
-                  <li key={x.category}><span className="v2-dec-title">{x.category === '—' ? t('perf.noCategory') : x.category}</span>
-                    <span className="v2-num">{money(x.now)}</span><span className="v2-muted v2-small v2-num">{t('perf.was', { v: money(x.before) })}</span></li>
-                ))}
-              </ul>
-            )}
-          </Card>
-          <Card title={t('perf.howTitle')}>
-            <ul className="v2-bullets">{['h1', 'h2', 'h3', 'h4', 'h5'].map((k) => <li key={k}>{t(`perf.how.${k}`)}</li>)}</ul>
-          </Card>
-          {accrual ? (
-            <Card title={t('perf.coverageTitle')} aside={<Link to="/business/performance/groups">{t('perf.groups.open')}</Link>}>
-              <p className="v2-sec">{t('perf.coverage', { n: accrual.coverage.categorised, m: accrual.coverage.total })}</p>
-              {accrual.coverage.missing.length > 0 && (
-                <ul className="v2-moves">{accrual.coverage.missing.slice(0, 6).map((x) => (
-                  <li key={x.name}><span>{x.name === '—' ? t('perf.noCategory') : x.name}</span><span className="v2-num">{x.count}</span></li>
-                ))}</ul>
-              )}
-              <p className="v2-muted v2-small">{t('perf.coverageNote')}</p>
-            </Card>
-          ) : (
-            <Card title={t('perf.setupTitle')}><p className="v2-sec">{t('perf.setupText')}</p><Btn variant="primary" to="/business/performance/groups">{t('perf.groups.setUp')}</Btn></Card>
-          )}
-        </aside>
-      </div>
-    </>
-  )
+        <Card title={t('perf.howTitle')}><p className="v2-small">{c.cash}. {c.netNote}</p><p className="v2-muted v2-small">{c.accrual}</p><ul className="v2-bullets">{c.cashHow.map((text,i)=><li key={i}>{text}</li>)}</ul></Card>
+        <Card title={t('perf.coverageTitle')} aside={<Link to="/business/performance/groups">{t('perf.groups.open')}</Link>}><p className="v2-sec">{c.coverage}: {coverage.included} {c.included} · {coverage.exceptions} {c.reviewCount}</p>{!coverage.included&&<p role="status">{c.empty}</p>}<p className="v2-muted v2-small">{c.fx}</p><Btn onClick={()=>onDetail('revenue')}>{c.exceptions}</Btn></Card>
+      </aside>
+    </div>
+  </>
 }
 
 function CashTab({ rows, sel, cash, t, lang }) {
@@ -291,53 +254,49 @@ export default function Performance() {
   const navigate = useNavigate()
   const tab = location.pathname.endsWith('/cash') ? 'cash' : location.pathname.endsWith('/forecast') ? 'forecast' : 'profit'
   const drill = readDrill(location.search)
-  const drillOn = !!drill.month && (!!drill.compare || !!drill.focus)
-  const months = useMemo(() => lastMonths(12), [])
+  const drillOn = tab !== 'profit' && !!drill.month && (!!drill.compare || !!drill.focus)
+  const {active}=useWorkspace()
+  const currentMonths = useMemo(() => lastMonths(12), [])
   const sp = new URLSearchParams(location.search)
-  const sel = sp.get('month') && months.includes(sp.get('month')) ? sp.get('month') : months[months.length - 2]
-  const pulse = useApi('/pulse')
-  const ins = useApi(`/pulse/advanced-insights?from=${months[0]}-01&to=${new Date().toISOString().slice(0, 10)}`)
-  const tx = useApi('/transactions?period=all')
-  const obl = useApi('/accountant/obligations')
-  // P-10: confirmed category groups switch Profit to the accrual view.
-  const cats = useApi('/cashflow-categories')
-  const debts = useApi('/debts')
-  const prof = useApi('/accountant/profile')
-  const assets = useApi('/assets')
-  const fund = useApi('/business-funding')
+  const sel = tab==='profit'?(sp.get('month')??currentMonths.at(-2)):sp.get('month')&&currentMonths.includes(sp.get('month'))?sp.get('month'):currentMonths.at(-2)
+  const currency=sp.get('currency')||'IDR',compare=sp.get('compare')||'',metric=sp.get('detail')||({costs:'operating_cost',revenue:'revenue',ebitda:'ebitda',net:'net_profit'}[sp.get('focus')]||null)
+  const months=useMemo(()=>tab==='profit'?reportHistory(sel,compare):currentMonths,[tab,sel,compare,currentMonths])
+  const c=copy(lang),invalid=tab==='profit'?filterError(sel,compare,currency):null
+  const pulse = useApi(tab==='profit'?null:'/pulse')
+  const ins = useApi(tab==='profit'?null:`/pulse/advanced-insights?from=${months[0]}-01&to=${new Date().toISOString().slice(0, 10)}`)
+  const tx = useApi(tab!=='profit'&&(tab==='cash'||drillOn)?'/transactions?period=all':null)
+  const obl = useApi(tab==='forecast'?'/accountant/obligations':null)
+  const query=new URLSearchParams({month:sel,currency,basis:'cash',months:months.join(',')});if(compare)query.set('compare',compare)
+  const pnl=useApi(tab==='profit'&&!invalid?'/pulse/profit-loss?'+query:null)
+  const raw=pnl.data,report=raw?.business_id===active?.id&&raw.month===sel&&raw.currency===currency&&(raw.compare||'')===compare?raw:null
+  const fund = useApi(tab==='forecast'?'/business-funding':null)
   useAskContext(t('nav.performance'), drillOn ? mName(drill.month, lang) : mName(sel, lang))
 
   const series = ins.data?.series || []
   const txs = Array.isArray(tx.data) ? tx.data : []
-  const pRows = useMemo(() => profitRows(series, months), [series, months])
+  const pRows = useMemo(() => report?reportSeries(report,months):tab==='profit'?[]:profitRows(series,months), [report,series,months,tab])
   const cRows = useMemo(() => cashRows({ series, transactions: txs, balance: pulse.data?.totalBalance, months }), [series, txs, pulse.data, months])
   const burn = burn3(cRows, months[months.length - 1])
-  const catList = cats.data?.categories || []
-  const confirmed = mappingConfirmed(catList)
-  const accrual = useMemo(() => {
-    if (!confirmed) return null
-    const r = accrualRows({ transactions: txs, debts: Array.isArray(debts.data) ? debts.data : [], categories: catList, months, assets: assets.data, funding: fund.data })
-    return { ...r, taxKey: taxLabelKey(prof.data?.profile?.tax_regime) }
-  }, [confirmed, txs, debts.data, catList, months, prof.data, assets.data, fund.data]) // eslint-disable-line react-hooks/exhaustive-deps
   // Export: the monthly rows of this tab as CSV (what is on screen, nothing recomputed).
   const exportCsv = () => {
-    const profitCols = ['month', 'revenue', 'direct', 'gross', 'opex', 'ebitda', 'depreciation', 'operating', 'otherIncome', 'interest', 'tax', 'net']
     const csv = tab === 'cash' ? rowsCsv(cRows, ['month', 'operating', 'equipment', 'funding', 'free', 'endCash'])
-      : rowsCsv(accrual ? accrual.rows : pRows, accrual ? profitCols : profitCols.filter((c) => !['depreciation', 'operating', 'otherIncome'].includes(c)))
+      : monthlyReportCsv(report,months)
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = `performance-${tab}-${accrual && tab === 'profit' ? 'accrual' : 'estimate'}-${months[months.length - 1]}.csv`
-    a.click(); URL.revokeObjectURL(a.href)
+    a.download = tab==='profit'?`performance-profit-cash-estimate-${sel}-${currency}.csv`:`performance-${tab}-estimate-${months[months.length - 1]}.csv`
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000)
   }
-  const setMonth = (m) => { const n = new URLSearchParams(); n.set('month', m); navigate(`${location.pathname}?${n}`, { replace: true }) }
+  const setParam=(key,value)=>{const n=new URLSearchParams(location.search);value?n.set(key,value):n.delete(key);if(['month','currency','compare','detail'].includes(key))n.delete('categories');navigate(`${location.pathname}?${n}`,{replace:key==='month'})}
+  const setMonth=m=>setParam('month',m)
+  const closeDetail=()=>{const n=new URLSearchParams(location.search);n.delete('detail');n.delete('focus');n.delete('categories');navigate(`${location.pathname}?${n}`,{replace:true})}
 
   const head = (
     <PageHead title={t('nav.performance')} sub={t('perf.sub')}
       actions={!drillOn && tab !== 'forecast' && (<>
-        <Btn onClick={exportCsv}>{t('perf.export')}</Btn>
-        <select className="v2-select" value={sel} onChange={(e) => setMonth(e.target.value)} aria-label={t('acct.month')}>
+        <Btn onClick={exportCsv} disabled={tab==='profit'&&!report}>{t('perf.export')}</Btn>
+        {tab==='profit'?<><Btn onClick={pnl.reload} disabled={pnl.loading}>{c.refresh}</Btn><input className="v2-input" type="month" min="2000-01" max="2099-12" value={sel} onChange={e=>setMonth(e.target.value)} aria-label={t('acct.month')}/></>:<select className="v2-select" value={sel} onChange={(e) => setMonth(e.target.value)} aria-label={t('acct.month')}>
           {[...months].reverse().map((m) => <option key={m} value={m}>{mName(m, lang)}</option>)}
-        </select>
+        </select>}
       </>)} />
   )
   const tabs = (
@@ -345,20 +304,24 @@ export default function Performance() {
       {TABS.map(([k, to]) => <Link key={k} to={to} className={`v2-tab-link${tab === k ? ' is-on' : ''}`} aria-current={tab === k ? 'page' : undefined}>{t(`perf.tab.${k}`)}</Link>)}
     </nav>
   )
-  if (ins.loading || pulse.loading) return <div className="v2-page">{head}{tabs}<Card><Skeleton rows={8} /></Card></div>
-  const needTx = drillOn || tab !== 'forecast'
+  if(invalid)return <div className="v2-page">{head}{tabs}<Card><p role="alert">{c[invalid]}</p><Btn onClick={()=>navigate(location.pathname,{replace:true})}>{c.resetFilters}</Btn></Card></div>
+  if(tab==='profit'&&!report&&!pnl.error)return <div className="v2-page">{head}{tabs}{pnl.loading?<Card><Skeleton rows={8}/></Card>:<ErrorBox error={c.invalidReport} onRetry={pnl.reload}/>}</div>
+  if(tab==='profit'&&pnl.error)return <div className="v2-page">{head}{tabs}<ErrorBox error={pnl.error} onRetry={pnl.reload}/></div>
+  if (tab!=='profit'&&(ins.loading || pulse.loading)) return <div className="v2-page">{head}{tabs}<Card><Skeleton rows={8} /></Card></div>
+  const needTx = tab!=='profit'&&(drillOn || tab !== 'forecast')
   if (needTx && tx.loading) return <div className="v2-page">{head}{tabs}<Card><Skeleton rows={8} /></Card></div>
   if (needTx && tx.error) return <div className="v2-page">{head}{tabs}<ErrorBox error={tx.error} onRetry={tx.reload} /></div>
-  if (ins.error || pulse.error) return <div className="v2-page">{head}{tabs}<ErrorBox error={(ins.error || pulse.error)?.status === 403 ? t('perf.forbidden') : (ins.error || pulse.error)} onRetry={() => { ins.reload(); pulse.reload() }} /></div>
+  if (tab!=='profit'&&(ins.error || pulse.error)) return <div className="v2-page">{head}{tabs}<ErrorBox error={(ins.error || pulse.error)?.status === 403 ? t('perf.forbidden') : (ins.error || pulse.error)} onRetry={() => { ins.reload(); pulse.reload() }} /></div>
 
-  const nothing = pRows.every((r) => r.empty) && !txs.length
+  const nothing = tab !== 'profit' && pRows.every((r) => r.empty) && !txs.length
   return (
-    <div className="v2-page">
+    <div className={`v2-page${tab==='profit'?' pnl-performance':''}`}>
       {head}
       {tabs}
+      {tab==='profit'&&metric&&<ProfitLossDetail data={report} metric={metric} month={sel} onClose={closeDetail} onChange={setParam} onReload={pnl.reload}/>}
       {drillOn ? <Drill drill={drill} tx={txs} t={t} lang={lang} clear={() => navigate(location.pathname)} />
         : nothing ? <Card><Empty icon={<I.performance size={28} />} title={t('perf.emptyTitle')} text={t('perf.emptyText')} action={<Btn variant="primary" to="/business/bank-import">{t('acc.import')}</Btn>} /></Card>
-        : tab === 'profit' ? <ProfitTab rows={accrual ? accrual.rows : pRows} accrual={accrual} sel={sel} t={t} lang={lang} needsReview={Number(ins.data?.needs_review_count) || 0} tx={txs} />
+        : tab === 'profit' ? <ProfitTab rows={pRows} report={report} sel={sel} t={t} lang={lang} compare={compare} onDetail={m=>setParam('detail',m)} />
         : tab === 'cash' ? <CashTab rows={cRows} sel={sel} cash={pulse.data?.totalBalance} t={t} lang={lang} />
         : <ForecastTab pulse={pulse.data} obligations={obl.data?.obligations || []} repayments={fund.data?.upcoming || []} burnMonthly={burn?.monthly} t={t} lang={lang} />}
     </div>

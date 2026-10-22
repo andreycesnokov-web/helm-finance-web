@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import I from '../icons'
 import { useT } from '../i18n'
 
-export default function Modal({ title, onClose, children, footer, wide = false, labelledBy }) {
+export default function Modal({ title, onClose, children, footer, wide = false, labelledBy, className = '', preventBackdropFocus = false }) {
   const t = useT()
   const box = useRef(null)
   const back = useRef(typeof document !== 'undefined' ? document.activeElement : null)
@@ -21,7 +21,7 @@ export default function Modal({ title, onClose, children, footer, wide = false, 
   }, [])
   const id = labelledBy || 'v2-modal-title'
   return createPortal(
-    <div className="v2-root v2-modal-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.() }}>
+    <div className={`v2-root v2-modal-scrim${className ? ` ${className}` : ''}`} onMouseDown={(e) => { if (e.target === e.currentTarget) { if (preventBackdropFocus) e.preventDefault(); onClose?.() } }}>
       <div ref={box} className={`v2-modal${wide ? ' is-wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1}>
         <div className="v2-modal-head">
           <h2 id={id} className="v2-h2">{title}</h2>

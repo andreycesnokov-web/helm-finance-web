@@ -48,7 +48,9 @@ export default function BillDetail({ kind = 'payable' }) {
   const pulse = useApi('/pulse')
   const fund = useApi('/business-funding')
   const cps = useApi('/counterparties')
-  const d = useMemo(() => (Array.isArray(debts.data) ? debts.data : []).find((x) => String(x.id) === String(id)), [debts.data, id])
+  const listed = useMemo(() => (Array.isArray(debts.data) ? debts.data : []).find((x) => String(x.id) === String(id)), [debts.data, id])
+  const lookup = useApi(!debts.loading && !debts.error && !listed ? '/debts?id=' + encodeURIComponent(id) : null)
+  const d = listed || (Array.isArray(lookup.data) ? lookup.data.find((x) => String(x.id) === String(id)) : null)
   // The record decides which list it belongs to (a document link opens /payables/:id for any debt).
   const listPath = (d ? d.type === 'receivable' : kind === 'receivable') ? '/business/receivables' : '/business/payables'
   const engine = useMemo(() => findWithholdingRule(rules.data?.rules || []), [rules.data])
@@ -68,8 +70,9 @@ export default function BillDetail({ kind = 'payable' }) {
       heading={t(upload.kind === 'proof' ? 'bill.uploadProofFor' : 'bill.uploadInvoiceFor', { who: upload.who })}
       onClose={() => setUpload(null)} onUploaded={() => invalidate()} />
   ) : null
-  if (debts.loading) return <div className="v2-page">{crumbs}<Card><Skeleton rows={6} /></Card>{intake}</div>
+  if (debts.loading || (!listed && lookup.loading)) return <div className="v2-page">{crumbs}<Card><Skeleton rows={6} /></Card>{intake}</div>
   if (debts.error) return <div className="v2-page">{crumbs}<ErrorBox error={debts.error} onRetry={debts.reload} />{intake}</div>
+  if (!listed && lookup.error) return <div className="v2-page">{crumbs}<ErrorBox error={lookup.error} onRetry={lookup.reload} />{intake}</div>
   if (!d) return <div className="v2-page">{crumbs}<Card><Empty icon={<I.bills size={28} />} title={t('bill.notFound')} text={t('bill.notFoundText')} action={<Btn to={listPath}>{t('bill.back')}</Btn>} /></Card>{intake}</div>
 
   const isPay = d.type !== 'receivable'
