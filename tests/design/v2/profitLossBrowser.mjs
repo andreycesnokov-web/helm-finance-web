@@ -7,8 +7,8 @@ import {chromium} from 'playwright-core'
 import {installFixtureTransport} from './fixtureTransport.mjs'
 import {metricDetail,exactMoney} from '../../../client/src/v2/lib/profitLossView.js'
 const require=createRequire(import.meta.url),{B,OTHER,fixture,tx}=require('../../fixtures/profitLoss.cjs'),{buildReport}=require('../../../server/lib/profitLoss.js'),FININ=require('../../../server/lib/financialInsights.js')
-const dir=path.resolve('reports/interactive-pnl-20261021/browser-final');fs.mkdirSync(dir,{recursive:true})
-const before=process.env.PNL_BEFORE==='true',root=path.resolve('reports/interactive-pnl-20261021/'+(before?'before-dist':'after-dist'))
+const dir=path.resolve(process.env.PNL_BROWSER_OUT||'reports/interactive-pnl-20261021/browser-final');fs.mkdirSync(dir,{recursive:true})
+const before=process.env.PNL_BEFORE==='true',root=path.resolve(process.env.PNL_BUILD_ROOT||'reports/interactive-pnl-20261021/'+(before?'before-dist':'after-dist'))
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM||'C:/Program Files/Google/Chrome/Application/chrome.exe'})
 const results=[]
 try{

@@ -23,11 +23,12 @@ function barPath(x, y0, w, y1, r = 4) {
     : `M${x},${y0}V${y1 - rr}Q${x},${y1} ${x + rr},${y1}H${x + w - rr}Q${x + w},${y1} ${x + w},${y1 - rr}V${y0}Z`
 }
 
-export default function BarChart({ rows, series, height = 220, caption, highlight, currency = 'IDR' }) {
+export default function BarChart({ rows, series, height = 220, caption, highlight, currency = 'IDR', formatValue, formatTick = tickLabel, unitLabel }) {
   const t = useT()
   const [asTable, setAsTable] = useState(false)
   const [hover, setHover] = useState(null)
   const [ref, width] = useWidth()
+  const displayValue = formatValue || (v => money(v, { currency }))
   if (!rows?.length) return null
   const narrow = width < 560
   const H = narrow ? Math.min(height, 180) : height
@@ -54,18 +55,19 @@ export default function BarChart({ rows, series, height = 220, caption, highligh
   const h = hover != null ? rows[hover] : null
   const tipRows = h?.empty && series.every((s) => !Number(h.values[s.key])) ? [{ label: 'none', note: t('chart.noData') }] : h ? series.map((s, j) => {
     const v = h.values[s.key]
-    return { label: s.label, value: v == null ? '—' : money(v, { currency }), color: SERIES[j % SERIES.length], box: true, tone: Number(v) < 0 ? 'neg' : null }
+    return { label: s.label, value: v == null ? '—' : displayValue(v), color: SERIES[j % SERIES.length], box: true, tone: Number(v) < 0 ? 'neg' : null }
   }) : []
   const focusKey = hover != null ? rows[hover].key : highlight
 
   return (
     <figure className="v2-chart" ref={ref}>
+      {unitLabel && <p className="v2-small v2-muted pnl-axis-unit">{unitLabel}</p>}
       {asTable ? (
         <div className="v2-tablewrap">
           <table className="v2-table">
             {caption && <caption className="v2-sr">{caption}</caption>}
             <thead><tr><th scope="col">{t('perf.col.month')}</th>{series.map((s) => <th key={s.key} scope="col" className="v2-r">{s.label}</th>)}</tr></thead>
-            <tbody>{rows.map((r) => <tr key={r.key}><td>{r.label}</td>{series.map((s) => <td key={s.key} className={`v2-r v2-num${Number(r.values[s.key]) < 0 ? ' v2-neg' : ''}`}>{r.values[s.key] == null ? '—' : money(r.values[s.key], { currency })}</td>)}</tr>)}</tbody>
+            <tbody>{rows.map((r) => <tr key={r.key}><td>{r.label}</td>{series.map((s) => <td key={s.key} className={`v2-r v2-num${Number(r.values[s.key]) < 0 ? ' v2-neg' : ''}`}>{r.values[s.key] == null ? '—' : displayValue(r.values[s.key])}</td>)}</tr>)}</tbody>
           </table>
         </div>
       ) : (
@@ -77,7 +79,7 @@ export default function BarChart({ rows, series, height = 220, caption, highligh
             {ticks.map((v) => (
               <g key={v}>
                 <line x1={padL} x2={width - padR} y1={y(v)} y2={y(v)} className={v === 0 ? 'v2-axis' : 'v2-grid'} />
-                <text x={width - padR + 6} y={y(v) + 4} className={`v2-tick${v < 0 ? ' v2-tick-neg' : ''}`}>{tickLabel(v)}</text>
+                <text x={width - padR + 6} y={y(v) + 4} className={`v2-tick${v < 0 ? ' v2-tick-neg' : ''}`}>{formatTick(v)}</text>
               </g>
             ))}
             {hover != null && <rect x={padL + hover * band + 1} y={padT - 4} width={Math.max(0, band - 2)} height={H - padT - padB + 4} rx="6" className="v2-col-hover" />}

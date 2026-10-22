@@ -1,5 +1,10 @@
 # Validation and reproducibility
 
+**22 October focused UI review:** see FINAL_REVIEW_20261022.md. Its final RC, 46 Node
+tests, four mobile widths plus desktop, CSV precision, evidence disclosures and
+keyboard/overlap results supersede the 21 October UI evidence below. The older
+native read probe remains a separate historical layer, not a new end-to-end claim.
+
 All test data is fictional. Exact results and final commit/tree are recorded in the
 external `reports/interactive-pnl-20261021/RC_MANIFEST.json` and implementation report.
 

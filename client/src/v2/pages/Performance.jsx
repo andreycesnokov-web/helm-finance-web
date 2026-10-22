@@ -24,7 +24,7 @@ import {
   lastMonths, profitRows, cashRows, burn3, runwayFrom, weekBuckets, cashOutDate, threeMonths, monthCompare, prevMonth, rowsCsv,
 } from '../lib/performance'
 import ProfitLossDetail from '../components/ProfitLossDetail'
-import {copy,exactMoney,difference,reportSeries,expenseBreakdown,metricTotal} from '../lib/profitLossView'
+import {copy,exactMoney,difference,reportSeries,expenseBreakdown,metricTotal,chartMoneyScale,monthlyReportCsv} from '../lib/profitLossView'
 import {useWorkspace} from '../../shell/WorkspaceProvider'
 import { AskButton } from '../ai/AskPanel'
 import { useAskContext } from '../ai/AskContext'
@@ -112,6 +112,8 @@ function ProfitTab({ rows, sel, t, lang, report, onDetail, compare }) {
   const c=copy(lang),cur=rows.find(r=>r.month===sel)||rows.at(-1),prev=rows.find(r=>r.month===(compare||prevMonth(cur.month)))
   const cmp=expenseBreakdown(report,cur.month,prev?.month)
   const chartRows=rows.map(r=>({key:r.month,empty:r.empty,label:mName(r.month,lang),short:mName(r.month,lang,'short'),values:{revenue:r.revenue,gross:r.gross,ebitda:r.ebitda,net:r.net}}))
+  const revScale=chartMoneyScale(rows.flatMap(r=>[r.revenue,r.gross]),report.currency),profitScale=chartMoneyScale(rows.flatMap(r=>[r.ebitda,r.net]),report.currency)
+  const formatValue=v=>exactMoney(v,report.currency)
   const total=(metric)=>exactMoney(metricTotal(report,cur.month,metric),report.currency)
   const before=prev?report.periods[prev.month].totals:null,now=report.periods[cur.month].totals
   const noteLink='/business/performance?'+new URLSearchParams({month:cur.month,...(prev?{compare:prev.month}:{}),currency:report.currency,detail:'operating_cost'})
@@ -119,6 +121,7 @@ function ProfitTab({ rows, sel, t, lang, report, onDetail, compare }) {
 
   return <>
     <div className="v2-banner v2-tone-info" role="note"><Pill tone="info">{t('perf.estimate')}</Pill><span className="v2-banner-text">{c.note}</span><Btn to="/business/performance/groups">{t('perf.groups.open')}</Btn></div>
+    <p className="v2-small v2-muted">{report.currency} · {c.moneyFormat}</p>
     <div className="v2-tiles">
       <Kpi label={t('perf.revenue',{m:mName(cur.month,lang,'short')})} value={total('revenue')} sub={prev&&pct(cur.revenue,prev.revenue)!=null?t(Number(cur.revenue)>=Number(prev.revenue)?'perf.upOn':'perf.downOn',{n:Math.abs(pct(cur.revenue,prev.revenue)),m:mName(prev.month,lang,'short')}):null}/>
       <Kpi label={t('perf.gross')} value={total('gross')}/>
@@ -127,8 +130,8 @@ function ProfitTab({ rows, sel, t, lang, report, onDetail, compare }) {
     </div>
     <Card><p className="v2-sec v2-note-ai"><AiText text={note}/></p><AskButton question={t('perf.profit.askQ',{m:mName(cur.month,lang)})}>{t('perf.askCfo')}</AskButton></Card>
     <div className="v2-grid-2">
-      <Card title={t('perf.chart.revGross')}><BarChart rows={chartRows} caption={t('perf.chart.revGross')} highlight={cur.month} currency={report.currency} series={[{key:'revenue',label:t('perf.revenueShort')},{key:'gross',label:t('perf.gross')}]}/></Card>
-      <Card title={t('perf.chart.ebitdaNet')}><BarChart rows={chartRows} caption={t('perf.chart.ebitdaNet')} highlight={cur.month} currency={report.currency} series={[{key:'ebitda',label:'EBITDA'},{key:'net',label:t('perf.net')}]}/><p className="v2-small v2-muted">{c.netNote}</p></Card>
+      <Card title={t('perf.chart.revGross')}><BarChart rows={chartRows} caption={t('perf.chart.revGross')} highlight={cur.month} currency={report.currency} formatValue={formatValue} {...revScale} series={[{key:'revenue',label:t('perf.revenueShort')},{key:'gross',label:t('perf.gross')}]}/></Card>
+      <Card title={t('perf.chart.ebitdaNet')}><BarChart rows={chartRows} caption={t('perf.chart.ebitdaNet')} highlight={cur.month} currency={report.currency} formatValue={formatValue} {...profitScale} series={[{key:'ebitda',label:'EBITDA'},{key:'net',label:t('perf.net')}]}/><p className="v2-small v2-muted">{c.netNote}</p></Card>
     </div>
     <div className="v2-grid-detail">
       <Card title={t('perf.waterfall',{m:mName(cur.month,lang)})} aside={<Pill tone="info">{t('perf.estimate')}</Pill>} className="v2-col">
@@ -272,13 +275,12 @@ export default function Performance() {
   const burn = burn3(cRows, months[months.length - 1])
   // Export: the monthly rows of this tab as CSV (what is on screen, nothing recomputed).
   const exportCsv = () => {
-    const profitCols = ['month', 'revenue', 'direct', 'gross', 'opex', 'ebitda', 'depreciation', 'operating', 'otherIncome', 'interest', 'tax', 'net']
     const csv = tab === 'cash' ? rowsCsv(cRows, ['month', 'operating', 'equipment', 'funding', 'free', 'endCash'])
-      : rowsCsv(pRows,profitCols)
+      : monthlyReportCsv(report,months)
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = `performance-${tab}-estimate-${months[months.length - 1]}.csv`
-    a.click(); URL.revokeObjectURL(a.href)
+    a.download = tab==='profit'?`performance-profit-cash-estimate-${sel}-${currency}.csv`:`performance-${tab}-estimate-${months[months.length - 1]}.csv`
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000)
   }
   const setParam=(key,value)=>{const n=new URLSearchParams(location.search);value?n.set(key,value):n.delete(key);if(['month','currency','compare','detail'].includes(key))n.delete('categories');navigate(`${location.pathname}?${n}`,{replace:key==='month'})}
   const setMonth=m=>setParam('month',m)
@@ -308,7 +310,7 @@ export default function Performance() {
 
   const nothing = tab !== 'profit' && pRows.every((r) => r.empty) && !txs.length
   return (
-    <div className="v2-page">
+    <div className={`v2-page${tab==='profit'?' pnl-performance':''}`}>
       {head}
       {tabs}
       {tab==='profit'&&metric&&<ProfitLossDetail data={report} metric={metric} month={sel} onClose={closeDetail} onChange={setParam} onReload={pnl.reload}/>}
