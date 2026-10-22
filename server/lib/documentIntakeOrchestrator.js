@@ -151,7 +151,7 @@ function assessTax(type, fields, opts = {}) {
   // Text handed over by an AI client (MCP: Claude / ChatGPT read the file themselves) is
   // the same kind of reading — a model's transcript, not the document's own text layer —
   // so it gets exactly the same discipline.
-  const fromVision = opts.readSource === 'ocr_vision' || opts.readSource === 'client_model_text';
+  const fromVision = opts.readSource === 'ocr_vision' || opts.readSource === 'ocr_nanonets' || opts.readSource === 'client_model_text';
   const evidence = !fromVision || !!opts.taxEvidence;
   const detected = hasNumber && evidence;
 
@@ -233,7 +233,7 @@ function taxEvidenceIn(extraction = {}) {
    vision RAN and still failed, repeating that would be misleading. */
 function ocrBlockerFor(input = {}) {
   const ocr = input.ocr || null;
-  if (!ocr || ocr.reason === 'ocr_disabled' || ocr.reason === 'ocr_not_configured') {
+  if (!ocr || ocr.reason === 'ocr_disabled' || ocr.reason === 'ocr_not_configured' || ocr.reason === 'nanonets_disabled' || ocr.reason === 'nanonets_not_configured') {
     return 'This looks like a scanned document. OCR/Vision is not enabled yet. '
       + 'Enter fields manually or request accountant review.';
   }

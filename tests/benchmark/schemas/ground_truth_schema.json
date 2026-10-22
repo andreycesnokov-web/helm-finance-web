@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CFO_AI_Document_Extraction_Ground_Truth_Schema",
+  "description": "Standard schema for CFO AI accounting document extraction benchmarks. Enforces strict separation of invoice subtotal, Faktur Pajak DPP, PPN, and receipt totals.",
+  "type": "object",
+  "required": [
+    "case_id",
+    "document_type",
+    "verification_status",
+    "missing_artifacts",
+    "financials",
+    "parties",
+    "dates"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "description": "Unique benchmark case identifier (e.g. CASE_A_CIRCLEKA, CASE_B_LMX, CASE_B_BCA_CONFIRMATION, CASE_C_ALFAMART)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable scenario title"
+    },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "commercial_invoice",
+        "tax_invoice",
+        "receipt",
+        "payment_proof",
+        "multi_document_package"
+      ]
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": [
+        "verified_production_ground_truth",
+        "synthetic_candidate_pending_raw_files"
+      ],
+      "description": "Whether this case has been validated against real verified documents or is a synthetic candidate awaiting original raw files."
+    },
+    "missing_artifacts": {
+      "type": "object",
+      "required": ["original_pdf_missing", "nanonets_json_missing"],
+      "properties": {
+        "original_pdf_missing": { "type": "boolean" },
+        "nanonets_json_missing": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    },
+    "physical_pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["page_number", "content_type"],
+        "properties": {
+          "page_number": { "type": "integer", "minimum": 1 },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "commercial_invoice",
+              "trade_activity_confirmation",
+              "faktur_pajak",
+              "receipt_kwitansi",
+              "lease_agreement",
+              "bank_remittance_slip"
+            ]
+          },
+          "document_number": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "financials": {
+      "type": "object",
+      "required": ["currency", "gross_payable_total"],
+      "properties": {
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "invoice_subtotal": {
+          "type": ["number", "null"],
+          "description": "Commercial invoice line subtotal before taxes and discounts."
+        },
+        "commercial_discount": {
+          "type": ["number", "null"],
+          "description": "Commercial discount or rebate."
+        },
+        "faktur_pajak_dpp": {
+          "type": ["number", "null"],
+          "description": "Dasar Pengenaan Pajak (tax base) from official DJP Faktur Pajak."
+        },
+        "subtotal_dpp_variance": {
+          "type": ["number", "null"],
+          "description": "Difference between invoice_subtotal and faktur_pajak_dpp (must NOT be auto-coerced into a discount)."
+        },
+        "ppn_rate": {
+          "type": ["number", "null"],
+          "description": "Statutory VAT rate (e.g. 0.11 or 0.12 in Indonesia)."
+        },
+        "ppn_amount": {
+          "type": ["number", "null"],
+          "description": "Pajak Pertambahan Nilai (VAT amount)."
+        },
+        "withholding_tax_type": {
+          "type": ["string", "null"],
+          "enum": ["pph_21", "pph_23", "pph_4_2", null]
+        },
+        "withholding_tax_base": {
+          "type": ["number", "null"],
+          "description": "Withholding tax base (PPh base)."
+        },
+        "withholding_tax_amount": {
+          "type": ["number", "null"],
+          "description": "Withholding tax amount (PPh amount)."
+        },
+        "receipt_total": {
+          "type": ["number", "null"],
+          "description": "Total amount paid or received on a receipt or Kwitansi payment voucher."
+        },
+        "gross_payable_total": {
+          "type": "number",
+          "description": "Final commercial gross payable or total transaction settlement amount."
+        },
+        "settled_amount": {
+          "type": ["number", "null"],
+          "description": "Amount settled via bank transfer / payment proof."
+        }
+      }
+    },
+    "parties": {
+      "type": "object",
+      "required": ["issuer"],
+      "properties": {
+        "issuer": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "npwp_raw": { "type": ["string", "null"] },
+            "npwp_15": { "type": ["string", "null"] },
+            "npwp_16": { "type": ["string", "null"] }
+          }
+        },
+        "buyer": {
+          "type": ["object", "null"],
+          "properties": {
+            "name": { "type": "string" },
+            "npwp_raw": { "type": ["string", "null"] },
+            "npwp_15": { "type": ["string", "null"] },
+            "npwp_16": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "dates": {
+      "type": "object",
+      "required": ["document_date"],
+      "properties": {
+        "document_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "due_date": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "estimated_payment_date": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "settlement_date": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+      }
+    },
+    "tax_identifiers": {
+      "type": "object",
+      "properties": {
+        "nsfp_serial": { "type": ["string", "null"] },
+        "document_number": { "type": ["string", "null"] }
+      }
+    },
+    "banking": {
+      "type": "object",
+      "properties": {
+        "bank_name": { "type": ["string", "null"] },
+        "account_number": { "type": ["string", "null"] },
+        "account_holder": { "type": ["string", "null"] },
+        "reference_number": { "type": ["string", "null"] }
+      }
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "total_price"],
+        "properties": {
+          "line_number": { "type": "integer" },
+          "description": { "type": "string" },
+          "quantity": { "type": ["number", "null"] },
+          "unit_price": { "type": ["number", "null"] },
+          "total_price": { "type": "number" },
+          "is_taxable": { "type": "boolean" }
+        }
+      }
+    },
+    "reconciliation_invariants": {
+      "type": "object",
+      "properties": {
+        "zero_posting_guard": { "type": "boolean" },
+        "needs_review_flag": { "type": "boolean" },
+        "kwitansi_direction_inverted": { "type": "boolean" },
+        "subtotal_dpp_reconciliation_required": { "type": "boolean" }
+      }
+    }
+  }
+}

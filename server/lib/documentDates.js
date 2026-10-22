@@ -101,10 +101,19 @@ function parseDate(raw) {
 const LABELS = {
   due_date: [/jatuh\s*tempo/i, /\bdue\s*date\b/i, /batas\s*(?:waktu\s*)?pembayaran/i,
     /tanggal\s*jatuh\s*tempo/i, /\bpayment\s*due\b/i],
+  estimated_payment_date: [/est(?:imated)?\.?\s*pay(?:ment)?\s*(?:date)?/i,
+    /estimasi\s*(?:tanggal\s*)?(?:pembayaran|bayar)/i, /rencana\s*(?:tanggal\s*)?bayar/i],
   payment_date: [/tanggal\s*(?:pembayaran|bayar|transfer|setor)/i, /\bpayment\s*date\b/i,
     /\bpaid\s*(?:on|date)\b/i, /tgl\s*transfer/i],
-  document_date: [/tanggal\s*(?:faktur|invoice|kwitansi|dokumen|nota)?/i, /\bdate\b/i,
-    /\binvoice\s*date\b/i, /\bdated\b/i, /tgl\b/i],
+  document_date: [
+    /\binvoice\s*date\b/i,
+    /\bdate\s*(?:of\s*issue|issued)?\b/i,
+    /\btanggal\s*(?:faktur|invoice|tagihan|dokumen|kwitansi|kuitansi|nota)?\b/i,
+    /\btgl\.?\s*(?:faktur|invoice|tagihan|dokumen|kwitansi|nota)?\b/i,
+    /\bdate\b/i,
+    /\bdated\b/i,
+    /tgl\b/i,
+  ],
 };
 
 // Windows after a label are short: a date sits next to its label, and a longer reach
@@ -129,7 +138,7 @@ const notApplicable = (why) => ({ value: null, original: null, status: 'not_appl
  * Every date the document states, separated by role.
  *
  * @param text  the document text (embedded or an OCR transcript)
- * @param opts  { document_type }
+ * @param opts  { document_type, known_date, due_date }
  * @returns { document_date, due_date, payment_date } — each
  *          { value, original, status, note }, status one of
  *          detected | needs_confirmation | not_found | not_applicable
@@ -138,14 +147,19 @@ function extractDates(text = '', opts = {}) {
   const t = String(text || '');
   const type = opts.document_type || 'unknown';
 
-  const due = findLabelled(t, LABELS.due_date);
+  let due = findLabelled(t, LABELS.due_date);
+  if (!due && opts.due_date) {
+    const parsedDue = parseDate(opts.due_date);
+    if (parsedDue) due = { ...parsedDue, label: 'provided_due_date', note: 'Due date from structured fields fallback.' };
+  }
+  const estPay = findLabelled(t, LABELS.estimated_payment_date);
   const paid = findLabelled(t, LABELS.payment_date);
 
   // The document's own date, taken from a label that is NOT one of the others. The
-  // due and payment matches are removed from consideration first so a single
-  // "Jatuh Tempo: 04-09-2026" cannot also answer as the issue date.
+  // due, estimated pay, and payment matches are removed from consideration first so a single
+  // date cannot also answer as the issue date.
   let docText = t;
-  for (const found of [due, paid]) {
+  for (const found of [due, estPay, paid]) {
     if (found?.original) docText = docText.replace(found.original, ' ');
   }
   let doc = findLabelled(docText, LABELS.document_date);
@@ -166,6 +180,13 @@ function extractDates(text = '', opts = {}) {
     }
   }
 
+  // Fallback to explicitly identified date from OCR/structured extraction
+  if (!doc && (opts.known_date || opts.document_date || opts.invoice_date)) {
+    const rawKnown = opts.known_date || opts.document_date || opts.invoice_date;
+    const p = parseDate(rawKnown);
+    if (p) doc = { ...p, label: 'provided_date', note: 'Date from extraction/OCR fallback.' };
+  }
+
   // A payment date belongs to documents that record a payment. On an invoice there is
   // nothing to record yet, so the honest answer is "not applicable", not "not found".
   const paymentBearing = ['receipt', 'payment_proof', 'bank_statement'].includes(type);
@@ -173,6 +194,7 @@ function extractDates(text = '', opts = {}) {
   return {
     document_date: doc || NOT_FOUND,
     due_date: due || NOT_FOUND,
+    estimated_payment_date: estPay || NOT_FOUND,
     payment_date: paid || (paymentBearing ? NOT_FOUND
       : notApplicable('This kind of document does not record a payment date.')),
   };

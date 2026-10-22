@@ -43,6 +43,9 @@ const ANCHORS = {
   invoice: [
     /\binvoice\b/i, /\btagihan\b/i, /\bno\.?\s*invoice\b/i,
     /\bbill\s+to\b/i, /\bkepada\s+yth\b/i, /\bnetto\b/i, /harga\s+jual/i,
+    /\b(?:sub\s*total|grand\s*total)\b/i,
+    /\b(?:deskripsi|description|item)\b[\s\S]{0,40}\b(?:qty|quantity|harga|price|amount|total)\b/i,
+    /\b(?:tax\s+invoice|commercial\s+invoice)\b/i,
   ],
   // A receipt records money already handed over; an invoice asks for it. Kwitansi is
   // the Indonesian form and is a strong signal on its own.
@@ -54,7 +57,8 @@ const ANCHORS = {
     /\bterbilang\b/i, /\buntuk\s+pembayaran\b/i, /\bpaid\s+in\s+full\b/i],
   contract: [/\bperjanjian\b/i, /\bkontrak\b/i, /\bcontract\b/i, /\bagreement\b/i,
     /\bsyarat\s+dan\s+ketentuan\b/i, /terms\s+and\s+conditions/i, /\bpara\s+pihak\b/i,
-    /\bpasal\s+\d/i, /\bmemorandum\s+of\s+understanding\b/i],
+    /\bpasal\s+\d/i, /\bmemorandum\s+of\s+understanding\b/i,
+    /\btrade\s+activity\s+confirmation\b/i, /\btac\b/i, /\bboth\s+parties\b/i],
   bank_statement: [/rekening\s+koran/i, /bank\s+statement/i, /account\s+statement/i,
     /mutasi\s+rekening/i, /saldo\s+akhir/i, /opening\s+balance[\s\S]{0,40}closing\s+balance/i],
   tax_document: [/\bspt\b/i, /surat\s+setoran\s+pajak/i, /\bssp\b/i, /\bbukti\s+potong\b/i,
@@ -88,7 +92,32 @@ function detectType(text = '', hints = {}) {
     if (declared === 'vendor_invoice' || declared === 'customer_invoice') return { type: 'invoice', anchors: 0, from: 'declared_type' };
     return { type: 'unknown', anchors: 0, from: 'no_anchors' };
   }
-  return { type: topType, anchors: topScore, from: 'content_anchors' };
+
+  let finalType = topType;
+  let finalScore = topScore;
+
+  // Commercial invoice package: if a document has commercial billing anchors (bill to,
+  // kepada yth, tagihan, or an explicit invoice upload hint) alongside a Faktur Pajak,
+  // the document is a commercial invoice package and its primary payable type is invoice.
+  const hasCommercialInvoice = (score.invoice >= 2 && /\b(?:bill\s+to|kepada(?:\s+yth\.?)?|tagihan|payment\s+instructions?|transfer\s+ke\s+rekening)\b/i.test(t))
+    || (score.invoice >= 1 && (hints.document_type === 'vendor_invoice' || hints.document_type === 'invoice'));
+
+  // Kwitansi / receipt package: if a document contains a receipt/kwitansi ("KWITANSI",
+  // "Sudah terima dari", "Bukti Pembayaran") alongside a Faktur Pajak or contract,
+  // the Kwitansi proves payment was already handed over. Its primary classification is receipt,
+  // preserving the zero-posting invariant (leaves settlement to manual review without auto-settling).
+  const hasKwitansiReceipt = (score.receipt >= 2 && /\b(?:kwitansi|kuitansi|(?:telah|sudah)\s+terima\s+dari|bukti\s+pembayaran)\b/i.test(t))
+    || (score.receipt >= 1 && hints.document_type === 'receipt');
+
+  if (topType === 'faktur_pajak' && hasCommercialInvoice) {
+    finalType = 'invoice';
+    finalScore = score.invoice;
+  } else if ((topType === 'faktur_pajak' || topType === 'contract') && hasKwitansiReceipt) {
+    finalType = 'receipt';
+    finalScore = score.receipt;
+  }
+
+  return { type: finalType, anchors: finalScore, from: 'content_anchors' };
 }
 
 /* ── helpers ───────────────────────────────────────────────────────────────
@@ -116,7 +145,8 @@ function afterLabel(text, labelRe, valueRe) {
 function amountAfter(text, labelRe) {
   const win = windowAfter(text, labelRe, 120);
   if (win === null) return null;
-  const num = /(?:rp\.?\s*)?(\d[\d.,\s]*\d|\d)/i.exec(win);
+  const cleanWin = win.replace(/\(\s*[^)]*?\d+%\s*\)|\b\d+%/g, '');
+  const num = /(?:rp\.?\s*)?(\d[\d.,\s]*\d|\d)/i.exec(cleanWin);
   return num ? parseAmount(num[1].trim()) : null;
 }
 
@@ -156,6 +186,55 @@ function trimName(v) {
   return s.length >= 3 ? s : null;
 }
 
+function extractLineItemsFromText(text, defaultCurrency = 'IDR') {
+  if (!text) return [];
+  const lines = String(text).split(/\r?\n/);
+  const items = [];
+  let inTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i].trim();
+    if (!rawLine) continue;
+
+    // Header detection
+    if (/^(?:no|item|deskripsi|description|uraian|nama\s+barang)\b/i.test(rawLine) &&
+        /\b(?:qty|quantity|harga|price|amount|total)\b/i.test(rawLine)) {
+      inTable = true;
+      continue;
+    }
+
+    // Stop at totals / summary lines
+    if (/^(?:sub\s*total|total|grand\s*total|dasar\s+pengenaan|dpp|ppn|pajak|payment\s+details|terbilang|catatan|notes|rekening|bank)\b/i.test(rawLine)) {
+      inTable = false;
+      continue;
+    }
+
+    if (!inTable) continue;
+
+    // Try parsing item line:
+    // Format A: "1 Description 59 8.00 472.00" or "Hifi Air 75GB 30 Hari 50 100,000 5,000,000"
+    const m = /^(?:(\d{1,3})[.)\s]+)?(.+?)\s+(\d+(?:[.,]\d+)?)\s+(?:[A-Za-z$]{1,3}\.?\s*)?(\d[\d.,]*\d|\d)\s+(?:[A-Za-z$]{1,3}\.?\s*)?(\d[\d.,]*\d|\d)$/.exec(rawLine);
+    if (m) {
+      const num = m[1] ? parseInt(m[1], 10) : items.length + 1;
+      const desc = m[2].trim();
+      const qty = parseAmount(m[3]) || 1;
+      const unitPrice = parseAmount(m[4]);
+      const totalAmount = parseAmount(m[5]);
+      if (desc.length >= 3 && totalAmount !== null) {
+        items.push({
+          item_number: num,
+          description: desc,
+          quantity: qty,
+          unit_price: unitPrice,
+          total_amount: totalAmount,
+          currency: defaultCurrency,
+        });
+      }
+    }
+  }
+  return items;
+}
+
 /* ── kwitansi / receipt ────────────────────────────────────────────────────
    A kwitansi reads in the opposite direction to an invoice. The company printed at
    the top RECEIVED the money; the party named after "Sudah terima dari" PAID it. Get
@@ -184,7 +263,11 @@ function extractReceiptFields(text) {
   const amount = amountAfter(text, /\bjumlah\s*(?:uang)?\b/i)
     ?? amountAfter(text, /\bsebesar\b/i)
     ?? amountAfter(text, /\btotal\b/i);
-  if (amount !== null) { f.gross_amount = amount; f.amount = amount; }
+  if (amount !== null) {
+    f.gross_amount = amount;
+    f.amount = amount;
+    f.receipt_total = amount;
+  }
 
   // How it moved. "Berupa : TRANSFER" / "Berupa : TUNAI"
   const method = afterLabel(text, /\bberupa\b/i, String.raw`[A-Za-z][A-Za-z /]{2,30}`);
@@ -206,6 +289,43 @@ function extractReceiptFields(text) {
 
   const ref = afterLabel(text, /\b(?:no\.?|nomor)\s*(?:kwitansi|kuitansi)?\b/i, String.raw`[A-Z0-9][A-Z0-9\-/.]{3,40}`);
   if (ref) f.document_number = ref;
+
+  // Attached Faktur Pajak details if package contains a tax invoice
+  const serialRaw = afterLabel(text, /kode\s+dan\s+nomor\s+seri\s+faktur\s+pajak/i, String.raw`[\d][\d.\-\s]{14,25}`)
+    || (/\b(\d{3}\.\d{3}[-.]\d{2}\.\d{8})\b/.exec(text) || [])[1]
+    || (/\b(\d{16,17})\b/.exec(text) || [])[1];
+  if (serialRaw) f.tax_invoice_serial = serialRaw.replace(/[\s.\-]/g, '');
+
+  const npwpPattern = String.raw`\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}|\d{16}`;
+  const issuerNpwp = afterLabel(text, /pengusaha\s+kena\s+pajak[\s\S]{0,80}?npwp/i, npwpPattern)
+    || afterLabel(text, /\b(?:npwp\s+(?:penjual|vendor|issuer)|npwp)\b/i, npwpPattern);
+  const buyerNpwp = afterLabel(text, /pembeli\s+barang\s+kena\s+pajak[\s\S]{0,80}?npwp/i, npwpPattern)
+    || afterLabel(text, /\b(?:npwp\s+(?:pembeli|buyer|customer|lawan\s*transaksi))\b/i, npwpPattern);
+
+  if (issuerNpwp) f.issuer_npwp = issuerNpwp;
+  if (buyerNpwp) f.buyer_npwp = buyerNpwp;
+
+  const dpp = amountAfter(text, /dasar\s+pengenaan\s+pajak/i) ?? amountAfter(text, /\bdpp\b/i);
+  if (dpp !== null) f.tax_base_dpp = dpp;
+
+  const ppn = amountAfter(text, /jumlah\s+ppn/i)
+    ?? amountAfter(text, /\bppn\b(?!\s*:?\s*$)/i)
+    ?? amountAfter(text, /pajak\s+pertambahan\s+nilai/i);
+  if (ppn !== null) f.commercial_tax_amount = ppn;
+
+  const sub = amountAfter(text, /\b(?:sub\s*total|harga\s+jual\s*\/\s*penggantian\s*\/\s*uang\s+muka(?:\s*\/\s*termin)?|biaya\s+sewa\s+pokok)\b/i)
+    ?? amountAfter(text, /\b(?:harga\s+jual|biaya\s+pokok)\b(?!\s*\/\s*penggantian(?!\s*\/\s*uang))/i);
+  if (sub !== null) {
+    f.subtotal = sub;
+    f.commercial_base_amount = sub;
+    if (dpp !== null && Math.abs(sub - dpp) > 0.5) {
+      f.subtotal_dpp_variance = Math.round((sub - dpp) * 100) / 100;
+    }
+  } else if (dpp !== null) {
+    f.commercial_base_amount = dpp;
+  }
+
+  f.line_items = extractLineItemsFromText(text, f.currency || 'IDR');
 
   if (f.gross_amount === null || f.gross_amount === undefined) {
     warnings.push('No amount could be read from this receipt. Enter it manually.');
@@ -250,6 +370,7 @@ function extractInvoiceFields(text) {
   const REF = String.raw`(?=[A-Z\/\-]*\d)[A-Z0-9][A-Z0-9\/\-.]{3,30}[A-Z0-9]`;
   f.document_number =
     afterLabel(text, /\b(?:no\.?\s*)?invoice\s*(?:no\.?|number|#|nomor)\s*/i, REF)
+    || afterLabel(text, /\b(?:customer\s+account|referensi|reference|ref\.?)\s*[:.]?/i, REF)
     || afterLabel(text, /\b(?:nomor|no\.?)\s*(?:invoice|dokumen|tagihan|referensi|faktur)?\s*:/i, REF)
     || afterLabel(text, /\b(?:no\.?\s*)?invoice\b/i, REF)
     || (/\b([A-Z]\d{9,12})\b/.exec(text) || [])[1]
@@ -290,32 +411,100 @@ function extractInvoiceFields(text) {
     f.payee_account_name = trimName(afterLabel(text, /\b(?:atas\s+nama|a\.n\.|account\s+name)\b/i, String.raw`[^\r\n]{3,80}`));
   }
 
-  const npwps = [...String(text).matchAll(/\b(\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3})\b/g)].map((m) => m[1]);
-  if (npwps[0]) f.issuer_npwp = npwps[0];
-  if (npwps[1]) f.buyer_npwp = npwps[1];
+  const npwpPattern = String.raw`\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}|\d{16}`;
+  const issuerNpwp = afterLabel(text, /pengusaha\s+kena\s+pajak[\s\S]{0,80}?npwp/i, npwpPattern)
+    || afterLabel(text, /\b(?:npwp\s+(?:penjual|vendor|issuer)|npwp)\b/i, npwpPattern);
+  const buyerNpwp = afterLabel(text, /pembeli\s+barang\s+kena\s+pajak[\s\S]{0,80}?npwp/i, npwpPattern)
+    || afterLabel(text, /\b(?:npwp\s+(?:pembeli|buyer|customer|lawan\s*transaksi))\b/i, npwpPattern);
 
-  // Amounts. DPP and PPN are the anchors; the total is checked against them below.
-  f.commercial_base_amount =
-    amountAfter(text, /dasar\s+pengenaan\s+pajak/i)
-    ?? amountAfter(text, /\b(?:dpp|harga\s+jual|penggantian)\b/i);
+  if (issuerNpwp) f.issuer_npwp = issuerNpwp;
+  if (buyerNpwp) f.buyer_npwp = buyerNpwp;
+
+  if (!f.issuer_npwp || !f.buyer_npwp) {
+    const npwps = [...String(text).matchAll(/\b(\d{2}\.\d{3}\.\d{3}\.\d[-.]\d{3}\.\d{3}|\d{16})\b/g)].map((m) => m[1]);
+    if (!f.issuer_npwp && npwps[0]) f.issuer_npwp = npwps[0];
+    if (!f.buyer_npwp && npwps[1]) f.buyer_npwp = npwps[1];
+  }
+
+  // Commercial Subtotal: labelled as Sub Total, Harga Jual, Nilai Tagihan, etc.
+  const subtotal = amountAfter(text, /\b(?:sub\s*total|harga\s+jual\s*\/\s*penggantian\s*\/\s*uang\s+muka(?:\s*\/\s*termin)?|jumlah\s+harga\s+(?:jual|barang)|nilai\s+tagihan\s+sebelum\s+pajak|biaya\s+sewa\s+pokok)\b/i)
+    ?? amountAfter(text, /\bharga\s+jual\b(?!\s*\/\s*penggantian(?!\s*\/\s*uang))/i);
+
+  // Tax Base (DPP) from Faktur Pajak or invoice tax section
+  const dpp = amountAfter(text, /dasar\s+pengenaan\s+pajak/i)
+    ?? amountAfter(text, /\bdpp\b/i);
+
+  // Explicit trade discount / incentive if stated
+  const discount = amountAfter(text, /\b(?:diskon|discount|potongan\s+harga|pengurangan|listing\s+incentive)\b/i);
+
+  f.subtotal = subtotal;
+  f.tax_base_dpp = dpp;
+  f.discount_amount = discount;
+
+  // Commercial base amount is the commercial subtotal if found; otherwise DPP
+  f.commercial_base_amount = subtotal ?? dpp ?? null;
+
+  // Tax amount (PPN)
   f.commercial_tax_amount =
     amountAfter(text, /jumlah\s+ppn/i)
     ?? amountAfter(text, /\bppn\b(?!\s*:?\s*$)/i)
     ?? amountAfter(text, /pajak\s+pertambahan\s+nilai/i);
-  f.gross_amount =
-    amountAfter(text, /\b(?:netto|total\s+tagihan|grand\s+total|jumlah\s+total)\b/i)
-    ?? amountAfter(text, /\btotal\b/i);
 
-  // Arithmetic check. If base + tax does not equal the total we read, one of the three
-  // was misread — say so rather than silently preferring one.
-  const { commercial_base_amount: b, commercial_tax_amount: x, gross_amount: g } = f;
-  if (b != null && x != null) {
-    const sum = Math.round((b + x) * 100) / 100;
-    if (g == null) { f.gross_amount = sum; warnings.push('Total was not found on the document; derived from base + tax.'); }
-    else if (Math.abs(g - sum) > 0.5) {
-      warnings.push(`Read total ${g} does not equal base ${b} + tax ${x} (${sum}). Confirm all three before saving.`);
+  // Currency from invoice text if specified
+  const cur = afterLabel(text, /\b(?:currency|mata\s+uang)\b/i, String.raw`[A-Za-z]{3}`)
+    || (/\b(USD|EUR|SGD|AUD|GBP|JPY|CNY)\b/i.exec(text) || [])[1];
+  if (cur) f.currency = cur.toUpperCase();
+
+  // Gross total: the actual amount payable printed on the invoice
+  f.gross_amount =
+    amountAfter(text, /\b(?:grand\s+total|total\s+(?:tagihan|invoice|pembayaran|bayar|netto|amount\s+payable)|jumlah\s+(?:total|tagihan|yang\s+harus\s+dibayar)|payable\s+to\s+supplier)\b/i)
+    ?? amountAfter(text, /(?<!sub\s*)\bnetto\b/i)
+    ?? amountAfter(text, /(?<!sub\s*|disc\s*|diskon\s*|price\s*|harga\s*)\btotal\b(?!\s*(?:disc|diskon|qty|price|harga))/i);
+
+  // Reconcile and check arithmetic
+  const b = f.commercial_base_amount;
+  const x = f.commercial_tax_amount;
+  const g = f.gross_amount;
+
+  // If subtotal and DPP both exist and differ, record the documentary variance neutrally.
+  // Do NOT assume it is a discount or incentive unless explicitly stated on the document.
+  if (subtotal != null && dpp != null && Math.abs(subtotal - dpp) > 0.5) {
+    const variance = Math.round((subtotal - dpp) * 100) / 100;
+    f.subtotal_dpp_variance = variance;
+    warnings.push(`Commercial subtotal (${subtotal}) differs from Faktur Pajak DPP (${dpp}) by ${variance}.`);
+  }
+
+  if (g != null) {
+    // Total is printed on the document. NEVER overwrite it.
+    // Check if it reconciles with either commercial subtotal + tax OR DPP + tax.
+    if (b != null && x != null) {
+      const sumCommercial = Math.round((b + x) * 100) / 100;
+      const sumDpp = dpp != null ? Math.round((dpp + x) * 100) / 100 : null;
+      const matchCommercial = Math.abs(g - sumCommercial) <= 1;
+      const matchDpp = sumDpp != null && Math.abs(g - sumDpp) <= 1;
+
+      if (!matchCommercial && !matchDpp) {
+        warnings.push(`Read total ${g} does not equal base ${b} + tax ${x} (${sumCommercial}). Confirm all three before saving.`);
+      }
+    }
+  } else {
+    // Total was not printed. Derive it from base + tax.
+    if (b != null && x != null) {
+      f.gross_amount = Math.round((b + x) * 100) / 100;
+      warnings.push('Total was not found on the document; derived from base + tax.');
+    } else if (dpp != null && x != null) {
+      f.gross_amount = Math.round((dpp + x) * 100) / 100;
+      warnings.push('Total was not found on the document; derived from DPP + tax.');
+    } else if (b != null && x == null) {
+      f.gross_amount = b;
     }
   }
+
+  if (f.gross_amount != null && f.amount == null) {
+    f.amount = f.gross_amount;
+  }
+
+  f.line_items = extractLineItemsFromText(text, f.currency || 'IDR');
 
   const period = /(\d{1,2}\s+\w+\s+\d{4})\s*(?:s\/d|sampai|-|–|to)\s*(\d{1,2}\s+\w+\s+\d{4})/i.exec(text);
   if (period) { f.period_start_text = period[1]; f.period_end_text = period[2]; }
@@ -375,9 +564,11 @@ const EMPTY_FIELDS = {
   issuer_npwp: null, buyer_npwp: null, description: null,
   period_start: null, period_end: null, period_start_text: null, period_end_text: null,
   currency: 'IDR',
-  commercial_base_amount: null, commercial_tax_amount: null, gross_amount: null,
+  subtotal: null, commercial_base_amount: null, tax_base_dpp: null, discount_amount: null,
+  subtotal_dpp_variance: null, commercial_tax_amount: null, gross_amount: null,
+  receipt_total: null, line_items: [],
   payment_reference_number: null, payment_status: null, bank_name: null,
-  transfer_date_text: null, amount: null, fee: null, payment_method: null,
+  transfer_date_text: null, document_date: null, amount: null, fee: null, payment_method: null,
   from_account_number: null, from_account_name: null,
   to_account_number: null, to_account_name: null,
   // Invoice payment instructions — the account the issuer asks to be paid into.
@@ -413,7 +604,8 @@ function extractFromText(text = '', opts = {}) {
       confidence: 'needs_review',
       status: 'needs_manual_review',
       fields: { ...EMPTY_FIELDS },
-      missing_fields: Object.keys(EMPTY_FIELDS).filter((k) => k !== 'currency'),
+      line_items: [],
+      missing_fields: Object.keys(EMPTY_FIELDS).filter((k) => k !== 'currency' && k !== 'line_items'),
       warnings: ['Automatic extraction not available for a scanned image yet. Enter the values manually for now.'],
       raw_text_excerpt: '',
       reason: opts.extraction_reason || 'no_embedded_text',
@@ -432,6 +624,7 @@ function extractFromText(text = '', opts = {}) {
         : { fields: {}, warnings: ['Document kind not recognised from its text.'] };
 
   const fields = { ...EMPTY_FIELDS, ...part.fields };
+  if (!Array.isArray(fields.line_items)) fields.line_items = [];
   const required = REQUIRED_BY_TYPE[det.type] || [];
   const missing = required.filter((k) => fields[k] === null || fields[k] === undefined);
 
@@ -445,6 +638,23 @@ function extractFromText(text = '', opts = {}) {
   const warnings = [...part.warnings];
   if (missing.length) warnings.push(`Could not read: ${missing.join(', ')}. Enter these manually.`);
   if (confidence !== 'high') warnings.push('Review every value before saving — extraction is a suggestion, not a reading you can rely on.');
+  const hasTaxInvoice = det.type === 'faktur_pajak' || !!fields.tax_invoice_serial
+    || ANCHORS.faktur_pajak.filter((re) => re.test(text)).length >= 2;
+  const hasContract = det.type === 'contract'
+    || ANCHORS.contract.filter((re) => re.test(text)).length >= 2;
+  const hasProof = det.type === 'payment_proof' || det.type === 'receipt'
+    || ANCHORS.payment_proof.filter((re) => re.test(text)).length >= 2
+    || ANCHORS.receipt.filter((re) => re.test(text)).length >= 2;
+  const hasInvoice = det.type === 'invoice'
+    || !!fields.document_number
+    || ANCHORS.invoice.filter((re) => re.test(text)).length >= 2;
+
+  const detected_supporting_documents = {
+    invoice: hasInvoice,
+    tax_invoice: hasTaxInvoice,
+    contract: hasContract,
+    payment_proof: hasProof,
+  };
 
   return {
     document_type: det.type,
@@ -453,6 +663,8 @@ function extractFromText(text = '', opts = {}) {
     status: confidence === 'needs_review' ? 'needs_manual_review' : 'suggested',
     detection: det,
     fields,
+    line_items: fields.line_items,
+    detected_supporting_documents,
     missing_fields: missing,
     warnings,
     raw_text_excerpt: String(text).replace(/\s+/g, ' ').trim().slice(0, 600),

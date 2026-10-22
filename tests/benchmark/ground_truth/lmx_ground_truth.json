@@ -1,0 +1,80 @@
+{
+  "$schema": "../schemas/ground_truth_schema.json",
+  "case_id": "CASE_B_LMX",
+  "title": "Location Media Xchange (LMX) 1-Page International SaaS Invoice",
+  "document_type": "commercial_invoice",
+  "verification_status": "synthetic_candidate_pending_raw_files",
+  "missing_artifacts": {
+    "original_pdf_missing": false,
+    "nanonets_json_missing": false,
+    "notes": "Verified against original OpenPDF binary media_1792380770426_ce582d0f.pdf and Nanonets export 74b20bc5-cc24-49e2-8e1e-7af0505f367f-ivlmxs-26-0215.pdf."
+  },
+  "physical_pages": [
+    {
+      "page_number": 1,
+      "content_type": "commercial_invoice",
+      "document_number": "IVLMXS-26-0215"
+    }
+  ],
+  "financials": {
+    "currency": "USD",
+    "invoice_subtotal": 472.00,
+    "commercial_discount": null,
+    "faktur_pajak_dpp": null,
+    "subtotal_dpp_variance": null,
+    "ppn_rate": null,
+    "ppn_amount": 0.00,
+    "withholding_tax_type": null,
+    "withholding_tax_base": null,
+    "withholding_tax_amount": null,
+    "receipt_total": null,
+    "gross_payable_total": 472.00,
+    "settled_amount": null
+  },
+  "parties": {
+    "issuer": {
+      "name": "Location Media Xchange Pte Ltd",
+      "npwp_raw": null,
+      "npwp_15": null,
+      "npwp_16": null
+    },
+    "buyer": {
+      "name": "PT. HELM CARE INDONESIA",
+      "npwp_raw": null,
+      "npwp_15": null,
+      "npwp_16": null
+    }
+  },
+  "dates": {
+    "document_date": "2026-10-05",
+    "due_date": "2026-10-19",
+    "estimated_payment_date": null,
+    "settlement_date": null
+  },
+  "tax_identifiers": {
+    "nsfp_serial": null,
+    "document_number": "IVLMXS-26-0215"
+  },
+  "banking": {
+    "bank_name": "DBS Bank Ltd",
+    "account_number": "003-902148-1",
+    "account_holder": "Location Media Xchange Pte Ltd",
+    "reference_number": "IVLMXS-26-0215"
+  },
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "Location Media Xchange Software Subscription",
+      "quantity": 59,
+      "unit_price": 8.00,
+      "total_price": 472.00,
+      "is_taxable": false
+    }
+  ],
+  "reconciliation_invariants": {
+    "zero_posting_guard": true,
+    "needs_review_flag": false,
+    "kwitansi_direction_inverted": false,
+    "subtotal_dpp_reconciliation_required": false
+  }
+}

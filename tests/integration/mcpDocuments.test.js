@@ -129,8 +129,11 @@ async function connect(services, { write = true } = {}) {
 const body = (r) => JSON.parse(r.content[0].text);
 const called = (s, name) => s.calls.filter((c) => c[0] === name);
 async function call(services, name, args = {}, opts) {
+  const finalArgs = name === 'submit_invoice_draft' && !('request_key' in args)
+    ? { request_key: crypto.randomUUID(), ...args }
+    : args;
   const { client, close } = await connect(services, opts);
-  try { return await client.callTool({ name, arguments: args }); } finally { await close(); }
+  try { return await client.callTool({ name, arguments: finalArgs }); } finally { await close(); }
 }
 const PDF_B64 = Buffer.from('%PDF-1.4 tiny').toString('base64');
 

@@ -3313,14 +3313,24 @@ async function linkedInvoiceSettlement(biz, docId) {
 // the SAME settlement + closeout engine as a stored invoice, fed the only facts known —
 // this document is the invoice, no payment is allocated, tax as the intake assessed it.
 // A preview for a caller deciding whether to enter it; never a stored state.
-function invoiceReadinessPreview(fields = {}, tax = {}) {
+function invoiceReadinessPreview(fields = {}, tax = {}, detectedDocs = {}) {
   const settlement = SETTLE.settlementOf({
     invoice_total: fields.gross_amount,
     base_amount: fields.commercial_base_amount,
     tax_amount: tax.ppn_detected ? tax.ppn_amount : null,
     allocations: [],
   });
-  const documents = { invoice: true };
+  const hasTaxInvoice = !!(
+    detectedDocs.tax_invoice
+    || fields.tax_invoice_serial
+    || fields.faktur_pajak
+  );
+  const documents = {
+    invoice: true,
+    tax_invoice: hasTaxInvoice,
+    contract: !!detectedDocs.contract,
+    payment_proof: !!detectedDocs.payment_proof,
+  };
   const closeout = SETTLE.closeoutState({ settlement, documents, has_tax: !!tax.ppn_detected });
   return { basis: 'preview_as_new_invoice', settlement, documents, closeout };
 }
@@ -14097,6 +14107,7 @@ const statementParsers = require('./lib/statementParsers');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
 const docOcr = require('./lib/documentOcr');
+const nanonetsOcr = require('./lib/nanonetsOcr');
 const docDates = require('./lib/documentDates');
 const docParties = require('./lib/documentParties');
 const uploadIntentLib = require('./lib/uploadIntent');
@@ -14866,12 +14877,13 @@ app.patch('/api/documents/:id', auth, async (req, res) => {
     // Build the safe patch (whitelist only); the RPC writes it + audit atomically.
     const patch = {};
     if (b.document_type != null) patch.document_type = b.document_type;
-    if (b.title != null) patch.document_number = String(b.title).slice(0, 200);
+    if (b.title != null || b.document_number != null) patch.document_number = String(b.title != null ? b.title : b.document_number).slice(0, 200);
     if (b.document_date !== undefined && b.document_date) patch.document_date = b.document_date;
     if (b.period_start !== undefined && b.period_start) patch.period_start = b.period_start;
     if (b.period_end !== undefined && b.period_end) patch.period_end = b.period_end;
     if (b.currency != null) patch.currency = b.currency;
-    if (b.amount !== undefined && b.amount != null && isFinite(Number(b.amount))) patch.gross_amount = Number(b.amount);
+    const grossAmt = b.amount !== undefined && b.amount !== null ? b.amount : b.gross_amount;
+    if (grossAmt !== undefined && grossAmt != null && isFinite(Number(grossAmt))) patch.gross_amount = Number(grossAmt);
     if (b.counterparty_id) patch.issuer_counterparty_id = b.counterparty_id;
     if (b.description !== undefined) patch.extracted_json = { ...(doc.extracted_json || {}), notes: b.description ? String(b.description).slice(0, 2000) : null };
     const { data, error } = await supabase.rpc('rpc_document_update_metadata',
@@ -15051,7 +15063,18 @@ async function readDocumentForIntake(biz, doc) {
   // no-text path produced it — the same "unsupported" answer as before OCR existed.
   let readSource = ex.text_available ? 'embedded_text' : 'filename_only';
   let ocr = null;
-  if (!ex.text_available && docOcr.ocrEnabled()) {
+  if (!ex.text_available && nanonetsOcr.nanonetsEnabled()) {
+    ocr = await nanonetsOcr.readDocumentWithNanonets(buf, {
+      mime_type: file.mime_type, file_name: file.file_name,
+    });
+    if (ocr.ok && (ocr.text || ocr.document_type !== 'unknown')) {
+      const fromText = docExtract.extractFromText(ocr.text, {
+        text_available: !!ocr.text, document_type: doc.document_type, file_name: file.file_name,
+      });
+      extraction = nanonetsOcr.mergeIntoExtraction(fromText, ocr);
+      readSource = 'ocr_nanonets';
+    }
+  } else if (!ex.text_available && docOcr.ocrEnabled()) {
     ocr = await docOcr.readDocumentWithVision(buf, {
       mime_type: file.mime_type, file_name: file.file_name, client: anthropic,
     });
@@ -15070,8 +15093,10 @@ async function readDocumentForIntake(biz, doc) {
   // caller of this helper gets the same structured answer. The FULL text, not the
   // 600-character excerpt stored on the row — a due date or a second party block
   // routinely sits past that cut.
-  const readText = (readSource === 'ocr_vision' ? (ocr && ocr.text) : ex.text) || '';
-  const dates = docDates.extractDates(readText, { document_type: extraction.document_type });
+  const readText = (/^ocr_/.test(readSource) ? (ocr && ocr.text) : ex.text) || '';
+  const knownDate = extraction.fields?.document_date || extraction.fields?.transfer_date_text || ocr?.fields?.invoice_date || ocr?.fields?.date || null;
+  const dueDate = ocr?.fields?.due_date || null;
+  const dates = docDates.extractDates(readText, { document_type: extraction.document_type, known_date: knownDate, due_date: dueDate });
   const parties = docParties.extractParties(readText);
 
   return { file, buf, extraction, readSource, ocr, dates, parties };
@@ -15084,7 +15109,8 @@ async function readDocumentForIntake(biz, doc) {
 function readTextForIntake(text) {
   const body = String(text || '');
   const extraction = docExtract.extractFromText(body, { text_available: body.trim().length > 0 });
-  const dates = docDates.extractDates(body, { document_type: extraction.document_type });
+  const knownDate = extraction.fields?.document_date || extraction.fields?.transfer_date_text || null;
+  const dates = docDates.extractDates(body, { document_type: extraction.document_type, known_date: knownDate });
   const parties = docParties.extractParties(body);
   return { file: null, buf: null, extraction, readSource: 'client_model_text', ocr: null, dates, parties };
 }
@@ -15273,7 +15299,7 @@ app.post('/api/documents/:id/counterparty-suggestion', auth, async (req, res) =>
     // being paired with another company's tax number — and what stops the business
     // being offered as its own counterparty.
     const partyRead = docParties.resolveCounterparty(
-      (read.readSource === 'ocr_vision' ? (read.ocr && read.ocr.text) : null) || extraction.raw_text_excerpt || '',
+      (/^ocr_/.test(read.readSource) ? (read.ocr && read.ocr.text) : null) || extraction.raw_text_excerpt || '',
       { legal_name: biz.business?.legal_name || biz.business?.name, display_name: biz.business?.name,
         name: biz.business?.name, npwp: biz.business?.npwp, aliases: biz.business?.aliases || [] });
 

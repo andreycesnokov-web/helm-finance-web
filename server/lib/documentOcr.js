@@ -27,7 +27,32 @@ const ocrEnabled = () => process.env.DOCUMENT_OCR_VISION_ENABLED === 'true';
 const MAX_OCR_BYTES = 8 * 1024 * 1024;   // ~10.7 MB base64, well inside the API limit
 const OCR_TIMEOUT_MS = 45000;
 const MAX_TEXT_CHARS = 6000;             // transcript we keep; the rest is not needed
-const MODEL = 'claude-sonnet-4-5';
+const DEFAULT_MODEL = 'claude-sonnet-4-5';
+
+const SUPPORTED_OCR_MODELS = new Set([
+  'claude-sonnet-4-5',
+  'claude-sonnet-4-5-20250929',
+  'claude-3-7-sonnet',
+  'claude-3-7-sonnet-20250219',
+  'claude-3-5-sonnet',
+  'claude-3-5-sonnet-latest',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-5-haiku',
+  'claude-3-5-haiku-latest',
+  'claude-3-5-haiku-20241022',
+  'claude-3-haiku-20240307',
+  'claude-3-opus',
+  'claude-3-opus-latest',
+  'claude-3-opus-20240229',
+]);
+
+function getOcrModel() {
+  const envVal = process.env.ANTHROPIC_OCR_MODEL ? process.env.ANTHROPIC_OCR_MODEL.trim() : '';
+  if (!envVal) return DEFAULT_MODEL;
+  if (SUPPORTED_OCR_MODELS.has(envVal)) return envVal;
+  console.warn(`[OCR] Configured ANTHROPIC_OCR_MODEL "${envVal}" is not in the supported list. Falling back to default "${DEFAULT_MODEL}".`);
+  return DEFAULT_MODEL;
+}
 
 const IMAGE_MIME = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
@@ -38,23 +63,38 @@ const OCR_TYPES = ['invoice', 'faktur_pajak', 'payment_proof', 'receipt', 'contr
   'bank_statement', 'tax_document', 'payroll_document', 'unknown'];
 
 // Field-by-field, so a model that invents a key cannot put it into the pipeline.
-const FIELD_KEYS = ['document_number', 'issuer_name', 'buyer_name', 'counterparty_name',
-  'date', 'currency', 'amount', 'commercial_base_amount', 'commercial_tax_amount',
-  'gross_amount', 'payment_method', 'period_start', 'period_end', 'reference_number', 'npwp'];
+const FIELD_KEYS = [
+  'document_number', 'issuer_name', 'buyer_name', 'counterparty_name',
+  'date', 'invoice_date', 'due_date', 'currency', 'amount',
+  'subtotal', 'commercial_base_amount', 'tax_base_dpp', 'discount_amount',
+  'commercial_tax_amount', 'gross_amount',
+  'payment_method', 'period_start', 'period_end', 'reference_number',
+  'npwp', 'issuer_npwp', 'buyer_npwp', 'tax_invoice_serial',
+];
 
-const NUMERIC_FIELDS = new Set(['amount', 'commercial_base_amount', 'commercial_tax_amount',
-  'gross_amount']);
+const NUMERIC_FIELDS = new Set([
+  'amount', 'subtotal', 'commercial_base_amount', 'tax_base_dpp', 'discount_amount',
+  'commercial_tax_amount', 'gross_amount',
+]);
 
 const PROMPT = `You are reading a scanned business document for an Indonesian accounting system.
 
 Return ONLY a JSON object, no markdown fence, no commentary:
-{"text":"","document_type":"","confidence":"","fields":{},"warnings":[]}
+{"text":"","document_type":"","confidence":"","fields":{},"line_items":[],"warnings":[],"supporting_documents":{}}
 
 document_type must be exactly one of: ${OCR_TYPES.join(', ')}.
 Indonesian guidance:
 - "KWITANSI"/"KUITANSI" (often with "Sudah terima dari", "Berupa", "Untuk pembayaran",
   "Terbilang") is a RECEIPT for money already handed over -> "receipt", NOT "invoice".
-- "Faktur Pajak" (with a Kode dan Nomor Seri) -> "faktur_pajak".
+- Multi-page document / package rule:
+  * When a document contains a commercial invoice / bill asking for payment, the primary
+    document_type is "invoice", even if accompanied by a Faktur Pajak or contract/agreement.
+  * When a document contains a Kwitansi / receipt attached with Faktur Pajak or contract/agreement,
+    the primary document_type is "receipt", with supporting_documents.tax_invoice = true.
+    A Kwitansi is proof of payment already made, not an open invoice or tax bill.
+  * Report attached supporting documents in supporting_documents:
+    {"invoice": true/false, "tax_invoice": true/false, "contract": true/false, "payment_proof": true/false}.
+- Standalone "Faktur Pajak" (with a Kode dan Nomor Seri and no commercial invoice) -> "faktur_pajak".
 - "Invoice"/"Tagihan" asking for payment -> "invoice".
 - A bank transfer slip / "Bukti Transfer" -> "payment_proof".
 - "Rekening Koran"/"Mutasi Rekening" -> "bank_statement".
@@ -65,13 +105,41 @@ confidence: "high" only if the document type and the total amount are both unamb
 "medium" if one is inferred; "low" if the page is unclear.
 
 fields (use null for anything not printed on the document — never guess):
- document_number, issuer_name, buyer_name, counterparty_name, date (YYYY-MM-DD),
- currency (ISO, "IDR" for Rp), amount, commercial_base_amount (DPP),
- commercial_tax_amount (PPN), gross_amount, payment_method, period_start, period_end,
- reference_number, npwp.
-Amounts: digits only, no separators. "Rp 11.322.000" -> 11322000.
-On a kwitansi: issuer_name is who RECEIVED the money, counterparty_name is who PAID
-("Sudah terima dari"), and amount is the "Jumlah".
+ document_number (commercial invoice reference, e.g. X2610001139),
+ tax_invoice_serial (16-digit Faktur Pajak serial, digits only),
+ issuer_name (supplier/seller), buyer_name (customer/buyer), counterparty_name,
+ issuer_npwp, buyer_npwp,
+ date (YYYY-MM-DD), invoice_date (YYYY-MM-DD), due_date (YYYY-MM-DD),
+ currency (ISO, "IDR" for Rp),
+ subtotal (commercial subtotal before tax/incentives),
+ commercial_base_amount (tax base or commercial base),
+ tax_base_dpp (Dasar Pengenaan Pajak on Faktur Pajak),
+ discount_amount (trade discount / incentive),
+ commercial_tax_amount (PPN / VAT),
+ gross_amount (total payable printed on commercial invoice, e.g. 143856000),
+ amount (same as gross_amount for invoices),
+ payment_method, period_start, period_end, reference_number, npwp.
+
+line_items: array of line items with:
+ item_number (integer, e.g. 1),
+ description (clean text, e.g. "Software Subscription"),
+ quantity (number, default 1),
+ unit_price (number),
+ total_amount (number),
+ currency (ISO, e.g. "IDR", "USD").
+ If no item lines appear on the document, return [].
+
+FINANCIAL RECONCILIATION RULE:
+- NEVER confuse Dasar Pengenaan Pajak (DPP, tax base) with commercial Subtotal or Total.
+  In Indonesian retail/consignment invoices, the commercial Subtotal and Faktur Pajak DPP may differ
+  due to fee calculations, trade incentives, or statutory tax base adjustments.
+  Keep Subtotal, DPP, and Gross Total strictly separate as printed.
+  Do NOT assume a difference between Subtotal and DPP is a discount unless explicitly stated on the document.
+  Read the explicit total printed on the commercial invoice for gross_amount.
+  Never calculate Gross Total as DPP + PPN if an explicit commercial total is printed.
+- Amounts: digits only, no separators. "Rp 143.856.000" -> 143856000.
+- On a kwitansi: issuer_name is who RECEIVED the money, counterparty_name is who PAID
+  ("Sudah terima dari"), and amount is the "Jumlah".
 
 text: a short plain-text transcript of the document, at most 1500 characters.
 warnings: short strings for anything unreadable, ambiguous or contradictory.
@@ -95,6 +163,31 @@ const asString = (v, cap = 200) => {
   return s && !/^(null|n\/a|-|unknown)$/i.test(s) ? s.slice(0, cap) : null;
 };
 
+function normalizeLineItems(rawItems, defaultCurrency = 'IDR') {
+  if (!Array.isArray(rawItems)) return [];
+  const normalized = [];
+  for (let i = 0; i < rawItems.length; i++) {
+    const it = rawItems[i];
+    if (!it || typeof it !== 'object') continue;
+    const desc = asString(it.description || it.name || it.item_name || it.deskripsi, 300);
+    if (!desc) continue;
+    const qty = asNumber(it.quantity ?? it.qty) ?? 1;
+    const unitPrice = asNumber(it.unit_price ?? it.price ?? it.rate ?? it.harga_satuan);
+    const total = asNumber(it.total_amount ?? it.total ?? it.amount ?? it.total_price)
+      ?? (unitPrice !== null ? Math.round(qty * unitPrice * 100) / 100 : null);
+    const cur = asString(it.currency, 8) ? String(it.currency).toUpperCase().slice(0, 8) : defaultCurrency;
+    normalized.push({
+      item_number: asNumber(it.item_number ?? it.line_number) ?? (i + 1),
+      description: desc,
+      quantity: qty,
+      unit_price: unitPrice,
+      total_amount: total,
+      currency: cur,
+    });
+  }
+  return normalized;
+}
+
 /** Coerce the model's answer into the exact documented shape. Unknown keys are dropped. */
 function normalizeResult(parsed) {
   const src = parsed && typeof parsed === 'object' ? parsed : {};
@@ -104,6 +197,8 @@ function normalizeResult(parsed) {
     fields[k] = NUMERIC_FIELDS.has(k) ? asNumber(rawFields[k]) : asString(rawFields[k]);
   }
   if (fields.currency) fields.currency = fields.currency.toUpperCase().slice(0, 8);
+
+  const line_items = normalizeLineItems(src.line_items || rawFields.line_items, fields.currency || 'IDR');
 
   const type = OCR_TYPES.includes(src.document_type) ? src.document_type : 'unknown';
   const confidence = ['high', 'medium', 'low'].includes(src.confidence) ? src.confidence : 'low';
@@ -118,6 +213,15 @@ function normalizeResult(parsed) {
     warnings.push('No amount could be read from this document. Check it before using the result.');
   }
 
+  const supporting_documents = src.supporting_documents && typeof src.supporting_documents === 'object'
+    ? {
+      invoice: !!src.supporting_documents.invoice,
+      tax_invoice: !!src.supporting_documents.tax_invoice,
+      contract: !!src.supporting_documents.contract,
+      payment_proof: !!src.supporting_documents.payment_proof,
+    }
+    : null;
+
   return {
     ok: true,
     source: 'ocr_vision',
@@ -125,6 +229,8 @@ function normalizeResult(parsed) {
     document_type: type,
     confidence: anyAmount === null && confidence === 'high' ? 'medium' : confidence,
     fields,
+    line_items,
+    supporting_documents,
     warnings,
   };
 }
@@ -133,6 +239,7 @@ const failure = (reason, warning) => ({
   ok: false, source: 'ocr_vision', reason,
   text: '', document_type: 'unknown', confidence: 'low',
   fields: Object.fromEntries(FIELD_KEYS.map((k) => [k, null])),
+  line_items: [],
   warnings: warning ? [warning] : [],
 });
 
@@ -170,13 +277,22 @@ async function readDocumentWithVision(buffer, opts = {}) {
   try {
     // A vision call runs inside an HTTP request that already holds a stored file, so it
     // gets a hard ceiling rather than the SDK's default patience.
-    resp = await Promise.race([
-      client.messages.create({
-        model: MODEL, max_tokens: 1500,
-        messages: [{ role: 'user', content: [block, { type: 'text', text: PROMPT }] }],
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('ocr_timeout')), OCR_TIMEOUT_MS)),
-    ]);
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('ocr_timeout')), OCR_TIMEOUT_MS);
+      if (timer && typeof timer.unref === 'function') timer.unref();
+    });
+    try {
+      resp = await Promise.race([
+        client.messages.create({
+          model: getOcrModel(), max_tokens: 2000,
+          messages: [{ role: 'user', content: [block, { type: 'text', text: PROMPT }] }],
+        }),
+        timeoutPromise,
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   } catch (e) {
     const timedOut = /ocr_timeout/.test(e.message || '');
     return failure(timedOut ? 'ocr_timeout' : 'ocr_request_failed',
@@ -199,18 +315,24 @@ async function readDocumentWithVision(buffer, opts = {}) {
 // these are the model's own structured answer.
 const FILL_FROM_OCR = {
   document_number: (f) => f.document_number,
+  tax_invoice_serial: (f) => f.tax_invoice_serial,
   issuer_name: (f) => f.issuer_name,
   buyer_name: (f) => f.buyer_name ?? f.counterparty_name,
-  issuer_npwp: (f) => f.npwp,
+  issuer_npwp: (f) => f.issuer_npwp ?? f.npwp,
+  buyer_npwp: (f) => f.buyer_npwp,
   description: () => null,
   currency: (f) => f.currency,
-  commercial_base_amount: (f) => f.commercial_base_amount,
+  subtotal: (f) => f.subtotal ?? f.commercial_base_amount,
+  commercial_base_amount: (f) => f.commercial_base_amount ?? f.subtotal,
+  tax_base_dpp: (f) => f.tax_base_dpp,
+  discount_amount: (f) => f.discount_amount,
   commercial_tax_amount: (f) => f.commercial_tax_amount,
   gross_amount: (f) => f.gross_amount ?? f.amount,
   amount: (f) => f.amount ?? f.gross_amount,
   payment_method: (f) => f.payment_method,
   payment_reference_number: (f) => f.reference_number,
   transfer_date_text: (f) => f.date,
+  document_date: (f) => f.invoice_date ?? f.date,
 };
 
 /**
@@ -235,8 +357,39 @@ function mergeIntoExtraction(base, ocr) {
     }
   }
 
-  const type = (base.document_type && base.document_type !== 'unknown')
+  const subtotalVal = fields.subtotal ?? fields.commercial_base_amount ?? null;
+  const dppVal = fields.tax_base_dpp ?? null;
+  if (subtotalVal !== null && dppVal !== null && subtotalVal !== dppVal) {
+    fields.subtotal_dpp_variance = Math.abs(subtotalVal - dppVal);
+  }
+
+  let type = (base.document_type && base.document_type !== 'unknown')
     ? base.document_type : ocr.document_type;
+
+  // Package reconciliation: if an invoice number/commercial bill exists alongside a Faktur Pajak,
+  // the document is a commercial invoice package and its primary payable type is invoice.
+  if (type === 'faktur_pajak' && (ocr.supporting_documents?.invoice || fields.document_number)) {
+    type = 'invoice';
+  }
+
+  // Kwitansi / receipt package reconciliation: if a document contains a receipt/kwitansi,
+  // classify as receipt over faktur_pajak, preserving zero-posting (needs manual review).
+  if (type === 'faktur_pajak' && (ocr.supporting_documents?.payment_proof || /kwitansi|kuitansi/i.test(ocr.text || ''))) {
+    type = 'receipt';
+  }
+
+  if ((!fields.line_items || fields.line_items.length === 0) && Array.isArray(ocr.line_items) && ocr.line_items.length > 0) {
+    fields.line_items = ocr.line_items;
+  } else if (!fields.line_items) {
+    fields.line_items = [];
+  }
+
+  const detected_supporting_documents = {
+    invoice: type === 'invoice' || !!(ocr.supporting_documents && ocr.supporting_documents.invoice),
+    tax_invoice: type === 'faktur_pajak' || !!fields.tax_invoice_serial || !!(ocr.supporting_documents && ocr.supporting_documents.tax_invoice),
+    contract: type === 'contract' || !!(ocr.supporting_documents && ocr.supporting_documents.contract),
+    payment_proof: type === 'payment_proof' || type === 'receipt' || !!(ocr.supporting_documents && ocr.supporting_documents.payment_proof),
+  };
 
   const RANK = { needs_review: 0, low: 1, medium: 2, high: 3 };
   const capped = Math.min(RANK[base.confidence] ?? 0, RANK[ocr.confidence] ?? 0, RANK.medium);
@@ -257,6 +410,8 @@ function mergeIntoExtraction(base, ocr) {
     confidence,
     status: 'suggested',
     fields,
+    line_items: fields.line_items || [],
+    detected_supporting_documents,
     missing_fields: missing,
     warnings,
     // Never the full transcript: this travels with the document row.
@@ -269,5 +424,7 @@ function mergeIntoExtraction(base, ocr) {
 
 module.exports = {
   readDocumentWithVision, normalizeResult, mergeIntoExtraction, ocrEnabled,
+  getOcrModel, DEFAULT_MODEL, SUPPORTED_OCR_MODELS,
+  normalizeLineItems,
   OCR_TYPES, FIELD_KEYS, MAX_OCR_BYTES, OCR_TIMEOUT_MS,
 };

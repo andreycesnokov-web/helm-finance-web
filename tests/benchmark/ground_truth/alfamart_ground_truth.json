@@ -1,0 +1,90 @@
+{
+  "$schema": "../schemas/ground_truth_schema.json",
+  "case_id": "CASE_C_ALFAMART",
+  "title": "Alfamart 3-Page Retail Lease & Tax Package (Kwitansi + Faktur Pajak + Agreement)",
+  "document_type": "multi_document_package",
+  "verification_status": "verified_production_ground_truth",
+  "missing_artifacts": {
+    "original_pdf_missing": false,
+    "nanonets_json_missing": false,
+    "notes": "Verified against real Nanonets export ad2d46ae-2006-417d-92a3-d33c3b4be013-kwt-tc-2607-0342-pthelm-care-indonesia.pdf. Kwitansi proves money already paid (IDR 11,322,000) on 04-08-2026."
+  },
+  "physical_pages": [
+    {
+      "page_number": 1,
+      "content_type": "receipt_kwitansi",
+      "document_number": "SAT/Z001/K-P/26/VIII/0133"
+    },
+    {
+      "page_number": 2,
+      "content_type": "faktur_pajak",
+      "document_number": "04002600300202886"
+    },
+    {
+      "page_number": 3,
+      "content_type": "lease_agreement",
+      "document_number": "TC-2607-0342"
+    }
+  ],
+  "financials": {
+    "currency": "IDR",
+    "invoice_subtotal": 10200000,
+    "commercial_discount": null,
+    "faktur_pajak_dpp": 9350000,
+    "subtotal_dpp_variance": 850000,
+    "ppn_rate": 0.12,
+    "ppn_amount": 1122000,
+    "withholding_tax_type": "pph_4_2",
+    "withholding_tax_base": 10200000,
+    "withholding_tax_amount": 1020000,
+    "receipt_total": 11322000,
+    "gross_payable_total": 11322000,
+    "settled_amount": 11322000
+  },
+  "parties": {
+    "issuer": {
+      "name": "PT SUMBER ALFARIA TRIJAYA TBK",
+      "npwp_raw": "01.336.238.9-054.000",
+      "npwp_15": "013362389054000",
+      "npwp_16": "0013362389054000"
+    },
+    "buyer": {
+      "name": "HELM CARE INDONESIA",
+      "npwp_raw": "1000000002284592",
+      "npwp_15": null,
+      "npwp_16": "1000000002284592"
+    }
+  },
+  "dates": {
+    "document_date": "2026-08-04",
+    "due_date": "2026-08-14",
+    "estimated_payment_date": null,
+    "settlement_date": "2026-08-04"
+  },
+  "tax_identifiers": {
+    "nsfp_serial": "04002600300202886",
+    "document_number": "SAT/Z001/K-P/26/VIII/0133"
+  },
+  "banking": {
+    "bank_name": "Bank Central Asia (BCA)",
+    "account_number": "012.893.1001",
+    "account_holder": "PT SUMBER ALFARIA TRIJAYA TBK",
+    "reference_number": "SAT/Z001/K-P/26/VIII/0133"
+  },
+  "line_items": [
+    {
+      "line_number": 1,
+      "description": "SEWA TENANT TC-2607-0342 TERM 1",
+      "quantity": 1,
+      "unit_price": 10200000,
+      "total_price": 10200000,
+      "is_taxable": true
+    }
+  ],
+  "reconciliation_invariants": {
+    "zero_posting_guard": true,
+    "needs_review_flag": true,
+    "kwitansi_direction_inverted": true,
+    "subtotal_dpp_reconciliation_required": true
+  }
+}

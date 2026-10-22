@@ -34,8 +34,8 @@ const isLimitError = (e) =>
           /maxOutputLength|buffer.{0,20}(too large|size)|output length/i.test(e.message || ''));
 
 // PDF string escapes: \( \) \\ \n \r \t \b \f and \ddd octal.
-function decodePdfString(s) {
-  return s.replace(/\\(n|r|t|b|f|\(|\)|\\|[0-7]{1,3})/g, (m, g) => {
+function decodePdfString(s, cmaps = {}) {
+  const unescaped = s.replace(/\\(n|r|t|b|f|\(|\)|\\|[0-7]{1,3})/g, (m, g) => {
     switch (g) {
       case 'n': return '\n'; case 'r': return '\r'; case 't': return '\t';
       case 'b': return '\b'; case 'f': return '\f';
@@ -43,11 +43,28 @@ function decodePdfString(s) {
       default: return String.fromCharCode(parseInt(g, 8));
     }
   });
+  // If string contains 2-byte Identity-H encoded characters (common in Type0 fonts)
+  if (Object.keys(cmaps).length > 0 && unescaped.length >= 2 && unescaped.charCodeAt(0) === 0) {
+    let out = '';
+    for (let i = 0; i < unescaped.length; i += 2) {
+      const cid = (unescaped.charCodeAt(i) << 8) | unescaped.charCodeAt(i + 1);
+      out += cmaps[cid] || (cid >= 32 && cid <= 126 ? String.fromCharCode(cid) : ' ');
+    }
+    return out;
+  }
+  return unescaped;
 }
 
-const decodeHexString = (hex) => {
+const decodeHexString = (hex, cmaps = {}) => {
   const clean = hex.replace(/[^0-9a-fA-F]/g, '');
   let out = '';
+  if (Object.keys(cmaps).length > 0 && clean.length >= 4 && clean.length % 4 === 0) {
+    for (let i = 0; i + 3 < clean.length; i += 4) {
+      const cid = parseInt(clean.substr(i, 4), 16);
+      out += cmaps[cid] || (cid >= 32 && cid <= 126 ? String.fromCharCode(cid) : '');
+    }
+    return out;
+  }
   for (let i = 0; i + 1 < clean.length; i += 2) {
     const code = parseInt(clean.substr(i, 2), 16);
     // UTF-16BE text often interleaves NULs; drop them rather than emitting control chars.
@@ -56,15 +73,60 @@ const decodeHexString = (hex) => {
   return out;
 };
 
+// Parse Adobe /ToUnicode CMaps to support Identity-H font extraction dependency-free.
+function parseCMap(str, cmaps = {}) {
+  if (!str || !str.includes('begincmap')) return cmaps;
+
+  // 1. Process beginbfrange ... endbfrange sections
+  const bfrangeSectionRe = /beginbfrange([\s\S]*?)endbfrange/g;
+  let bfm;
+  while ((bfm = bfrangeSectionRe.exec(str)) !== null) {
+    const section = bfm[1];
+    // Array format: <start> <end> [ <dest1> <dest2> ... ]
+    const arrRangeRe = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*\[([^\]]+)\]/g;
+    let arm;
+    while ((arm = arrRangeRe.exec(section)) !== null) {
+      const s = parseInt(arm[1], 16);
+      const items = arm[3].match(/<([0-9a-fA-F]+)>/g) || [];
+      items.forEach((item, idx) => {
+        const h = item.replace(/[<>]/g, '');
+        cmaps[s + idx] = String.fromCharCode(parseInt(h, 16));
+      });
+    }
+    // Consecutive range format: <start> <end> <destStart>
+    const rangeRe = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g;
+    let rm;
+    while ((rm = rangeRe.exec(section)) !== null) {
+      const s = parseInt(rm[1], 16);
+      const e = parseInt(rm[2], 16);
+      const d = parseInt(rm[3], 16);
+      for (let c = s; c <= e; c++) cmaps[c] = String.fromCharCode(d + (c - s));
+    }
+  }
+
+  // 2. Process beginbfchar ... endbfchar sections
+  const bfcharSectionRe = /beginbfchar([\s\S]*?)endbfchar/g;
+  let bfc;
+  while ((bfc = bfcharSectionRe.exec(str)) !== null) {
+    const section = bfc[1];
+    const charRe = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g;
+    let cm;
+    while ((cm = charRe.exec(section)) !== null) {
+      cmaps[parseInt(cm[1], 16)] = String.fromCharCode(parseInt(cm[2], 16));
+    }
+  }
+  return cmaps;
+}
+
 // Pull the text-showing operators out of one decoded content stream.
-function textFromContentStream(content) {
+function textFromContentStream(content, cmaps = {}) {
   const parts = [];
   // (literal) Tj / TJ / ' / "   and   <hex> Tj / TJ
   const re = /(?:\(((?:\\.|[^\\()])*)\)|<([0-9a-fA-F\s]*)>)\s*(Tj|TJ|'|")?/g;
   let m;
   while ((m = re.exec(content)) !== null) {
-    if (m[1] !== undefined) parts.push(decodePdfString(m[1]));
-    else if (m[2] !== undefined) parts.push(decodeHexString(m[2]));
+    if (m[1] !== undefined) parts.push(decodePdfString(m[1], cmaps));
+    else if (m[2] !== undefined) parts.push(decodeHexString(m[2], cmaps));
     if (parts.length > 40000) break;
   }
   // Line/paragraph operators are lost above; join with spaces so word boundaries survive.
@@ -96,9 +158,12 @@ function extractPdfText(buffer) {
     let out = '';
     let streams = 0;
     let totalInflated = 0;
+    const cmaps = {};
+    const contentStreams = [];
+
     const re = /stream\r?\n?/g;
     let m;
-    while ((m = re.exec(latin)) !== null && streams < MAX_STREAMS && out.length < MAX_TEXT_CHARS) {
+    while ((m = re.exec(latin)) !== null && streams < MAX_STREAMS) {
       // Wall-clock guard: a pathological file must not hold the request open.
       if (Date.now() - startedAt > MAX_ELAPSED_MS) return fail('extraction_time_limit_exceeded');
       const start = m.index + m[0].length;
@@ -107,7 +172,8 @@ function extractPdfText(buffer) {
       streams += 1;
       // The stream's dictionary sits just before the `stream` keyword.
       const dict = latin.slice(Math.max(0, m.index - 600), m.index);
-      if (/\/Image\b|\/DCTDecode|\/JPXDecode|\/CCITTFaxDecode/.test(dict)) continue;  // scanned page bitmap
+      // Skip scanned image bitmaps and binary font tables (glyf, loca, etc.)
+      if (/\/Image\b|\/DCTDecode|\/JPXDecode|\/CCITTFaxDecode|\/FontFile[23]?\b|\/Length1\b/.test(dict)) continue;
       const rawSlice = buffer.subarray(start, end);
       let content = null;
       if (/\/FlateDecode/.test(dict)) {
@@ -141,9 +207,19 @@ function extractPdfText(buffer) {
         content = rawSlice.toString('latin1');
       }
       if (!content) continue;
-      if (!/\bTj\b|\bTJ\b|\bBT\b/.test(content)) continue;   // not a text content stream
-      out += ' ' + textFromContentStream(content);
-      re.lastIndex = end;
+
+      if (content.includes('begincmap')) {
+        parseCMap(content, cmaps);
+      } else if (/\bTj\b|\bTJ\b|\bBT\b/.test(content)) {
+        contentStreams.push(content);
+      }
+      re.lastIndex = end + 9;
+    }
+
+    // Now decode content streams using parsed CMaps if available
+    for (const cStream of contentStreams) {
+      if (out.length >= MAX_TEXT_CHARS) break;
+      out += ' ' + textFromContentStream(cStream, cmaps);
     }
 
     const text = out.replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT_CHARS);
@@ -155,4 +231,4 @@ function extractPdfText(buffer) {
   }
 }
 
-module.exports = { extractPdfText, MAX_INPUT_BYTES };
+module.exports = { extractPdfText, parseCMap, isLegible, decodePdfString, decodeHexString, MAX_INPUT_BYTES };

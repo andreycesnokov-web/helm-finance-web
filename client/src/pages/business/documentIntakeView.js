@@ -27,11 +27,12 @@ export const uploadIntentOf = (d) => d?.extracted_json?.upload_intent || null;
 export const READ_SOURCE_LABEL = {
   embedded_text: 'Read from the document text',
   ocr_vision: 'Read by OCR/Vision',
+  ocr_nanonets: 'Read by Nanonets OCR',
   filename_only: 'Not read — file name only',
   manual: 'Set by a person',
 };
 export const readSourceLabel = (v2) => READ_SOURCE_LABEL[v2?.source] || null;
-export const wasReadByOcr = (v2) => v2?.source === 'ocr_vision';
+export const wasReadByOcr = (v2) => v2?.source === 'ocr_vision' || v2?.source === 'ocr_nanonets';
 
 /** Legacy intake (documentIntake.js). Still shown for vault classification; distinct thing. */
 export const legacyIntakeOf = (d) => d?.extracted_json?.ai_intake || null;
