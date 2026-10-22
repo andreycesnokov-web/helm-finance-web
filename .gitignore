@@ -28,3 +28,6 @@ server/data/*.json
 /reports/interactive-pnl-20261021/
 /reports/pnl-final-review-20261022/
 /reports/pnl-completion-20261022/
+/reports/unified-rc-20261022/
+/reports/payroll-preview/
+/reports/transaction-picker-preview/

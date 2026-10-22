@@ -6,10 +6,12 @@ const fs = require('fs');
 const path = require('path');
 
 const nanonetsOcr = require('../server/lib/nanonetsOcr');
-const PDF_PATH = 'C:/Users/HUAWEI/.gemini/antigravity/brain/396847ea-25f9-4094-a805-2ea7638707db/.user_uploaded/media_1792386125403_ad49c751.pdf';
+// Portable synthetic image-only input; provider output below is explicitly mocked.
+// Do not require or read the owner's original invoice for an offline RC gate.
+const PDF_PATH = path.join(__dirname, 'fixtures', 'synthetic_invoice_pure_image_scan.pdf');
 
 test('Nanonets Pipeline Integration: Image-only PDF intake mapping & review shape', async () => {
-  assert.ok(fs.existsSync(PDF_PATH), 'Ary\'s mikro.pdf must exist');
+  assert.ok(fs.existsSync(PDF_PATH), 'Committed synthetic image-only PDF must exist');
   const pdfBuf = fs.readFileSync(PDF_PATH);
 
   // Mock Nanonets response for Ary's mikro

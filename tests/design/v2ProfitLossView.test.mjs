@@ -64,6 +64,7 @@ test('existing AI note link preserves report currency and a strictly read-only m
 test('supported languages explicitly distinguish cash estimate and unsupported accrual',()=>{
  for(const lang of ['en','ru','id']){const c=copy(lang);assert.ok(c.cash);assert.ok(c.accrual);assert.ok(c.netNote);assert.ok(c.missing);assert.equal(c.cashHow.length,5)}
  assert.ok(copy('en').cashHow[0].includes('transaction date'));assert.ok(!copy('en').cashHow.join(' ').includes('when you invoice'))
+ assert.match(copy('ru').invalidReport,/Ответ/);assert.match(copy('ru').undated,/Записи/);assert.ok(!/\?{3,}/.test(copy('ru').invalidReport+copy('ru').undated))
 })
 test('all clickable waterfall totals equal the signed records inside their panel',()=>{
  const r=buildReport(fixture(),{businessId:B,month:'2026-08',compare:'2026-07'})

@@ -14,6 +14,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert');
+const { randomUUID } = require('node:crypto');
 
 const ORCH = require('../../server/lib/documentIntakeOrchestrator');
 const docExtract = require('../../server/lib/documentExtraction');
@@ -118,7 +119,11 @@ const body = (r) => JSON.parse(r.content[0].text);
 const writes = (s) => s.calls.filter((c) => c[0] === 'createPendingPayableDraft');
 async function call(services, name, args = {}) {
   const { client, close } = await connect(services);
-  try { return await client.callTool({ name, arguments: args }); } finally { await close(); }
+  // Reach the actual role/tenant gate with a valid write request. Dedicated
+  // submitInvoiceDraft tests still explicitly exercise omitted/invalid keys.
+  const finalArgs = name === 'submit_invoice_draft' && !Object.hasOwn(args, 'request_key')
+    ? { ...args, request_key: randomUUID() } : args;
+  try { return await client.callTool({ name, arguments: finalArgs }); } finally { await close(); }
 }
 const LIMITED_KEYS_ABSENT = ['package_readiness', 'counterparty', 'suggested_record', 'duplicate', 'tax', 'blockers', 'next_actions'];
 

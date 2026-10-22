@@ -11,15 +11,19 @@ test('bounded lookup validates bigint IDs and preserves exact strings',()=>{
  assert.deepEqual(read.decode(rows,'transactions','1'),[{id:'9007199254740993',amount_original:'0.000000000000000001',balance_version:'9'}]);
  assert.equal(read.select('transactions',null),'*');assert.equal(read.decode(rows,'transactions',null),rows);
 });
-async function harness(table,fn){
+async function harness(table,fn,paging=false){
  const logs=[],app=express(),id='9007199254740993';
  const supabase=createClient('https://synthetic.invalid','synthetic',{auth:{persistSession:false,autoRefreshToken:false},global:{fetch:async(url,init)=>{
   const u=new URL(url),name=u.pathname.split('/').at(-1);assert.equal(init.method,'GET');logs.push(u);
   let data=[];
-  if(name===table){assert.equal(u.searchParams.get('business_id'),'eq.'+B);assert.equal(u.searchParams.get('limit'),'1');
+  if(name===table&&paging){
+   assert.ok(u.searchParams.get('or').includes(B));
+   const before=Number((u.searchParams.get('id')||'').replace('lt.',''))||Infinity;
+   data=[3,2,1].filter(id=>id<before).slice(0,Number(u.searchParams.get('limit'))||3).map(id=>({id,business_id:B,amount_original:100+id}));
+  }else if(name===table){assert.equal(u.searchParams.get('business_id'),'eq.'+B);assert.equal(u.searchParams.get('limit'),'1');
    const own=u.searchParams.get('id')==='eq.'+id,employee=u.searchParams.get('created_by_user_id');
    if(own&&!employee)data=[{business_id:B,type:'payable',exact_id:id,exact_amount_original:'0.1',exact_amount:'1.1',exact_original_amount:'1.1',exact_paid_amount:'0.1',exact_balance_version:'2',exact_bill_version:'2'}];
-  }
+  }else if(name==='document_transaction_links'){assert.equal(u.searchParams.get('business_id'),'eq.'+B);data=[{id:'link1',transaction_id:2}];}
   return new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}});
  }}});
  const tag=`app.get('/api/${table}',`,start=index.indexOf(tag),end=index.indexOf('\n});',start)+5;assert.ok(start>0&&end>start);
@@ -36,5 +40,13 @@ for(const table of ['transactions','debts'])test(table+' actual route deep looku
  assert.deepEqual(await(await get('id=42')).json(),[]);
  const n=logs.length;assert.equal((await get('id='+id,{})).status,401);assert.equal((await get('id='+id,{authorization:'x','x-revoked':'1'})).status,403);assert.equal(logs.length,n);
  assert.equal((await get('id=bad')).status,400);assert.equal(logs.length,n);
+ if(table==='transactions')for(const q of ['id='+id+'&limit=2','id='+id+'&before_id=3','id='+id+'&limit=500&include_document_status=true']){const n=logs.length;assert.equal((await get(q)).status,400);assert.equal(logs.length,n);}
  const employee=await get('id='+id,{authorization:'x','x-role':'employee'});assert.equal(employee.status,table==='transactions'?403:200);if(table==='debts')assert.deepEqual(await employee.json(),[]);
 }));
+test('combined actual transaction GET preserves cursor pages, document status and legacy array',()=>harness('transactions',async({get,logs})=>{
+ const first=await get('limit=2&include_document_status=true');assert.equal(first.status,200);const rows=await first.json();assert.deepEqual(rows.map(r=>r.id),[3,2]);assert.ok(rows.every(r=>r.document_link_status_known===true));assert.equal(rows[1].document_link_count,1);
+ const second=await get('limit=2&before_id=2');assert.deepEqual((await second.json()).map(r=>r.id),[1]);
+ const old=await get('');assert.equal(old.status,200);assert.ok(Array.isArray(await old.json()));
+ for(const q of ['limit=501','limit=0','limit=2&before_id=bad']){const n=logs.length;assert.equal((await get(q)).status,400);assert.equal(logs.length,n);}
+ const pageQueries=logs.filter(u=>u.pathname.endsWith('/transactions'));assert.equal(pageQueries[0].searchParams.get('order'),'id.desc');assert.equal(pageQueries.at(-1).searchParams.get('order'),'created_at.desc');
+},true));
