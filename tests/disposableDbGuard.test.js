@@ -53,9 +53,16 @@ test('every integration test that writes into its DATABASE_URL database calls th
   const dir = path.join(__dirname, 'integration');
   const writers = ['postgresBankImportBatchDocumentLinking.test.js', 'postgresIndependentConnections.test.js',
     'postgresBankImportBatchHttpApi.test.js', 'postgresBankReconciliationFlow.test.js', '_prodSchemaDb.js'];
+  // A test may guard directly, or get its database only from the shared helper that guards before
+  // CREATE DATABASE (_prodSchemaDb.createProdSchemaDatabase, reached via _d4Harness.createD4Database).
+  const viaHelper = (s) => /\bcreateD4Database\(|\bcreateProdSchemaDatabase\(/.test(s) && !/new (?:pg\.)?Client\(\s*\{\s*connectionString:\s*process\.env\.DATABASE_URL/.test(s);
   for (const f of writers) {
     const s = fs.readFileSync(path.join(dir, f), 'utf8');
+    if (viaHelper(s)) continue;
     assert.match(s, /assertDisposableUrl\(/, f);
     assert.match(s, /assertDisposableDatabase\(/, f);
   }
+  const helper = fs.readFileSync(path.join(dir, '_prodSchemaDb.js'), 'utf8');
+  assert.ok(helper.indexOf('assertDisposableDatabase(') > 0 && helper.indexOf('assertDisposableDatabase(') < helper.indexOf('CREATE DATABASE'), 'helper guards before CREATE DATABASE');
+  assert.match(fs.readFileSync(path.join(dir, '_d4Harness.js'), 'utf8'), /return createProdSchemaDatabase\(/);
 });

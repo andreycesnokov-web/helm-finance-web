@@ -169,3 +169,12 @@ test('the vault uses authenticated encryption with the standard GCM parameters',
     assert.strictEqual(Buffer.from(s.encryption_tag, 'base64').length, 16);   // full 128-bit tag
   });
 });
+
+test('a truncated GCM tag is refused (full 128-bit tag only)', () => withKey(KEY_B64, () => {
+  const row = VAULT.encrypt(SECRET, CTX);
+  assert.strictEqual(VAULT.decrypt(row, CTX), SECRET);
+  for (const n of [4, 8, 12]) {
+    const short = { ...row, encryption_tag: Buffer.from(row.encryption_tag, 'base64').subarray(0, n).toString('base64') };
+    assert.throws(() => VAULT.decrypt(short, CTX), /credential_tag_invalid/);
+  }
+}));

@@ -129,9 +129,12 @@ function encrypt(plaintext, context) {
  */
 function decrypt(row, context) {
   const key = getKey();
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(row.encryption_iv, 'base64'));
+  // Full 128-bit tag only: without authTagLength Node accepts truncated tags (weaker forgery bound).
+  const tag = Buffer.from(row.encryption_tag, 'base64');
+  if (tag.length !== 16) throw new Error('credential_tag_invalid');
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(row.encryption_iv, 'base64'), { authTagLength: 16 });
   decipher.setAAD(buildAad(context));
-  decipher.setAuthTag(Buffer.from(row.encryption_tag, 'base64'));
+  decipher.setAuthTag(tag);
   return Buffer.concat([
     decipher.update(Buffer.from(row.encrypted_value, 'base64')),
     decipher.final(),
