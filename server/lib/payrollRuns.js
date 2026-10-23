@@ -2,6 +2,8 @@
 // Business-only accrual/reconciliation. This module never writes bank transactions.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MONEY=['salary','bonus','earnings','pph21','bpjs','other','employer_bpjs'];
+// Optional split of the `bpjs` total, as the accountant's sheet records it (BPJS Kesehatan, BPJS TK JP, BPJS TK JHT).
+const BPJS_PARTS=['bpjs_kes','bpjs_jp','bpjs_jht'];
 function payload(body={}) {
  const {request_key,...p}=body;
  if(!['create','edit','approve','cancel','link'].includes(p.action))throw Error('payroll_invalid_request');
@@ -20,9 +22,12 @@ function payload(body={}) {
   p.lines=p.lines.map(line=>{
    if(!line||!UUID.test(line.employee_id)||seen.has(line.employee_id.toLowerCase()))throw Error('payroll_duplicate_employee');
    seen.add(line.employee_id.toLowerCase());
-   if(Object.keys(line).some(k=>!['employee_id',...MONEY].includes(k)))throw Error('payroll_invalid_line');
+   if(Object.keys(line).some(k=>!['employee_id',...MONEY,...BPJS_PARTS].includes(k)))throw Error('payroll_invalid_line');
    const out={employee_id:line.employee_id.toLowerCase()};
-   for(const k of MONEY){const s=String(line[k]??'');if(!/^(0|[1-9]\d*)$/.test(s)||Number(s)>1e12)throw Error('payroll_invalid_amount');out[k]=s;}
+   const amount=k=>{const s=String(line[k]??'');if(!/^(0|[1-9]\d*)$/.test(s)||Number(s)>1e12)throw Error('payroll_invalid_amount');return s;};
+   for(const k of MONEY)out[k]=amount(k);
+   for(const k of BPJS_PARTS)if(k in line)out[k]=amount(k);
+   if(BPJS_PARTS.reduce((s,k)=>s+Number(out[k]||0),0)>Number(out.bpjs))throw Error('payroll_invalid_amount');
    if(Number(out.salary)+Number(out.bonus)+Number(out.earnings)<=Number(out.pph21)+Number(out.bpjs)+Number(out.other))throw Error('payroll_invalid_net');
    return out;
   });

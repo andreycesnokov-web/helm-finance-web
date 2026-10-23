@@ -1061,6 +1061,23 @@ export default {
   "approve": "Approve payroll — no transfer",
   "cancel": "Cancel unpaid run",
   "reload": "Close and reload saved runs",
+  "col": {
+    "salary": "Salary",
+    "bonus": "Additional pay",
+    "earnings": "Other earnings",
+    "gross": "Gross",
+    "pph21": "PPh 21",
+    "bpjs_kes": "BPJS Kesehatan",
+    "bpjs_jp": "BPJS TK JP",
+    "bpjs_jht": "BPJS TK JHT",
+    "bpjs": "BPJS (one sum)",
+    "other": "Other deductions",
+    "employer_bpjs": "Employer BPJS",
+    "net": "Take-home"
+  },
+  "more": "More columns: other earnings, deductions, employer BPJS",
+  "less": "Hide extra columns",
+  "sheetNote": "Columns follow the accountant's monthly payroll sheet. Enter PPh 21 and BPJS as the accountant calculated them: CFO AI does not calculate them. Take-home should equal Gaji bersih on the sheet.",
   "errors": {
   "stale": "The run changed. Reload and review it before saving.",
   "exists": "This employee already has payroll for this month. Open the saved run instead of creating another.",

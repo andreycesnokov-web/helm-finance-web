@@ -30,6 +30,8 @@ try{
   catch(e){console.log('Synthetic page text:',(await page.locator('body').innerText()).slice(-1800));await page.screenshot({path:path.join(dir,name+'-error.png')});throw e}
   await modal.getByLabel('PPh 21 · Employee One',{exact:true}).fill('0')
   await modal.getByLabel('PPh 21 · Employee Two',{exact:true}).fill('0')
+  // Employer BPJS is not on the accountant's sheet: it sits under More.
+  await modal.locator('[data-payrun-more]').click()
   await modal.getByLabel('Employer BPJS · Employee One',{exact:true}).fill('50000')
   assert.match(await modal.innerText(),/Rp 10,000,000/)
   const save=modal.getByRole('button',{name:'Save draft',exact:true});assert.equal(await save.isDisabled(),true)

@@ -8,6 +8,14 @@ test('request validation preserves explicit zero tax and blocks malformed dates 
  for(const key of ['salary','pph21','employer_bpjs'])for(const val of [-1,'1.2','NaN',null]){const b=body();b.lines[0][key]=val;assert.throws(()=>payload(b),/amount/)}
  assert.throws(()=>payload({...body(),tax_confirmed:false}),/confirmation/)
 });
+test('BPJS parts are optional, validated like every amount and may not exceed the BPJS total',()=>{
+ const b=body();Object.assign(b.lines[0],{bpjs:'320000',bpjs_kes:'80000',bpjs_jp:'80000',bpjs_jht:'160000'});
+ assert.deepEqual(payload(b).lines[0],{...b.lines[0],employee_id:b.lines[0].employee_id.toLowerCase()});
+ assert.equal('bpjs_kes' in payload(body()).lines[0],false);
+ const over=body();Object.assign(over.lines[0],{bpjs:'100000',bpjs_kes:'80000',bpjs_jp:'80000'});assert.throws(()=>payload(over),/amount/);
+ for(const val of [-1,'1.2','',null]){const x=body();x.lines[0].bpjs='100';x.lines[0].bpjs_jht=val;assert.throws(()=>payload(x),/amount/)}
+ const unknown=body();unknown.lines[0].bpjs_other='1';assert.throws(()=>payload(unknown),/invalid_line/);
+});
 test('duplicate employees, unknown fields, stale version shape and invalid action are refused',()=>{
  const b=body();b.lines.push({...b.lines[0]});assert.throws(()=>payload(b),/duplicate/);
  assert.throws(()=>payload({...body(),status:'paid'}),/invalid_request/);

@@ -1,0 +1,159 @@
+-- Payroll BPJS breakdown, as the accountant's monthly sheet records it. PREPARED ONLY; release approval required.
+-- Applies AFTER 20261022165230_payroll_runs_receipt_contract_compat.sql (never instead of it). Additive:
+-- replaces rpc_payroll_run_action only; no table, constraint, row, payment, receipt or balance is rewritten.
+--
+-- A line may carry BPJS Kesehatan / BPJS TK JP / BPJS TK JHT (bpjs_kes, bpjs_jp, bpjs_jht) next to the
+-- existing `bpjs`, which stays the employee's TOTAL BPJS deduction (net and the receipt contract are unchanged).
+-- The parts are optional and may not exceed the total; each part > 0 is stored as its own deduction item, and
+-- any remainder stays one `bpjs` item. BPJS Kesehatan and BPJS Ketenagakerjaan are separate payees, so
+-- the split must survive. Lines without parts behave exactly as before.
+-- Rollback: 20261024090000_payroll_bpjs_breakdown_down.sql (restores the compat function body).
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='60s';
+SELECT public.fn_ledger_writer_lock();
+DO $$ BEGIN
+ IF to_regclass('public.payroll_runs') IS NULL
+  OR to_regprocedure('public.rpc_payroll_run_action(uuid,bigint,text,jsonb)') IS NULL
+  OR to_regprocedure('public.fn_payroll_actor(uuid,bigint)') IS NULL
+  THEN RAISE EXCEPTION 'payroll_bpjs_breakdown_requires_payroll_runs'; END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.rpc_payroll_run_action(p_business uuid,p_actor bigint,p_request_key text,p_payload jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $$
+DECLARE role_name text; owner_id bigint; r public.payroll_runs; old_run jsonb;
+ prior public.financial_write_requests; answer jsonb; aid uuid; a text; line jsonb; k text; n numeric;
+ emp public.payroll_employees; w public.wallets; payment public.payroll_payments; tx public.transactions;
+ gross numeric; deductions numeric; net numeric; employer numeric; payment_id uuid; seen uuid[]:='{}';
+ day date; month text; v bigint; previous_row public.payroll_payments; parts numeric;
+BEGIN
+ PERFORM public.fn_ledger_writer_lock();
+ role_name:=public.fn_payroll_actor(p_business,p_actor);
+ SELECT owner_user_id INTO owner_id FROM public.businesses WHERE id=p_business;
+ IF p_request_key IS NULL OR length(p_request_key) NOT BETWEEN 1 AND 128 OR trim(p_request_key)<>p_request_key
+  OR jsonb_typeof(p_payload) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'payroll_invalid_request'; END IF;
+ a:=p_payload->>'action';
+ IF a IS NULL OR a NOT IN('create','edit','approve','cancel','link') THEN RAISE EXCEPTION 'payroll_invalid_request'; END IF;
+ SELECT * INTO prior FROM public.financial_write_requests WHERE business_id=p_business AND actor_user_id=p_actor
+  AND operation='payroll_run' AND request_key=p_request_key;
+ IF FOUND THEN
+  IF prior.intent IS DISTINCT FROM jsonb_build_object('version',1,'operation','payroll_run','scope','business','payload',p_payload)
+   THEN RAISE EXCEPTION 'idempotency_key_mismatch'; END IF;
+  RETURN prior.result||jsonb_build_object('is_replay',true,'result_is_historical',true);
+ END IF;
+ IF a<>'create' THEN
+  SELECT * INTO r FROM public.payroll_runs WHERE id=(p_payload->>'run_id')::uuid AND business_id=p_business FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'payroll_not_found'; END IF;
+  IF r.version IS DISTINCT FROM (p_payload->>'version')::bigint THEN RAISE EXCEPTION 'payroll_stale_review'; END IF;
+  old_run:=jsonb_build_object('run',to_jsonb(r),'payments',(SELECT coalesce(jsonb_agg(to_jsonb(p)||jsonb_build_object('items',
+   (SELECT coalesce(jsonb_agg(to_jsonb(i)),'[]') FROM public.payroll_payment_items i WHERE i.payroll_payment_id=p.id))),'[]')
+   FROM public.payroll_payments p WHERE p.run_id=r.id AND p.business_id=p_business));
+ END IF;
+ IF a IN('create','edit') THEN
+  IF a='edit' AND r.status<>'draft' THEN RAISE EXCEPTION 'payroll_draft_required'; END IF;
+  IF p_payload->>'tax_confirmed' IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'payroll_tax_confirmation_required'; END IF;
+  month:=p_payload->>'period_month';
+  IF month IS NULL OR month !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' OR p_payload->>'payment_date' IS NULL
+   OR p_payload->>'payment_date' !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN RAISE EXCEPTION 'payroll_invalid_period'; END IF;
+  day:=(p_payload->>'payment_date')::date;
+  SELECT * INTO w FROM public.wallets WHERE id=(p_payload->>'wallet_id')::uuid AND business_id=p_business
+   AND scope='business' AND currency='IDR' AND is_active FOR SHARE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'payroll_wallet_required'; END IF;
+  IF jsonb_typeof(p_payload->'lines') IS DISTINCT FROM 'array' OR jsonb_array_length(p_payload->'lines') NOT BETWEEN 1 AND 500
+   THEN RAISE EXCEPTION 'payroll_lines_required'; END IF;
+  IF a='create' THEN
+   INSERT INTO public.payroll_runs(business_id,period_month,payment_date,wallet_id,created_by_user_id)
+    VALUES(p_business,month,day,w.id,p_actor) RETURNING * INTO r;
+  ELSE
+   DELETE FROM public.payroll_payment_items WHERE payroll_payment_id IN(SELECT id FROM public.payroll_payments WHERE run_id=r.id AND business_id=p_business);
+   DELETE FROM public.payroll_payments WHERE run_id=r.id AND business_id=p_business AND transaction_id IS NULL AND status='draft';
+   IF EXISTS(SELECT 1 FROM public.payroll_payments WHERE run_id=r.id) THEN RAISE EXCEPTION 'payroll_draft_required'; END IF;
+   UPDATE public.payroll_runs SET period_month=month,payment_date=day,wallet_id=w.id WHERE id=r.id;
+  END IF;
+  FOR line IN SELECT value FROM jsonb_array_elements(p_payload->'lines') LOOP
+   IF jsonb_typeof(line) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'payroll_invalid_line'; END IF;
+   SELECT * INTO emp FROM public.payroll_employees WHERE id=(line->>'employee_id')::uuid AND business_id=p_business
+    AND status='active' AND currency='IDR' FOR SHARE;
+   IF NOT FOUND THEN RAISE EXCEPTION 'payroll_employee_required'; END IF;
+   IF emp.id=ANY(seen) THEN RAISE EXCEPTION 'payroll_duplicate_employee'; END IF;
+   seen:=array_append(seen,emp.id);
+   IF EXISTS(SELECT 1 FROM public.payroll_payments WHERE business_id=p_business AND employee_id=emp.id
+    AND period_month=month AND status<>'cancelled') THEN RAISE EXCEPTION 'payroll_employee_period_exists'; END IF;
+   FOREACH k IN ARRAY ARRAY['salary','bonus','earnings','pph21','bpjs','other','employer_bpjs','bpjs_kes','bpjs_jp','bpjs_jht'] LOOP
+    -- The BPJS parts are optional; every other amount stays required.
+    CONTINUE WHEN k IN('bpjs_kes','bpjs_jp','bpjs_jht') AND NOT line ? k;
+    IF line->>k IS NULL OR line->>k !~ '^[0-9]+$' OR length(line->>k)>13 THEN RAISE EXCEPTION 'payroll_invalid_amount'; END IF;
+    n:=(line->>k)::numeric;
+    IF n>1000000000000 THEN RAISE EXCEPTION 'payroll_invalid_amount'; END IF;
+   END LOOP;
+   parts:=coalesce((line->>'bpjs_kes')::numeric,0)+coalesce((line->>'bpjs_jp')::numeric,0)+coalesce((line->>'bpjs_jht')::numeric,0);
+   IF parts>(line->>'bpjs')::numeric THEN RAISE EXCEPTION 'payroll_invalid_amount'; END IF;
+   gross:=(line->>'salary')::numeric+(line->>'bonus')::numeric+(line->>'earnings')::numeric;
+   deductions:=(line->>'pph21')::numeric+(line->>'bpjs')::numeric+(line->>'other')::numeric;
+   net:=gross-deductions; employer:=(line->>'employer_bpjs')::numeric;
+   IF net<=0 THEN RAISE EXCEPTION 'payroll_invalid_net'; END IF;
+   INSERT INTO public.payroll_payments(business_id,user_id,created_by_user_id,employee_id,employee_name,amount,currency,
+    period_month,payment_date,wallet_id,status,gross_amount,deduction_amount,net_amount,run_id,employer_bpjs,tax_source)
+   VALUES(p_business,owner_id,p_actor,emp.id,emp.name,net,'IDR',month,day,w.id,'draft',gross,deductions,net,r.id,employer,'accountant_entered') RETURNING id INTO payment_id;
+   FOREACH k IN ARRAY ARRAY['salary','bonus','earnings','pph21','bpjs_kes','bpjs_jp','bpjs_jht','bpjs','other'] LOOP
+    -- `bpjs` keeps only what the parts do not explain, so the items still add up to the total deduction.
+    n:=CASE WHEN k='bpjs' THEN (line->>'bpjs')::numeric-parts ELSE coalesce((line->>k)::numeric,0) END;
+    -- Preserve an explicit zero PPh21 so tax-not-entered cannot be confused with zero.
+    IF n>0 OR k='pph21' THEN
+     INSERT INTO public.payroll_payment_items(business_id,user_id,payroll_payment_id,item_type,label,amount,direction)
+      VALUES(p_business,owner_id,payment_id,k,k,n,CASE WHEN k IN('salary','bonus','earnings') THEN 'addition' ELSE 'deduction' END);
+    END IF;
+   END LOOP;
+  END LOOP;
+ ELSIF a='approve' THEN
+  IF r.status<>'draft' THEN RAISE EXCEPTION 'payroll_draft_required'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.wallets WHERE id=r.wallet_id AND business_id=p_business AND scope='business' AND is_active AND currency=r.currency)
+   THEN RAISE EXCEPTION 'payroll_wallet_required'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.payroll_payments WHERE run_id=r.id AND business_id=p_business AND status='draft')
+   OR EXISTS(SELECT 1 FROM public.payroll_payments p JOIN public.payroll_employees e ON e.id=p.employee_id
+    WHERE p.run_id=r.id AND (e.status<>'active' OR e.business_id IS DISTINCT FROM p_business)) THEN RAISE EXCEPTION 'payroll_employee_required'; END IF;
+  UPDATE public.payroll_runs SET status='scheduled',approved_at=now(),approved_by_user_id=p_actor WHERE id=r.id;
+  UPDATE public.payroll_payments SET status='scheduled',updated_at=now() WHERE run_id=r.id AND business_id=p_business;
+ ELSIF a='cancel' THEN
+  IF r.status NOT IN('draft','scheduled') OR EXISTS(SELECT 1 FROM public.payroll_payments WHERE run_id=r.id AND (status='paid' OR transaction_id IS NOT NULL))
+   THEN RAISE EXCEPTION 'payroll_paid_history_locked'; END IF;
+  UPDATE public.payroll_runs SET status='cancelled' WHERE id=r.id;
+  UPDATE public.payroll_payments SET status='cancelled',updated_at=now() WHERE run_id=r.id AND business_id=p_business;
+ ELSIF a='link' THEN
+  IF r.status<>'scheduled' OR r.approved_at IS NULL THEN RAISE EXCEPTION 'payroll_approval_required'; END IF;
+  SELECT * INTO payment FROM public.payroll_payments WHERE id=(p_payload->>'payment_id')::uuid AND run_id=r.id AND business_id=p_business FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'payroll_not_found'; END IF;
+  IF payment.status<>'scheduled' OR payment.transaction_id IS NOT NULL THEN RAISE EXCEPTION 'payroll_already_linked'; END IF;
+  SELECT * INTO tx FROM public.transactions WHERE id=(p_payload->>'transaction_id')::bigint AND business_id=p_business FOR SHARE;
+  IF NOT FOUND OR tx.type NOT IN('expense','payroll') OR tx.scope IS DISTINCT FROM 'business'
+   OR tx.wallet_id IS DISTINCT FROM payment.wallet_id OR tx.currency_original IS DISTINCT FROM payment.currency
+   OR tx.amount_original IS DISTINCT FROM payment.net_amount OR tx.transfer_id IS NOT NULL
+   OR tx.is_debt_payment OR tx.debt_payment_id IS NOT NULL THEN RAISE EXCEPTION 'payroll_transaction_mismatch'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.bank_import_rows br WHERE br.business_id=p_business
+   AND br.review_status IN('imported','matched_existing') AND (br.linked_transaction_id=tx.id OR br.matched_transaction_id=tx.id))
+   THEN RAISE EXCEPTION 'payroll_bank_evidence_required'; END IF;
+  IF EXISTS(SELECT 1 FROM public.payroll_payments WHERE transaction_id=tx.id)
+   OR EXISTS(SELECT 1 FROM public.debt_settlement_allocations WHERE transaction_id=tx.id)
+   THEN RAISE EXCEPTION 'payroll_transaction_already_allocated'; END IF;
+  UPDATE public.payroll_payments SET transaction_id=tx.id,status='paid',payment_date=tx.transaction_date,updated_at=now() WHERE id=payment.id;
+  IF NOT EXISTS(SELECT 1 FROM public.payroll_payments WHERE run_id=r.id AND status<>'paid') THEN
+   UPDATE public.payroll_runs SET status='paid' WHERE id=r.id;
+  END IF;
+ END IF;
+ IF a<>'create' THEN UPDATE public.payroll_runs SET version=version+1,updated_at=now() WHERE id=r.id; END IF;
+ SELECT * INTO r FROM public.payroll_runs WHERE id=r.id;
+ INSERT INTO public.audit_events(business_id,actor_user_id,actor_role,channel,entity_type,entity_id,action,before_json,after_json,request_id)
+ VALUES(p_business,p_actor,role_name,'web','payroll_run',r.id::text,'payroll_'||a,old_run,
+  jsonb_build_object('run',to_jsonb(r),'payment_id',payment.id,'transaction_id',CASE WHEN a='link' THEN tx.id END,
+   'payments',(SELECT coalesce(jsonb_agg(to_jsonb(p)||jsonb_build_object('items',
+    (SELECT coalesce(jsonb_agg(to_jsonb(i)),'[]') FROM public.payroll_payment_items i WHERE i.payroll_payment_id=p.id))),'[]')
+    FROM public.payroll_payments p WHERE p.run_id=r.id AND p.business_id=p_business)),p_request_key) RETURNING id INTO aid;
+ answer:=jsonb_build_object('ok',true,'run',to_jsonb(r),'audit_id',aid,'cash_changed',false);
+ INSERT INTO public.financial_write_requests(business_id,actor_user_id,operation,request_key,intent,result)
+ VALUES(p_business,p_actor,'payroll_run',p_request_key,jsonb_build_object('version',1,'operation','payroll_run','scope','business','payload',p_payload),answer);
+ RETURN answer;
+END $$;
+REVOKE ALL ON FUNCTION public.rpc_payroll_run_action(uuid,bigint,text,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_payroll_run_action(uuid,bigint,text,jsonb) TO service_role;
+NOTIFY pgrst,'reload schema';
+COMMIT;

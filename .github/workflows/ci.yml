@@ -98,3 +98,8 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
           CFO_PAYROLL_COMPAT_TEST: 'true'
         run: node --test tests/integration/postgresPayrollRunRaces.test.js
+
+      - name: Verify Payroll BPJS breakdown and its rollback on native PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresPayrollBpjsBreakdown.test.js

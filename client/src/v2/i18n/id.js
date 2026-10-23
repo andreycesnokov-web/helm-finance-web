@@ -1061,6 +1061,23 @@ export default {
   "approve": "Setujui — tanpa transfer",
   "cancel": "Batalkan penggajian belum dibayar",
   "reload": "Tutup dan muat ulang penggajian tersimpan",
+  "col": {
+    "salary": "Gaji per bulan",
+    "bonus": "Gaji tambahan",
+    "earnings": "Pendapatan lain",
+    "gross": "Gaji bulan ini",
+    "pph21": "PPh 21",
+    "bpjs_kes": "BPJS Kesehatan",
+    "bpjs_jp": "BPJS TK JP",
+    "bpjs_jht": "BPJS TK JHT",
+    "bpjs": "BPJS (satu jumlah)",
+    "other": "Potongan lain",
+    "employer_bpjs": "BPJS perusahaan",
+    "net": "Gaji bersih"
+  },
+  "more": "Kolom lain: pendapatan lain, potongan, BPJS perusahaan",
+  "less": "Sembunyikan kolom tambahan",
+  "sheetNote": "Kolom mengikuti daftar gaji bulanan dari akuntan. Isi PPh 21 dan BPJS sesuai hitungan akuntan: CFO AI tidak menghitungnya. Gaji bersih harus sama dengan daftar gaji.",
   "errors": {
   "stale": "Penggajian berubah. Muat ulang dan periksa sebelum menyimpan.",
   "exists": "Karyawan ini sudah memiliki penggajian bulan tersebut. Buka penggajian tersimpan.",

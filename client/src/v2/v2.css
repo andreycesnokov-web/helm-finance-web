@@ -1675,7 +1675,15 @@ button.v2-start-btn:focus-visible { outline: 2px solid var(--action-primary); ou
 .v2-modal.is-wide:has(.v2-payd-table) { max-width: 1000px; }
 .v2-payd-row > .v2-num { white-space: nowrap; }
 .v2-payd-paid { margin-left: var(--space-2); }
-.v2-payrun-table .v2-payd-row { grid-template-columns: minmax(140px,1.6fr) repeat(7,minmax(90px,1fr)) minmax(120px,1.2fr); min-width: 1060px; }
+.v2-payrun-table .v2-payd-row { grid-template-columns: var(--payrun-grid); min-width: var(--payrun-min); }
+.v2-payrun-computed, .v2-payrun-net { white-space: nowrap; }
+.v2-payrun-table .v2-payd-row.is-head > span { line-height: 1.25; }
+.v2-payrun-computed { padding-inline: var(--space-2); color: var(--text-muted); }
+.v2-payrun-tools { display:flex; justify-content:flex-end; }
+/* Like the accountant's sheet: column names and the total stay in view while the people scroll. */
+.v2-payrun-table .v2-payd-row.is-head, .v2-payrun-table .v2-payd-row.is-total { position:sticky; z-index:1; background:var(--surface-card); }
+.v2-payrun-table .v2-payd-row.is-head { top:0; padding-block:var(--space-2); box-shadow:0 1px 0 var(--border-subtle); }
+.v2-payrun-table .v2-payd-row.is-total { bottom:0; padding-bottom:var(--space-2); }
 .v2-modal.is-wide:has(.v2-payrun-table) { max-width:1200px; }
 .v2-payrun-cell { min-width:0; }
 .v2-payrun-mobile-label { display:none; }
@@ -1690,7 +1698,9 @@ body:has(.v2-payrun-table, .v2-payrun-lines) [data-financial-recovery] > button 
  .v2-payrun-table { overflow:visible; flex-shrink:0; }
  .v2-payrun-table .v2-payd-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr); min-width:0; padding:var(--space-4); border:1px solid var(--border-subtle); border-radius:12px; gap:var(--space-3); }
  .v2-payrun-table .v2-payd-row.is-head { display:none; }
- .v2-payrun-table .v2-pe-sug-row, .v2-payrun-net { grid-column:1/-1; }
+ .v2-payrun-table .v2-pe-sug-row, .v2-payrun-net, .v2-payrun-table .is-total > [role=rowheader] { grid-column:1/-1; }
+ .v2-payrun-table .v2-payrun-computed { padding-inline:0; }
+ .v2-payrun-table .v2-payd-row.is-total { position:static; }
  .v2-payrun-mobile-label { display:block; font-family:var(--font-sans); font-size:12px; color:var(--text-muted); margin-bottom:var(--space-1); white-space:normal; }
 }
 
