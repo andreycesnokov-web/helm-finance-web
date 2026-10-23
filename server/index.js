@@ -2437,9 +2437,9 @@ app.post('/api/telegram/debts/attach-receipt', async (req, res) => {
     const ownerId = debt.user_id;
     const name = debt.created_by_name || String(telegram_id);
     const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
-    const lines = attachments.map((a, i) => `${i + 1}. ${a.amount ? Number(a.amount).toLocaleString('en-US') + ' ' + ccy : '— не распознано'}${a.counterparty ? ' · ' + a.counterparty : ''}`).join('\n');
+    const lines = attachments.map((a, i) => `${i + 1}. ${a.amount ? Number(a.amount).toLocaleString('en-US') + ' ' + ccy : '— не распознано'}${a.counterparty ? ' · ' + tgEsc(a.counterparty) : ''}`).join('\n');
     notifyBusinessAdminsViaTelegram(ownerId,
-      `📎 Чек получен (${attachments.length}/${MAX_RECEIPTS}) по заявке\n\nОт: ${name}\n${lines}\n\nИтого по чекам: <b>${receiptsTotal.toLocaleString('en-US')} ${ccy}</b>`,
+      `📎 Чек получен (${attachments.length}/${MAX_RECEIPTS}) по заявке\n\nОт: ${tgEsc(name)}\n${lines}\n\nИтого по чекам: <b>${receiptsTotal.toLocaleString('en-US')} ${ccy}</b>`,
       [[{ text: '🌐 Открыть заявку', url: `${webAppUrl}/${debt.type === 'receivable' ? 'receivables' : 'payables'}` }]],
       // The debt's own business, never the notifier's. A legacy row with a null business_id
       // resolves to no recipients rather than to a guess.
@@ -2539,8 +2539,8 @@ app.post('/api/telegram/debts/from-receipt', async (req, res) => {
     const webAppUrl = process.env.WEB_APP_URL || 'https://helm-finance-web-production.up.railway.app';
     if (!m.isPrivileged) {
       const text = isReimbursement
-        ? `🧾 <b>Компенсация расхода (из Telegram)</b>\n\nВернуть: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Оплачено с личных средств · ⏳ ожидает подтверждения`
-        : `📤 <b>Счёт на оплату (из Telegram)</b>\n\nПоставщик: ${data.counterparty}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${ccy}</b>\nСрок: ${data.due_date || '—'}\nСоздал: ${m.submitterUser.name} · ${m.role}\n📎 Распознано со счёта · ⏳ ожидает подтверждения`;
+        ? `🧾 <b>Компенсация расхода (из Telegram)</b>\n\nВернуть: ${tgEsc(data.counterparty)}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${tgEsc(ccy)}</b>\nСоздал: ${tgEsc(m.submitterUser.name)} · ${tgEsc(m.role)}\n📎 Оплачено с личных средств · ⏳ ожидает подтверждения`
+        : `📤 <b>Счёт на оплату (из Telegram)</b>\n\nПоставщик: ${tgEsc(data.counterparty)}\nСумма: <b>${amountNum.toLocaleString('en-US')} ${tgEsc(ccy)}</b>\nСрок: ${tgEsc(data.due_date || '—')}\nСоздал: ${tgEsc(m.submitterUser.name)} · ${tgEsc(m.role)}\n📎 Распознано со счёта · ⏳ ожидает подтверждения`;
       notifyBusinessAdminsViaTelegram(m.ownerId, text, [
         [ { text: '📊 View impact', callback_data: `debt_impact:${data.id}` } ],
         [ { text: '✅ Approve', callback_data: `debt_approve:${data.id}` }, { text: '❌ Reject', callback_data: `debt_reject:${data.id}` } ],
@@ -2587,7 +2587,12 @@ app.get('/api/debts/:id/receipt', async (req, res) => {
     const filePath = meta?.result?.file_path;
     if (!filePath) return res.status(404).json({ error: 'File not found' });
     const fileResp = await fetch(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
-    res.set('Content-Type', fileResp.headers.get('content-type') || 'image/jpeg');
+    // Served from the app origin: only images/PDF render inline; anything else is a download, never a page.
+    const upstreamType = String(fileResp.headers.get('content-type') || 'image/jpeg').split(';')[0].trim().toLowerCase();
+    const inline = /^image\/(jpeg|png|webp|gif)$/.test(upstreamType) || upstreamType === 'application/pdf';
+    res.set('Content-Type', inline ? upstreamType : 'application/octet-stream');
+    res.set('Content-Disposition', inline ? 'inline' : 'attachment');
+    res.set('X-Content-Type-Options', 'nosniff');
     res.set('Cache-Control', 'private, max-age=300');
     const buf = Buffer.from(await fileResp.arrayBuffer());
     res.send(buf);
@@ -3743,7 +3748,7 @@ app.post('/api/accountant/telegram/test', auth, async (req, res) => {
     if (!TAX_TG_TEMPLATES[tpl]) return res.status(400).json({ error: `Unknown template. One of: ${Object.keys(TAX_TG_TEMPLATES).join(', ')}` });
     const language = normalizeLanguage(await getUserLanguage(req.user.userId));
     const fn = TAX_TG_TEMPLATES[tpl][language] || TAX_TG_TEMPLATES[tpl].en;
-    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(req.body?.detail || ''), taxTgButtons(language),
+    const r = await notifyBusinessAdminsViaTelegram(biz.ownerUserId, fn(tgEsc(req.body?.detail || '')), taxTgButtons(language),
       { category: 'tax_compliance', businessId: biz.business?.id || null });
     res.json({ ok: true, sent: r.sent ?? 0, template: tpl });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -14123,6 +14128,7 @@ const taxDeadlines = require('./lib/taxDeadlines');
 const { normalizePkpStatus } = require('./lib/pkpStatus');
 const defaultCategories = require('./lib/defaultCategories');
 const docProviderPolicy = require('./lib/documentProviderPolicy');
+const { tgEsc } = require('./lib/telegramText');
 const statementParsers = require('./lib/statementParsers');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
