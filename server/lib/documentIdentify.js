@@ -13,6 +13,7 @@
 // FAIL-OPEN: no key, a timeout, a refusal or unparseable output return { ok: false, reason }
 // and the caller still shows the classifier's verdict.
 'use strict';
+const { paidDocumentAIEnabled } = require('./documentProviderPolicy');
 
 const MODEL = 'claude-sonnet-4-5';
 const TIMEOUT_MS = 40000;
@@ -130,6 +131,7 @@ function fileBlock(buffer, mime_type, file_name) {
 }
 
 async function explainDocument({ client, text, verdict, types, lang = 'en', file_name = '', company_name = '', buffer = null, mime_type = '' }) {
+  if (!paidDocumentAIEnabled()) return { ok: false, reason: 'paid_document_ai_disabled' }
   if (!client || typeof client?.messages?.create !== 'function' || !process.env.ANTHROPIC_API_KEY) return { ok: false, reason: 'ai_unavailable' }
   const hasText = !!String(text || '').trim()
   const block = hasText ? null : fileBlock(buffer, mime_type, file_name)

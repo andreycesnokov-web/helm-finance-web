@@ -57,6 +57,8 @@ const ANSWER = {
 
   console.log('\nidentify — the model explains, in the user language');
   process.env.ANTHROPIC_API_KEY = 'test-key';
+  // The model path is the operator opt-in (documentProviderPolicy); OCR-OFF is tested in documentProviderPolicy.test.js.
+  process.env.DOCUMENT_OCR_VISION_ENABLED = 'true';
   await t('text document: one call, Russian requested, answer normalised', async () => {
     calls.length = 0;
     const r = await ID.explainDocument({ client: stub(ANSWER), text: AHU, verdict: { doc_type: 'sk_kemenkumham', confidence: 'medium' }, types: TYPES, lang: 'ru', file_name: 'x.pdf' });

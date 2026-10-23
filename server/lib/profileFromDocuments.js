@@ -13,6 +13,7 @@
 //
 // FAIL-OPEN: no key, a timeout or unparseable output → that document contributes nothing.
 'use strict';
+const { paidDocumentAIEnabled } = require('./documentProviderPolicy');
 
 const MODEL = 'claude-sonnet-4-5';
 const TIMEOUT_MS = 45000;
@@ -100,6 +101,7 @@ function normalize(raw, { text = '' } = {}) {
 }
 
 async function readDocument({ client, text, buffer, mime_type, file_name, docType }) {
+  if (!paidDocumentAIEnabled()) return { ok: false, reason: 'paid_document_ai_disabled' }
   if (!client || typeof client?.messages?.create !== 'function' || !process.env.ANTHROPIC_API_KEY) return { ok: false, reason: 'ai_unavailable' }
   const block = text ? null : fileBlock(buffer, mime_type, file_name)
   if (!text && !block) return { ok: false, reason: 'unreadable' }

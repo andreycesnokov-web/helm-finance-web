@@ -2359,7 +2359,8 @@ async function fetchTelegramFile(fileId) {
 // Recognize amount + counterparty from a receipt image/PDF via Claude vision.
 // Returns { amount, counterparty, currency, date } or null on failure.
 async function recognizeReceipt(file) {
-  if (!process.env.ANTHROPIC_API_KEY || !file) return null;
+  // Paid reading of a receipt photo/PDF follows the document-AI switch (OCR-OFF = no provider call).
+  if (!process.env.ANTHROPIC_API_KEY || !file || !docProviderPolicy.paidDocumentAIEnabled()) return null;
   try {
     const isPdf = /pdf/i.test(file.mime);
     const block = isPdf
@@ -6306,7 +6307,7 @@ app.post('/api/bank-import/read', auth, async (req, res) => {
     else if (typeof req.body?.sheet_text === 'string') text = req.body.sheet_text.slice(0, 500000);   // the browser's CSV of the first sheet
     let parsed = text ? statementParsers.parseStatement({ text, file_name: name }) : { ok: false, reason: 'no_text' };
     let method = parsed.ok ? parsed.format : null;
-    if (!parsed.ok && anthropic && process.env.ANTHROPIC_API_KEY && (!isSheet || text)) {
+    if (!parsed.ok && anthropic && process.env.ANTHROPIC_API_KEY && docProviderPolicy.paidDocumentAIEnabled() && (!isSheet || text)) {
       // A format no engine knows (or a scan): the model reads it; the engine still checks it.
       const block = text ? null : docIdentify.fileBlock(buf, file.mime_type, name);
       if (text || block) {
@@ -14121,6 +14122,7 @@ const profileDocs = require('./lib/profileFromDocuments');
 const taxDeadlines = require('./lib/taxDeadlines');
 const { normalizePkpStatus } = require('./lib/pkpStatus');
 const defaultCategories = require('./lib/defaultCategories');
+const docProviderPolicy = require('./lib/documentProviderPolicy');
 const statementParsers = require('./lib/statementParsers');
 const { extractPdfText } = require('./lib/pdfText');
 const docExtract = require('./lib/documentExtraction');
