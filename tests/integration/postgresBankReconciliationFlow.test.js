@@ -62,8 +62,6 @@ describe('Real PostgreSQL: bank reconciliation and transaction linking HTTP flow
     wallet = await seed.wallet(biz, OWNER, { opening: 45000000, date: '2026-08-31', createdAt: '2026-08-31T00:00:00Z' });
     otherWallet = await seed.wallet(otherBiz, OTHER, { opening: 10000000, date: '2026-08-31' });
     wrongWallet = await seed.wallet(biz, OWNER, { opening: 10000000, date: '2026-08-31', name: 'Other account' });
-    // Account used only for refusal; exclude from active-bank readiness checks.
-    await admin.query('UPDATE public.wallets SET is_active=false WHERE id=$1', [wrongWallet.id]);
     const file = crypto.randomUUID(); doc = crypto.randomUUID();
     await admin.query(`INSERT INTO public.document_files(id,business_id,storage_path,file_name,sha256_hash)
       VALUES($1,$2,$3,'synthetic-bca-sept.csv',$4)`, [file, biz, `${biz}/${file}`, 'a'.repeat(64)]);
@@ -81,6 +79,8 @@ describe('Real PostgreSQL: bank reconciliation and transaction linking HTTP flow
     expense = await seed.manual(biz, OWNER, wallet.id, '2026-09-20', -3000000, rows[2].description);
     foreignTx = await seed.manual(otherBiz, OTHER, otherWallet.id, '2026-09-20', -3000000);
     wrongWalletTx = await seed.manual(biz, OWNER, wrongWallet.id, '2026-09-20', -3000000);
+    // Seed valid existing history before archiving the refusal-only account.
+    await admin.query('UPDATE public.wallets SET is_active=false WHERE id=$1', [wrongWallet.id]);
     app = await H.startServer(db.connectionString);
     ({ closeReadiness, packageExportData } = await import('../../client/src/v2/lib/accounting.js'));
   });

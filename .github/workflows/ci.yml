@@ -92,3 +92,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
         run: node --test tests/integration/postgresBankReconciliationFlow.test.js
+
+      - name: Verify alternative Payroll D4 receipt contract on native PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+          CFO_PAYROLL_COMPAT_TEST: 'true'
+        run: node --test tests/integration/postgresPayrollRunRaces.test.js

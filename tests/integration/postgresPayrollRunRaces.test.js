@@ -7,13 +7,22 @@ const fs=require('node:fs'),path=require('node:path');
 const {createProdSchemaDatabase}=require('./_prodSchemaDb');
 const {assertDisposableUrl}=require('./_disposableDbGuard');
 let db,a,b,o;const root=path.resolve(__dirname,'../..');let uid=99500;
+// Reuse these independent-connection tests for the alternative D4 contract.
+// The environment switch selects only these two committed migration paths.
+const compatibility=process.env.CFO_PAYROLL_COMPAT_TEST==='true';
 before(async()=>{
  assert.ok(process.env.DATABASE_URL,'Set the confirmed disposable local DATABASE_URL explicitly');
  assertDisposableUrl(process.env.DATABASE_URL,{adminOnly:true});
- db=await createProdSchemaDatabase('hf_payroll_races',require('./_d4Harness').CHAIN);
+ const H=require('./_d4Harness');
+ db=await createProdSchemaDatabase('hf_payroll_races',compatibility?[...H.CHAIN,H.D4]:H.CHAIN);
  if(!db)throw Error('Native PostgreSQL unavailable; no concurrency proof');
  for(const name of ['a','b','o']){const c=new Client({connectionString:db.connectionString,connectionTimeoutMillis:3000});await c.connect();await c.query("SET statement_timeout='8s';SET lock_timeout='6s'");if(name==='a')a=c;if(name==='b')b=c;if(name==='o')o=c;}
- await a.query(fs.readFileSync(path.join(root,'migrations/20261020163121_payroll_runs_no_cash.sql'),'utf8'));
+ if(compatibility){
+  await assert.rejects(a.query(fs.readFileSync(path.join(root,'migrations/20261020163121_payroll_runs_no_cash.sql'),'utf8')),/payroll_receipt_contract_review_required/);
+  await a.query('ROLLBACK');
+  assert.equal((await a.query("SELECT to_regclass('public.payroll_runs')::text r")).rows[0].r,null);
+ }
+ await a.query(fs.readFileSync(path.join(root,compatibility?'supabase/migrations/20261022165230_payroll_runs_receipt_contract_compat.sql':'migrations/20261020163121_payroll_runs_no_cash.sql'),'utf8'));
 });
 after(async()=>{for(const c of[a,b,o]){await c?.query('ROLLBACK').catch(()=>{});await c?.end()}if(db)await db.drop()});
 async function fixture(){const f={biz:randomUUID(),wallet:randomUUID(),employee:randomUUID(),actor:++uid};
@@ -44,3 +53,34 @@ test('membership removal participates in the retained writer order and blocks a 
  await assert.rejects(act(b,f,randomUUID(),{action:'cancel',run_id:run.id,version:2}),/payroll_forbidden/);
  assert.equal((await count(f)).transactions,0);
 });
+
+if(compatibility){
+ test('D4 compatibility preserves reanchor receipts, scopes replay by actor and rejects changed payload',async()=>{
+  const f=await fixture(),other=await fixture(),key=randomUUID();await act(a,f,key);
+  await a.query("INSERT INTO financial_write_requests(business_id,actor_user_id,operation,request_key,intent,result) VALUES($1,$2,'wallet_reanchor','existing-reanchor','{}','{}')",[f.biz,f.actor]);
+  const read=async(actor)=> (await a.query('SELECT rpc_list_own_financial_receipts($1,$2) r',[f.biz,actor])).rows[0].r;
+  const receipts=await read(f.actor);assert.equal(receipts.rows.length,2);
+  assert.ok(receipts.rows.some(x=>x.operation==='wallet_reanchor'));
+  assert.ok(receipts.rows.some(x=>x.operation==='payroll_run'&&x.request_key===key));
+  await assert.rejects(read(other.actor),/business_write_forbidden/);
+  await assert.rejects(act(a,f,key,{...f.body,payment_date:'2026-08-26'}),/idempotency_key_mismatch/);
+  assert.deepEqual(await count(f),{runs:1,receipts:2,audits:1,transactions:0});
+ });
+ test('native grants/RLS deny anonymous and authenticated direct access; RPC remains invoker',async()=>{
+  const r=(await a.query("SELECT relrowsecurity,has_table_privilege('anon',oid,'SELECT') anon,has_table_privilege('authenticated',oid,'SELECT') authenticated FROM pg_class WHERE oid='public.payroll_runs'::regclass")).rows[0];
+  assert.equal(r.relrowsecurity,true);assert.equal(r.anon,false);assert.equal(r.authenticated,false);
+  for(const role of['anon','authenticated']){await a.query('SET ROLE '+role);try{await assert.rejects(a.query('SELECT * FROM public.payroll_runs'),/permission denied|row-level security/)}finally{await a.query('RESET ROLE')}}
+  for(const fn of['rpc_payroll_run_action(uuid,bigint,text,jsonb)','rpc_list_own_financial_receipts(uuid,bigint,text,timestamptz,text,text)']){
+   const p=(await a.query("SELECT prosecdef,has_function_privilege('anon',oid,'EXECUTE') anon,has_function_privilege('authenticated',oid,'EXECUTE') authenticated,has_function_privilege('service_role',oid,'EXECUTE') service FROM pg_proc WHERE oid=$1::regprocedure",[fn])).rows[0];
+   assert.equal(p.prosecdef,false);assert.equal(p.anon,false);assert.equal(p.authenticated,false);assert.equal(p.service,true);
+  }
+ });
+ test('audit failure rolls back run, payment items and receipt with zero cash',async()=>{
+  const f=await fixture();
+  await a.query("CREATE FUNCTION public.ci_fail_payroll_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic_audit_failure'; END $$;CREATE TRIGGER ci_fail_payroll_audit BEFORE INSERT ON public.audit_events FOR EACH ROW EXECUTE FUNCTION public.ci_fail_payroll_audit()");
+  try{await assert.rejects(act(a,f,randomUUID()),/synthetic_audit_failure/)}finally{await a.query('DROP TRIGGER ci_fail_payroll_audit ON public.audit_events;DROP FUNCTION public.ci_fail_payroll_audit()')}
+  assert.deepEqual(await count(f),{runs:0,receipts:0,audits:0,transactions:0});
+  assert.equal(Number((await a.query('SELECT count(*) n FROM public.payroll_payments WHERE business_id=$1',[f.biz])).rows[0].n),0);
+  const ok=await act(a,f,randomUUID());assert.equal(ok.cash_changed,false);
+ });
+}
