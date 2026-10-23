@@ -162,7 +162,12 @@ describe('Real PostgreSQL: bank reconciliation and transaction linking HTTP flow
       if (tx === wrongWalletTx) assert.match(r.body.error, /different wallet/i);
       assert.deepEqual(await mutationSnapshot(), before);
     }
-    const denied = await call(`/bank-imports/${completed.id}/requests/${completed.body.request_key}`, { user: OTHER, biz: otherBiz });
-    assert.notEqual(denied.status, 200); assert.equal(denied.body.result, undefined);
+    const receiptPath = `/bank-imports/${completed.id}/requests/${completed.body.request_key}`;
+    const denied = await call(receiptPath, { user: OTHER, biz });
+    assert.equal(denied.status, 403, JSON.stringify(denied.body)); assert.equal(denied.body.result, undefined);
+    // A valid member of their OWN company gets the exact non-disclosing reader contract.
+    const absent = await call(receiptPath, { user: OTHER, biz: otherBiz });
+    assert.equal(absent.status, 200);
+    assert.deepEqual(absent.body, { state: 'not_found', request_id: completed.body.request_key });
   });
 });
