@@ -1,0 +1,187 @@
+[
+  {
+    "id": "whatsapp",
+    "name": "WhatsApp",
+    "icon": "whatsapp",
+    "status": "coming_soon",
+    "status_labels": {
+      "en": "Coming Soon",
+      "id": "Segera Hadir",
+      "ru": "Скоро"
+    },
+    "order": 1,
+    "visible": true,
+    "link": "https://cfo-ai.site/en/platform#connected-workspace",
+    "translations": {
+      "en": {
+        "name": "WhatsApp",
+        "subtitle": "Messaging & Receipt Intake",
+        "example": "Send a receipt or invoice directly from a conversation.",
+        "description": "Upcoming messaging integration for receipts and bill intake. Soon you will be able to submit photos directly into your verification queue from WhatsApp.",
+        "flow_desc": "Direct photo capture -> Central intake queue -> Human review & approval"
+      },
+      "id": {
+        "name": "WhatsApp",
+        "subtitle": "Pesan & Pengiriman Bukti",
+        "example": "Kirim kuitansi atau faktur langsung dari percakapan.",
+        "description": "Integrasi perpesanan mendatang untuk kuitansi dan penerimaan tagihan. Segera hadir: kirim foto langsung ke antrean verifikasi Anda dari WhatsApp.",
+        "flow_desc": "Pengambilan foto langsung -> Antrean penerimaan pusat -> Tinjauan manusia & persetujuan"
+      },
+      "ru": {
+        "name": "WhatsApp",
+        "subtitle": "Сообщения и отправка чеков",
+        "example": "Отправляйте чеки или счета прямо из диалога.",
+        "description": "Предстоящая интеграция для приема чеков и счетов через мессенджер. Скоро вы сможете отправлять фотографии прямо в очередь проверки из WhatsApp.",
+        "flow_desc": "Фотосъемка чека -> Центральная очередь -> Проверка человеком и утверждение"
+      }
+    }
+  },
+  {
+    "id": "telegram",
+    "name": "Telegram",
+    "icon": "telegram",
+    "status": "available",
+    "status_labels": {
+      "en": "Available",
+      "id": "Tersedia",
+      "ru": "Доступно"
+    },
+    "order": 2,
+    "visible": true,
+    "link": "https://cfo-ai.site/en/platform#connected-workspace",
+    "translations": {
+      "en": {
+        "name": "Telegram",
+        "subtitle": "Summaries & Approvals",
+        "example": "Ask for today's cash runway or approve a pending vendor bill.",
+        "description": "Authorized managers review pending expenses, approve disbursements with one tap, and query runway metrics directly in chat with full cryptographic audit logs.",
+        "flow_desc": "Runway & balance queries -> Pending approval alert -> Authenticated one-tap action"
+      },
+      "id": {
+        "name": "Telegram",
+        "subtitle": "Ringkasan & Persetujuan",
+        "example": "Tanyakan runway kas hari ini atau setujui tagihan vendor yang tertunda.",
+        "description": "Manajer berwenang meninjau pengeluaran tertunda, menyetujui pengeluaran dalam satu ketukan, dan memeriksa metrik runway langsung di chat dengan log audit kriptografis.",
+        "flow_desc": "Kueri saldo & runway -> Peringatan persetujuan -> Tindakan satu ketukan terotentikasi"
+      },
+      "ru": {
+        "name": "Telegram",
+        "subtitle": "Сводки и согласования",
+        "example": "Запросите прогноз остатка денег или согласуйте счет поставщика.",
+        "description": "Руководители просматривают ожидающие расходы, утверждают выплаты в одно касание и запрашивают метрики ликвидности прямо в чате с журналом аудита.",
+        "flow_desc": "Запрос остатков и runway -> Уведомление о согласовании -> Утверждение в одно касание"
+      }
+    }
+  },
+  {
+    "id": "chatgpt",
+    "name": "ChatGPT",
+    "icon": "chatgpt",
+    "status": "available",
+    "status_labels": {
+      "en": "Available",
+      "id": "Tersedia",
+      "ru": "Доступно"
+    },
+    "order": 3,
+    "visible": true,
+    "link": "https://cfo-ai.site/en/platform#connected-workspace",
+    "translations": {
+      "en": {
+        "name": "ChatGPT",
+        "subtitle": "Conversational Financial Queries",
+        "example": "Ask about cash flow, outstanding invoices, expenses, and financial performance using your preferred AI assistant.",
+        "description": "Connect ChatGPT via Model Context Protocol (MCP) to query confirmed balances, outstanding receivables, and expense breakdowns with company-governed access.",
+        "flow_desc": "Governed MCP connection -> Natural language query -> Company-scoped read analysis"
+      },
+      "id": {
+        "name": "ChatGPT",
+        "subtitle": "Kueri Keuangan Percakapan",
+        "example": "Tanyakan tentang arus kas, faktur belum dibayar, pengeluaran, dan kinerja keuangan menggunakan asisten AI pilihan Anda.",
+        "description": "Hubungkan ChatGPT melalui Model Context Protocol (MCP) untuk memeriksa saldo terkonfirmasi, piutang tertunda, dan rincian pengeluaran dengan akses terkendali.",
+        "flow_desc": "Koneksi MCP terkendali -> Kueri bahasa alami -> Analisis baca berbatas perusahaan"
+      },
+      "ru": {
+        "name": "ChatGPT",
+        "subtitle": "Финансовые запросы в диалоге",
+        "example": "Узнайте о движении денег, неоплаченных счетах, расходах и финансовых результатах у вашего привычного ИИ-ассистента.",
+        "description": "Подключите ChatGPT через Model Context Protocol (MCP) для запроса подтвержденных остатков, дебиторской задолженности и статей расходов с разграничением прав доступа.",
+        "flow_desc": "Защищенное MCP-подключение -> Запрос на естественном языке -> Анализ данных компании"
+      }
+    }
+  },
+  {
+    "id": "claude",
+    "name": "Claude",
+    "icon": "claude",
+    "status": "available",
+    "status_labels": {
+      "en": "Available",
+      "id": "Tersedia",
+      "ru": "Доступно"
+    },
+    "order": 4,
+    "visible": true,
+    "link": "https://cfo-ai.site/en/platform#connected-workspace",
+    "translations": {
+      "en": {
+        "name": "Claude",
+        "subtitle": "Financial Analysis & Synthesis",
+        "example": "Analyze burn rate trends and summarize vendor spending this quarter.",
+        "description": "Use Claude with MCP integration for deep financial synthesis, voucher citations, and runway scenario planning governed by authenticated read permissions.",
+        "flow_desc": "MCP session handshake -> Financial synthesis prompt -> Governed context & voucher citation"
+      },
+      "id": {
+        "name": "Claude",
+        "subtitle": "Analisis & Sintesis Keuangan",
+        "example": "Analisis tren burn rate dan rangkum pengeluaran vendor kuartal ini.",
+        "description": "Gunakan Claude dengan integrasi MCP untuk sintesis keuangan mendalam, sitasi bukti transaksi, dan perencanaan skenario runway dengan izin baca terotentikasi.",
+        "flow_desc": "Handshake sesi MCP -> Prompt sintesis keuangan -> Konteks terkendali & sitasi bukti"
+      },
+      "ru": {
+        "name": "Claude",
+        "subtitle": "Финансовый анализ и синтез",
+        "example": "Проанализируйте динамику burn rate и подведите итоги расходов по поставщикам за квартал.",
+        "description": "Используйте Claude с интеграцией MCP для углубленного финансового анализа, ссылок на первичные документы и сценарного планирования с подтвержденными правами чтения.",
+        "flow_desc": "Согласование MCP-сессии -> Запрос на анализ -> Контекст компании со ссылками на документы"
+      }
+    }
+  },
+  {
+    "id": "webapp",
+    "name": "CFO AI Web App",
+    "icon": "webapp",
+    "status": "available",
+    "status_labels": {
+      "en": "Available",
+      "id": "Tersedia",
+      "ru": "Доступно"
+    },
+    "order": 5,
+    "visible": true,
+    "link": "https://app.cfo-ai.site",
+    "translations": {
+      "en": {
+        "name": "CFO AI Web App",
+        "subtitle": "Operations & Verification Workbench",
+        "example": "Upload vendor invoices, review AI extraction, match bank feeds, and authorize entries.",
+        "description": "The primary control center for financial operations. Review incoming documents side-by-side with OCR extraction, verify bank suggestions, and approve ledger postings.",
+        "flow_desc": "Multi-format document upload -> Side-by-side human verification -> Approved posting & reconciliation"
+      },
+      "id": {
+        "name": "CFO AI Web App",
+        "subtitle": "Meja Kerja Operasi & Verifikasi",
+        "example": "Unggah faktur vendor, tinjau ekstraksi AI, cocokkan mutasi bank, dan otorisasi entri.",
+        "description": "Pusat kendali utama untuk operasi keuangan. Tinjau dokumen masuk berdampingan dengan ekstraksi OCR, verifikasi saran pencocokan bank, dan setujui pencatatan buku besar.",
+        "flow_desc": "Unggah dokumen multi-format -> Verifikasi berdampingan oleh manusia -> Entri & rekonsiliasi disetujui"
+      },
+      "ru": {
+        "name": "CFO AI Web App",
+        "subtitle": "Рабочее место операций и сверки",
+        "example": "Загружайте счета поставщиков, проверяйте распознанные данные, сверяйте выписки и утверждайте проводки.",
+        "description": "Основной центр управления финансовыми операциями. Проверяйте поступающие документы рядом с результатами OCR, утверждайте банковские сопоставления и вносите записи в книги.",
+        "flow_desc": "Загрузка документов любых форматов -> Проверка человеком -> Утвержденная проводка и сверка"
+      }
+    }
+  }
+]

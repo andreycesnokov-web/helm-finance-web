@@ -1,0 +1,154 @@
+[
+  {
+    "id": "getting-started",
+    "order": 1,
+    "icon": "sparkles",
+    "translations": {
+      "en": {
+        "name": "Getting Started",
+        "description": "Account creation, workspace initialization, company profile, and team invitations."
+      },
+      "id": {
+        "name": "Memulai",
+        "description": "Pembuatan akun, inisialisasi ruang kerja, profil perusahaan, dan undangan tim."
+      },
+      "ru": {
+        "name": "Начало работы",
+        "description": "Создание аккаунта, настройка рабочего пространства, профиль компании и приглашение команды."
+      }
+    }
+  },
+  {
+    "id": "accounts-transactions",
+    "order": 2,
+    "icon": "wallet",
+    "translations": {
+      "en": {
+        "name": "Accounts & Transactions",
+        "description": "Operational bank accounts, cash wallets, manual entries, and balance tracking."
+      },
+      "id": {
+        "name": "Akun & Transaksi",
+        "description": "Rekening bank operasional, dompet kas fisik, pencatatan manual, dan pemantauan saldo."
+      },
+      "ru": {
+        "name": "Счета и операции",
+        "description": "Операционные банковские счета, касса, ручные операции и отслеживание остатков."
+      }
+    }
+  },
+  {
+    "id": "bank-reconciliation",
+    "order": 3,
+    "icon": "arrows-right-left",
+    "translations": {
+      "en": {
+        "name": "Bank Reconciliation",
+        "description": "Supported CSV/Excel bank formats, statement matching, and unmatched workflows."
+      },
+      "id": {
+        "name": "Rekonsiliasi Bank",
+        "description": "Format rekening koran CSV/Excel yang didukung, pencocokan mutasi, dan penanganan transaksi tertunda."
+      },
+      "ru": {
+        "name": "Банковская сверка",
+        "description": "Поддерживаемые форматы выписок CSV/Excel, сверка операций и обработка несопоставленных записей."
+      }
+    }
+  },
+  {
+    "id": "documents-invoices",
+    "order": 4,
+    "icon": "document-text",
+    "translations": {
+      "en": {
+        "name": "Documents & Invoices",
+        "description": "Receipt scanning, OCR extraction review, outgoing invoices, and bill tracking."
+      },
+      "id": {
+        "name": "Dokumen & Faktur",
+        "description": "Pemindaian kuitansi, peninjauan ekstraksi OCR, faktur penjualan, dan pelacakan tagihan."
+      },
+      "ru": {
+        "name": "Документы и счета",
+        "description": "Сканирование чеков, проверка данных OCR, выставление счетов и учет расходов."
+      }
+    }
+  },
+  {
+    "id": "reports-performance",
+    "order": 5,
+    "icon": "chart-bar",
+    "translations": {
+      "en": {
+        "name": "Reports & Performance",
+        "description": "Runway tracking, cash burn rate, financial pulse, and accountant exports."
+      },
+      "id": {
+        "name": "Laporan & Kinerja",
+        "description": "Pelacakan runway kas, burn rate bulanan, denyut keuangan, dan ekspor paket akuntan."
+      },
+      "ru": {
+        "name": "Отчеты и показатели",
+        "description": "Прогноз ликвидности (runway), burn rate, финансовый радар и выгрузка для бухгалтера."
+      }
+    }
+  },
+  {
+    "id": "payroll-workflows",
+    "order": 6,
+    "icon": "users",
+    "translations": {
+      "en": {
+        "name": "Payroll Workflows",
+        "description": "Staff directory, salary entries, PPh 21 TER review, and payroll approvals."
+      },
+      "id": {
+        "name": "Alur Kerja Penggajian",
+        "description": "Direktori staf, komponen gaji, tinjauan PPh 21 TER, dan persetujuan penggajian."
+      },
+      "ru": {
+        "name": "Зарплатные процессы",
+        "description": "Справочник сотрудников, начисление окладов, предварительный расчет PPh 21 TER и утверждение выплат."
+      }
+    }
+  },
+  {
+    "id": "ai-cfo-accountant",
+    "order": 7,
+    "icon": "cpu-chip",
+    "translations": {
+      "en": {
+        "name": "AI CFO & Accountant",
+        "description": "AI assistant capabilities, human verification limits, and statutory boundaries."
+      },
+      "id": {
+        "name": "AI CFO & Akuntan",
+        "description": "Kemampuan asisten AI, batasan verifikasi oleh manusia, dan batasan regulasi hukum."
+      },
+      "ru": {
+        "name": "AI CFO и Бухгалтер",
+        "description": "Возможности ИИ-ассистентов, границы контроля человеком и правовой статус рекомендаций."
+      }
+    }
+  },
+  {
+    "id": "account-support",
+    "order": 8,
+    "icon": "shield-check",
+    "translations": {
+      "en": {
+        "name": "Account & Support",
+        "description": "Trial terms, plan upgrades, security safeguards, and contacting our support desk."
+      },
+      "id": {
+        "name": "Akun & Dukungan",
+        "description": "Ketentuan uji coba, peningkatan paket, standar keamanan data, dan menghubungi meja bantuan."
+      },
+      "ru": {
+        "name": "Аккаунт и поддержка",
+        "description": "Условия пробного периода, смена тарифов, защита данных и обращение в службу поддержки."
+      }
+    }
+  }
+]

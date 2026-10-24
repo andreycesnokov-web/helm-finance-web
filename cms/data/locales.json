@@ -1,0 +1,90 @@
+[
+  {
+    "code": "en",
+    "name": "English",
+    "nativeName": "English",
+    "status": "published",
+    "isDefault": true,
+    "direction": "ltr"
+  },
+  {
+    "code": "id",
+    "name": "Indonesian",
+    "nativeName": "Bahasa Indonesia",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "ru",
+    "name": "Russian",
+    "nativeName": "Русский",
+    "status": "published",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "fr",
+    "name": "French",
+    "nativeName": "Français",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "de",
+    "name": "German",
+    "nativeName": "Deutsch",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "es",
+    "name": "Spanish",
+    "nativeName": "Español",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "it",
+    "name": "Italian",
+    "nativeName": "Italiano",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "zh-cn",
+    "name": "Simplified Chinese",
+    "nativeName": "简体中文",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "ja",
+    "name": "Japanese",
+    "nativeName": "日本語",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "th",
+    "name": "Thai",
+    "nativeName": "ไทย",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  },
+  {
+    "code": "vi",
+    "name": "Vietnamese",
+    "nativeName": "Tiếng Việt",
+    "status": "staged",
+    "isDefault": false,
+    "direction": "ltr"
+  }
+]

@@ -1,0 +1,136 @@
+{
+  "header": {
+    "logo_text": "CFO AI",
+    "logo_tagline": "Financial Operating System",
+    "links": [
+      {
+        "label": "Platform",
+        "url": "/platform",
+        "is_external": false
+      },
+      {
+        "label": "Document Intelligence",
+        "url": "/document-intelligence",
+        "is_external": false
+      },
+      {
+        "label": "Tax & Compliance",
+        "url": "/compliance",
+        "is_external": false
+      },
+      {
+        "label": "Knowledge Hub",
+        "url": "/blog",
+        "is_external": false
+      },
+      {
+        "label": "Pricing",
+        "url": "/pricing",
+        "is_external": false
+      }
+    ],
+    "login_button": {
+      "label": "Log in",
+      "url": "https://app.cfo-ai.site/login"
+    },
+    "cta_button": {
+      "label": "Start Free Trial",
+      "url": "https://app.cfo-ai.site/login"
+    }
+  },
+  "footer": {
+    "brand_description": "AI-powered financial operating system for businesses operating in Indonesia. Real-time cash visibility, document intelligence, automated bank reconciliation, and regulatory monitoring.",
+    "columns": [
+      {
+        "title": "Platform",
+        "links": [
+          {
+            "label": "Pulse Command Center",
+            "url": "/platform#pulse"
+          },
+          {
+            "label": "Radar Cash Trajectory",
+            "url": "/platform#radar"
+          },
+          {
+            "label": "Document Intelligence",
+            "url": "/document-intelligence"
+          },
+          {
+            "label": "Bank Reconciliation",
+            "url": "/platform#bank-import"
+          },
+          {
+            "label": "Pricing & Plans",
+            "url": "/pricing"
+          }
+        ]
+      },
+      {
+        "title": "Knowledge Hub",
+        "links": [
+          {
+            "label": "All Tax & Business Guides",
+            "url": "/blog"
+          },
+          {
+            "label": "PT PMA Compliance Guide",
+            "url": "/blog/pt-pma-tax-compliance-guide-2026"
+          },
+          {
+            "label": "PPh 21 TER Formulas",
+            "url": "/blog/pph-21-ter-calculation-rules-indonesia"
+          },
+          {
+            "label": "CoreTax PMK 81/2024",
+            "url": "/blog/coretax-pmk-81-2024-transition-guide"
+          }
+        ]
+      },
+      {
+        "title": "Compliance & Security",
+        "links": [
+          {
+            "label": "Indonesian Tax Radar",
+            "url": "/compliance"
+          },
+          {
+            "label": "CoreTax Integration",
+            "url": "/compliance#coretax"
+          },
+          {
+            "label": "Security & Tenant Isolation",
+            "url": "/platform#security"
+          },
+          {
+            "label": "Statutory Disclaimers",
+            "url": "/compliance#disclaimers"
+          }
+        ]
+      },
+      {
+        "title": "Company",
+        "links": [
+          {
+            "label": "Sign In to Application",
+            "url": "https://app.cfo-ai.site/login"
+          },
+          {
+            "label": "7-Day Free Trial",
+            "url": "https://app.cfo-ai.site/login"
+          },
+          {
+            "label": "Status & Uptime",
+            "url": "#"
+          },
+          {
+            "label": "Privacy Policy",
+            "url": "#"
+          }
+        ]
+      }
+    ],
+    "copyright": "© 2026 CFO AI Indonesia. All rights reserved.",
+    "statutory_note": "CFO AI is a financial management and operational accounting preparation software. It does not issue statutory audit opinions or replace a registered Indonesian tax consultant (Konsultan Pajak)."
+  }
+}

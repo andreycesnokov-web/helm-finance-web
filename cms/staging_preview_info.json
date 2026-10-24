@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-10-18T10:24:41.806Z",
+  "status": "ONLINE",
+  "surfaces": {
+    "public_website": {
+      "https_url": "https://brandon-blind-markets-empty.trycloudflare.com",
+      "english_homepage": "https://brandon-blind-markets-empty.trycloudflare.com/en",
+      "indonesian_homepage": "https://brandon-blind-markets-empty.trycloudflare.com/id",
+      "pricing_url": "https://brandon-blind-markets-empty.trycloudflare.com/en/pricing",
+      "hub_url": "https://brandon-blind-markets-empty.trycloudflare.com/en/blog",
+      "verified_https": false,
+      "local_port": 3002
+    },
+    "cms_studio": {
+      "https_url": "https://manhattan-img-surprising-crown.trycloudflare.com",
+      "admin_login_url": "https://manhattan-img-surprising-crown.trycloudflare.com/admin/",
+      "staging_gateway_protection": {
+        "auth_type": "HTTP Basic Auth",
+        "username": "admin",
+        "password": "[EPHEMERAL_RUNTIME_GENERATED_DO_NOT_EXPOSE]"
+      },
+      "cms_application_accounts": [
+        {
+          "role": "Owner",
+          "email": "owner@cfo-ai.site",
+          "permissions": "Full publishing & rollback, pricing edit, SEO, block editor"
+        },
+        {
+          "role": "Editor",
+          "email": "editor@cfo-ai.site",
+          "permissions": "Content & article draft/edit, block editing"
+        },
+        {
+          "role": "Reviewer",
+          "email": "reviewer@cfo-ai.site",
+          "permissions": "Read-only preview, audit inspect"
+        }
+      ],
+      "verified_https": false,
+      "local_port": 3003
+    }
+  }
+}

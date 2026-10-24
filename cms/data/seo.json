@@ -1,0 +1,81 @@
+{
+  "site_name": "CFO AI Indonesia",
+  "base_url": "https://cfo-ai.site",
+  "default_title": "CFO AI — Financial Operating System for Indonesia",
+  "default_description": "AI-powered financial management, automated bank statement reconciliation, document intelligence, and Indonesian tax compliance for PT and PT PMA companies.",
+  "default_og_image": "https://cfo-ai.site/assets/product/dashboard-pulse.svg",
+  "twitter_handle": "@cfo_ai_id",
+  "robots_directives": {
+    "allow_all_crawlers": true,
+    "disallow_paths": [
+      "/admin/",
+      "/api/cms/",
+      "/preview/"
+    ],
+    "sitemap_url": "https://cfo-ai.site/sitemap.xml"
+  },
+  "redirects": [
+    {
+      "from": "/signup",
+      "to": "https://app.cfo-ai.site/login",
+      "status": 301
+    },
+    {
+      "from": "/register",
+      "to": "https://app.cfo-ai.site/login",
+      "status": 301
+    },
+    {
+      "from": "/features",
+      "to": "/platform",
+      "status": 301
+    },
+    {
+      "from": "/tax-compliance",
+      "to": "/compliance",
+      "status": 301
+    },
+    {
+      "from": "/ocr",
+      "to": "/document-intelligence",
+      "status": 301
+    },
+    {
+      "from": "/blog/pt-pma-tax-guide-2025",
+      "to": "/blog/pt-pma-tax-compliance-guide-2026",
+      "status": 301
+    }
+  ],
+  "pages_meta": {
+    "home": {
+      "title": "CFO AI — Financial Operating System for Indonesia",
+      "description": "Real-time cash visibility, document OCR, automated bank reconciliation, and Indonesian tax compliance for PT and PT PMA companies.",
+      "canonical": "https://cfo-ai.site/"
+    },
+    "pricing": {
+      "title": "Transparent Subscription Pricing — CFO AI Indonesia",
+      "description": "Simple B2B SaaS pricing ($59, $149, $249/mo) with full usage limits and feature comparison for Indonesian businesses. 7-day free trial.",
+      "canonical": "https://cfo-ai.site/pricing"
+    },
+    "platform": {
+      "title": "Platform Tour & Architecture — CFO AI Indonesia",
+      "description": "Explore CFO AI's core modules: Pulse Cash Command, Radar Forecasts, AI Executive Briefings, and Bank Import Reconciliation.",
+      "canonical": "https://cfo-ai.site/platform"
+    },
+    "document-intelligence": {
+      "title": "Document Intelligence & OCR Verification — CFO AI",
+      "description": "Automated invoice and receipt processing with DPP and PPN 11% extraction, human-in-the-loop review drawer, and bank matching.",
+      "canonical": "https://cfo-ai.site/document-intelligence"
+    },
+    "compliance": {
+      "title": "Indonesian Tax & CoreTax PMK 81/2024 Radar — CFO AI",
+      "description": "Statutory compliance tracking for PPh 21 TER, PPh 23, PPN 11%, and DJP CoreTax transition workflows in Indonesia.",
+      "canonical": "https://cfo-ai.site/compliance"
+    },
+    "hub": {
+      "title": "Knowledge Hub & Tax Guides — CFO AI Indonesia",
+      "description": "Authoritative guides on Indonesian corporate tax compliance, PPh 21 TER calculations, bank reconciliation, and business operations.",
+      "canonical": "https://cfo-ai.site/blog"
+    }
+  }
+}
