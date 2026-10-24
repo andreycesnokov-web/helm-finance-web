@@ -1,12 +1,38 @@
 /**
- * CMS RBAC Authentication Middleware
+ * CMS RBAC Authentication Middleware & Cryptographic Password Utilities
  * Independent session auth with least-privilege role separation.
  * Completely isolated from financial application authentication.
  */
 
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 const CMS_JWT_SECRET = process.env.CMS_JWT_SECRET || 'cfo_ai_cms_secure_isolated_secret_2026';
+
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
+
+function generateSalt() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+function verifyPassword(password, storedHash, salt) {
+  if (!password || !storedHash || !salt) return false;
+  try {
+    const hash = hashPassword(password, salt);
+    const hashBuf = Buffer.from(hash, 'hex');
+    const storedBuf = Buffer.from(storedHash, 'hex');
+    if (hashBuf.length !== storedBuf.length) return false;
+    return crypto.timingSafeEqual(hashBuf, storedBuf);
+  } catch {
+    return false;
+  }
+}
+
+function generateResetToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
 
 function generateCmsToken(user) {
   return jwt.sign(
@@ -31,6 +57,7 @@ function verifyCmsToken(token) {
 
 /**
  * Middleware enforcing CMS authentication.
+ * Checks Authorization header (Bearer token) or HttpOnly cookie.
  */
 function requireCmsAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -38,6 +65,17 @@ function requireCmsAuth(req, res, next) {
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.substring(7);
+  } else if (req.headers.cookie) {
+    const cookies = req.headers.cookie.split(';');
+    for (const c of cookies) {
+      const parts = c.trim().split('=');
+      const k = parts[0];
+      const v = parts.slice(1).join('=');
+      if (k === 'cms_token' || k === 'cfo_admin_session') {
+        token = decodeURIComponent(v);
+        break;
+      }
+    }
   } else if (req.query && req.query.token) {
     token = req.query.token;
   }
@@ -76,6 +114,10 @@ function requireCmsRole(allowedRoles) {
 }
 
 module.exports = {
+  hashPassword,
+  generateSalt,
+  verifyPassword,
+  generateResetToken,
   generateCmsToken,
   verifyCmsToken,
   requireCmsAuth,

@@ -135,6 +135,40 @@ class ContentStore {
     return this.readJson('users.json') || [];
   }
 
+  saveUser(userData, user = 'system') {
+    const users = this.getUsers();
+    const idx = users.findIndex(u => u.id === userData.id || (userData.email && u.email && u.email.toLowerCase() === userData.email.toLowerCase()));
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], ...userData, updated_at: new Date().toISOString() };
+    } else {
+      users.push({
+        ...userData,
+        id: userData.id || `usr-${Date.now()}`,
+        created_at: new Date().toISOString()
+      });
+    }
+    this.writeJson('users.json', users);
+    this.logAudit(user, 'save_user', `user:${userData.email}`);
+    return users.find(u => u.email && userData.email && u.email.toLowerCase() === userData.email.toLowerCase());
+  }
+
+  getUserByEmail(email) {
+    if (!email) return null;
+    const users = this.getUsers();
+    const cleanEmail = email.trim().toLowerCase();
+    let user = users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
+    if (!user && (cleanEmail === 'owner@cfo-ai.site' || cleanEmail === 'admin@cfo-ai.site')) {
+      user = users.find(u => u.role === 'owner');
+    }
+    return user || null;
+  }
+
+  getUserByResetToken(token) {
+    if (!token) return null;
+    const users = this.getUsers();
+    return users.find(u => u.reset_token === token && u.reset_token_expires && new Date(u.reset_token_expires) > new Date()) || null;
+  }
+
   // --- ENTITY MUTATIONS (DRAFT / EDIT) ---
 
   updatePage(slug, pageData, user = 'editor') {

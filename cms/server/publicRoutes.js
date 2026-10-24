@@ -179,11 +179,13 @@ function createPublicRoutes(contentStore) {
         <span>${t.announcement.text}</span>
         <a href="/${locale}/blog/coretax-pmk-81-2024-transition-guide" class="ml-2 underline font-bold hover:text-blue-200">${t.announcement.link_text} &rarr;</a>
       </div>
-      <!-- Language Switcher in Header -->
+      <!-- Language Switcher in Header (Compact Active Locales Only) -->
       <div class="hidden sm:flex items-center gap-1.5 text-xs text-blue-100 ml-4 shrink-0">
         <svg class="w-3.5 h-3.5 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-        <select onchange="window.location.href='/' + this.value + window.location.pathname.substring(3)" class="bg-[#042C53] text-white text-xs rounded px-2.5 py-1 border border-blue-400/50 focus:outline-none cursor-pointer">
-          ${localeDropdownOptions}
+        <select onchange="switchLanguage(this.value)" class="bg-[#042C53] text-white text-xs rounded px-2 py-0.5 border border-blue-400/50 focus:outline-none cursor-pointer" aria-label="Select language">
+          <option value="en" ${locale === 'en' ? 'selected' : ''}>English (EN)</option>
+          <option value="id" ${locale === 'id' ? 'selected' : ''}>Bahasa Indonesia (ID)</option>
+          <option value="ru" ${locale === 'ru' ? 'selected' : ''}>Русский (RU)</option>
         </select>
       </div>
     </div>
@@ -191,58 +193,90 @@ function createPublicRoutes(contentStore) {
 
   <!-- NAVIGATION HEADER (White with crisp border, 35% increased official logo) -->
   <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#CBD5E1]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-22 flex items-center justify-between gap-4 lg:gap-6 xl:gap-8">
-      <div class="flex items-center gap-4 lg:gap-6 xl:gap-8 min-w-0">
-        <!-- Official Logo increased by 35% -->
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-22 flex items-center justify-between gap-2.5 lg:gap-4 xl:gap-6">
+      <div class="flex items-center min-w-0">
+        <!-- Official Logo increased by 35% on left -->
         <a href="/${locale}" class="flex items-center py-2 shrink-0" aria-label="CFO AI Homepage">
           <img src="/assets/brand/logo_main_navy_transparent.svg" alt="CFO AI Financial OS" class="h-11 sm:h-12 w-auto object-contain">
         </a>
 
-        <nav class="hidden lg:flex items-center gap-3 xl:gap-4 text-xs xl:text-sm font-semibold text-[#06366B]">
+        <!-- Desktop Navigation shifted slightly right (xl:flex avoids 1024px crowding across EN/ID/RU) -->
+        <nav class="hidden xl:flex items-center gap-2 xl:gap-2.5 2xl:gap-4 text-xs xl:text-sm font-semibold text-[#06366B] ml-3.5 xl:ml-5 2xl:ml-8">
           <a href="/${locale}" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'home' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.home}</a>
           <a href="/${locale}/platform" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'platform' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.platform}</a>
           <a href="/${locale}/document-intelligence" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'doc' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.doc_intelligence}</a>
           <a href="/${locale}/compliance" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'compliance' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.compliance}</a>
           <a href="/${locale}/blog" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'blog' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.hub}</a>
-          <a href="/${locale}/help" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'help' ? 'text-[#318FF4] font-bold' : ''}">${t.footer.link_help_center || 'Help Center'}</a>
+          <a href="/${locale}/help" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'help' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.help || 'Help Center'}</a>
           <a href="/${locale}/pricing" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'pricing' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.pricing}</a>
           <a href="/${locale}/about" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'about' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.about}</a>
         </nav>
       </div>
 
-      <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
+      <!-- Right Action Cluster: Compact Lang Selector, Log In, Trial CTA, Hamburger -->
+      <div class="flex items-center gap-2 sm:gap-2.5 xl:gap-3 shrink-0 mr-0.5 sm:mr-1">
+        <!-- Compact Language Selector (~76-82px wide) -->
+        <div class="relative inline-block text-left" id="cfo-lang-selector">
+          <button type="button" onclick="toggleLangDropdown(event)" class="inline-flex items-center justify-between w-[76px] sm:w-[82px] h-[38px] px-2.5 py-1.5 text-xs font-bold text-[#06366B] bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1768C9] transition-all" aria-haspopup="true" aria-expanded="false" id="lang-menu-btn" title="Switch Language">
+            <span class="flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+              <span>${locale.toUpperCase()}</span>
+            </span>
+            <svg class="w-3 h-3 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="lang-dropdown-menu" class="hidden absolute right-0 mt-1.5 w-48 rounded-xl shadow-xl bg-white border border-slate-200 py-1.5 z-50 ring-1 ring-black ring-opacity-5 focus:outline-none">
+            <button type="button" onclick="switchLanguage('en')" class="w-full text-left px-3.5 py-2 text-xs font-semibold ${locale === 'en' ? 'text-[#1768C9] bg-blue-50/70 font-bold' : 'text-slate-700 hover:bg-slate-50'} flex items-center justify-between transition-colors">
+              <span>English</span>
+              <span class="text-[10px] font-mono font-bold text-slate-400">EN</span>
+            </button>
+            <button type="button" onclick="switchLanguage('id')" class="w-full text-left px-3.5 py-2 text-xs font-semibold ${locale === 'id' ? 'text-[#1768C9] bg-blue-50/70 font-bold' : 'text-slate-700 hover:bg-slate-50'} flex items-center justify-between transition-colors">
+              <span>Bahasa Indonesia</span>
+              <span class="text-[10px] font-mono font-bold text-slate-400">ID</span>
+            </button>
+            <button type="button" onclick="switchLanguage('ru')" class="w-full text-left px-3.5 py-2 text-xs font-semibold ${locale === 'ru' ? 'text-[#1768C9] bg-blue-50/70 font-bold' : 'text-slate-700 hover:bg-slate-50'} flex items-center justify-between transition-colors">
+              <span>Русский</span>
+              <span class="text-[10px] font-mono font-bold text-slate-400">RU</span>
+            </button>
+          </div>
+        </div>
+
         <a href="https://app.cfo-ai.site/login" class="hidden sm:inline-block text-xs xl:text-sm font-bold text-[#06366B] hover:text-[#318FF4] px-2.5 py-2 transition-colors whitespace-nowrap">
           ${t.nav.login}
         </a>
         <a href="https://app.cfo-ai.site/login" class="text-xs xl:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-3.5 sm:px-5 py-2.5 rounded-xl shadow-sm transition-all min-h-[44px] flex items-center justify-center whitespace-nowrap">
           ${t.nav.trial_cta}
         </a>
-        <!-- Mobile Menu Toggle Button -->
-        <button onclick="toggleMobileMenu()" class="lg:hidden p-2 rounded-lg text-slate-700 hover:text-[#318FF4] hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Toggle navigation menu">
+        <!-- Mobile / Tablet Hamburger Toggle Button -->
+        <button onclick="toggleMobileMenu()" class="xl:hidden p-2 rounded-lg text-slate-700 hover:text-[#318FF4] hover:bg-slate-100 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Toggle navigation menu">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
       </div>
     </div>
 
     <!-- Mobile Drawer Navigation -->
-    <div id="mobile-menu" class="hidden lg:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-1.5">
+    <div id="mobile-menu" class="hidden xl:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-6 space-y-1.5 shadow-lg">
       <a href="/${locale}" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'home' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.home}</a>
       <a href="/${locale}/platform" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'platform' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.platform}</a>
       <a href="/${locale}/document-intelligence" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'doc' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.doc_intelligence}</a>
       <a href="/${locale}/compliance" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'compliance' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.compliance}</a>
       <a href="/${locale}/blog" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'blog' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.hub}</a>
-      <a href="/${locale}/help" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'help' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.footer.link_help_center || 'Help Center'}</a>
+      <a href="/${locale}/help" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'help' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.help || 'Help Center'}</a>
       <a href="/${locale}/pricing" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'pricing' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.pricing}</a>
       <a href="/${locale}/about" class="block py-2.5 px-3 rounded-lg text-sm font-semibold text-slate-800 hover:bg-slate-50 min-h-[44px] flex items-center ${activeTab === 'about' ? 'text-[#1768C9] font-bold bg-blue-50/60' : ''}">${t.nav.about}</a>
-      <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
-        <span class="text-xs font-bold text-slate-500">Language:</span>
-        <select onchange="window.location.href='/' + this.value + window.location.pathname.substring(3)" class="bg-slate-100 text-slate-800 text-xs rounded px-2.5 py-1.5 border border-slate-300">
-          ${localeDropdownOptions}
-        </select>
+      <div class="pt-3 border-t border-slate-200">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Language / Bahasa / Язык</span>
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="switchLanguage('en')" class="h-11 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center ${locale === 'en' ? 'bg-[#1768C9] text-white border-[#1768C9]' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}">EN &bull; English</button>
+          <button onclick="switchLanguage('id')" class="h-11 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center ${locale === 'id' ? 'bg-[#1768C9] text-white border-[#1768C9]' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}">ID &bull; Indonesia</button>
+          <button onclick="switchLanguage('ru')" class="h-11 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center ${locale === 'ru' ? 'bg-[#1768C9] text-white border-[#1768C9]' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}">RU &bull; Русский</button>
+        </div>
       </div>
-      <div class="pt-2">
-        <a href="https://app.cfo-ai.site/login" class="block w-full text-center text-xs font-bold bg-[#1768C9] text-white py-3 rounded-xl min-h-[44px] flex items-center justify-center">
-          ${t.nav.app_link} &rarr;
+      <div class="pt-2 flex items-center gap-2">
+        <a href="https://app.cfo-ai.site/login" class="flex-1 text-center text-xs font-bold bg-slate-100 text-[#06366B] py-3 rounded-xl min-h-[44px] flex items-center justify-center border border-slate-200">
+          ${t.nav.login}
+        </a>
+        <a href="https://app.cfo-ai.site/login" class="flex-1 text-center text-xs font-bold bg-[#1768C9] text-white py-3 rounded-xl min-h-[44px] flex items-center justify-center shadow">
+          ${t.nav.trial_cta} &rarr;
         </a>
       </div>
     </div>
@@ -271,7 +305,7 @@ function createPublicRoutes(contentStore) {
         <!-- Col 2: Platform -->
         <div>
           <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2">${t.footer.col_platform}</h4>
-          <ul class="space-y-1.5 text-xs">
+          <ul class="space-y-2 text-sm text-slate-300">
             <li><a href="/${locale}/platform" class="hover:text-white transition-colors">${t.footer.link_overview}</a></li>
             <li><a href="/${locale}/platform#features" class="hover:text-white transition-colors">${t.footer.link_features}</a></li>
             <li><a href="/${locale}/document-intelligence" class="hover:text-white transition-colors">${t.nav.doc_intelligence}</a></li>
@@ -283,7 +317,7 @@ function createPublicRoutes(contentStore) {
         <!-- Col 3: Knowledge Hub -->
         <div>
           <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2">${t.footer.col_hub}</h4>
-          <ul class="space-y-1.5 text-xs">
+          <ul class="space-y-2 text-sm text-slate-300">
             <li><a href="/${locale}/help" class="hover:text-white transition-colors font-semibold text-blue-300">${t.footer.link_help_center || 'Help Center & Guides'}</a></li>
             <li><a href="/${locale}/blog" class="hover:text-white transition-colors">All Tax &amp; Business Guides</a></li>
             <li><a href="/${locale}/blog/pt-pma-tax-compliance-guide-2026" class="hover:text-white transition-colors">${t.footer.link_tax_guides}</a></li>
@@ -295,7 +329,7 @@ function createPublicRoutes(contentStore) {
         <!-- Col 4: Company & Legal -->
         <div>
           <h4 class="text-xs font-bold uppercase tracking-wider text-white mb-2">${t.footer.col_legal}</h4>
-          <ul class="space-y-1.5 text-xs">
+          <ul class="space-y-2 text-sm text-slate-300">
             <li><a href="/${locale}/about" class="hover:text-white transition-colors">${t.nav.about}</a></li>
             <li><a href="/${locale}/about#contact" class="hover:text-white transition-colors">${t.footer.link_contact}</a></li>
             <li><a href="/${locale}/privacy" class="hover:text-white transition-colors">${t.footer.link_privacy}</a></li>
@@ -306,7 +340,7 @@ function createPublicRoutes(contentStore) {
       </div>
 
       <!-- Footer Bottom Bar with Back to Top (Consolidated Compact Single Row) -->
-      <div class="border-t border-slate-700/60 pt-3.5 flex flex-col md:flex-row items-center justify-between text-[11px] text-slate-400 gap-3">
+      <div class="border-t border-slate-700/60 pt-3.5 flex flex-col md:flex-row items-center justify-between text-xs text-slate-300 gap-3 leading-relaxed">
         <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-center md:text-left">
           <span class="font-medium text-slate-300">${t.footer.copyright}</span>
           <span class="hidden md:inline text-slate-600">&bull;</span>
@@ -324,7 +358,7 @@ function createPublicRoutes(contentStore) {
   <div id="cfo-lightbox" class="fixed inset-0 z-50 hidden bg-[#021B36]/90 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true">
     <div class="w-full max-w-6xl flex items-center justify-between text-white pb-3 mb-2 border-b border-white/10">
       <div class="flex items-center gap-3">
-        <span id="cfo-lightbox-badge" class="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-[#318FF4] text-white">AUTHENTIC V2 SCREEN</span>
+        <span id="cfo-lightbox-badge" class="text-xs uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-[#318FF4] text-white">AUTHENTIC V2 SCREEN</span>
         <h3 id="cfo-lightbox-title" class="text-xs sm:text-sm font-bold tracking-tight text-white">CFO AI Application Screen</h3>
       </div>
       <div class="flex items-center gap-2 sm:gap-3">
@@ -344,6 +378,37 @@ function createPublicRoutes(contentStore) {
   </div>
 
   <script>
+    function toggleLangDropdown(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('lang-dropdown-menu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', function(e) {
+      const selector = document.getElementById('cfo-lang-selector');
+      const menu = document.getElementById('lang-dropdown-menu');
+      if (menu && selector && !selector.contains(e.target)) {
+        menu.classList.add('hidden');
+      }
+    });
+
+    function switchLanguage(targetLang) {
+      const path = window.location.pathname;
+      const segments = path.split('/').filter(Boolean);
+      if (segments.length === 0) {
+        window.location.href = '/' + targetLang;
+        return;
+      }
+      const knownLocales = ['en', 'id', 'ru', 'fr', 'de', 'es', 'it', 'zh-cn', 'ja', 'th', 'vi'];
+      if (knownLocales.includes(segments[0])) {
+        segments[0] = targetLang;
+      } else {
+        segments.unshift(targetLang);
+      }
+      const newPath = '/' + segments.join('/') + window.location.search + window.location.hash;
+      window.location.href = newPath;
+    }
+
     function scrollToTop() {
       const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       window.scrollTo({
@@ -439,7 +504,7 @@ function createPublicRoutes(contentStore) {
       <section class="py-20 px-4 sm:px-6 lg:px-8 bg-ice-primary border-b border-[#CBD5E1] relative overflow-hidden">
         ${renderWatermark({ color: '#06366B', opacity: '0.04', size: 'w-[520px] h-[520px]', className: 'absolute -right-28 -top-10 pointer-events-none select-none z-0' })}
         <div class="max-w-7xl mx-auto text-center relative z-10">
-          <div class="inline-flex items-center gap-2 bg-white border border-blue-200 text-[#06366B] text-[11px] font-bold px-3.5 py-1 rounded-full uppercase tracking-wider mb-6 shadow-sm">
+          <div class="inline-flex items-center gap-2 bg-white border border-blue-200 text-[#06366B] text-xs font-bold px-3.5 py-1 rounded-full uppercase tracking-wider mb-6 shadow-sm">
             <span class="w-2 h-2 rounded-full bg-[#318FF4]"></span>
             <span>${heroBadge}</span>
           </div>
@@ -465,24 +530,24 @@ function createPublicRoutes(contentStore) {
           <!-- Real-Time Operational KPI Metrics Counter Bar -->
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto mt-12 text-left">
             <div class="bento-card p-4 sm:p-5">
-              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">${t.kpis.runway_label}</div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.runway_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-[#06366B] font-mono-num">${t.kpis.runway_val}</div>
-              <div class="text-[11px] text-emerald-700 font-semibold mt-1">${t.kpis.runway_sub}</div>
+              <div class="text-xs sm:text-sm text-emerald-800 font-bold mt-1">${t.kpis.runway_sub}</div>
             </div>
             <div class="bento-card p-4 sm:p-5">
-              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">${t.kpis.net_flow_label}</div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.net_flow_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-[#06366B] font-mono-num">${t.kpis.net_flow_val}</div>
-              <div class="text-[11px] text-emerald-700 font-semibold mt-1">${t.kpis.net_flow_sub}</div>
+              <div class="text-xs sm:text-sm text-emerald-800 font-bold mt-1">${t.kpis.net_flow_sub}</div>
             </div>
             <div class="bento-card p-4 sm:p-5">
-              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">${t.kpis.recon_label}</div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.recon_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-[#06366B] font-mono-num">${t.kpis.recon_val}</div>
-              <div class="text-[11px] text-[#1768C9] font-semibold mt-1">${t.kpis.recon_sub}</div>
+              <div class="text-xs sm:text-sm text-[#1768C9] font-bold mt-1">${t.kpis.recon_sub}</div>
             </div>
             <div class="bento-card p-4 sm:p-5">
-              <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">${t.kpis.tax_label}</div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.tax_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-emerald-800 font-mono-num">${t.kpis.tax_val}</div>
-              <div class="text-[11px] text-slate-600 font-semibold mt-1">${t.kpis.tax_sub}</div>
+              <div class="text-xs sm:text-sm text-slate-700 font-bold mt-1">${t.kpis.tax_sub}</div>
             </div>
           </div>
 
@@ -497,7 +562,7 @@ function createPublicRoutes(contentStore) {
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">${t.hero.live_feed_badge}</span>
-                <button onclick="openLightbox('/assets/screens/Main.png', 'Pulse Command Center', 'Real-time liquidity, cash runway in days, and burn rate across all corporate bank accounts.', 'AUTHENTIC V2 SCREEN')" class="text-[11px] font-semibold text-[#1768C9] hover:underline cursor-pointer">Enlarge &rarr;</button>
+                <button onclick="openLightbox('/assets/screens/Main.png', 'Pulse Command Center', 'Real-time liquidity, cash runway in days, and burn rate across all corporate bank accounts.', 'AUTHENTIC V2 SCREEN')" class="text-xs sm:text-sm font-semibold text-[#1768C9] hover:underline cursor-pointer">Enlarge &rarr;</button>
               </div>
             </div>
             <div class="p-3 sm:p-5 bg-white cursor-zoom-in" onclick="openLightbox('/assets/screens/Main.png', 'Pulse Command Center', 'Real-time liquidity, cash runway in days, and burn rate across all corporate bank accounts.', 'AUTHENTIC V2 SCREEN')">
@@ -544,7 +609,7 @@ function createPublicRoutes(contentStore) {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             ${t.personas.cards.map((c, i) => `
               <div class="bento-card p-8 bg-white ${i === 1 ? 'border-2 border-[#1768C9] shadow-md relative' : ''}">
-                ${c.badge ? `<div class="absolute -top-3 left-6 bg-[#1768C9] text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded">${c.badge}</div>` : ''}
+                ${c.badge ? `<div class="absolute -top-3 left-6 bg-[#1768C9] text-white text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded">${c.badge}</div>` : ''}
                 <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider block mb-2">${c.role}</span>
                 <h3 class="text-xl font-black text-[#06366B] mb-3">${c.title}</h3>
                 <p class="text-xs text-slate-600 leading-relaxed mb-6">${c.desc}</p>
@@ -572,10 +637,10 @@ function createPublicRoutes(contentStore) {
                 <div>
                   <div class="text-xs font-bold text-[#1768C9] mb-1 font-mono">${s.location}</div>
                   <h3 class="font-black text-base text-[#06366B] mb-1">${s.company}</h3>
-                  <div class="text-[11px] text-slate-500 italic mb-4">${s.profile}</div>
+                  <div class="text-xs sm:text-sm text-slate-600 italic mb-4">${s.profile}</div>
                   <p class="text-xs text-slate-600 leading-relaxed mb-6">"${s.quote}"</p>
                 </div>
-                <div class="border-t border-slate-100 pt-4 text-[11px] text-emerald-800 font-semibold">
+                <div class="border-t border-slate-100 pt-4 text-xs sm:text-sm text-emerald-800 font-semibold">
                   ${s.outcome}
                 </div>
               </div>
@@ -623,7 +688,7 @@ function createPublicRoutes(contentStore) {
               return `
                 <div class="bento-card p-6 flex flex-col justify-between">
                   <div>
-                    <div class="flex items-center justify-between text-[11px] text-slate-500 mb-3">
+                    <div class="flex items-center justify-between text-xs text-slate-600 mb-3">
                       <span class="font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded">${art.category_name}</span>
                       <span>${art.reading_time_minutes} min read</span>
                     </div>
@@ -658,7 +723,7 @@ function createPublicRoutes(contentStore) {
                   ${t.hero.primary_cta} &rarr;
                 </a>
               </div>
-              <div class="text-[11px] text-slate-400 mt-2 font-medium">${t.cta_section.note}</div>
+              <div class="text-xs sm:text-sm text-slate-600 mt-2 font-medium">${t.cta_section.note}</div>
             </div>
           </div>
         </div>
@@ -751,7 +816,7 @@ function createPublicRoutes(contentStore) {
           <div class="mb-4">
             <div class="flex items-center justify-between mb-3 px-1">
               <div class="inline-flex items-center gap-2">
-                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_1_badge || 'LEVEL 1'}</span>
+                <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_1_badge || 'LEVEL 1'}</span>
                 <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">${ui.level_1_title || 'Input &amp; Interaction Channels'}</span>
               </div>
               <span class="text-[11px] text-slate-500 hidden sm:inline">${ui.level_1_hint || 'Click any channel to inspect pipeline and governance'}</span>
@@ -826,7 +891,7 @@ function createPublicRoutes(contentStore) {
                   <div>
                     <div class="inline-flex items-center gap-2 mb-1">
                       <span class="text-[10px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_2_badge || 'LEVEL 2 • CENTRAL CORE'}</span>
-                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${ui.level_2_pill || 'AI Suggests • User Confirms'}</span>
+                      <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${ui.level_2_pill || 'AI Suggests • User Confirms'}</span>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black text-[#06366B] tracking-tight">${cw.intelligence_engine.title}</h3>
                     <p class="text-xs text-slate-500 mt-0.5">${cw.intelligence_engine.subtitle}</p>
@@ -913,7 +978,7 @@ function createPublicRoutes(contentStore) {
           <div class="mb-8">
             <div class="flex items-center justify-between mb-3 px-1">
               <div class="inline-flex items-center gap-2">
-                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_3_badge || 'LEVEL 3'}</span>
+                <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">${ui.level_3_badge || 'LEVEL 3'}</span>
                 <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">${cw.workspace_destinations.badge}</span>
               </div>
               <span class="text-[11px] text-slate-500 hidden sm:inline">${cw.workspace_destinations.title}</span>
@@ -1091,7 +1156,7 @@ function createPublicRoutes(contentStore) {
                   <div>
                     <div class="inline-flex items-center gap-2 mb-2">
                       <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2.5 py-0.5 rounded">WORKFLOW ${wf.num}</span>
-                      <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-[#06366B] border border-slate-200">${wf.badge}</span>
+                      <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-[#06366B] border border-slate-200">${wf.badge}</span>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black text-[#06366B] tracking-tight">${wf.title}</h3>
                     <p class="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">${wf.desc}</p>
@@ -1163,7 +1228,7 @@ function createPublicRoutes(contentStore) {
                     <div class="lg:col-span-5 ${isEven ? 'lg:order-2' : ''}">
                       <div class="inline-flex items-center gap-2 mb-3">
                         <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2.5 py-0.5 rounded">MOD 0${idx + 1}</span>
-                        <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${t.platform.authentic_tag}</span>
+                        <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${t.platform.authentic_tag}</span>
                       </div>
                       <h3 class="text-2xl font-black text-[#06366B] mb-3">${mod.title}</h3>
                       <p class="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">${mod.desc}</p>
@@ -1253,7 +1318,7 @@ function createPublicRoutes(contentStore) {
                   ${t.hero.primary_cta} &rarr;
                 </a>
               </div>
-              <div class="text-[11px] text-slate-400 mt-2 font-medium">${t.cta_section.note}</div>
+              <div class="text-xs sm:text-sm text-slate-600 mt-2 font-medium">${t.cta_section.note}</div>
             </div>
           </div>
         </div>
@@ -1460,7 +1525,8 @@ function createPublicRoutes(contentStore) {
                       <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">${s.phase}</span>
                     </div>
                     <h3 class="text-lg font-black text-[#06366B] mb-2">${s.title}</h3>
-                    <p class="text-xs text-slate-600 leading-relaxed">${s.desc}</p>
+                    <p class="text-sm text-slate-700 leading-relaxed">
+                  ${s.desc}</p>
                   </div>
                 </div>
               `).join('')}
@@ -1499,7 +1565,7 @@ function createPublicRoutes(contentStore) {
             <!-- LEVEL A: BUSINESS CAPABILITIES TABLE -->
             <div class="mb-6">
               <div class="flex items-center gap-2 mb-3">
-                <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL A</span>
+                <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL A</span>
                 <span class="text-xs font-bold text-[#06366B] uppercase tracking-wider">${pPage.comparison.level_a_tab}</span>
               </div>
 
@@ -1535,7 +1601,7 @@ function createPublicRoutes(contentStore) {
               <summary class="p-4 sm:p-5 cursor-pointer flex items-center justify-between font-bold text-[#06366B] hover:bg-slate-50 transition-colors select-none list-none">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                   <div class="inline-flex items-center gap-2">
-                    <span class="text-[11px] font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL B</span>
+                    <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">LEVEL B</span>
                     <span class="text-xs sm:text-sm font-black text-[#06366B]">${pPage.comparison.level_b_tab}</span>
                   </div>
                   <span class="text-[11px] text-slate-500 font-normal">(${pPage.comparison.level_b_hint})</span>
@@ -1610,7 +1676,7 @@ function createPublicRoutes(contentStore) {
           <!-- SOFTWARE SUBSCRIPTION VS PROFESSIONAL ACCOUNTING SERVICES NOTICE -->
           <div class="bento-card p-6 sm:p-8 bg-slate-50/90 border border-slate-200 rounded-2xl max-w-5xl mx-auto mb-20 text-left">
             <div class="flex items-center gap-2 mb-2">
-              <span class="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">${pPage.accountant_notice.eyebrow}</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">${pPage.accountant_notice.eyebrow}</span>
             </div>
             <h3 class="text-xl sm:text-2xl font-black text-[#06366B] mb-2">${pPage.accountant_notice.title}</h3>
             <p class="text-xs sm:text-sm text-slate-700 font-semibold mb-6 p-3 bg-white border border-slate-200 rounded-xl leading-relaxed">
@@ -1732,7 +1798,7 @@ function createPublicRoutes(contentStore) {
                 return `
                   <article class="bento-card p-6 flex flex-col justify-between hover:border-[#1768C9]">
                     <div>
-                      <div class="flex items-center justify-between text-[11px] text-slate-500 mb-3">
+                      <div class="flex items-center justify-between text-xs text-slate-600 mb-3">
                         <span class="font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded">${art.category_name}</span>
                         <span class="font-mono">${art.reading_time_minutes} min read</span>
                       </div>
@@ -2102,7 +2168,7 @@ function createPublicRoutes(contentStore) {
                   ${idx + 1}
                 </div>
                 <h3 class="font-bold text-sm text-[#021B36] mb-2">${p.title}</h3>
-                <p class="text-xs text-slate-600 leading-relaxed">
+                <p class="text-sm text-slate-700 leading-relaxed">
                   ${p.desc}
                 </p>
               </div>
@@ -2133,7 +2199,7 @@ function createPublicRoutes(contentStore) {
                       0${idx + 1}
                     </div>
                     <h3 class="font-bold text-sm text-[#021B36] mb-2">${c.title}</h3>
-                    <p class="text-xs text-slate-600 leading-relaxed">${c.desc}</p>
+                    <p class="text-sm text-slate-700 leading-relaxed">${c.desc}</p>
                   </div>
                 </div>
               `;
@@ -2161,7 +2227,7 @@ function createPublicRoutes(contentStore) {
 
           <div class="lg:col-span-5">
             <div class="browser-frame shadow-sm cursor-zoom-in" onclick="openLightbox('/assets/screens/CompanyProfile.png', 'Company Profile Configuration', 'PT & PT PMA corporate profile configuration with 16-digit NPWP in CFO AI', 'VERIFIED V2 UI')">
-              <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-200 text-[11px] font-mono text-slate-500 flex items-center justify-between">
+              <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-200 text-xs font-mono text-slate-600 flex items-center justify-between">
                 <span>CFO AI &bull; Company Profile</span>
                 <span class="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded text-[10px] font-bold">PT PMA READY</span>
               </div>
@@ -2186,7 +2252,7 @@ function createPublicRoutes(contentStore) {
             ${(ab.security_items || []).map(s => `
               <div class="bento-card p-5">
                 <div class="font-bold text-xs text-[#06366B] mb-2">${s.title}</div>
-                <p class="text-xs text-slate-600 leading-relaxed">
+                <p class="text-sm text-slate-700 leading-relaxed">
                   ${s.desc}
                 </p>
               </div>
@@ -2209,7 +2275,7 @@ function createPublicRoutes(contentStore) {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bento-card p-6 space-y-2">
               <div class="font-bold text-sm text-[#06366B]">${ab.contact_support_title}</div>
-              <p class="text-xs text-slate-600 leading-relaxed">${ab.contact_support_desc}</p>
+              <p class="text-sm text-slate-700 leading-relaxed">${ab.contact_support_desc}</p>
               <div class="text-xs font-bold text-blue-700 font-mono select-all">
                 <a href="mailto:${ab.contact_support_email}">${ab.contact_support_email}</a>
               </div>
@@ -2218,7 +2284,7 @@ function createPublicRoutes(contentStore) {
 
             <div class="bento-card p-6 space-y-2">
               <div class="font-bold text-sm text-[#06366B]">${ab.contact_sales_title}</div>
-              <p class="text-xs text-slate-600 leading-relaxed">${ab.contact_sales_desc}</p>
+              <p class="text-sm text-slate-700 leading-relaxed">${ab.contact_sales_desc}</p>
               <div class="text-xs font-bold text-blue-700 font-mono select-all">
                 <a href="mailto:${ab.contact_sales_email}">${ab.contact_sales_email}</a>
               </div>
@@ -2227,7 +2293,7 @@ function createPublicRoutes(contentStore) {
 
             <div class="bento-card p-6 space-y-2">
               <div class="font-bold text-sm text-[#06366B]">${ab.contact_admin_title}</div>
-              <p class="text-xs text-slate-600 leading-relaxed">${ab.contact_admin_desc}</p>
+              <p class="text-sm text-slate-700 leading-relaxed">${ab.contact_admin_desc}</p>
               <div class="text-xs font-bold text-blue-700 font-mono select-all">
                 <a href="mailto:${ab.contact_admin_email}">${ab.contact_admin_email}</a>
               </div>
@@ -2583,12 +2649,43 @@ function createPublicRoutes(contentStore) {
             <!-- Header -->
             <div class="border-b border-slate-100 pb-6">
               <div class="flex flex-wrap items-center gap-2 mb-3">
-                <span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-[#06366B] text-[10px] font-bold uppercase tracking-wider">${catName}</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-[#06366B] text-xs font-bold uppercase tracking-wider">${catName}</span>
                 <span class="text-slate-400 text-xs">&bull;</span>
                 <span class="text-xs text-slate-500">${article.read_time || '5 min read'}</span>
                 <span class="text-slate-400 text-xs">&bull;</span>
                 <span class="text-xs text-slate-500">Verified for CFO OS V2</span>
               </div>
+            <!-- Accounting Caveats & Disclaimers -->
+            ${article.slug === 'cashflow-radar' ? `
+              <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-950 leading-relaxed space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-amber-900">
+                  <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                  <span>${locale === 'id' ? 'Catatan Keuangan Penting:' : locale === 'ru' ? 'Важное финансовое примечание:' : 'Important Financial Notice:'}</span>
+                </div>
+                <p class="text-xs sm:text-sm text-amber-900 leading-relaxed">${locale === 'id' ? 'Proyeksi runway dan prakiraan Cash Radar adalah estimasi analitis yang diturunkan dari histori pengeluaran (burn rate) tercatat dan jadwal kewajiban mendatang. Proyeksi ini bukan jaminan masa depan dan bukan laporan audit keuangan resmi.' : locale === 'ru' ? 'Прогнозы Cash Radar и оценка взлетно-посадочной полосы (runway) представляют собой расчетные аналитические оценки на основе фактического темпа расходов (burn rate) и запланированных обязательств. Они не являются гарантированными прогнозами или официальной аудиторской отчетностью.' : 'Cash flow runway projections and radar forecasts are analytical estimates derived from recorded historical burn rates and scheduled obligations. They do not constitute guaranteed financial projections or statutory audit reports.'}</p>
+              </div>
+            ` : ''}
+
+            ${article.slug === 'document-upload' ? `
+              <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-950 leading-relaxed space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-blue-900">
+                  <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>${locale === 'id' ? 'Prinsip Pembukuan:' : locale === 'ru' ? 'Принцип бухгалтерского учета:' : 'Accounting Safeguard:'}</span>
+                </div>
+                <p class="text-xs sm:text-sm text-blue-900 leading-relaxed">${locale === 'id' ? 'Ekstraksi dokumen otomatis membuat draf usulan transaksi yang memerlukan verifikasi pengguna, bukan jurnal akuntansi otomatis.' : locale === 'ru' ? 'Автоматическое распознавание документов создает черновики для проверки пользователем, а не автоматические бухгалтерские проводки.' : 'Document capture creates draft proposals requiring user verification, not automatic journal entries.'}</p>
+              </div>
+            ` : ''}
+
+            ${article.slug === 'accountant-package' ? `
+              <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-950 leading-relaxed space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-blue-900">
+                  <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span>${locale === 'id' ? 'Kepatuhan Pajak Indonesia:' : locale === 'ru' ? 'Налоговый комплаенс:' : 'Tax Compliance Notice:'}</span>
+                </div>
+                <p class="text-xs sm:text-sm text-blue-900 leading-relaxed">${locale === 'id' ? 'Ringkasan pajak dan ekspor laporan disiapkan untuk telaah dan persiapan kepatuhan, bukan pelaporan SPT langsung otomatis ke CoreTax DJP.' : locale === 'ru' ? 'Налоговые сводки и отчетные пакеты формируются для проверки и подготовки отчетности, а не для автоматической подачи в систему CoreTax DJP.' : 'Tax summaries and export packages are prepared for review and compliance preparation, not automated CoreTax filing.'}</p>
+              </div>
+            ` : ''}
+
               <h1 class="font-brand text-2xl sm:text-4xl text-[#021B36] tracking-tight leading-tight mb-3">
                 ${trans.title}
               </h1>
@@ -2600,7 +2697,7 @@ function createPublicRoutes(contentStore) {
             <!-- Section 1: Accomplish & Prerequisites -->
             <section id="what-you-accomplish" class="space-y-3 scroll-mt-24">
               <h2 class="text-lg font-bold text-[#06366B]">${locale === 'id' ? 'Tujuan & Prasyarat' : locale === 'ru' ? 'Цель и предварительные требования' : 'What You Will Accomplish'}</h2>
-              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <p class="text-sm text-slate-700 leading-relaxed">
                 ${trans.what_you_accomplish}
               </p>
               ${trans.prerequisites && trans.prerequisites.length > 0 ? `
@@ -2622,7 +2719,7 @@ function createPublicRoutes(contentStore) {
                     <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 font-mono">${st.step || idx + 1}</span>
                     <h3 class="font-bold text-sm text-[#021B36]">${st.title}</h3>
                   </div>
-                  <p class="text-xs sm:text-sm text-slate-600 pl-8 leading-relaxed">
+                  <p class="text-sm text-slate-700 pl-8 leading-relaxed">
                     ${st.instruction}
                   </p>
                 </div>
@@ -2631,7 +2728,7 @@ function createPublicRoutes(contentStore) {
               <!-- UI Screenshot -->
               ${article.screenshot ? `
                 <div class="browser-frame my-6 cursor-zoom-in" onclick="openLightbox('${article.screenshot}', '${(trans.title || '').replace(/'/g, "\\'")}', 'Authentic CFO OS V2 screen capture', 'VERIFIED V2 UI')">
-                  <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-200 text-[11px] font-mono text-slate-500 flex items-center justify-between">
+                  <div class="bg-slate-100 px-3 py-1.5 border-b border-slate-200 text-xs font-mono text-slate-600 flex items-center justify-between">
                     <span>app.cfo-ai.site / ${article.slug}</span>
                     <span class="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded text-[10px] font-bold">VERIFIED V2 UI</span>
                   </div>
@@ -2656,7 +2753,7 @@ function createPublicRoutes(contentStore) {
                   ${trans.troubleshooting.map(tb => `
                     <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                       <strong class="text-slate-900 block mb-1">&bull; ${tb.error}</strong>
-                      <p class="text-xs text-slate-600 leading-relaxed">${tb.solution}</p>
+                      <p class="text-sm text-slate-700 leading-relaxed">${tb.solution}</p>
                     </div>
                   `).join('')}
                 </div>

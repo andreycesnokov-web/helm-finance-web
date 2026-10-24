@@ -1,0 +1,3429 @@
+{
+  "release_id": "rel-1792845629930-1ff6ca48",
+  "version": "v202610241240",
+  "hash": "1ff6ca48",
+  "created_at": "2026-10-24T12:40:29.930Z",
+  "author": "test-runner",
+  "notes": "Verify integrations & help preservation",
+  "pricing_validation": {
+    "isValid": true,
+    "discrepancies": [],
+    "catalogVersion": "v2.1-commercial",
+    "verifiedAt": "2026-10-18T07:20:00Z"
+  },
+  "snapshot": {
+    "pages": [
+      {
+        "slug": "home",
+        "title": "CFO AI — Financial Operating System for Indonesia",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "hero-block",
+            "type": "hero",
+            "title": "Know your numbers. Control your business.",
+            "badge": "DESIGNED FOR INDONESIA • PT & PT PMA",
+            "subtitle": "Your AI Chief Financial Officer. Real-time cash visibility, document intelligence, automated bank reconciliation, and Indonesian tax compliance — unified in one financial operating system.",
+            "primary_cta_text": "Start Free Trial (7 Days)",
+            "primary_cta_url": "https://app.cfo-ai.site/login",
+            "secondary_cta_text": "Explore Platform Tour",
+            "secondary_cta_url": "/platform",
+            "trial_disclaimer": "No credit card required • Instant company provisioning • Full access for 168 hours",
+            "hero_image": "/assets/product/dashboard-pulse.svg"
+          },
+          {
+            "id": "capabilities-block",
+            "type": "feature_grid",
+            "section_title": "FOUR CORE VALUE PILLARS",
+            "section_heading": "Engineered for Complete Financial Control",
+            "section_subheading": "Eliminate fragmented spreadsheets and disconnects between operations and accounting.",
+            "items": [
+              {
+                "icon": "shield-check",
+                "title": "AI Chief Financial Officer",
+                "description": "Composite health scoring (0-100), automated weekly briefings, and natural language ledger Q&A with voucher citations."
+              },
+              {
+                "icon": "file-search",
+                "title": "Document Intelligence",
+                "description": "Multi-channel intake (Telegram & web upload), AI OCR parsing of vendor names, DPP, and PPN 11% with human verification drawer."
+              },
+              {
+                "icon": "scale",
+                "title": "Regulatory & Tax Intelligence",
+                "description": "Indonesian statutory calendar monitoring, PPh 21 TER, PPh 23, PPN 11%, and CoreTax PMK 81/2024 compliance advisories."
+              },
+              {
+                "icon": "cpu",
+                "title": "Bank Reconciliation & Export",
+                "description": "BCA Giro CSV and Permata e-Statement parsers with one-click downloadable Accountant Readiness Package (ZIP)."
+              }
+            ]
+          },
+          {
+            "id": "product-showcase-1",
+            "type": "product_bento",
+            "section_title": "REAL-TIME VISIBILITY",
+            "section_heading": "Pulse Command Center",
+            "description": "Monitor unified multi-currency liquidity across BCA, Mandiri, Permata, and petty cash floats with real-time runway forecasting.",
+            "image": "/assets/product/dashboard-pulse.svg",
+            "stats": [
+              {
+                "label": "Cash Runway",
+                "value": "162 Days"
+              },
+              {
+                "label": "30-Day Net Flow",
+                "value": "+Rp 148.5M"
+              },
+              {
+                "label": "Reconciliation Status",
+                "value": "100% Balanced"
+              }
+            ]
+          },
+          {
+            "id": "product-showcase-2",
+            "type": "product_bento",
+            "section_title": "PREDICTIVE CASH TRAJECTORY",
+            "section_heading": "Radar Forward Runway",
+            "description": "Step-point cash forecasts over 30, 60, and 90-day horizons with what-if scenario levers simulating delayed receivables and tax installments.",
+            "image": "/assets/product/analytics-radar.svg"
+          },
+          {
+            "id": "pricing-cta-block",
+            "type": "cta_banner",
+            "heading": "Ready to bring complete clarity to your business finances?",
+            "subheading": "Join Indonesian businesses that have streamlined cash visibility, bank reconciliation, and tax readiness.",
+            "cta_text": "Start Free Trial (7 Days)",
+            "cta_url": "https://app.cfo-ai.site/login"
+          }
+        ]
+      },
+      {
+        "slug": "pricing",
+        "title": "Pricing & Subscription Plans — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "pricing-hero",
+            "type": "hero",
+            "badge": "TRANSPARENT SUBSCRIPTION PRICING",
+            "title": "Simple, Transparent Subscription Pricing",
+            "subtitle": "Designed for Indonesian PT and PT PMA businesses. 7-day free trial on all plans. Zero credit card required at signup."
+          }
+        ]
+      },
+      {
+        "slug": "platform",
+        "title": "Platform Architecture Tour — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "platform-hero",
+            "type": "hero",
+            "badge": "PLATFORM TOUR",
+            "title": "A Complete Financial Operating System",
+            "subtitle": "Discover how CFO AI replaces fragmented software with a unified, high-integrity financial operations workspace."
+          }
+        ]
+      },
+      {
+        "slug": "document-intelligence",
+        "title": "Document Intelligence & OCR — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "doc-hero",
+            "type": "hero",
+            "badge": "DOCUMENT INTELLIGENCE",
+            "title": "From Paper Receipt to General Ledger in Seconds",
+            "subtitle": "Eliminate 80% of manual data entry with multimodal vision OCR, human-in-the-loop verification, and automated bank matching."
+          }
+        ]
+      },
+      {
+        "slug": "compliance",
+        "title": "Indonesian Tax & CoreTax Compliance — CFO AI",
+        "updated_at": "2026-10-18T07:20:00Z",
+        "status": "published",
+        "blocks": [
+          {
+            "id": "compliance-hero",
+            "type": "hero",
+            "badge": "STATUTORY RADAR",
+            "title": "Indonesian Tax & CoreTax Radar",
+            "subtitle": "Stay ahead of PPh 21 TER, PPh 23, PPN 11%, and PMK 81/2024 CoreTax transition deadlines with automated calculation worksheets."
+          }
+        ]
+      }
+    ],
+    "pricing": {
+      "updated_at": "2026-10-18T02:06:43.289Z",
+      "updated_by": "test-runner",
+      "headline": "Simple, Transparent Subscription Pricing",
+      "subheadline": "Designed for Indonesian PT and PT PMA businesses. No hidden setup fees. 7-day free trial on all plans.",
+      "trial_badge": "7-Day Free Trial (Zero Card Required)",
+      "plans": [
+        {
+          "id": "starter",
+          "name": "Starter",
+          "tagline": "Organize Your Finances",
+          "description": "For small businesses that need cash visibility and organized financial records.",
+          "price_monthly": 59,
+          "currency": "USD",
+          "billing_interval": "month",
+          "is_recommended": false,
+          "cta_text": "Start Free Trial (7 Days)",
+          "cta_url": "https://app.cfo-ai.site/login?plan=starter",
+          "capacity_highlights": [
+            {
+              "label": "User Seats",
+              "value": "5 Users"
+            },
+            {
+              "label": "Companies",
+              "value": "1 Company"
+            },
+            {
+              "label": "Monthly Transactions",
+              "value": "2,000 / mo"
+            },
+            {
+              "label": "Document Uploads",
+              "value": "200 / mo"
+            }
+          ],
+          "feature_bullets": [
+            "Pulse real-time cash dashboard",
+            "Transactions, accounts & bills",
+            "Basic AI CFO questions (50/mo)",
+            "Bank statement import (5/mo)",
+            "Basic tax calendar dates"
+          ]
+        },
+        {
+          "id": "control",
+          "name": "Control",
+          "tagline": "Total Operational Control",
+          "description": "For growing businesses needing deeper intelligence, approvals, and tax readiness.",
+          "price_monthly": 149,
+          "currency": "USD",
+          "billing_interval": "month",
+          "is_recommended": true,
+          "badge": "RECOMMENDED • FLAGSHIP",
+          "cta_text": "Start Free Trial (7 Days)",
+          "cta_url": "https://app.cfo-ai.site/login?plan=control",
+          "capacity_highlights": [
+            {
+              "label": "User Seats",
+              "value": "10 Users"
+            },
+            {
+              "label": "Companies",
+              "value": "2 Companies"
+            },
+            {
+              "label": "Monthly Transactions",
+              "value": "10,000 / mo"
+            },
+            {
+              "label": "Document Uploads",
+              "value": "1,000 / mo"
+            }
+          ],
+          "feature_bullets": [
+            "Everything in Starter included",
+            "Financial approvals & staff permissions",
+            "Bank reconciliation (BCA & Permata)",
+            "AI Accountant & monthly close reports",
+            "Indonesian tax calendar & CoreTax updates",
+            "Payroll management workflows"
+          ]
+        },
+        {
+          "id": "pro",
+          "name": "Pro",
+          "tagline": "Multi-Entity & Scaling",
+          "description": "For multi-entity businesses requiring high volume, audit logs, and API access.",
+          "price_monthly": 249,
+          "currency": "USD",
+          "billing_interval": "month",
+          "is_recommended": false,
+          "cta_text": "Start Free Trial (7 Days)",
+          "cta_url": "https://app.cfo-ai.site/login?plan=pro",
+          "capacity_highlights": [
+            {
+              "label": "User Seats",
+              "value": "30 Users"
+            },
+            {
+              "label": "Companies",
+              "value": "5 Companies"
+            },
+            {
+              "label": "Monthly Transactions",
+              "value": "50,000 / mo"
+            },
+            {
+              "label": "Document Uploads",
+              "value": "3,000 / mo"
+            }
+          ],
+          "feature_bullets": [
+            "Everything in Control included",
+            "Group company management (5 entities)",
+            "Intercompany & advanced filing prep",
+            "MCP / API tool calls (15,000/mo)",
+            "Full audit logs & priority queue"
+          ]
+        }
+      ],
+      "usage_limits_table": [
+        {
+          "key": "users",
+          "label": "Users (Active Seats)",
+          "starter": "5",
+          "control": "10",
+          "pro": "30"
+        },
+        {
+          "key": "companies",
+          "label": "Companies (Owned Workspaces)",
+          "starter": "1",
+          "control": "2",
+          "pro": "5"
+        },
+        {
+          "key": "accounts",
+          "label": "Financial Accounts (Wallets)",
+          "starter": "5",
+          "control": "15",
+          "pro": "50"
+        },
+        {
+          "key": "documents",
+          "label": "Documents / Month",
+          "starter": "200",
+          "control": "1,000",
+          "pro": "3,000"
+        },
+        {
+          "key": "ai",
+          "label": "AI CFO Questions / Month",
+          "starter": "50",
+          "control": "300",
+          "pro": "1,000"
+        },
+        {
+          "key": "imports",
+          "label": "Bank Statement Imports / Month",
+          "starter": "5",
+          "control": "20",
+          "pro": "100"
+        },
+        {
+          "key": "bank_rows",
+          "label": "Bank Statement Rows / Month",
+          "starter": "1,000",
+          "control": "10,000",
+          "pro": "50,000"
+        },
+        {
+          "key": "transactions",
+          "label": "Transactions / Period",
+          "starter": "2,000",
+          "control": "10,000",
+          "pro": "50,000"
+        },
+        {
+          "key": "ai_accountant",
+          "label": "AI Accountant Requests / Month",
+          "starter": "0",
+          "control": "50",
+          "pro": "200"
+        },
+        {
+          "key": "ai_extraction",
+          "label": "AI Document Recognition / Month",
+          "starter": "100",
+          "control": "500",
+          "pro": "1,500"
+        },
+        {
+          "key": "mcp",
+          "label": "MCP / API Requests / Month",
+          "starter": "500",
+          "control": "3,000",
+          "pro": "15,000"
+        }
+      ],
+      "features_table": [
+        {
+          "name": "Pulse & Radar Cash Dashboard",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Invoices & Bills, Documents",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Basic AI CFO Financial Assistant",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Universal Bank Statement Import",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Team Invitations & Role Permissions",
+          "starter": true,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Spend Approvals & Spend Authorization",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Staff Compensation & Payroll Workflows",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "AI Accountant Month-End Close Assistant",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Tax & Compliance Monitoring (PPh 21 TER / PPN)",
+          "starter": "Basic",
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Auditor-Ready General Ledger ZIP Export",
+          "starter": false,
+          "control": true,
+          "pro": true
+        },
+        {
+          "name": "Group Company Management",
+          "starter": false,
+          "control": false,
+          "pro": "5 Entities"
+        },
+        {
+          "name": "Multi-Entity Workspace Switching",
+          "starter": false,
+          "control": false,
+          "pro": "Included (Pro)"
+        }
+      ],
+      "feature_availability_table": [
+        {
+          "key": "pulse_radar_transactions",
+          "label": "Pulse, Radar, Transactions, Accounts",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "bills_documents",
+          "label": "Invoices & Bills, Documents",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "ai_cfo",
+          "label": "Basic AI CFO",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "bank_import",
+          "label": "Bank Statement Import",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "team",
+          "label": "Employee Invitations",
+          "starter": "Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "approvals",
+          "label": "Approvals & Spend Authorization",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "payroll",
+          "label": "Payroll Workflows",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "ai_accountant",
+          "label": "AI Accountant Assistant",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "tax_compliance",
+          "label": "Tax & Compliance Monitoring",
+          "starter": "Basic",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "accounting_export",
+          "label": "Reconciliation & Accounting Reports",
+          "starter": "Not Included",
+          "control": "Included",
+          "pro": "Included"
+        },
+        {
+          "key": "multi_company",
+          "label": "Group Company Management",
+          "starter": "Not Included",
+          "control": "Not Included",
+          "pro": "Included (5 entities)"
+        },
+        {
+          "key": "intercompany",
+          "label": "Intercompany & Advanced Filing Preparation",
+          "starter": "Not Included",
+          "control": "Not Included",
+          "pro": "Included (Pro)"
+        }
+      ],
+      "matrix_categories": [
+        {
+          "id": "financial_core",
+          "category_name": "Financial Core",
+          "rows": [
+            {
+              "key": "pulse_radar",
+              "name": "Real-Time Cash Cockpit (Pulse & Radar)",
+              "desc": "Executive cash runway tracking & 30/60/90-day trajectory modeling",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "accounts",
+              "name": "Financial Accounts (Wallets)",
+              "desc": "Operating accounts, savings, cash floats & foreign currency ledgers",
+              "starter": "5",
+              "control": "15",
+              "pro": "50"
+            },
+            {
+              "key": "bank_imports",
+              "name": "Bank Statement Imports / Month",
+              "desc": "Corporate bank statement parsing via CSV, PDF, and MT940",
+              "starter": "5 / mo",
+              "control": "20 / mo",
+              "pro": "100 / mo"
+            },
+            {
+              "key": "bank_rows",
+              "name": "Bank Statement Rows / Month",
+              "desc": "Statement transaction rows submitted for reconciliation",
+              "starter": "1,000 / mo",
+              "control": "10,000 / mo",
+              "pro": "50,000 / mo"
+            },
+            {
+              "key": "transactions",
+              "name": "Monthly Booked Transactions",
+              "desc": "General ledger transaction volume per accounting period",
+              "starter": "2,000 / mo",
+              "control": "10,000 / mo",
+              "pro": "50,000 / mo"
+            },
+            {
+              "key": "recon",
+              "name": "Bank Reconciliation Engine",
+              "desc": "Rule-based and automatic matching against bank feeds",
+              "starter": "Standard",
+              "control": "Automated",
+              "pro": "Multi-Account Auto"
+            }
+          ]
+        },
+        {
+          "id": "operations",
+          "category_name": "Operations & Spend Control",
+          "rows": [
+            {
+              "key": "bills_invoices",
+              "name": "Invoices, Bills & Vendor Records",
+              "desc": "Sales invoicing, vendor bills, customer directory & payment status",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "documents",
+              "name": "Document Uploads & Storage / Month",
+              "desc": "Monthly receipts, invoices, and payment proof attachments",
+              "starter": "200 / mo",
+              "control": "1,000 / mo",
+              "pro": "3,000 / mo"
+            },
+            {
+              "key": "approvals",
+              "name": "Spend Approvals & Authorization Workflows",
+              "desc": "Internal controls on vendor payments and expense disbursements",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "payroll",
+              "name": "Staff Compensation & Payroll Workflows",
+              "desc": "Monthly payroll preparation, salary registers & pay slip tracking",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            }
+          ]
+        },
+        {
+          "id": "ai_automation",
+          "category_name": "AI & Automation",
+          "rows": [
+            {
+              "key": "ai",
+              "name": "AI CFO Financial Inquiries / Month",
+              "desc": "Natural language questions answered with exact voucher citations",
+              "starter": "50 / mo",
+              "control": "300 / mo",
+              "pro": "1,000 / mo"
+            },
+            {
+              "key": "ai_extraction",
+              "name": "Multimodal Document OCR (Faktur Pajak)",
+              "desc": "Vision OCR parsing DPP, PPN 11%, NSFP, and vendor details",
+              "starter": "100 / mo",
+              "control": "500 / mo",
+              "pro": "1,500 / mo"
+            },
+            {
+              "key": "ai_accountant",
+              "name": "AI Accountant Month-End Close Requests",
+              "desc": "Assisted month-end closing, discrepancy resolution & review checklists",
+              "starter": "—",
+              "control": "50 / mo",
+              "pro": "200 / mo"
+            },
+            {
+              "key": "categorization",
+              "name": "Automatic Transaction Matching",
+              "desc": "Intelligent matching between bank feeds and supporting documents",
+              "starter": "Rule-Based",
+              "control": "Machine Learning",
+              "pro": "Custom Rules Engine"
+            }
+          ]
+        },
+        {
+          "id": "tax_compliance",
+          "category_name": "Tax & Compliance",
+          "rows": [
+            {
+              "key": "tax_calendar",
+              "name": "Indonesian Statutory Tax Calendar",
+              "desc": "Filing deadline tracking for PPh 21, PPh 23, PPh 4(2), and PPN 11%",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "pph21",
+              "name": "PPh 21 TER Withholding Calculator",
+              "desc": "Government-mandated TER Categories A, B, C per PP 58/2023",
+              "starter": "Basic Preview",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "coretax",
+              "name": "CoreTax (PMK 81/2024) Readiness Worksheets",
+              "desc": "Structured filing schedules for the DGT nationwide tax transition",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "accounting_export",
+              "name": "Auditor-Ready General Ledger ZIP Export",
+              "desc": "One-click export with balanced GL CSVs, voucher attachments & audit logs",
+              "starter": "—",
+              "control": "Included",
+              "pro": "Included"
+            }
+          ]
+        },
+        {
+          "id": "team_organization",
+          "category_name": "Team & Organization",
+          "rows": [
+            {
+              "key": "users",
+              "name": "Active Member Seats Included",
+              "desc": "Finance directors, operators, accountants, and staff members",
+              "starter": "5 Seats",
+              "control": "10 Seats",
+              "pro": "30 Seats"
+            },
+            {
+              "key": "team_roles",
+              "name": "Employee Invitations & Role Permissions",
+              "desc": "Owner, Director, Accountant, Member, and Viewer role isolation",
+              "starter": "Standard Roles",
+              "control": "Custom Permissions",
+              "pro": "Department Isolation"
+            },
+            {
+              "key": "companies",
+              "name": "Owned Company Workspaces",
+              "desc": "Completely separate company organizations under one master login",
+              "starter": "1 Company",
+              "control": "2 Companies",
+              "pro": "5 Companies"
+            },
+            {
+              "key": "multi_company",
+              "name": "Multi-Entity Workspace Switching",
+              "desc": "Tenant data isolation across multiple PT and PT PMA entities",
+              "starter": "—",
+              "control": "—",
+              "pro": "5 Entities (Isolated Ledgers)"
+            }
+          ]
+        },
+        {
+          "id": "integrations_usage",
+          "category_name": "Integrations & Platform",
+          "rows": [
+            {
+              "key": "mcp",
+              "name": "MCP & REST API Tool Calls / Month",
+              "desc": "Programmatic integration via Model Context Protocol & REST endpoints",
+              "starter": "500 / mo",
+              "control": "3,000 / mo",
+              "pro": "15,000 / mo"
+            },
+            {
+              "key": "bank_formats",
+              "name": "Universal Statement Compatibility",
+              "desc": "Supports BCA, Mandiri, Permata, BRI & international bank statement files",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            },
+            {
+              "key": "data_ownership",
+              "name": "Raw Data Export & Portability",
+              "desc": "Full customer ownership with zero vendor lock-in",
+              "starter": "Included",
+              "control": "Included",
+              "pro": "Included"
+            }
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "question": "How does the 7-day free trial work?",
+          "answer": "You receive full, unrestricted access to your chosen tier for 168 hours (7 days). No credit card is required at signup. At the end of 7 days, your workspace enters read-only mode until a commercial subscription is activated."
+        },
+        {
+          "question": "Can I upgrade or downgrade my tier later?",
+          "answer": "Yes. You can switch between Starter, Control, and Pro at any time from your in-app Billing Center. Upgrades take effect immediately with prorated billing."
+        },
+        {
+          "question": "What happens if I exceed my monthly transaction or OCR limits?",
+          "answer": "We never freeze read access or interrupt core cash visibility. When you approach 80% and 100% of your quota, the system sends an email notification and provides an option to upgrade or purchase additional unit packs."
+        },
+        {
+          "question": "Does CFO AI replace my local Indonesian tax consultant (Konsultan Pajak)?",
+          "answer": "No. CFO AI prepares, structures, and reconciles your general ledger, e-Bupot calculations, and PMK 81/2024 CoreTax schedules. It provides organized readiness exports for your licensed consultant or internal finance team, but does not provide legal tax representation."
+        }
+      ]
+    },
+    "integrations": [
+      {
+        "id": "whatsapp",
+        "name": "WhatsApp",
+        "icon": "whatsapp",
+        "status": "coming_soon",
+        "status_labels": {
+          "en": "Coming Soon",
+          "id": "Segera Hadir",
+          "ru": "Скоро"
+        },
+        "order": 1,
+        "visible": true,
+        "link": "https://cfo-ai.site/en/platform#connected-workspace",
+        "translations": {
+          "en": {
+            "name": "WhatsApp",
+            "subtitle": "Messaging & Receipt Intake",
+            "example": "Send a receipt or invoice directly from a conversation.",
+            "description": "Upcoming messaging integration for receipts and bill intake. Soon you will be able to submit photos directly into your verification queue from WhatsApp.",
+            "flow_desc": "Direct photo capture -> Central intake queue -> Human review & approval"
+          },
+          "id": {
+            "name": "WhatsApp",
+            "subtitle": "Pesan & Pengiriman Bukti",
+            "example": "Kirim kuitansi atau faktur langsung dari percakapan.",
+            "description": "Integrasi perpesanan mendatang untuk kuitansi dan penerimaan tagihan. Segera hadir: kirim foto langsung ke antrean verifikasi Anda dari WhatsApp.",
+            "flow_desc": "Pengambilan foto langsung -> Antrean penerimaan pusat -> Tinjauan manusia & persetujuan"
+          },
+          "ru": {
+            "name": "WhatsApp",
+            "subtitle": "Сообщения и отправка чеков",
+            "example": "Отправляйте чеки или счета прямо из диалога.",
+            "description": "Предстоящая интеграция для приема чеков и счетов через мессенджер. Скоро вы сможете отправлять фотографии прямо в очередь проверки из WhatsApp.",
+            "flow_desc": "Фотосъемка чека -> Центральная очередь -> Проверка человеком и утверждение"
+          }
+        }
+      },
+      {
+        "id": "telegram",
+        "name": "Telegram",
+        "icon": "telegram",
+        "status": "available",
+        "status_labels": {
+          "en": "Available",
+          "id": "Tersedia",
+          "ru": "Доступно"
+        },
+        "order": 2,
+        "visible": true,
+        "link": "https://cfo-ai.site/en/platform#connected-workspace",
+        "translations": {
+          "en": {
+            "name": "Telegram",
+            "subtitle": "Summaries & Approvals",
+            "example": "Ask for today's cash runway or approve a pending vendor bill.",
+            "description": "Authorized managers review pending expenses, approve disbursements with one tap, and query runway metrics directly in chat with full cryptographic audit logs.",
+            "flow_desc": "Runway & balance queries -> Pending approval alert -> Authenticated one-tap action"
+          },
+          "id": {
+            "name": "Telegram",
+            "subtitle": "Ringkasan & Persetujuan",
+            "example": "Tanyakan runway kas hari ini atau setujui tagihan vendor yang tertunda.",
+            "description": "Manajer berwenang meninjau pengeluaran tertunda, menyetujui pengeluaran dalam satu ketukan, dan memeriksa metrik runway langsung di chat dengan log audit kriptografis.",
+            "flow_desc": "Kueri saldo & runway -> Peringatan persetujuan -> Tindakan satu ketukan terotentikasi"
+          },
+          "ru": {
+            "name": "Telegram",
+            "subtitle": "Сводки и согласования",
+            "example": "Запросите прогноз остатка денег или согласуйте счет поставщика.",
+            "description": "Руководители просматривают ожидающие расходы, утверждают выплаты в одно касание и запрашивают метрики ликвидности прямо в чате с журналом аудита.",
+            "flow_desc": "Запрос остатков и runway -> Уведомление о согласовании -> Утверждение в одно касание"
+          }
+        }
+      },
+      {
+        "id": "chatgpt",
+        "name": "ChatGPT",
+        "icon": "chatgpt",
+        "status": "available",
+        "status_labels": {
+          "en": "Available",
+          "id": "Tersedia",
+          "ru": "Доступно"
+        },
+        "order": 3,
+        "visible": true,
+        "link": "https://cfo-ai.site/en/platform#connected-workspace",
+        "translations": {
+          "en": {
+            "name": "ChatGPT",
+            "subtitle": "Conversational Financial Queries",
+            "example": "Ask about cash flow, outstanding invoices, expenses, and financial performance using your preferred AI assistant.",
+            "description": "Connect ChatGPT via Model Context Protocol (MCP) to query confirmed balances, outstanding receivables, and expense breakdowns with company-governed access.",
+            "flow_desc": "Governed MCP connection -> Natural language query -> Company-scoped read analysis"
+          },
+          "id": {
+            "name": "ChatGPT",
+            "subtitle": "Kueri Keuangan Percakapan",
+            "example": "Tanyakan tentang arus kas, faktur belum dibayar, pengeluaran, dan kinerja keuangan menggunakan asisten AI pilihan Anda.",
+            "description": "Hubungkan ChatGPT melalui Model Context Protocol (MCP) untuk memeriksa saldo terkonfirmasi, piutang tertunda, dan rincian pengeluaran dengan akses terkendali.",
+            "flow_desc": "Koneksi MCP terkendali -> Kueri bahasa alami -> Analisis baca berbatas perusahaan"
+          },
+          "ru": {
+            "name": "ChatGPT",
+            "subtitle": "Финансовые запросы в диалоге",
+            "example": "Узнайте о движении денег, неоплаченных счетах, расходах и финансовых результатах у вашего привычного ИИ-ассистента.",
+            "description": "Подключите ChatGPT через Model Context Protocol (MCP) для запроса подтвержденных остатков, дебиторской задолженности и статей расходов с разграничением прав доступа.",
+            "flow_desc": "Защищенное MCP-подключение -> Запрос на естественном языке -> Анализ данных компании"
+          }
+        }
+      },
+      {
+        "id": "claude",
+        "name": "Claude",
+        "icon": "claude",
+        "status": "available",
+        "status_labels": {
+          "en": "Available",
+          "id": "Tersedia",
+          "ru": "Доступно"
+        },
+        "order": 4,
+        "visible": true,
+        "link": "https://cfo-ai.site/en/platform#connected-workspace",
+        "translations": {
+          "en": {
+            "name": "Claude",
+            "subtitle": "Financial Analysis & Synthesis",
+            "example": "Analyze burn rate trends and summarize vendor spending this quarter.",
+            "description": "Use Claude with MCP integration for deep financial synthesis, voucher citations, and runway scenario planning governed by authenticated read permissions.",
+            "flow_desc": "MCP session handshake -> Financial synthesis prompt -> Governed context & voucher citation"
+          },
+          "id": {
+            "name": "Claude",
+            "subtitle": "Analisis & Sintesis Keuangan",
+            "example": "Analisis tren burn rate dan rangkum pengeluaran vendor kuartal ini.",
+            "description": "Gunakan Claude dengan integrasi MCP untuk sintesis keuangan mendalam, sitasi bukti transaksi, dan perencanaan skenario runway dengan izin baca terotentikasi.",
+            "flow_desc": "Handshake sesi MCP -> Prompt sintesis keuangan -> Konteks terkendali & sitasi bukti"
+          },
+          "ru": {
+            "name": "Claude",
+            "subtitle": "Финансовый анализ и синтез",
+            "example": "Проанализируйте динамику burn rate и подведите итоги расходов по поставщикам за квартал.",
+            "description": "Используйте Claude с интеграцией MCP для углубленного финансового анализа, ссылок на первичные документы и сценарного планирования с подтвержденными правами чтения.",
+            "flow_desc": "Согласование MCP-сессии -> Запрос на анализ -> Контекст компании со ссылками на документы"
+          }
+        }
+      },
+      {
+        "id": "webapp",
+        "name": "CFO AI Web App",
+        "icon": "webapp",
+        "status": "available",
+        "status_labels": {
+          "en": "Available",
+          "id": "Tersedia",
+          "ru": "Доступно"
+        },
+        "order": 5,
+        "visible": true,
+        "link": "https://app.cfo-ai.site",
+        "translations": {
+          "en": {
+            "name": "CFO AI Web App",
+            "subtitle": "Operations & Verification Workbench",
+            "example": "Upload vendor invoices, review AI extraction, match bank feeds, and authorize entries.",
+            "description": "The primary control center for financial operations. Review incoming documents side-by-side with OCR extraction, verify bank suggestions, and approve ledger postings.",
+            "flow_desc": "Multi-format document upload -> Side-by-side human verification -> Approved posting & reconciliation"
+          },
+          "id": {
+            "name": "CFO AI Web App",
+            "subtitle": "Meja Kerja Operasi & Verifikasi",
+            "example": "Unggah faktur vendor, tinjau ekstraksi AI, cocokkan mutasi bank, dan otorisasi entri.",
+            "description": "Pusat kendali utama untuk operasi keuangan. Tinjau dokumen masuk berdampingan dengan ekstraksi OCR, verifikasi saran pencocokan bank, dan setujui pencatatan buku besar.",
+            "flow_desc": "Unggah dokumen multi-format -> Verifikasi berdampingan oleh manusia -> Entri & rekonsiliasi disetujui"
+          },
+          "ru": {
+            "name": "CFO AI Web App",
+            "subtitle": "Рабочее место операций и сверки",
+            "example": "Загружайте счета поставщиков, проверяйте распознанные данные, сверяйте выписки и утверждайте проводки.",
+            "description": "Основной центр управления финансовыми операциями. Проверяйте поступающие документы рядом с результатами OCR, утверждайте банковские сопоставления и вносите записи в книги.",
+            "flow_desc": "Загрузка документов любых форматов -> Проверка человеком -> Утвержденная проводка и сверка"
+          }
+        }
+      }
+    ],
+    "hub_categories": [
+      {
+        "id": "indonesian-taxes-regulations",
+        "name": "Indonesian Taxes & Regulations",
+        "slug": "indonesian-taxes-regulations",
+        "description": "Statutory tax rules, UU HPP, CoreTax PMK 81/2024, PPh 21 TER, PPh 23, PPN, and DJP compliance.",
+        "icon": "scale",
+        "article_count": 3
+      },
+      {
+        "id": "accounting-bookkeeping",
+        "name": "Accounting & Bookkeeping",
+        "slug": "accounting-bookkeeping",
+        "description": "Chart of accounts, reconciliation practices, month-close procedures, and SAK standards for Indonesian PTs.",
+        "icon": "book-open",
+        "article_count": 2
+      },
+      {
+        "id": "cash-flow-financial-management",
+        "name": "Cash Flow & Financial Management",
+        "slug": "cash-flow-financial-management",
+        "description": "Working capital optimization, runway forecasting, AP/AR management, and multi-currency banking.",
+        "icon": "trending-up",
+        "article_count": 2
+      },
+      {
+        "id": "business-operations-indonesia",
+        "name": "Business Operations in Indonesia",
+        "slug": "business-operations-indonesia",
+        "description": "PT PMA establishment, OSS RBA licensing, KBLI compliance, LKPM BKPM reporting, and director governance.",
+        "icon": "building-2",
+        "article_count": 2
+      },
+      {
+        "id": "ai-finance-automation",
+        "name": "AI & Finance Automation",
+        "slug": "ai-finance-automation",
+        "description": "Receipt OCR extraction, conversational CFO intelligence, automated reconciliation, and MCP tool workflows.",
+        "icon": "cpu",
+        "article_count": 2
+      },
+      {
+        "id": "cfo-ai-product-guides",
+        "name": "CFO AI Product Guides",
+        "slug": "cfo-ai-product-guides",
+        "description": "Step-by-step walkthroughs, bank statement imports (BCA/Permata), approval workflows, and multi-company setup.",
+        "icon": "file-text",
+        "article_count": 1
+      }
+    ],
+    "hub_articles": [
+      {
+        "id": "art-01",
+        "slug": "pt-pma-tax-compliance-guide-2026",
+        "category": "indonesian-taxes-regulations",
+        "category_name": "Indonesian Taxes & Regulations",
+        "jurisdiction": "ID",
+        "featured_image": "/assets/blog/pt-pma-tax-guide.svg",
+        "reading_time_minutes": 9,
+        "publication_date": "2026-10-15T08:00:00Z",
+        "last_updated": "2026-10-18T07:00:00Z",
+        "last_legal_review": "2026-10-17T12:00:00Z",
+        "legal_reviewer": "Indonesian Tax Legal Desk (Verified under UU HPP & PMK 81/2024)",
+        "review_status": "published",
+        "author": {
+          "name": "Budi Santoso, SE, Ak, CA",
+          "role": "Senior Tax & Accounting Advisor",
+          "avatar": "/assets/authors/budi-santoso.png"
+        },
+        "tags": [
+          "PT PMA",
+          "Corporate Tax",
+          "PPh 21",
+          "PPN 11%",
+          "CoreTax",
+          "BKPM LKPM"
+        ],
+        "translations": {
+          "en": {
+            "title": "PT PMA Tax Obligations in Indonesia: Complete 2026 Director's Compliance Guide",
+            "excerpt": "A definitive guide for foreign directors and finance leaders navigating Indonesian corporate income tax, withholding rules, PPN 11%, CoreTax transition, and quarterly LKPM filings.",
+            "seo_title": "PT PMA Tax Obligations Indonesia 2026: Director's Compliance Guide | CFO AI",
+            "meta_description": "Comprehensive 2026 guide to Indonesian PT PMA taxation: corporate income tax (PPh Badan), PPh 21 TER, PPh 23, PPN 11%, LKPM reporting, and CoreTax PMK 81/2024 rules.",
+            "canonical_url": "https://cfo-ai.site/en/blog/pt-pma-tax-compliance-guide-2026",
+            "content_markdown": "# PT PMA Tax Obligations in Indonesia: Complete 2026 Director's Compliance Guide\n\nOperating a Foreign Direct Investment Company (**Perseroan Terbatas Penanaman Modal Asing / PT PMA**) in Indonesia offers immense market access across Southeast Asia's largest economy. However, foreign directors frequently discover that Indonesia's corporate tax regime is one of the most rigorously enforced withholding-based systems in the world.\n\nWith the enforcement of the **Tax Harmonization Law (UU No. 7/2021 / UU HPP)** and the transition to the **DJP CoreTax System under PMK No. 81/2024**, foreign-owned enterprises face strict automated data exchange between commercial banks, OSS RBA, and the Directorate General of Taxes (Direktorat Jenderal Pajak / DJP).\n\nThis guide breaks down every core statutory obligation, filing cadence, and documentation standard that foreign directors must maintain in 2026.\n\n---\n\n## 1. Corporate Income Tax (PPh Badan)\n\nThe standard Corporate Income Tax rate in Indonesia is **22%** on taxable net profit (Penghasilan Kena Pajak). \n\n### Key Principles for PT PMA:\n- **No Small Business Lump-Sum:** The 0.5% final gross tax rate (PP 55/2022) available to local micro-enterprises (UMKM) is **strictly not applicable to PT PMAs**. Foreign investment companies must maintain full double-entry accrual bookkeeping under Indonesian Financial Accounting Standards (SAK).\n- **Article 31E Facility:** Companies with gross annual turnover up to Rp 50 Billion receive a **50% discount** on the standard rate (reducing the effective tax to 11%) on the proportion of taxable income derived from turnover up to Rp 4.8 Billion.\n- **Monthly PPh 25 Installments:** Corporate income tax is not paid solely at year-end. Companies must pay monthly advance installments (**PPh Pasal 25**) calculated from the prior year's annual return.\n\n---\n\n## 2. Monthly Withholding Tax Ecosystem (Withholding Obligations)\n\nIn Indonesia, corporate entities act as mandatory withholding agents for the government. If your PT PMA pays a vendor, contractor, landlord, or employee, you are legally obligated to withhold the applicable tax at source, issue an official Withholding Slip (**Bukti Pemotongan / e-Bupot**), and remit the tax to DJP by the statutory deadline.\n\n| Withholding Tax Type | Object of Taxation | Standard Statutory Rate | Filing Deadline | Remittance Deadline |\n| :--- | :--- | :--- | :--- | :--- |\n| **PPh Pasal 21** | Employee salaries, director fees, independent contractors | Progressive Rates / TER (PP 58/2023) | 20th of following month | 10th of following month |\n| **PPh Pasal 23** | Domestic services (consulting, legal, IT, marketing, technical), royalties, dividends | 2% (with NPWP) / 4% (without NPWP) | 20th of following month | 10th of following month |\n| **PPh Pasal 4 ayat (2)** | Office/warehouse rent, land leasing, construction services | 10% Final (Rent) / 1.75% - 4% (Construction) | 20th of following month | 10th of following month |\n| **PPh Pasal 26** | Cross-border payments to foreign entities (management fees, overseas software, interest) | 20% (or reduced Tax Treaty rate with valid DGT-1 form) | 20th of following month | 10th of following month |\n\n> **Critical Compliance Note:** Failure to withhold tax from a vendor invoice does not absolve the PT PMA. Under tax audit, DJP will assess the unpaid withholding tax, plus statutory interest penalties (Tarif Bunga Sanksi Administrasi), directly against the PT PMA.\n\n---\n\n## 3. Value Added Tax (PPN 11%) and PKP Status\n\n- **Threshold:** Any enterprise with gross annual sales exceeding **Rp 4.8 Billion** must register as a Taxable Enterprise (**Pengusaha Kena Pajak / PKP**).\n- **Current PPN Rate:** **11%** (governed under UU HPP).\n- **Faktur Pajak (Electronic Tax Invoices):** Every taxable supply must be backed by an electronic Faktur Pajak generated via e-Faktur or the CoreTax portal within strict timeframes. Failure to issue Faktur Pajak by the 15th of the following month incurs a mandatory 1% penalty on the transaction value.\n- **Input vs. Output Matching:** Companies may credit Input VAT (Pajak Masukan) on business acquisitions against Output VAT (Pajak Keluaran) collected from customers.\n\n---\n\n## 4. Quarterly LKPM Reporting to Ministry of Investment (BKPM)\n\nBeyond tax, PT PMAs are subject to mandatory investment supervision. Under **BKPM Regulation No. 5/2021**, all foreign investment companies must submit the Investment Activity Report (**Laporan Kegiatan Penanaman Modal / LKPM**) electronically via the OSS RBA portal.\n\n### Filing Schedule for Companies with Capital > Rp 500 Million:\n- **Quarter I:** April 1 – 10\n- **Quarter II:** July 1 – 10\n- **Quarter III:** October 1 – 10\n- **Quarter IV:** January 1 – 10\n\n### Reported Financial Data:\n1. Fixed asset additions (machinery, building improvements, office equipment).\n2. Realized working capital expenditures (salaries, raw materials, professional fees).\n3. Indonesian vs. expatriate workforce headcount.\n4. Realization against the mandatory Rp 10 Billion total investment commitment (excluding land and buildings).\n\n*Sanctions:* BKPM issues formal Written Warnings (Surat Peringatan I, II, III). Failure to rectify leads to the immediate freezing and revocation of your Business Identification Number (**NIB**).\n\n---\n\n## 5. CoreTax PMK 81/2024 Readiness for PT PMA Directors\n\nThe implementation of the **CoreTax Administration System (PMK 81/2024)** represents the largest technological leap in Indonesian tax history. CoreTax unifies previously separate portals (DJP Online, e-Billing, e-Faktur, e-Bupot) into a centralized Taxpayer Account Management (TAM) platform.\n\n### Essential Action Checklist:\n1. **16-Digit NPWP Validation:** Ensure that foreign directors have validated their 16-digit Tax Identification Number linked to their KITAS/Passport, and that corporate NPWPs use the new 16-digit format.\n2. **Clean General Ledger Reconciliation:** In CoreTax, banking data submitted by commercial banks (BCA, Mandiri, Permata) is cross-matched against corporate revenue filings in near-real-time. Unreconciled bank inflows will trigger automated inquiries (SP2DK).\n3. **Structured Digital Audit Trail:** Ensure every disbursement has an attached itemized invoice, proof of withholding, and bank payment confirmation.\n\n---\n\n## Statutory Disclaimer\n*This publication is prepared for general informational purposes and operational workflow design. It does not constitute formal legal counsel or statutory audit opinions. Indonesian tax laws and implementing regulations are subject to administrative interpretation. Always verify transactions with your licensed Indonesian Tax Consultant (Konsultan Pajak) or registered Public Accounting Firm (KAP).*"
+          },
+          "id": {
+            "title": "Kewajiban Pajak PT PMA di Indonesia: Panduan Kepatuhan Lengkap Direktur 2026",
+            "excerpt": "Panduan definitif bagi direktur asing dan pimpinan keuangan dalam mengelola PPh Badan, pemotongan pajak, PPN 11%, transisi CoreTax, dan pelaporan LKPM kuartalan.",
+            "seo_title": "Kewajiban Pajak PT PMA Indonesia 2026: Panduan Kepatuhan Direktur | CFO AI",
+            "meta_description": "Panduan komprehensif perpajakan PT PMA 2026: PPh Badan, PPh 21 TER, PPh 23, PPN 11%, pelaporan LKPM BKPM, dan aturan CoreTax PMK 81/2024.",
+            "canonical_url": "https://cfo-ai.site/id/blog/pt-pma-tax-compliance-guide-2026",
+            "content_markdown": "# Kewajiban Pajak PT PMA di Indonesia: Panduan Kepatuhan Lengkap Direktur 2026\n\nMenjalankan Perusahaan Penanaman Modal Asing (**PT PMA**) di Indonesia memberikan peluang pasar yang sangat besar di kawasan Asia Tenggara. Namun, para direktur perusahaan sering kali menyadari bahwa sistem perpajakan Indonesia adalah salah satu rezim pemotongan pajak (*withholding tax*) yang paling ketat penegakannya di dunia.\n\nDengan berlakunya **Undang-Undang Harmonisasi Peraturan Perpajakan (UU No. 7/2021 / UU HPP)** dan masa transisi menuju sistem **CoreTax DJP berdasarkan PMK No. 81/2024**, perusahaan modal asing menghadapi pertukaran data otomatis antara perbankan, OSS RBA, dan Direktorat Jenderal Pajak (DJP).\n\nPanduan ini menguraikan setiap kewajiban hukum utama, jadwal pelaporan, dan standar dokumentasi yang wajib dipatuhi oleh manajemen PT PMA pada tahun 2026.\n\n---\n\n## 1. Pajak Penghasilan Badan (PPh Badan)\n\nTarif umum Pajak Penghasilan Badan di Indonesia adalah **22%** dari Penghasilan Kena Pajak bersih.\n\n### Prinsip Utama untuk PT PMA:\n- **Tidak Berlaku Skema UMKM 0,5%:** Fasilitas PPh Final 0,5% berdasarkan PP 55/2022 untuk usaha mikro **sama sekali tidak berlaku untuk PT PMA**. Perusahaan penanaman modal asing wajib menyelenggarakan pembukuan berpasangan (*double-entry*) berbasis akrual sesuai Standar Akuntansi Keuangan (SAK).\n- **Fasilitas Pasal 31E:** PT PMA dengan peredaran bruto hingga Rp 50 Miliar mendapatkan **diskon tarif 50%** (sehingga tarif efektif menjadi 11%) atas bagian penghasilan kena pajak dari omzet sampai dengan Rp 4,8 Miliar.\n- **Angsuran Bulanan PPh 25:** PPh Badan tidak hanya disetor pada akhir tahun. Perusahaan wajib menyetor angsuran bulanan PPh Pasal 25 yang dihitung dari SPT Tahunan tahun sebelumnya.\n\n---\n\n## 2. Ekosistem Pemotongan Pajak Bulanan (Withholding Tax)\n\nDi Indonesia, badan usaha bertindak sebagai agen pemotong pajak pemerintah. Setiap kali PT PMA membayar tagihan vendor, kontraktor, sewa gedung, atau gaji karyawan, perusahaan wajib memotong pajak di sumber, menerbitkan Bukti Pemotongan (**e-Bupot**), dan menyetorkannya ke kas negara.\n\n| Jenis Pajak Pemotongan | Objek Pajak | Tarif Standar | Batas Waktu Lapor | Batas Waktu Setor |\n| :--- | :--- | :--- | :--- | :--- |\n| **PPh Pasal 21** | Gaji karyawan, upah tenaga ahli, honorarium | Tarif Progresif / TER (PP 58/2023) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n| **PPh Pasal 23** | Jasa teknik, manajemen, konsultasi, sewa aset, dividen | 2% (ber-NPWP) / 4% (tanpa NPWP) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n| **PPh Pasal 4 ayat (2)** | Sewa tanah/bangunan, jasa konstruksi | 10% Final (Sewa) / 1,75% - 4% (Konstruksi) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n| **PPh Pasal 26** | Pembayaran ke entitas luar negeri (manajemen, royalti, bunga) | 20% (atau tarif P3B / Tax Treaty dengan Form DGT-1) | Tanggal 20 bulan berikutnya | Tanggal 10 bulan berikutnya |\n\n---\n\n## 3. Pajak Pertambahan Nilai (PPN 11%) dan Pengukuhan PKP\n\n- **Ambang Batas PKP:** Perusahaan dengan peredaran bruto melebihi **Rp 4,8 Miliar** dalam satu tahun buku wajib dikukuhkan sebagai Pengusaha Kena Pajak (**PKP**).\n- **Tarif PPN:** **11%** (UU HPP).\n- **Faktur Pajak Elektronik:** Setiap penyerahan Barang/Jasa Kena Pajak wajib disertai Faktur Pajak elektronik (e-Faktur). Keterlambatan penerbitan dikenakan denda administratif 1% dari Dasar Pengenaan Pajak (DPP).\n\n---\n\n## 4. Pelaporan LKPM Kuartalan ke Kementerian Investasi (BKPM)\n\nBerdasarkan **Peraturan BKPM No. 5/2021**, seluruh PT PMA wajib menyampaikan Laporan Kegiatan Penanaman Modal (**LKPM**) secara triwulanan melalui sistem OSS RBA.\n\n### Jadwal Pelaporan Kuartal:\n- **Kuartal I:** 1 – 10 April\n- **Kuartal II:** 1 – 10 Juli\n- **Kuartal III:** 1 – 10 Oktober\n- **Kuartal IV:** 1 – 10 Januari\n\nSanksi ketidakpatuhan meliputi Surat Peringatan I, II, III hingga pencabutan Nomor Induk Berusaha (**NIB**).\n\n---\n\n## Catatan Hukum Resmi\n*Panduan ini disusun untuk tujuan informasi dan persiapan alur kerja operasional. Materi ini bukan merupakan nasihat hukum resmi atau opini audit. Selalu konsultasikan pembukuan dan perpajakan Anda dengan Konsultan Pajak terdaftar atau Kantor Akuntan Publik (KAP).*"
+          },
+          "ru": {
+            "title": "Налоговые обязательства компаний PT PMA в Индонезии: руководство для директоров 2026",
+            "excerpt": "Полное руководство для иностранных директоров и финансовых руководителей: корпоративный налог, налоги у источника, НДС 11%, переход на CoreTax и отчетность LKPM BKPM.",
+            "seo_title": "Налоги PT PMA в Индонезии 2026: Руководство для директоров | CFO AI",
+            "meta_description": "Руководство по налогам компании PT PMA в Индонезии: PPh Badan, удержание PPh 21 TER, PPh 23, НДС 11%, ежеквартальная отчетность LKPM BKPM и система CoreTax PMK 81/2024.",
+            "canonical_url": "https://cfo-ai.site/ru/blog/pt-pma-tax-compliance-guide-2026",
+            "content_markdown": "# Налоговые обязательства компаний PT PMA в Индонезии: руководство для директоров 2026\n\nУправление компанией с иностранными инвестициями (**PT PMA**) в Индонезии открывает доступ к крупнейшей экономике Юго-Восточной Азии. Однако иностранные учредители и директора часто сталкиваются с тем, что налоговая система Индонезии является одной из самых строго контролируемых систем удержания налогов у источника (*withholding tax*).\n\nВ связи с вступлением в силу **Закона о гармонизации налогового законодательства (UU No. 7/2021 / UU HPP)** и переходом на цифровую налоговую платформу **CoreTax (PMK No. 81/2024)**, бизнес в Индонезии находится под прямым автоматическим контролем налоговой службы (DJP) и инвестиционного министерства (BKPM).\n\nВ этом руководстве детально разобраны все обязательства, ставки и график отчетности для директоров PT PMA на 2026 год.\n\n---\n\n## 1. Корпоративный подоходный налог (PPh Badan)\n\nБазовая ставка корпоративного налога на прибыль в Индонезии составляет **22%** от чистой налогооблагаемой прибыли.\n\n### Важные правила для PT PMA:\n- **Упрощенная ставка 0,5% не применяется:** Льготный налог с оборота 0,5% для малого бизнеса (PP 55/2022) **категорически запрещен для компаний PT PMA**. Иностранные предприятия обязаны вести полноценный бухгалтерский учет по методу начисления в соответствии с индонезийскими стандартами SAK.\n- **Льгота по Статье 31E:** Компании с годовой выручкой до 50 млрд индонезийских рупий получают **скидку 50%** на ставку налога (эффективная ставка 11%) на долю прибыли, приходящуюся на оборот до 4,8 млрд IDR.\n- **Ежемесячные авансовые платежи PPh 25:** Налог на прибыль не выплачивается разово в конце года. Компания обязана ежемесячно перечислять авансовые взносы PPh 25, рассчитанные на базе предыдущей годовой декларации.\n\n---\n\n## 2. Налоги у источника выплаты (Withholding Taxes)\n\nВ Индонезии юридические лица являются налоговыми агентами государства. При оплате услуг подрядчиков, аренды или зарплат компания обязана удержать налог, выпустить официальную справку об удержании (**e-Bupot**) и перечислить налог в бюджет.\n\n| Тип налога | Объект налогообложения | Ставка | Срок подачи декларации | Срок уплаты налога |\n| :--- | :--- | :--- | :--- | :--- |\n| **PPh 21** | Заработная плата сотрудников, вознаграждения директоров | Прогрессивная шкала / TER (PP 58/2023) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n| **PPh 23** | Услуги местных компаний (консалтинг, IT, маркетинг, аренда оборудования) | 2% (с NPWP) / 4% (без NPWP) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n| **PPh 4(2)** | Аренда офиса, земли, складов, строительные работы | 10% (Аренда) / 1.75% - 4% (Стройка) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n| **PPh 26** | Выплаты иностранным компаниям (роялти, зарубежное ПО, проценты) | 20% (или сниженная ставка по соглашению об избежании двойного налогообложения с формой DGT-1) | До 20-го числа след. месяца | До 10-го числа след. месяца |\n\n---\n\n## 3. НДС (PPN 11%) и статус PKP\n\n- **Порог обязательной регистрации:** При достижении выручки свыше **4,8 млрд индонезийских рупий** за финансовый год компания обязана зарегистрироваться плательщиком НДС (**PKP**).\n- **Ставка НДС:** **11%**.\n- **Электронные счета-фактуры (Faktur Pajak):** Каждая облагаемая операция должна сопровождаться электронной фактурой, сформированной в государственной системе e-Faktur.\n\n---\n\n## 4. Ежеквартальная отчетность LKPM в BKPM\n\nСогласно **Положению BKPM № 5/2021**, все компании PT PMA обязаны ежеквартально подавать инвестиционный отчет (**LKPM**) через портал OSS RBA.\n\n### Календарь сдачи LKPM:\n- **I квартал:** 1 – 10 апреля\n- **II квартал:** 1 – 10 июля\n- **III квартал:** 1 – 10 октября\n- **IV квартал:** 1 – 10 января\n\nНесоблюдение сроков влечет выдачу предупреждений (SP 1, SP 2, SP 3) и аннулирование лицензии NIB.\n\n---\n\n## Официальная правовая оговорка\n*Данный материал подготовлен исключительно в информационных целях и для организации финансовых процессов. Он не является официальной юридической консультацией или аудиторским заключением. Всегда сверяйте налоговые расчеты с лицензированным индонезийским налоговым консультантом (Konsultan Pajak) или аудиторской компанией (KAP).*"
+          }
+        }
+      },
+      {
+        "id": "art-02",
+        "slug": "pph-21-ter-calculation-rules-indonesia",
+        "category": "indonesian-taxes-regulations",
+        "category_name": "Indonesian Taxes & Regulations",
+        "jurisdiction": "ID",
+        "featured_image": "/assets/blog/pph-21-ter-guide.svg",
+        "reading_time_minutes": 8,
+        "publication_date": "2026-10-16T09:00:00Z",
+        "last_updated": "2026-10-18T07:00:00Z",
+        "last_legal_review": "2026-10-17T14:00:00Z",
+        "legal_reviewer": "Indonesian Payroll & Tax Advisory Panel",
+        "review_status": "published",
+        "author": {
+          "name": "Siti Rahmawati, Ak, BKP",
+          "role": "Payroll & Withholding Tax Specialist",
+          "avatar": "/assets/authors/siti-rahmawati.png"
+        },
+        "tags": [
+          "PPh 21",
+          "TER",
+          "PP 58/2023",
+          "PMK 168/2023",
+          "Payroll",
+          "PTKP"
+        ],
+        "translations": {
+          "en": {
+            "title": "PPh 21 TER Withholding Tax Under PP 58/2023: Formulas, Monthly Brackets & Payroll Reconciliation",
+            "excerpt": "A practical guide to implementing Indonesia's Effective Average Tax Rate (TER) mechanism for monthly employee payroll, bonus adjustments, and December year-end reconciliations.",
+            "seo_title": "PPh 21 TER Calculation Rules Indonesia PP 58/2023 | CFO AI",
+            "meta_description": "Master Indonesia's PPh 21 TER monthly withholding rules under PP 58/2023 and PMK 168/2023. Categories A, B, C brackets, payroll formulas, and December reconciliation steps.",
+            "canonical_url": "https://cfo-ai.site/en/blog/pph-21-ter-calculation-rules-indonesia",
+            "content_markdown": "# PPh 21 TER Withholding Tax Under PP 58/2023: Formulas, Monthly Brackets & Payroll Reconciliation\n\nStarting in 2024 and cemented under **Government Regulation (PP) No. 58/2023** and **Finance Minister Regulation (PMK) No. 168/2023**, Indonesia completely restructured how personal income tax (**PPh Pasal 21**) is withheld from monthly employee compensation.\n\nThe historical method—which required payroll clerks to annualize monthly income, subtract occupational allowances (Biaya Jabatan) and non-taxable income (PTKP), calculate progressive Article 17 brackets, and divide by 12 every single month—has been abolished for months January through November.\n\nIn its place stands the **Tarif Efektif Rata-Rata (TER)** mechanism: a simplified monthly lookup table based on gross earnings, coupled with a mandatory reconciliation in December.\n\n---\n\n## 1. The Three Monthly TER Categories (A, B, C)\n\nThe applicable monthly TER bracket depends strictly on the employee's non-taxable income status (**Penghasilan Tidak Kena Pajak / PTKP**) at the beginning of the tax year:\n\n### Category A\n- **Applicable to:** Single with no dependents (TK/0), Single with 1 dependent (TK/1), or Married with no dependents (K/0).\n- **Brackets:** 44 distinct monthly salary tiers. Gross monthly income up to Rp 5,400,000 incurs **0%** withholding. Above Rp 5.4M, rates start at 0.25% and scale up to 34% for monthly earnings over Rp 1.4 Billion.\n\n### Category B\n- **Applicable to:** TK/2, TK/3, K/1, K/2.\n- **Brackets:** 40 tiers. Zero-tax threshold extends up to Rp 6,200,000 per month (0%).\n\n### Category C\n- **Applicable to:** Married with 3 dependents (K/3).\n- **Brackets:** 41 tiers. Zero-tax threshold extends up to Rp 6,600,000 per month (0%).\n\n---\n\n## 2. Monthly Calculation Formula (January – November)\n\nDuring months 1 through 11, withholding calculation requires only one simple multiplication:\n\n$$\\text{Monthly PPh 21 Withholding} = \\text{Gross Monthly Earnings} \\times \\text{TER Rate (\\%)}$$\n\n### Worked Example:\n- Employee: Senior Developer, status K/1 (Category B).\n- Gross Salary in March: Rp 18,500,000.\n- Lookup in Category B Table: Monthly gross between Rp 17,750,000 and Rp 19,500,000 carries a TER rate of **7%**.\n- Monthly Withholding: $\\text{Rp } 18,500,000 \\times 7\\% = \\mathbf{\\text{Rp } 1,295,000}$.\n\n---\n\n## 3. The December Month-Close Reconciliation\n\nThe monthly TER rate is an *administrative withholding estimate*. It does not replace the permanent annual progressive rates under Article 17 paragraph (1) letter a of the Income Tax Law.\n\nIn December (the final tax period of the year), the employer must perform an annual true-up:\n1. Sum all gross compensation earned from January to December (including base salary, allowances, bonuses, THR, and employer-paid BPJS contributions).\n2. Deduct allowable annual deductions: Biaya Jabatan (5% of gross, max Rp 6,000,000/year), employee BPJS Ketenagakerjaan contributions (JHT 2%, JP 1%), and the employee's annual PTKP.\n3. Compute the **Actual Annual PPh 21** using progressive Article 17 brackets (5% up to Rp 60M, 15% from Rp 60M to Rp 250M, 25% from Rp 250M to Rp 500M, 30% from Rp 500M to Rp 5B, 35% above Rp 5B).\n4. Deduct the total PPh 21 already withheld during January through November.\n5. The difference is the December withholding amount (or refund if over-withheld).\n\n$$\\text{PPh 21 December} = \\text{Total Annual Article 17 Tax} - \\sum_{m=1}^{11} \\text{PPh 21 Paid (TER)}$$\n\n---\n\n## Statutory Disclaimer\n*This article provides operational payroll calculation guidance. It does not replace formal tax consultations. Always verify complex severance, expatriate tax residency, or multi-employer scenarios with a licensed Indonesian tax advisor.*"
+          },
+          "id": {
+            "title": "Perhitungan PPh 21 TER Berdasarkan PP 58/2023: Formula, Tarif Bulanan & Rekonsiliasi Payroll",
+            "excerpt": "Panduan praktis penerapan Tarif Efektif Rata-Rata (TER) PPh Pasal 21 untuk gaji karyawan, tunjangan hari raya (THR), dan rekonsiliasi masa pajak Desember.",
+            "seo_title": "Perhitungan PPh 21 TER PP 58/2023 Indonesia | CFO AI",
+            "meta_description": "Panduan lengkap perhitungan PPh 21 TER berdasarkan PP 58/2023 dan PMK 168/2023. Kategori A, B, C, formula potongan bulanan, dan rekonsiliasi akhir tahun Desember.",
+            "canonical_url": "https://cfo-ai.site/id/blog/pph-21-ter-calculation-rules-indonesia",
+            "content_markdown": "# Perhitungan PPh 21 TER Berdasarkan PP 58/2023: Formula, Tarif Bulanan & Rekonsiliasi Payroll\n\nSejak berlakunya **Peraturan Pemerintah (PP) No. 58/2023** dan **Peraturan Menteri Keuangan (PMK) No. 168/2023**, mekanisme pemotongan Pajak Penghasilan Pasal 21 atas penghasilan karyawan di Indonesia mengalami penyederhanaan yang mendasar.\n\nMetode lama yang mewajibkan perusahaan menghitung estimasi penghasilan neto disetahunkan setiap bulan kini telah dihapus untuk masa pajak Januari sampai dengan November. Sebagai gantinya, pemerintah memberlakukan mekanisme **Tarif Efektif Rata-Rata (TER)** bulanan.\n\n---\n\n## 1. Tiga Kategori TER Bulanan (A, B, dan C)\n\nPenentuan tabel TER yang berlaku didasarkan pada status Penghasilan Tidak Kena Pajak (**PTKP**) karyawan pada awal tahun pajak:\n- **Kategori A:** TK/0, TK/1, K/0 (Batas nihil pajak hingga Rp 5,4 juta per bulan).\n- **Kategori B:** TK/2, TK/3, K/1, K/2 (Batas nihil pajak hingga Rp 6,2 juta per bulan).\n- **Kategori C:** K/3 (Batas nihil pajak hingga Rp 6,6 juta per bulan).\n\n---\n\n## 2. Formula Pemotongan Masa Januari – November\n\n$$\\text{PPh 21 Masa Bulanan} = \\text{Penghasilan Bruto Sebulan} \\times \\text{Tarif TER (\\%)}$$\n\nPerhitungan bulanan menjadi instan dan mengurangi risiko perbedaan kalkulasi manual di bagian HR dan keuangan.\n\n---\n\n## 3. Rekonsiliasi Masa Pajak Desember\n\nPada bulan Desember, perusahaan menghitung kembali total PPh 21 terutang setahun penuh menggunakan tarif progresif Pasal 17 ayat (1) huruf a UU PPh, kemudian dikurangi seluruh pemotongan TER yang telah disetor dari Januari hingga November."
+          },
+          "ru": {
+            "title": "Расчет налога на доходы PPh 21 TER по PP 58/2023: формулы, шкалы и зарплатный учет в Индонезии",
+            "excerpt": "Практическое руководство по расчету подоходного налога сотрудников в Индонезии по новой системе TER: сетки категорий A, B, C, расчет бонусов и сверка в декабре.",
+            "seo_title": "Расчет налога PPh 21 TER Индонезия PP 58/2023 | CFO AI",
+            "meta_description": "Правила расчета налога с зарплат PPh 21 TER в Индонезии по постановлениям PP 58/2023 и PMK 168/2023. Категории ставок A, B, C, учет бонусов и декабрьская сверка.",
+            "canonical_url": "https://cfo-ai.site/ru/blog/pph-21-ter-calculation-rules-indonesia",
+            "content_markdown": "# Расчет налога на доходы PPh 21 TER по PP 58/2023: формулы, шкалы и зарплатный учет в Индонезии\n\nС 2024 года в соответствии с **Постановлением Правительства (PP) № 58/2023** и **Постановлением Минфина (PMK) № 168/2023** Индонезия кардинально обновила порядок удержания подоходного налога с физических лиц (**PPh 21**).\n\nСтарый сложный алгоритм, требовавший ежемесячного приведения зарплаты к годовому эквиваленту и вычета необлагаемого минимума, заменен механизмом **средних эффективных ставок (TER)** для месяцев с января по ноябрь.\n\n---\n\n## 1. Три категории ставок TER (A, B, C)\n\nКатегория зависит от семейного статуса сотрудника (**PTKP**) на 1 января налогового года:\n- **Категория A:** Холост/не замужем без иждивенцев (TK/0, TK/1), женат/замужем без детей (K/0). Необлагаемый порог — до 5,4 млн рупий в месяц (0%).\n- **Категория B:** TK/2, TK/3, K/1, K/2. Необлагаемый порог — до 6,2 млн рупий в месяц (0%).\n- **Категория C:** Женат/замужем с 3 детьми (K/3). Необлагаемый порог — до 6,6 млн рупий в месяц (0%).\n\n---\n\n## 2. Формула ежемесячного удержания (январь – ноябрь)\n\n$$\\text{Удержание PPh 21} = \\text{Грязный доход за месяц (Gross)} \\times \\text{Ставка TER (\\%)}$$\n\nВ декабре работодатель рассчитывает совокупный годовой налог по постоянной прогрессивной шкале Статьи 17 и вычитает суммы, уплаченные по TER за предыдущие 11 месяцев."
+          }
+        }
+      },
+      {
+        "id": "art-03",
+        "slug": "coretax-pmk-81-2024-transition-guide",
+        "category": "indonesian-taxes-regulations",
+        "category_name": "Indonesian Taxes & Regulations",
+        "jurisdiction": "ID",
+        "featured_image": "/assets/blog/coretax-transition-guide.svg",
+        "reading_time_minutes": 10,
+        "publication_date": "2026-10-17T10:00:00Z",
+        "last_updated": "2026-10-18T07:00:00Z",
+        "last_legal_review": "2026-10-17T16:00:00Z",
+        "legal_reviewer": "Indonesian Tax Modernization Research Taskforce",
+        "review_status": "published",
+        "author": {
+          "name": "Budi Santoso, SE, Ak, CA",
+          "role": "Senior Tax & Accounting Advisor",
+          "avatar": "/assets/authors/budi-santoso.png"
+        },
+        "tags": [
+          "CoreTax",
+          "PMK 81/2024",
+          "DJP Online",
+          "e-Bupot",
+          "Tax Compliance",
+          "Bank Data Matching"
+        ],
+        "translations": {
+          "en": {
+            "title": "CoreTax PMK 81/2024 Transition: Preparing Bank Feeds, e-Bupot & General Ledgers",
+            "excerpt": "How Indonesian businesses must adapt their ERPs, bank statement reconciliation, and invoice matching ahead of the mandatory CoreTax system rollout under PMK 81/2024.",
+            "seo_title": "CoreTax Indonesia PMK 81/2024 Transition Guide | CFO AI",
+            "meta_description": "Complete transition runbook for Indonesia's CoreTax platform under PMK 81/2024. Bank statement data matching, 16-digit NPWP, e-Bupot unifikasi, and general ledger preparation.",
+            "canonical_url": "https://cfo-ai.site/en/blog/coretax-pmk-81-2024-transition-guide",
+            "content_markdown": "# CoreTax PMK 81/2024 Transition: Preparing Bank Feeds, e-Bupot & General Ledgers\n\nIndonesia's Directorate General of Taxes (DJP) is executing the most comprehensive digital transformation in its history: the **CoreTax Administration System (Sistem Inti Administrasi Perpajakan / SIAP)**, codified under **Finance Minister Regulation (PMK) No. 81/2024**.\n\nCoreTax is not simply a visual redesign of DJP Online. It represents a unified data architecture where 21 distinct administrative processes—including taxpayer registration, e-Faktur issuance, e-Bupot unifikasi, tax deposits, refund requests, and audit tracking—are consolidated into a real-time **Taxpayer Account Management (TAM)** core.\n\nFor Indonesian business owners and CFOs, CoreTax fundamentally eliminates the buffer between operational accounting and tax enforcement. Under CoreTax, commercial bank feeds, customs declarations, and supplier invoices are continuously reconciled against reported tax filings.\n\n---\n\n## 1. Structural Changes Codified Under PMK 81/2024\n\n### A. Unified 16-Digit Taxpayer Identification\nAll corporate and individual taxpayers are unified under a standard 16-digit format. For Indonesian citizens, this corresponds to the National Identity Number (NIK). For corporate entities and foreign nationals, the legacy 15-digit NPWP is migrated to an updated 16-digit format. Systems issuing invoices or withholding slips with invalid NPWPs are rejected automatically at API boundaries.\n\n### B. Interoperable e-Bupot Unifikasi 2.0\nUnder CoreTax, withholding slips are no longer isolated XML uploads. When Company A withholds PPh 23 on a service fee paid to Company B, the e-Bupot voucher is instantly posted to Company B's Taxpayer Account. Company B can immediately claim the tax credit without manual document exchange or lost physical paper copies.\n\n### C. Automated Bank Data Triangulation\nUnder Law No. 9/2017 and PMK 81/2024, commercial banks in Indonesia (including BCA, Mandiri, BRI, BNI, and Permata) report transaction velocity and account balance snapshots to DJP. In CoreTax, discrepancies between gross bank inflows and reported taxable revenue trigger automated **SP2DK** (Surat Permintaan Penjelasan atas Data dan/atau Keterangan) inquiry letters within weeks, rather than years later during retrospective audits.\n\n---\n\n## 2. The 5-Step CoreTax Preparation Runbook\n\nFinance teams must execute five audit steps before the full mandatory cutover:\n\n1. **Clean General Ledger Reconciliation:** Ensure that every bank transaction in your corporate accounts (BCA Giro, Permata, cash) is tied to a documented invoice or balance transfer. Unreconciled bank lines will be presumed taxable revenue under audit.\n2. **Counterparty NPWP 16-Digit Master Audit:** Run an audit across your active vendor and client databases to ensure all legal entities have recorded valid 16-digit NPWPs and accurate registered business addresses.\n3. **DPP and PPN Separation:** Verify that accounting entries strictly segregate Base Tax Value (DPP) from PPN 11% and withholding taxes, matching the electronic Faktur Pajak.\n4. **Employee PTKP Status Review:** Verify employee marital and dependent declarations (TK/0 through K/3) to ensure monthly PPh 21 TER brackets are applied accurately.\n5. **Standardized Readiness Package Export:** Implement accounting tools capable of generating unified month-close reconciliation archives (CSV and PDF) for instant verification.\n\n---\n\n## 3. How CFO AI Accelerates CoreTax Readiness\n\nCFO AI was engineered from the ground up to support modern Indonesian tax compliance:\n- Automated OCR extracting vendor legal names, 16-digit NPWPs, DPP, and PPN 11%.\n- Direct bank reconciliation matching imported BCA Giro CSVs and Permata PDFs against unpaid bills.\n- One-click downloadable **Accountant Readiness Package (ZIP)** containing clean reconciliation CSVs and bilingual summary reports formatted for immediate compliance review.\n\n---\n\n## Statutory Disclaimer\n*This article is published for technical and administrative preparation purposes. It does not replace advice from a licensed Indonesian tax attorney or registered Konsultan Pajak.*"
+          },
+          "id": {
+            "title": "Transisi CoreTax PMK 81/2024: Mempersiapkan Rekonsiliasi Bank, e-Bupot & Buku Besar",
+            "excerpt": "Langkah strategis perusahaan Indonesia dalam menyesuaikan sistem akuntansi, pembukuan bank, dan pencocokan faktur menjelang pemberlakuan CoreTax DJP PMK 81/2024.",
+            "seo_title": "Panduan Transisi CoreTax PMK 81/2024 Indonesia | CFO AI",
+            "meta_description": "Panduan lengkap transisi CoreTax Indonesia berdasarkan PMK 81/2024. Rekonsiliasi rekening koran, NPWP 16 digit, e-Bupot unifikasi, dan kesiapan buku besar.",
+            "canonical_url": "https://cfo-ai.site/id/blog/coretax-pmk-81-2024-transition-guide",
+            "content_markdown": "# Transisi CoreTax PMK 81/2024: Mempersiapkan Rekonsiliasi Bank, e-Bupot & Buku Besar\n\nDirektorat Jenderal Pajak (DJP) tengah mengimplementasikan transformasi digital terbesar dalam sejarah administrasi perpajakan nasional: **Sistem Inti Administrasi Perpajakan (CoreTax)** yang diatur dalam **Peraturan Menteri Keuangan (PMK) No. 81/2024**.\n\nCoreTax bukan sekadar pembaruan tampilan DJP Online, melainkan penggabungan 21 proses bisnis perpajakan ke dalam satu platform terpadu (**Taxpayer Account Management**).\n\nBagi pemilik bisnis dan direktur keuangan di Indonesia, CoreTax menuntut rekonsiliasi yang jauh lebih akurat antara catatan perbankan operasional dan pelaporan pajak.\n\n---\n\n## Poin-Poin Kunci PMK 81/2024:\n1. **NPWP 16 Digit Terpadu:** Standarisasi nomor identitas perpajakan.\n2. **e-Bupot Unifikasi 2.0:** Integrasi otomatis bukti potong antar wajib pajak.\n3. **Pencocokan Data Rekening Bank:** Rekonsiliasi mutasi rekening koran dengan SPT yang dilaporkan."
+          },
+          "ru": {
+            "title": "Переход на налоговую систему CoreTax PMK 81/2024: банковские выписки, e-Bupot и главная книга",
+            "excerpt": "Как бизнесу в Индонезии подготовить бухгалтерский учет, сверку банковских выписок и счета-фактуры к запуску единой государственной системы CoreTax по PMK 81/2024.",
+            "seo_title": "Переход на CoreTax Индонезия PMK 81/2024 | CFO AI",
+            "meta_description": "Руководство по внедрению CoreTax в Индонезии по постановлению PMK 81/2024. Сверка банковских выписок, 16-значный NPWP, справки e-Bupot и аудит главной книги.",
+            "canonical_url": "https://cfo-ai.site/ru/blog/coretax-pmk-81-2024-transition-guide",
+            "content_markdown": "# Переход на налоговую систему CoreTax PMK 81/2024: банковские выписки, e-Bupot и главная книга\n\nНалоговая служба Индонезии (DJP) реализует крупнейшую цифровую трансформацию в истории страны — запуск **Единой системы налогового администрирования (CoreTax)**, закрепленной в **Постановлении Минфина (PMK) № 81/2024**.\n\nCoreTax объединяет 21 разрозненный налоговый процесс в централизованную систему управления счетами налогоплательщиков (**Taxpayer Account Management**).\n\nВ системе CoreTax данные банковских транзакций напрямую сопоставляются с заявленной налоговой выручкой, что требует от бизнеса ежедневной точности в учете."
+          }
+        }
+      }
+    ],
+    "help_categories": [
+      {
+        "id": "getting-started",
+        "order": 1,
+        "icon": "sparkles",
+        "translations": {
+          "en": {
+            "name": "Getting Started",
+            "description": "Account creation, workspace initialization, company profile, and team invitations."
+          },
+          "id": {
+            "name": "Memulai",
+            "description": "Pembuatan akun, inisialisasi ruang kerja, profil perusahaan, dan undangan tim."
+          },
+          "ru": {
+            "name": "Начало работы",
+            "description": "Создание аккаунта, настройка рабочего пространства, профиль компании и приглашение команды."
+          }
+        }
+      },
+      {
+        "id": "accounts-transactions",
+        "order": 2,
+        "icon": "wallet",
+        "translations": {
+          "en": {
+            "name": "Accounts & Transactions",
+            "description": "Operational bank accounts, cash wallets, manual entries, and balance tracking."
+          },
+          "id": {
+            "name": "Akun & Transaksi",
+            "description": "Rekening bank operasional, dompet kas fisik, pencatatan manual, dan pemantauan saldo."
+          },
+          "ru": {
+            "name": "Счета и операции",
+            "description": "Операционные банковские счета, касса, ручные операции и отслеживание остатков."
+          }
+        }
+      },
+      {
+        "id": "bank-reconciliation",
+        "order": 3,
+        "icon": "arrows-right-left",
+        "translations": {
+          "en": {
+            "name": "Bank Reconciliation",
+            "description": "Supported CSV/Excel bank formats, statement matching, and unmatched workflows."
+          },
+          "id": {
+            "name": "Rekonsiliasi Bank",
+            "description": "Format rekening koran CSV/Excel yang didukung, pencocokan mutasi, dan penanganan transaksi tertunda."
+          },
+          "ru": {
+            "name": "Банковская сверка",
+            "description": "Поддерживаемые форматы выписок CSV/Excel, сверка операций и обработка несопоставленных записей."
+          }
+        }
+      },
+      {
+        "id": "documents-invoices",
+        "order": 4,
+        "icon": "document-text",
+        "translations": {
+          "en": {
+            "name": "Documents & Invoices",
+            "description": "Receipt scanning, OCR extraction review, outgoing invoices, and bill tracking."
+          },
+          "id": {
+            "name": "Dokumen & Faktur",
+            "description": "Pemindaian kuitansi, peninjauan ekstraksi OCR, faktur penjualan, dan pelacakan tagihan."
+          },
+          "ru": {
+            "name": "Документы и счета",
+            "description": "Сканирование чеков, проверка данных OCR, выставление счетов и учет расходов."
+          }
+        }
+      },
+      {
+        "id": "reports-performance",
+        "order": 5,
+        "icon": "chart-bar",
+        "translations": {
+          "en": {
+            "name": "Reports & Performance",
+            "description": "Runway tracking, cash burn rate, financial pulse, and accountant exports."
+          },
+          "id": {
+            "name": "Laporan & Kinerja",
+            "description": "Pelacakan runway kas, burn rate bulanan, denyut keuangan, dan ekspor paket akuntan."
+          },
+          "ru": {
+            "name": "Отчеты и показатели",
+            "description": "Прогноз ликвидности (runway), burn rate, финансовый радар и выгрузка для бухгалтера."
+          }
+        }
+      },
+      {
+        "id": "payroll-workflows",
+        "order": 6,
+        "icon": "users",
+        "translations": {
+          "en": {
+            "name": "Payroll Workflows",
+            "description": "Staff directory, salary entries, PPh 21 TER review, and payroll approvals."
+          },
+          "id": {
+            "name": "Alur Kerja Penggajian",
+            "description": "Direktori staf, komponen gaji, tinjauan PPh 21 TER, dan persetujuan penggajian."
+          },
+          "ru": {
+            "name": "Зарплатные процессы",
+            "description": "Справочник сотрудников, начисление окладов, предварительный расчет PPh 21 TER и утверждение выплат."
+          }
+        }
+      },
+      {
+        "id": "ai-cfo-accountant",
+        "order": 7,
+        "icon": "cpu-chip",
+        "translations": {
+          "en": {
+            "name": "AI CFO & Accountant",
+            "description": "AI assistant capabilities, human verification limits, and statutory boundaries."
+          },
+          "id": {
+            "name": "AI CFO & Akuntan",
+            "description": "Kemampuan asisten AI, batasan verifikasi oleh manusia, dan batasan regulasi hukum."
+          },
+          "ru": {
+            "name": "AI CFO и Бухгалтер",
+            "description": "Возможности ИИ-ассистентов, границы контроля человеком и правовой статус рекомендаций."
+          }
+        }
+      },
+      {
+        "id": "account-support",
+        "order": 8,
+        "icon": "shield-check",
+        "translations": {
+          "en": {
+            "name": "Account & Support",
+            "description": "Trial terms, plan upgrades, security safeguards, and contacting our support desk."
+          },
+          "id": {
+            "name": "Akun & Dukungan",
+            "description": "Ketentuan uji coba, peningkatan paket, standar keamanan data, dan menghubungi meja bantuan."
+          },
+          "ru": {
+            "name": "Аккаунт и поддержка",
+            "description": "Условия пробного периода, смена тарифов, защита данных и обращение в службу поддержки."
+          }
+        }
+      }
+    ],
+    "help_articles": [
+      {
+        "id": "art-help-01",
+        "slug": "company-setup",
+        "category_id": "getting-started",
+        "featured": true,
+        "read_time": "5 min",
+        "order": 1,
+        "review_status": "published",
+        "screenshot": "/assets/screens/CompanyProfile.png",
+        "translations": {
+          "en": {
+            "title": "Configuring Company Profile, Tax Identification & Entity Details",
+            "summary": "Set up your PT or PT PMA company, enter your 16-digit corporate NPWP, and configure financial year settings.",
+            "what_you_accomplish": "Bind your CFO AI workspace to your official Indonesian corporate identity. This ensures all bank imports, invoices, and accountant exports reflect your verified legal business details.",
+            "prerequisites": [
+              "Active CFO AI account with Owner or Admin role",
+              "Official legal entity name registered in AHU/Kemenkumham deed",
+              "16-digit corporate NPWP (or 15-digit legacy format)",
+              "Registered Indonesian business address"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Navigate to Company Profile",
+                "instruction": "Log in to app.cfo-ai.site. In the left navigation sidebar, click Settings, then select the Company Profile tab."
+              },
+              {
+                "step": 2,
+                "title": "Enter Legal Entity Name & Business Type",
+                "instruction": "Enter the exact legal company name (e.g. PT Inovasi Keuangan Nusantara). Under Entity Type, select PT Biasa (Domestic), PT PMA (Foreign Investment), or CV."
+              },
+              {
+                "step": 3,
+                "title": "Configure 16-Digit Corporate NPWP",
+                "instruction": "Enter your corporate Tax Identification Number. CFO AI validates both the 16-digit format under PMK 81/2024 and legacy 15-digit numbers."
+              },
+              {
+                "step": 4,
+                "title": "Confirm Base Currency & Save Changes",
+                "instruction": "Confirm your base operational currency is set to Indonesian Rupiah (IDR), then click Save Profile Changes."
+              }
+            ],
+            "expected_result": "A green confirmation badge appears. Your legal entity name and corporate NPWP will now automatically populate on outgoing invoice drafts, receipt match suggestions, and exported accountant preparation packages.",
+            "troubleshooting": [
+              {
+                "error": "Invalid NPWP character length",
+                "solution": "Ensure your entry contains either exactly 15 or 16 numeric digits. Remove any spaces, dashes, or accidental characters copied from scanned PDFs."
+              },
+              {
+                "error": "Permission denied: Admin role required",
+                "solution": "Only workspace Owners and Admins can modify legal profile details. If you have an Accountant or Viewer role, contact your workspace Owner."
+              }
+            ],
+            "keywords": "npwp 16 digit pt pma entity profile setup settings tax coretax onboarding company"
+          },
+          "id": {
+            "title": "Mengonfigurasi Profil Perusahaan, Identitas Pajak & Detail Entitas",
+            "summary": "Siapkan perusahaan PT atau PT PMA Anda, masukkan 16 digit NPWP perusahaan, dan atur periode tahun buku keuangan.",
+            "what_you_accomplish": "Menghubungkan ruang kerja CFO AI dengan identitas resmi badan usaha Indonesia Anda agar seluruh mutasi bank, faktur, dan paket akuntan mencantumkan data hukum yang valid.",
+            "prerequisites": [
+              "Akun CFO AI aktif dengan peran Pemilik (Owner) atau Admin",
+              "Nama badan hukum resmi sesuai akta pendirian AHU/Kemenkumham",
+              "16 digit NPWP badan (atau format lama 15 digit)",
+              "Alamat domisili usaha terdaftar di Indonesia"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Profil Perusahaan",
+                "instruction": "Masuk ke app.cfo-ai.site. Pada bilah navigasi kiri, klik Pengaturan (Settings), lalu pilih tab Profil Perusahaan (Company Profile)."
+              },
+              {
+                "step": 2,
+                "title": "Masukkan Nama Badan Hukum & Bentuk Usaha",
+                "instruction": "Ketik nama resmi entitas Anda (contoh: PT Inovasi Keuangan Nusantara). Pada Jenis Entitas, pilih PT Biasa, PT PMA, atau CV."
+              },
+              {
+                "step": 3,
+                "title": "Konfigurasikan 16 Digit NPWP Badan",
+                "instruction": "Masukkan NPWP perusahaan. Sistem memvalidasi format baru 16 digit sesuai ketentuan PMK 81/2024 maupun format lama 15 digit."
+              },
+              {
+                "step": 4,
+                "title": "Konfirmasi Mata Uang Dasar & Simpan",
+                "instruction": "Pastikan mata uang dasar operasional adalah Rupiah (IDR), lalu klik tombol Simpan Perubahan Profil."
+              }
+            ],
+            "expected_result": "Muncul notifikasi hijau bahwa profil berhasil diperbarui. Nama badan usaha dan NPWP akan otomatis dicantumkan pada draf faktur, pencocokan bukti transaksi, dan berkas ekspor akuntan.",
+            "troubleshooting": [
+              {
+                "error": "Panjang karakter NPWP tidak valid",
+                "solution": "Pastikan nomor hanya terdiri dari tepat 15 atau 16 angka. Hapus tanda titik, tanda hubung, atau spasi jika disalin dari dokumen cetak."
+              },
+              {
+                "error": "Akses ditolak: Memerlukan peran Admin",
+                "solution": "Hanya Pemilik dan Admin ruang kerja yang dapat mengubah profil hukum perusahaan. Hubungi Pemilik ruang kerja jika Anda memiliki peran Akuntan atau Viewer."
+              }
+            ],
+            "keywords": "npwp 16 digit pt pma entitas profil pengaturan pajak coretax onboarding badan usaha"
+          },
+          "ru": {
+            "title": "Настройка профиля компании, налогового номера NPWP и реквизитов",
+            "summary": "Настройте параметры юридического лица PT или PT PMA, введите 16-значный корпоративный NPWP и задайте финансовый год.",
+            "what_you_accomplish": "Привязка рабочего пространства CFO AI к официальным юридическим реквизитам индонезийской компании для корректного отображения в счетах, выписках и пакетах для бухгалтера.",
+            "prerequisites": [
+              "Активный аккаунт CFO AI с ролью Владелец (Owner) или Администратор (Admin)",
+              "Официальное наименование юридического лица по уставу AHU/Kemenkumham",
+              "16-значный налоговый номер NPWP (или 15-значный старого образца)",
+              "Юридический адрес компании в Индонезии"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Перейдите в профиль компании",
+                "instruction": "Войдите на app.cfo-ai.site. В боковом меню выберите Настройки (Settings), затем вкладку Профиль компании (Company Profile)."
+              },
+              {
+                "step": 2,
+                "title": "Укажите наименование компании и форму собственности",
+                "instruction": "Введите официальное название компании (например, PT Inovasi Keuangan Nusantara) и выберите тип: PT Biasa, PT PMA или CV."
+              },
+              {
+                "step": 3,
+                "title": "Укажите 16-значный корпоративный номер NPWP",
+                "instruction": "Введите номер NPWP. Система проверяет как 16-значный формат стандарта PMK 81/2024, так и 15-значный формат старого образца."
+              },
+              {
+                "step": 4,
+                "title": "Подтвердите базовую валюту и сохраните изменения",
+                "instruction": "Убедитесь, что базовая валюта установлена как индонезийская рупия (IDR), и нажмите Сохранить изменения."
+              }
+            ],
+            "expected_result": "Появится зеленое подтверждение об успешном обновлении. Реквизиты и NPWP будут автоматически подставляться в выставляемые счета и архивные пакеты для налогового консультанта.",
+            "troubleshooting": [
+              {
+                "error": "Неверная длина номера NPWP",
+                "solution": "Убедитесь, что номер состоит ровно из 15 или 16 цифр. Удалите пробелы, дефисы и точки при копировании из сканированных документов."
+              },
+              {
+                "error": "Доступ запрещен: требуется роль Администратора",
+                "solution": "Изменять юридические реквизиты могут только роли Owner и Admin. Обратитесь к владельцу компании для обновления данных."
+              }
+            ],
+            "keywords": "npwp 16 цифр pt pma компания реквизиты профиль настройки налоги индонезия"
+          }
+        }
+      },
+      {
+        "id": "art-help-02",
+        "slug": "create-account",
+        "category_id": "getting-started",
+        "featured": false,
+        "read_time": "4 min",
+        "order": 2,
+        "review_status": "published",
+        "screenshot": "/assets/screens/FirstDay.png",
+        "translations": {
+          "en": {
+            "title": "Creating Your Account and Initial Workspace Setup",
+            "summary": "Step-by-step guide to signing up via work email, naming your workspace, and selecting your base currency.",
+            "what_you_accomplish": "Create your personal authenticated identity and establish your first company workspace with isolated financial data.",
+            "prerequisites": [
+              "Corporate or personal work email address",
+              "Web browser supporting modern TLS 1.3 encryption"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Initiate Registration",
+                "instruction": "Visit app.cfo-ai.site/login and select 'Create Free Account' or enter your work email address."
+              },
+              {
+                "step": 2,
+                "title": "Verify Email Magic Link",
+                "instruction": "Check your inbox for the secure authentication link sent from auth.cfo-ai.site and click to confirm your session."
+              },
+              {
+                "step": 3,
+                "title": "Name Your Workspace",
+                "instruction": "Enter your operating company brand or trade name. Choose whether this workspace is for a single operating business or a holding entity."
+              },
+              {
+                "step": 4,
+                "title": "Select Base Currency & Timezone",
+                "instruction": "Select Indonesian Rupiah (IDR) as your reporting currency and Asia/Jakarta (WIB) or Asia/Makassar (WITA) timezone."
+              }
+            ],
+            "expected_result": "You are redirected into the CFO AI Business Pulse dashboard, ready to add accounts and invite collaborators.",
+            "troubleshooting": [
+              {
+                "error": "Magic link email not received",
+                "solution": "Check your spam or junk folder. Ensure your email server permits incoming messages from auth.cfo-ai.site."
+              }
+            ],
+            "keywords": "signup register account workspace email password currency idr login"
+          },
+          "id": {
+            "title": "Membuat Akun dan Menyiapkan Ruang Kerja Pertama",
+            "summary": "Panduan langkah demi langkah mendaftar melalui email kerja, menamai ruang kerja, dan memilih mata uang dasar.",
+            "what_you_accomplish": "Membuat identitas terotentikasi dan menginisialisasi ruang kerja perusahaan pertama dengan data keuangan yang terisolasi aman.",
+            "prerequisites": [
+              "Alamat email kerja perusahaan atau pribadi",
+              "Peramban web yang mendukung enkripsi TLS 1.3"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Mulai Pendaftaran",
+                "instruction": "Kunjungi app.cfo-ai.site/login dan pilih 'Buat Akun Gratis' atau masukkan alamat email kerja Anda."
+              },
+              {
+                "step": 2,
+                "title": "Verifikasi Tautan Magic Link Email",
+                "instruction": "Periksa kotak masuk email untuk tautan otentikasi aman yang dikirim dari auth.cfo-ai.site dan klik untuk mengonfirmasi sesi."
+              },
+              {
+                "step": 3,
+                "title": "Beri Nama Ruang Kerja",
+                "instruction": "Ketik nama merek dagang atau nama operasional entitas Anda. Pilih apakah ruang kerja ini untuk satu badan usaha atau entitas holding."
+              },
+              {
+                "step": 4,
+                "title": "Pilih Mata Uang & Zona Waktu",
+                "instruction": "Pilih Rupiah (IDR) sebagai mata uang pelaporan dan zona waktu Asia/Jakarta (WIB) atau Asia/Makassar (WITA)."
+              }
+            ],
+            "expected_result": "Anda langsung dialihkan ke dasbor Business Pulse CFO AI dan siap menambahkan rekening serta mengundang tim.",
+            "troubleshooting": [
+              {
+                "error": "Email tautan masuk tidak kunjung tiba",
+                "solution": "Periksa folder spam atau promosi. Pastikan server email perusahaan tidak memblokir pengirim auth.cfo-ai.site."
+              }
+            ],
+            "keywords": "daftar akun buat akun ruang kerja email mata uang idr masuk login"
+          },
+          "ru": {
+            "title": "Создание аккаунта и первоначальная настройка компании",
+            "summary": "Пошаговая инструкция по регистрации через рабочий email, созданию рабочего пространства и выбору базовой валюты.",
+            "what_you_accomplish": "Регистрация учетной записи пользователя и создание изолированного рабочего пространства компании с защищенной базой данных.",
+            "prerequisites": [
+              "Рабочий адрес электронной почты",
+              "Современный веб-браузер с поддержкой TLS 1.3"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Начните регистрацию",
+                "instruction": "Перейдите на страницу app.cfo-ai.site/login, нажмите 'Создать аккаунт' или введите рабочий email."
+              },
+              {
+                "step": 2,
+                "title": "Подтвердите вход через magic link",
+                "instruction": "Откройте почту, найдите письмо от auth.cfo-ai.site и перейдите по безопасной ссылке для входа."
+              },
+              {
+                "step": 3,
+                "title": "Задайте название компании",
+                "instruction": "Укажите название вашего бренда или юрлица, определите статус (операционная компания или холдинг)."
+              },
+              {
+                "step": 4,
+                "title": "Выберите валюту и часовой пояс",
+                "instruction": "Укажите индонезийскую рупию (IDR) в качестве базовой валюты и выберите часовой пояс WIB (Джакарта/Бали)."
+              }
+            ],
+            "expected_result": "Вы попадете на главный экран Business Pulse и сможете сразу приступить к настройке счетов и подключению команды.",
+            "troubleshooting": [
+              {
+                "error": "Письмо с ссылкой не приходит",
+                "solution": "Проверьте папку 'Спам'. Убедитесь, что домен auth.cfo-ai.site не заблокирован почтовым сервисом."
+              }
+            ],
+            "keywords": "регистрация аккаунт вход компания создание пространства валюта idr"
+          }
+        }
+      },
+      {
+        "id": "art-help-03",
+        "slug": "team-invites",
+        "category_id": "getting-started",
+        "featured": false,
+        "read_time": "4 min",
+        "order": 3,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Settings.png",
+        "translations": {
+          "en": {
+            "title": "Inviting Team Members and Managing Role Permissions",
+            "summary": "How to invite staff, assign Owner, Admin, Accountant, or Viewer roles, and restrict financial access.",
+            "what_you_accomplish": "Safely collaborate with directors, finance managers, and external tax accountants while enforcing strict least-privilege role boundaries.",
+            "prerequisites": [
+              "Owner or Admin permissions in the workspace",
+              "Email addresses of invitees"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open Team Settings",
+                "instruction": "In the sidebar, navigate to Settings > Team Members."
+              },
+              {
+                "step": 2,
+                "title": "Click Invite Member",
+                "instruction": "Click the 'Invite Member' button in the top right corner of the directory table."
+              },
+              {
+                "step": 3,
+                "title": "Select Appropriate Role",
+                "instruction": "Enter the email and choose: Owner (full control & billing), Admin (operational configuration), Accountant (reconciliation & export packages), or Viewer (read-only charts)."
+              },
+              {
+                "step": 4,
+                "title": "Send Invitation",
+                "instruction": "Confirm the invite. The recipient will receive an email invitation valid for 7 days."
+              }
+            ],
+            "expected_result": "The invited user appears in your team directory as 'Pending Invite' until they accept and authenticate.",
+            "troubleshooting": [
+              {
+                "error": "Accountant cannot view billing tab",
+                "solution": "By design, Accountant roles do not have access to credit card or billing management. Only workspace Owners can manage billing."
+              }
+            ],
+            "keywords": "invite team staff permissions roles accountant access security users admin"
+          },
+          "id": {
+            "title": "Mengundang Anggota Tim dan Mengatur Hak Akses Peran",
+            "summary": "Cara mengundang staf, menetapkan peran Pemilik, Admin, Akuntan, atau Viewer, dan membatasi akses data keuangan.",
+            "what_you_accomplish": "Berkolaborasi dengan direktur, manajer keuangan, dan konsultan pajak eksternal dengan batasan hak akses yang ketat.",
+            "prerequisites": [
+              "Izin Pemilik (Owner) atau Admin di ruang kerja",
+              "Alamat email anggota yang akan diundang"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Pengaturan Tim",
+                "instruction": "Pada bilah menu navigasi, buka Pengaturan > Anggota Tim (Team Members)."
+              },
+              {
+                "step": 2,
+                "title": "Klik Undang Anggota",
+                "instruction": "Klik tombol 'Undang Anggota' pada sudut kanan atas tabel anggota."
+              },
+              {
+                "step": 3,
+                "title": "Pilih Peran yang Tepat",
+                "instruction": "Ketik email dan pilih: Pemilik (kontrol penuh & penagihan), Admin (pengaturan operasional), Akuntan (rekonsiliasi & ekspor paket), atau Viewer (hanya melihat)."
+              },
+              {
+                "step": 4,
+                "title": "Kirim Undangan",
+                "instruction": "Konfirmasi pengiriman. Anggota tim akan menerima email undangan yang berlaku selama 7 hari."
+              }
+            ],
+            "expected_result": "Nama staf tercantum dalam daftar anggota dengan status 'Menunggu Konfirmasi' hingga mereka menerima undangan.",
+            "troubleshooting": [
+              {
+                "error": "Akuntan tidak dapat melihat menu penagihan (billing)",
+                "solution": "Sesuai standar keamanan, peran Akuntan sengaja dibatasi dari informasi kartu kredit dan langganan. Hanya Pemilik yang dapat mengelola penagihan."
+              }
+            ],
+            "keywords": "undang tim staf peran hak akses akuntan admin keamanan anggota"
+          },
+          "ru": {
+            "title": "Приглашение сотрудников и управление правами доступа",
+            "summary": "Как пригласить коллег, назначить роли Владельца, Администратора, Бухгалтера или Наблюдателя и разграничить доступ к финансам.",
+            "what_you_accomplish": "Организация совместной работы основателей, финансовых менеджеров и внешних налоговых бухгалтеров с жестким разграничением полномочий.",
+            "prerequisites": [
+              "Роль Owner или Admin в рабочем пространстве",
+              "Email приглашаемого сотрудника"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте настройки команды",
+                "instruction": "В боковом меню перейдите в раздел Настройки > Команда (Team Members)."
+              },
+              {
+                "step": 2,
+                "title": "Нажмите 'Пригласить пользователя'",
+                "instruction": "В правом верхнем углу списка нажмите кнопку приглашения нового сотрудника."
+              },
+              {
+                "step": 3,
+                "title": "Выберите подходящую роль",
+                "instruction": "Укажите email и назначьте роль: Owner (полный доступ и биллинг), Admin (операционные настройки), Accountant (сверка и экспорт) или Viewer (только просмотр)."
+              },
+              {
+                "step": 4,
+                "title": "Отправьте приглашение",
+                "instruction": "Подтвердите отправку. Пользователь получит пригласительное письмо со ссылкой со сроком действия 7 дней."
+              }
+            ],
+            "expected_result": "Сотрудник появится в списке со статусом 'Ожидает подтверждения' до момента первого входа в систему.",
+            "troubleshooting": [
+              {
+                "error": "Бухгалтер не видит раздел с оплатой подписки",
+                "solution": "По правилам безопасности роль Бухгалтер не имеет доступа к платежным картам и биллингу. Управлять подпиской может только Owner."
+              }
+            ],
+            "keywords": "приглашение команда роли права доступа бухгалтер администратор безопасность"
+          }
+        }
+      },
+      {
+        "id": "art-help-04",
+        "slug": "bank-accounts",
+        "category_id": "accounts-transactions",
+        "featured": false,
+        "read_time": "5 min",
+        "order": 4,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Accounts.png",
+        "translations": {
+          "en": {
+            "title": "Adding Operational Bank Accounts and Cash Wallets",
+            "summary": "Configure bank accounts (BCA, Mandiri, BRI, BNI, Permata, Wise) and physical petty cash wallets in your ledger.",
+            "what_you_accomplish": "Establish all liquidity sources across Indonesian checking accounts and petty cash to maintain total cash runway visibility.",
+            "prerequisites": [
+              "Admin or Owner role",
+              "Account numbers and opening balances of commercial bank accounts"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open Accounts Screen",
+                "instruction": "In the main navigation menu, click Accounts."
+              },
+              {
+                "step": 2,
+                "title": "Click Add Account",
+                "instruction": "Select 'Add New Account' at the top of the balance overview card."
+              },
+              {
+                "step": 3,
+                "title": "Choose Bank or Cash Type",
+                "instruction": "Select your financial institution (BCA, Mandiri, BRI, BNI, Permata, Danamon, CIMB, Wise, or Physical Cash Wallet)."
+              },
+              {
+                "step": 4,
+                "title": "Enter Account Number & Opening Balance",
+                "instruction": "Input the last digits of the account number, currency (IDR/USD), and verified opening ledger balance."
+              }
+            ],
+            "expected_result": "The new account is immediately visible in your Accounts overview and available for bank statement matching.",
+            "troubleshooting": [
+              {
+                "error": "Opening balance differs from bank balance",
+                "solution": "Verify whether uncredited cheques or late deposits were pending on the date of your opening balance."
+              }
+            ],
+            "keywords": "bank account cash wallet bca mandiri idr balances operational petty cash"
+          },
+          "id": {
+            "title": "Menambahkan Rekening Bank Operasional & Kas Fisik",
+            "summary": "Konfigurasikan rekening bank (BCA, Mandiri, BRI, BNI, Permata, Wise) dan dompet kas kecil (petty cash) di buku besar.",
+            "what_you_accomplish": "Mendaftarkan seluruh sumber likuiditas perusahaan agar saldo kas gabungan dan runway terpantau secara akurat.",
+            "prerequisites": [
+              "Peran Admin atau Pemilik",
+              "Nomor rekening dan saldo awal buku besar bank terkait"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Rekening (Accounts)",
+                "instruction": "Pada menu utama navigasi, klik menu Rekening."
+              },
+              {
+                "step": 2,
+                "title": "Klik Tambah Rekening",
+                "instruction": "Pilih tombol 'Tambah Rekening Baru' di bagian atas ikhtisar saldo."
+              },
+              {
+                "step": 3,
+                "title": "Pilih Bank atau Kas Fisik",
+                "instruction": "Pilih institusi bank Anda (BCA, Mandiri, BRI, BNI, Permata, Danamon, CIMB, Wise, atau Dompet Kas Kecil)."
+              },
+              {
+                "step": 4,
+                "title": "Masukkan Nomor Rekening & Saldo Awal",
+                "instruction": "Ketik nomor rekening, tentukan mata uang (IDR/USD), dan masukkan saldo awal pembukuan yang telah diverifikasi."
+              }
+            ],
+            "expected_result": "Rekening baru langsung muncul di daftar akun dan siap digunakan untuk pencocokan mutasi bank.",
+            "troubleshooting": [
+              {
+                "error": "Saldo awal berbeda dengan saldo rekening koran",
+                "solution": "Periksa apakah ada transaksi kliring atau setoran tertunda pada tanggal penetapan saldo awal buku besar Anda."
+              }
+            ],
+            "keywords": "rekening bank kas dompet bca mandiri saldo rupiah petty cash akun operasional"
+          },
+          "ru": {
+            "title": "Добавление расчетных счетов и наличных касс",
+            "summary": "Настройка расчетных счетов индонезийских банков (BCA, Mandiri, BRI, BNI, Permata, Wise) и касс petty cash в едином учете.",
+            "what_you_accomplish": "Подключение всех источников ликвидности компании для точного расчета доступных средств и срока выживаемости (runway).",
+            "prerequisites": [
+              "Роль Owner или Admin",
+              "Номера расчетных счетов и начальные остатки"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Перейдите в раздел Счета (Accounts)",
+                "instruction": "В главном меню навигации выберите раздел Счета."
+              },
+              {
+                "step": 2,
+                "title": "Нажмите 'Добавить счет'",
+                "instruction": "В верхней части сводки балансов нажмите кнопку создания нового счета."
+              },
+              {
+                "step": 3,
+                "title": "Выберите банк или наличную кассу",
+                "instruction": "Укажите банк (BCA, Mandiri, BRI, BNI, Permata, CIMB, Wise) или выберите тип 'Наличная касса'."
+              },
+              {
+                "step": 4,
+                "title": "Укажите номер счета и начальный остаток",
+                "instruction": "Введите реквизиты счета, выберите валюту (IDR, USD) и укажите проверенный начальный баланс."
+              }
+            ],
+            "expected_result": "Счет сразу появится в списке счетов и станет доступен для сопоставления с выписками и ручных проводок.",
+            "troubleshooting": [
+              {
+                "error": "Начальный остаток не сходится с выпиской",
+                "solution": "Проверьте дату начального остатка: возможно, часть платежей еще находилась в процессе межбанковского клиринга."
+              }
+            ],
+            "keywords": "банковские счета касса bca mandiri idr остатки баланс расчетный счет"
+          }
+        }
+      },
+      {
+        "id": "art-help-05",
+        "slug": "manual-transactions",
+        "category_id": "accounts-transactions",
+        "featured": false,
+        "read_time": "4 min",
+        "order": 5,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Transactions.png",
+        "translations": {
+          "en": {
+            "title": "Recording and Categorizing Manual Transactions",
+            "summary": "How to manually enter income, expenses, and transfers when bank statements are not immediately available.",
+            "what_you_accomplish": "Maintain up-to-date cash tracking for immediate cash expenses, director loans, or physical cash dispatches.",
+            "prerequisites": [
+              "Accountant, Admin, or Owner role",
+              "Transaction date, amount, and receipt details"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Go to Transactions Screen",
+                "instruction": "Click Transactions in the left navigation sidebar."
+              },
+              {
+                "step": 2,
+                "title": "Click New Transaction",
+                "instruction": "Click '+ Record Transaction' at the top right of the transactions table."
+              },
+              {
+                "step": 3,
+                "title": "Choose Type (Expense, Income, Transfer)",
+                "instruction": "Select whether this is an Expense, Income, or Internal Account Transfer."
+              },
+              {
+                "step": 4,
+                "title": "Assign Category & Attach Voucher",
+                "instruction": "Select an operating expense category, enter counterparty/vendor name, and optionally drag-and-drop the payment receipt photo."
+              }
+            ],
+            "expected_result": "The transaction appears in your ledger with a 'Manual Entry' badge and updates your account balance in real-time.",
+            "troubleshooting": [
+              {
+                "error": "Duplicate transaction warning",
+                "solution": "If the bank statement import later includes this transaction, CFO AI's match engine will suggest linking it to avoid double-counting."
+              }
+            ],
+            "keywords": "manual transaction expense income transfer category tag status"
+          },
+          "id": {
+            "title": "Mencatat dan Mengkategorikan Transaksi Manual",
+            "summary": "Cara memasukkan pendapatan, pengeluaran, dan transfer antar-rekening saat mutasi bank belum diekspor.",
+            "what_you_accomplish": "Menjaga keterkinian catatan kas harian untuk pengeluaran tunai, nota kecil, atau pengeluaran operasional mendesak.",
+            "prerequisites": [
+              "Peran Akuntan, Admin, atau Pemilik",
+              "Tanggal transaksi, nominal, dan bukti pembayaran"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Transaksi",
+                "instruction": "Klik menu Transaksi pada bilah navigasi kiri."
+              },
+              {
+                "step": 2,
+                "title": "Klik Catat Transaksi Baru",
+                "instruction": "Pilih tombol '+ Catat Transaksi' pada sudut kanan atas tabel transaksi."
+              },
+              {
+                "step": 3,
+                "title": "Tentukan Jenis Transaksi",
+                "instruction": "Pilih apakah transaksi berupa Pengeluaran, Pendapatan, atau Transfer Antar-Rekening."
+              },
+              {
+                "step": 4,
+                "title": "Pilih Kategori & Lampirkan Bukti",
+                "instruction": "Pilih kategori beban operasional, nama vendor/rekanan, dan unggah foto nota atau kuitansi pembayaran."
+              }
+            ],
+            "expected_result": "Transaksi langsung tercatat dalam buku besar dengan label 'Entri Manual' dan memperbarui saldo seketika.",
+            "troubleshooting": [
+              {
+                "error": "Peringatan transaksi ganda (duplikat)",
+                "solution": "Jika transaksi ini nantinya muncul di mutasi bank yang diunggah, sistem pencocokan akan menyarankan penggabungan agar tidak tercatat dua kali."
+              }
+            ],
+            "keywords": "transaksi manual pengeluaran pendapatan transfer kategori nota kuitansi"
+          },
+          "ru": {
+            "title": "Ввод и классификация ручных операций",
+            "summary": "Как вручную заносить доходы, расходы и переводы между счетами при отсутствии свежей банковской выписки.",
+            "what_you_accomplish": "Поддержание актуального финансового учета наличных расходов, подотчетных сумм и прямых переводов.",
+            "prerequisites": [
+              "Роль Accountant, Admin или Owner",
+              "Дата, сумма операции и подтверждающий чек"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Перейдите в раздел Операции",
+                "instruction": "В боковом меню выберите раздел Операции (Transactions)."
+              },
+              {
+                "step": 2,
+                "title": "Нажмите 'Создать операцию'",
+                "instruction": "Нажмите кнопку '+ Записать операцию' над таблицей проводок."
+              },
+              {
+                "step": 3,
+                "title": "Выберите тип (Расход, Доход, Перевод)",
+                "instruction": "Укажите характер операции: расход компании, доход или внутренний перевод между счетами."
+              },
+              {
+                "step": 4,
+                "title": "Укажите категорию и прикрепите документ",
+                "instruction": "Выберите статью затрат, укажите контрагента и прикрепите фото или скан квитанции."
+              }
+            ],
+            "expected_result": "Операция сохраняется в журнале с отметкой 'Ручной ввод' и моментально пересчитывает доступный остаток на счете.",
+            "troubleshooting": [
+              {
+                "error": "Предупреждение о возможном дублировании",
+                "solution": "При последующей загрузке банковской выписки алгоритм предложит связать ручную запись с банковской строкой во избежание задвоения."
+              }
+            ],
+            "keywords": "ручные операции расходы доходы переводы статьи затрат квитанция чек проводка"
+          }
+        }
+      },
+      {
+        "id": "art-help-06",
+        "slug": "bank-import",
+        "category_id": "bank-reconciliation",
+        "featured": true,
+        "read_time": "6 min",
+        "order": 6,
+        "review_status": "published",
+        "screenshot": "/assets/screens/BankImport.png",
+        "translations": {
+          "en": {
+            "title": "Importing Bank Statements (CSV/Excel) and Matching Records",
+            "summary": "Upload bank statement exports from BCA KlikBisnis, Mandiri MCM, BRI, or Wise and reconcile transactions.",
+            "what_you_accomplish": "Eliminate manual bookkeeping by importing official bank feed files and executing intelligent 1-click transaction reconciliation.",
+            "prerequisites": [
+              "Exported CSV or Excel (.xlsx) file from your Indonesian internet banking portal",
+              "Assigned bank account created in CFO AI Accounts"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Navigate to Bank Import",
+                "instruction": "Click 'Bank Reconciliation' in the sidebar, then select the 'Import Feed' tab."
+              },
+              {
+                "step": 2,
+                "title": "Select Target Account",
+                "instruction": "Choose which configured bank account corresponds to the file you are uploading."
+              },
+              {
+                "step": 3,
+                "title": "Upload Statement File",
+                "instruction": "Drag and drop the CSV/Excel statement file. The parser detects standard date, description, debit, and credit columns."
+              },
+              {
+                "step": 4,
+                "title": "Review Matched Transactions",
+                "instruction": "Review suggested matches with your existing invoices and manual receipts. Click 'Confirm Match' or 'Create New Ledger Entry'."
+              }
+            ],
+            "expected_result": "Statement transactions transition from 'Pending Match' to 'Reconciled'. Your runway and P&L charts update automatically.",
+            "troubleshooting": [
+              {
+                "error": "Unrecognized date format in CSV",
+                "solution": "Indonesian banks frequently use DD/MM/YYYY. If your export uses custom formats, verify the column mapping preview before clicking Import."
+              }
+            ],
+            "keywords": "bank statement import csv excel bca mandiri reconcile match matching unmatched"
+          },
+          "id": {
+            "title": "Mengimpor Rekening Koran Bank (CSV/Excel) & Mencocokkan Data",
+            "summary": "Unggah rekening koran dari BCA KlikBisnis, Mandiri MCM, BRI, atau Wise dan rekonsiliasikan transaksi dengan cepat.",
+            "what_you_accomplish": "Menghilangkan pembukuan manual yang memakan waktu dengan mengimpor mutasi resmi bank dan mencocokkannya dalam satu klik.",
+            "prerequisites": [
+              "File ekspor CSV atau Excel (.xlsx) dari portal internet banking bank Anda",
+              "Rekening bank tujuan yang telah didaftarkan di CFO AI"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Rekonsiliasi Bank",
+                "instruction": "Klik 'Rekonsiliasi Bank' pada bilah menu samping, lalu pilih tab 'Impor Mutasi'."
+              },
+              {
+                "step": 2,
+                "title": "Pilih Rekening Tujuan",
+                "instruction": "Tentukan rekening bank operasional yang sesuai dengan file rekening koran yang diunggah."
+              },
+              {
+                "step": 3,
+                "title": "Unggah File Rekening Koran",
+                "instruction": "Seret dan letakkan file CSV/Excel Anda. Parser otomatis membaca kolom tanggal, deskripsi, debit, dan kredit."
+              },
+              {
+                "step": 4,
+                "title": "Tinjau Hasil Pencocokan",
+                "instruction": "Periksa saran pencocokan dengan faktur atau kuitansi yang ada. Klik 'Konfirmasi Cocok' atau 'Buat Entri Baru'."
+              }
+            ],
+            "expected_result": "Baris mutasi bank berubah status dari 'Tertunda' menjadi 'Terekonsiliasi'. Angka runway dan P&L langsung terbarui.",
+            "troubleshooting": [
+              {
+                "error": "Format tanggal CSV tidak dikenali",
+                "solution": "Bank di Indonesia umumnya memakai format DD/MM/YYYY. Periksa pratinjau pemetaan kolom sebelum menekan tombol Impor."
+              }
+            ],
+            "keywords": "impor mutasi rekening koran csv excel bca mandiri rekonsiliasi cocok"
+          },
+          "ru": {
+            "title": "Импорт банковских выписок (CSV/Excel) и сверка операций",
+            "summary": "Загрузка файлов выписок из интернет-банков BCA KlikBisnis, Mandiri MCM, BRI или Wise и сопоставление платежей.",
+            "what_you_accomplish": "Автоматизация рутинного учета: загрузка банковских файлов, распознавание строк и сверка с подтверждающими документами в один клик.",
+            "prerequisites": [
+              "Файл выписки в формате CSV или Excel (.xlsx) из клиент-банка",
+              "Созданный банковский счет в настройках CFO AI"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Перейдите в раздел Банковская сверка",
+                "instruction": "В боковом меню выберите раздел 'Банковская сверка', затем вкладку 'Импорт выписки'."
+              },
+              {
+                "step": 2,
+                "title": "Выберите счет назначения",
+                "instruction": "Укажите расчетный счет компании, к которому относится загружаемая банковская выписка."
+              },
+              {
+                "step": 3,
+                "title": "Загрузите файл выписки",
+                "instruction": "Перетащите файл в окно загрузки. Парсер автоматически определит колонки даты, описания платежа, дебета и кредита."
+              },
+              {
+                "step": 4,
+                "title": "Проверьте сопоставления",
+                "instruction": "Ознакомьтесь с предложенными совпадениями со счетами и чеками. Нажмите 'Подтвердить соответствие' или 'Создать проводку'."
+              }
+            ],
+            "expected_result": "Строки выписки переходят в статус 'Сверено'. Графики ликвидности и отчет P&L пересчитываются моментально.",
+            "troubleshooting": [
+              {
+                "error": "Неверный формат даты в выписке",
+                "solution": "Индонезийские банки чаще всего используют формат ДД/ММ/ГГГГ. Проверьте окно сопоставления колонок перед импортом."
+              }
+            ],
+            "keywords": "импорт выписки банк сверка bca mandiri csv excel сопоставление платежи"
+          }
+        }
+      },
+      {
+        "id": "art-help-07",
+        "slug": "document-upload",
+        "category_id": "documents-invoices",
+        "featured": true,
+        "read_time": "5 min",
+        "order": 7,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Documents.png",
+        "translations": {
+          "en": {
+            "title": "Uploading Receipts and Invoices for Document Extraction",
+            "summary": "How to upload PDF, JPG, or PNG files, view OCR-extracted amounts, and link receipts to ledger entries.",
+            "what_you_accomplish": "Centralize all vendor bills, paper receipts, and Indonesian Kwitansi, reading critical fields with AI OCR and preserving audit evidence.",
+            "prerequisites": [
+              "Scanned PDF, JPG, or PNG file of the receipt or invoice",
+              "File size under 15 MB"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open Document Intake",
+                "instruction": "Go to Documents in the left navigation sidebar."
+              },
+              {
+                "step": 2,
+                "title": "Upload File",
+                "instruction": "Drag your document into the upload dropzone or click 'Browse Files'."
+              },
+              {
+                "step": 3,
+                "title": "Inspect OCR Extraction",
+                "instruction": "Our local OCR engine analyzes vendor name, date, invoice number, line items, and total amount with PPN tax detection."
+              },
+              {
+                "step": 4,
+                "title": "Verify and Link to Ledger",
+                "instruction": "Review extracted values on the verification pane, make adjustments if needed, and click 'Attach to Ledger'."
+              }
+            ],
+            "expected_result": "The document is saved in your secure encrypted archive, linked directly to the financial transaction.",
+            "troubleshooting": [
+              {
+                "error": "Faint or blurry receipt text",
+                "solution": "If a paper receipt has thermal fading, you can manually type missing digits into the verification fields before saving."
+              }
+            ],
+            "keywords": "upload receipt invoice bill ocr extraction scan document kwitansi pdf"
+          },
+          "id": {
+            "title": "Mengunggah Bukti Pembayaran & Faktur untuk Ekstraksi OCR",
+            "summary": "Cara mengunggah file PDF, JPG, atau PNG, melihat data hasil pembacaan OCR, dan menautkannya ke buku besar.",
+            "what_you_accomplish": "Memusatkan seluruh kuitansi, nota warung, dan faktur vendor dengan ekstraksi angka otomatis dan penyimpanan arsip bukti audit.",
+            "prerequisites": [
+              "File hasil foto atau pindai PDF/JPG/PNG dari bukti transaksi",
+              "Ukuran file tidak melebihi 15 MB"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Dokumen",
+                "instruction": "Pilih menu Dokumen pada bilah navigasi samping."
+              },
+              {
+                "step": 2,
+                "title": "Unggah Dokumen",
+                "instruction": "Tarik file bukti transaksi ke area unggah atau klik tombol 'Pilih File'."
+              },
+              {
+                "step": 3,
+                "title": "Periksa Ekstraksi OCR",
+                "instruction": "Mesin OCR membaca nama toko/vendor, tanggal, nomor faktur, dan rincian nominal termasuk PPN."
+              },
+              {
+                "step": 4,
+                "title": "Verifikasi & Tautkan ke Pembukuan",
+                "instruction": "Periksa angka hasil ekstraksi di panel samping, sesuaikan jika ada yang keliru, lalu klik 'Tautkan ke Transaksi'."
+              }
+            ],
+            "expected_result": "Dokumen tersimpan aman dalam arsip terenkripsi dan terhubung langsung ke catatan keuangan terkait.",
+            "troubleshooting": [
+              {
+                "error": "Struk pudar atau buram",
+                "solution": "Jika struk termal agak buram, Anda tetap dapat mengoreksi angka nominal secara manual pada kolom verifikasi sebelum disimpan."
+              }
+            ],
+            "keywords": "unggah kuitansi faktur ocr ekstraksi struk dokumen nota kwitansi"
+          },
+          "ru": {
+            "title": "Загрузка чеков и счетов для распознавания (OCR)",
+            "summary": "Как загружать файлы PDF, JPG или PNG, проверять распознанные поля и прикреплять сканы к проводкам.",
+            "what_you_accomplish": "Хранение всех счетов поставщиков, чеков и индонезийских Kwitansi в едином защищенном архиве с автоматическим распознаванием реквизитов.",
+            "prerequisites": [
+              "Скан или фото чека/счета в формате PDF, JPG или PNG",
+              "Размер файла до 15 МБ"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте раздел Документы",
+                "instruction": "В боковом меню перейдите в раздел Документы (Documents)."
+              },
+              {
+                "step": 2,
+                "title": "Загрузите файл",
+                "instruction": "Перетащите изображение или скан в окно загрузки либо выберите файл на диске."
+              },
+              {
+                "step": 3,
+                "title": "Проверьте результаты OCR",
+                "instruction": "Модуль распознавания извлекает имя поставщика, дату, номер счета, сумму и выделяет налог PPN."
+              },
+              {
+                "step": 4,
+                "title": "Подтвердите и свяжите с проводкой",
+                "instruction": "Проверьте значения в правой панели верификации, внесите правки при необходимости и нажмите 'Прикрепить к учету'."
+              }
+            ],
+            "expected_result": "Документ помещается в защищенный архив компании и навсегда связывается с соответствующей финансовой проводкой.",
+            "troubleshooting": [
+              {
+                "error": "Нечеткий или выцветший чек",
+                "solution": "Если кассовый термочек выцвел, недостающие цифры можно легко дописать вручную в полях проверки перед сохранением."
+              }
+            ],
+            "keywords": "загрузка чеков счета ocr распознавание скан kwitansi документы архив"
+          }
+        }
+      },
+      {
+        "id": "art-help-08",
+        "slug": "create-invoices",
+        "category_id": "documents-invoices",
+        "featured": false,
+        "read_time": "5 min",
+        "order": 8,
+        "review_status": "published",
+        "screenshot": "/assets/screens/BillDetail.png",
+        "translations": {
+          "en": {
+            "title": "Creating Outgoing Invoices and Tracking Payments",
+            "summary": "Issue customer invoices, track due dates, record partial payments, and manage outstanding receivables.",
+            "what_you_accomplish": "Professional billing workflow that updates your accounts receivable and forecasts upcoming cash inflows.",
+            "prerequisites": [
+              "Customer business name and email",
+              "Configured company profile details"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Go to Invoices & Bills",
+                "instruction": "Navigate to Invoices > Outgoing Invoices in the sidebar."
+              },
+              {
+                "step": 2,
+                "title": "Click Create Invoice",
+                "instruction": "Click '+ New Invoice' to open the invoice builder."
+              },
+              {
+                "step": 3,
+                "title": "Add Client & Line Items",
+                "instruction": "Select customer, payment due date (e.g. Net 14 or Net 30), and add products or services with pricing and tax rate."
+              },
+              {
+                "step": 4,
+                "title": "Send or Download PDF",
+                "instruction": "Save the invoice draft, generate an official PDF, or email it directly to the customer."
+              }
+            ],
+            "expected_result": "The invoice is registered as 'Awaiting Payment' and appears in your Cash Radar as an anticipated incoming cash flow.",
+            "troubleshooting": [
+              {
+                "error": "Client paid via bank transfer with partial amount",
+                "solution": "Click 'Record Payment' on the invoice detail page and enter the partial received amount; the remaining balance remains tracked."
+              }
+            ],
+            "keywords": "invoice customer billing due date payment receivable overdue"
+          },
+          "id": {
+            "title": "Membuat Faktur Penjualan & Memantau Pelunasan",
+            "summary": "Menerbitkan faktur tagihan pelanggan, melacak jatuh tempo, mencatat pembayaran bertahap, dan mengelola piutang.",
+            "what_you_accomplish": "Alur penagihan profesional yang secara otomatis memperbarui piutang usaha dan memproyeksikan arus kas masuk.",
+            "prerequisites": [
+              "Nama pelanggan dan alamat email tujuan",
+              "Data profil badan usaha yang sudah diisi lengkap"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Faktur Penjualan",
+                "instruction": "Pilih menu Faktur > Faktur Penjualan (Outgoing Invoices) pada bilah navigasi."
+              },
+              {
+                "step": 2,
+                "title": "Klik Buat Faktur",
+                "instruction": "Klik tombol '+ Faktur Baru' untuk membuka formulir pembuatan tagihan."
+              },
+              {
+                "step": 3,
+                "title": "Masukkan Klien & Rincian Item",
+                "instruction": "Pilih nama pelanggan, tanggal jatuh tempo (misal Tempo 14 atau 30 hari), dan tambahkan rincian produk/jasa beserta tarif pajaknya."
+              },
+              {
+                "step": 4,
+                "title": "Unduh PDF atau Kirim",
+                "instruction": "Simpan draf tagihan, cetak PDF resmi berlogo perusahaan, atau kirimkan langsung via email ke pelanggan."
+              }
+            ],
+            "expected_result": "Faktur tercatat dengan status 'Menunggu Pembayaran' dan otomatis diperhitungkan dalam proyeksi arus kas masuk.",
+            "troubleshooting": [
+              {
+                "error": "Klien membayar sebagian (termin)",
+                "solution": "Buka detail faktur, klik 'Catat Pembayaran', dan masukkan nominal yang diterima; sisa tagihan akan tetap terpantau."
+              }
+            ],
+            "keywords": "faktur tagihan penjualan piutang jatuh tempo pelunasan invoice"
+          },
+          "ru": {
+            "title": "Выставление счетов клиентам и контроль оплат",
+            "summary": "Формирование счетов на оплату, отслеживание сроков, учет частичных поступлений и контроль дебиторской задолженности.",
+            "what_you_accomplish": "Профессиональный биллинг с автоматическим обновлением дебиторки и отображением ожидаемых поступлений в радаре ликвидности.",
+            "prerequisites": [
+              "Наименование и email клиента",
+              "Заполненный профиль собственной компании"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте раздел Счета клиентам",
+                "instruction": "В боковом меню перейдите в Счета > Исходящие счета (Outgoing Invoices)."
+              },
+              {
+                "step": 2,
+                "title": "Нажмите 'Создать счет'",
+                "instruction": "Нажмите кнопку '+ Новый счет' для открытия конструктора счетов."
+              },
+              {
+                "step": 3,
+                "title": "Укажите клиента и позиции",
+                "instruction": "Выберите контрагента, срок оплаты (например, 14 дней), добавьте услуги или товары с ценами и налогом."
+              },
+              {
+                "step": 4,
+                "title": "Скачайте PDF или отправьте клиенту",
+                "instruction": "Сохраните счет, сформируйте официальный PDF-документ или отправьте его на почту клиенту."
+              }
+            ],
+            "expected_result": "Счет переходит в статус 'Ожидает оплаты' и учитывается как прогнозируемое поступление денег в Cash Radar.",
+            "troubleshooting": [
+              {
+                "error": "Клиент оплатил только часть счета",
+                "solution": "В карточке счета нажмите 'Учесть платеж' и введите полученную сумму; остаток долга продолжит отслеживаться."
+              }
+            ],
+            "keywords": "выставление счетов клиенты оплата задолженность дебиторка фактура"
+          }
+        }
+      },
+      {
+        "id": "art-help-09",
+        "slug": "cashflow-radar",
+        "category_id": "reports-performance",
+        "featured": true,
+        "read_time": "5 min",
+        "order": 9,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Radar.png",
+        "translations": {
+          "en": {
+            "title": "Navigating Financial Dashboards & Cash Flow Runway",
+            "summary": "Understanding cash burn rate, runway days, and monitoring monthly income vs. operating expenses.",
+            "what_you_accomplish": "Gain instant executive clarity on company survival runway, monthly fixed burn, and net cash trajectory.",
+            "prerequisites": [
+              "At least one active bank or cash account with reconciled entries"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open Radar Screen",
+                "instruction": "Click 'Cash Radar' or 'Pulse' in the top navigation section."
+              },
+              {
+                "step": 2,
+                "title": "Review Consolidated Cash",
+                "instruction": "Observe total liquid assets summed across all operational checking and savings accounts."
+              },
+              {
+                "step": 3,
+                "title": "Inspect Runway in Days",
+                "instruction": "Evaluate the runway gauge calculated from your trailing 90-day average net operating cash burn."
+              },
+              {
+                "step": 4,
+                "title": "Filter by Period",
+                "instruction": "Toggle between 30-day, 90-day, or Year-to-Date views to isolate seasonal swings."
+              }
+            ],
+            "expected_result": "Clear visual understanding of financial health without requiring complex spreadsheet maintenance.",
+            "troubleshooting": [
+              {
+                "error": "Runway shows 'Calculating...'",
+                "solution": "Ensure you have at least 14 days of categorized transaction history so the burn rate formula has sufficient baseline data."
+              }
+            ],
+            "keywords": "radar runway dashboard burn rate pulse cash flow performance reports"
+          },
+          "id": {
+            "title": "Memahami Dasbor Keuangan & Runway Arus Kas",
+            "summary": "Memahami tingkat bakar kas (burn rate), sisa hari runway, dan membandingkan pendapatan bulanan dengan biaya operasional.",
+            "what_you_accomplish": "Mendapatkan gambaran eksekutif langsung mengenai ketahanan kas perusahaan, pengeluaran rutin, dan tren arus kas bersih.",
+            "prerequisites": [
+              "Minimal satu rekening bank atau akun kas dengan transaksi yang telah direkonsiliasi"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Radar Kas",
+                "instruction": "Klik 'Radar Kas' atau 'Pulse' pada menu navigasi atas."
+              },
+              {
+                "step": 2,
+                "title": "Tinjau Saldo Kas Gabungan",
+                "instruction": "Lihat total aset likuid yang dijumlahkan dari seluruh rekening giro, tabungan, dan kas operasional."
+              },
+              {
+                "step": 3,
+                "title": "Periksa Estimasi Runway (Hari)",
+                "instruction": "Evaluasi indikator runway yang dihitung dari rata-rata pengeluaran kas operasional bersih selama 90 hari terakhir."
+              },
+              {
+                "step": 4,
+                "title": "Ganti Rentang Waktu Analisis",
+                "instruction": "Pilih tampilan 30 hari, 90 hari, atau Tahun Berjalan (YTD) untuk mengamati pola musiman."
+              }
+            ],
+            "expected_result": "Pemahaman visual yang jelas mengenai kesehatan keuangan perusahaan tanpa harus mengelola spreadsheet manual.",
+            "troubleshooting": [
+              {
+                "error": "Runway berstatus 'Sedang Menghitung...'",
+                "solution": "Pastikan ruang kerja Anda memiliki setidaknya 14 hari riwayat transaksi berkategori agar rumus rata-rata burn rate memiliki data acuan yang cukup."
+              }
+            ],
+            "keywords": "radar kas runway burn rate dasbor arus kas kinerja laporan keuangan"
+          },
+          "ru": {
+            "title": "Анализ финансового дашборда и горизонта ликвидности (Runway)",
+            "summary": "Расчет скорости сжигания денег (burn rate), прогноза остатка дней работы компании и соотношения доходов и расходов.",
+            "what_you_accomplish": "Моментальная оценка жизнеспособности бизнеса: запас ликвидности в днях, ежемесячный отток и чистая траектория движения денег.",
+            "prerequisites": [
+              "Хотя бы один банковский или кассовый счет со сверенными операциями"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте экран Cash Radar",
+                "instruction": "В верхнем меню навигации выберите раздел 'Радар' или 'Pulse'."
+              },
+              {
+                "step": 2,
+                "title": "Оцените консолидированный остаток",
+                "instruction": "Проверьте общую сумму ликвидных средств по всем операционным и депозитным счетам компании."
+              },
+              {
+                "step": 3,
+                "title": "Проверьте метрику Runway (в днях)",
+                "instruction": "Спидометр ликвидности рассчитывает, на сколько дней хватит денег при среднем темпе расходов за 90 дней."
+              },
+              {
+                "step": 4,
+                "title": "Переключайте периоды анализа",
+                "instruction": "Используйте фильтры 30 дней, 90 дней или С начала года для выявления сезонности."
+              }
+            ],
+            "expected_result": "Наглядная картина финансового состояния компании без необходимости вести сложные таблицы в Excel.",
+            "troubleshooting": [
+              {
+                "error": "Вместо цифры Runway отображается 'Вычисление...'",
+                "solution": "Для достоверного расчета требуется история операций хотя бы за 14 дней, чтобы система рассчитала базовый burn rate."
+              }
+            ],
+            "keywords": "радар ликвидность runway burn rate дашборд прогноз денежные средства отчеты"
+          }
+        }
+      },
+      {
+        "id": "art-help-10",
+        "slug": "accountant-package",
+        "category_id": "reports-performance",
+        "featured": true,
+        "read_time": "5 min",
+        "order": 10,
+        "review_status": "published",
+        "screenshot": "/assets/screens/AccountantPackages.png",
+        "translations": {
+          "en": {
+            "title": "Generating Accountant Readiness Packages for Month-End",
+            "summary": "Export pre-organized, balanced transaction summaries and attached voucher archives in one ZIP.",
+            "what_you_accomplish": "Package monthly financial records into an organized archive for external tax consultants and statutory bookkeepers.",
+            "prerequisites": [
+              "Accountant, Admin, or Owner permissions",
+              "Completed bank reconciliation for the target month"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Navigate to Accountant Hub",
+                "instruction": "Click 'Accountant' in the sidebar menu."
+              },
+              {
+                "step": 2,
+                "title": "Select Month-End Period",
+                "instruction": "Choose the target closing calendar month and year."
+              },
+              {
+                "step": 3,
+                "title": "Review Readiness Checklist",
+                "instruction": "Verify that unreconciled bank items and unverified invoice drafts are zero or explicitly resolved."
+              },
+              {
+                "step": 4,
+                "title": "Generate ZIP Archive",
+                "instruction": "Click 'Generate Accountant Package'. Download the complete ZIP containing structured Excel ledgers and voucher folders."
+              }
+            ],
+            "expected_result": "A clean ZIP archive ready to email directly to your Indonesian Konsultan Pajak or statutory accounting firm.",
+            "troubleshooting": [
+              {
+                "error": "Warning: 'Unreconciled items remaining'",
+                "solution": "You can still generate a preliminary package, but items marked unreconciled will be highlighted in yellow in the summary sheet."
+              }
+            ],
+            "keywords": "accountant package zip export month end audit reconciliation download"
+          },
+          "id": {
+            "title": "Membuat Paket Kesiapan Akuntan untuk Tutup Buku Bulanan",
+            "summary": "Ekspor ringkasan transaksi berimbang dan arsip bukti kuitansi dalam satu file ZIP terstruktur.",
+            "what_you_accomplish": "Mengemas seluruh pembukuan bulanan menjadi arsip rapi untuk konsultan pajak eksternal atau staf akuntansi.",
+            "prerequisites": [
+              "Peran Akuntan, Admin, atau Pemilik",
+              "Rekonsiliasi bank yang telah selesai untuk bulan yang dituju"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Akuntan",
+                "instruction": "Klik menu 'Akuntan' pada bilah navigasi samping."
+              },
+              {
+                "step": 2,
+                "title": "Pilih Periode Tutup Buku",
+                "instruction": "Tentukan bulan dan tahun kalender yang akan ditutup bukunya."
+              },
+              {
+                "step": 3,
+                "title": "Periksa Daftar Kesiapan (Checklist)",
+                "instruction": "Pastikan transaksi yang belum terekonsiliasi dan draf faktur yang belum diverifikasi sudah tuntas."
+              },
+              {
+                "step": 4,
+                "title": "Unduh File ZIP Lengkap",
+                "instruction": "Klik 'Buat Paket Akuntan'. Unduh file ZIP yang berisi buku besar Excel terstruktur dan folder arsip kuitansi."
+              }
+            ],
+            "expected_result": "File ZIP rapi yang siap dikirimkan langsung ke Konsultan Pajak atau kantor akuntan publik Anda.",
+            "troubleshooting": [
+              {
+                "error": "Peringatan: 'Masih ada transaksi belum terekonsiliasi'",
+                "solution": "Anda tetap dapat mengunduh draf awal paket, namun baris yang belum cocok akan disorot warna kuning dalam lembar ringkasan Excel."
+              }
+            ],
+            "keywords": "paket akuntan ekspor tutup buku zip rekonsiliasi konsultan pajak"
+          },
+          "ru": {
+            "title": "Формирование пакета для бухгалтера при закрытии месяца",
+            "summary": "Выгрузка структурированных таблиц проводок и архива прикрепленных чеков в едином ZIP-файле.",
+            "what_you_accomplish": "Подготовка полного комплекта первичных документов и реестров для передачи внешнему индонезийскому Konsultan Pajak.",
+            "prerequisites": [
+              "Роль Accountant, Admin или Owner",
+              "Завершенная банковская сверка за закрываемый период"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Перейдите в раздел Бухгалтер",
+                "instruction": "В боковом меню выберите раздел 'Бухгалтер' (Accountant)."
+              },
+              {
+                "step": 2,
+                "title": "Выберите закрываемый период",
+                "instruction": "Укажите отчетный месяц и год для формирования архива."
+              },
+              {
+                "step": 3,
+                "title": "Проверьте чеклист готовности",
+                "instruction": "Убедитесь, что все банковские строки сопоставлены, а ожидающие чеки проверены."
+              },
+              {
+                "step": 4,
+                "title": "Сформируйте ZIP-пакет",
+                "instruction": "Нажмите 'Сформировать пакет бухгалтера' и скачайте архив с реестрами в Excel и каталогом прикрепленных чеков."
+              }
+            ],
+            "expected_result": "Готовый структурированный ZIP-архив, который можно сразу отправить вашему налоговому консультанту.",
+            "troubleshooting": [
+              {
+                "error": "Предупреждение: 'Остались несверенные операции'",
+                "solution": "Вы можете выгрузить предварительный пакет, но несопоставленные строки будут выделены желтым цветом в сводной таблице."
+              }
+            ],
+            "keywords": "пакет бухгалтера закрытие месяца архив zip экспорт выгрузка отчетность"
+          }
+        }
+      },
+      {
+        "id": "art-help-11",
+        "slug": "payroll-run",
+        "category_id": "payroll-workflows",
+        "featured": false,
+        "read_time": "5 min",
+        "order": 11,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Payroll.png",
+        "translations": {
+          "en": {
+            "title": "Setting Up Team Members and Running Monthly Payroll",
+            "summary": "Manage salary components, calculate PPh 21 TER withholding previews, and record approved salary disbursements.",
+            "what_you_accomplish": "Organized payroll cycles compliant with Indonesian tax rules, creating auditable salary records and disbursements.",
+            "prerequisites": [
+              "Admin or Owner role",
+              "Staff salary contracts and BPJS/tax status details"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open Payroll Screen",
+                "instruction": "In the left navigation sidebar, click 'Payroll'."
+              },
+              {
+                "step": 2,
+                "title": "Set Up Staff Profiles",
+                "instruction": "Add staff with their legal names, Indonesian NIK/NPWP, monthly base salary, allowances, and PTKP tax category."
+              },
+              {
+                "step": 3,
+                "title": "Initiate Payroll Cycle",
+                "instruction": "Click 'Run Monthly Payroll', select the pay period, and review the automatic PPh 21 TER withholding calculations."
+              },
+              {
+                "step": 4,
+                "title": "Approve & Record Disbursement",
+                "instruction": "Review gross-to-net totals, approve the run, and link the disbursement to your bank checking account."
+              }
+            ],
+            "expected_result": "Payroll entries post to your ledger, PPh 21 tax liability is tracked, and individual salary slips can be generated.",
+            "troubleshooting": [
+              {
+                "error": "Employee PTKP category changed mid-year",
+                "solution": "Update the staff member's PTKP category under Payroll > Staff Directory; subsequent cycles will apply the updated withholding percentage."
+              }
+            ],
+            "keywords": "payroll salary pph 21 ter staff employees approval disbursement"
+          },
+          "id": {
+            "title": "Menyiapkan Data Karyawan & Menjalankan Penggajian Bulanan",
+            "summary": "Kelola komponen gaji, hitung estimasi potongan PPh 21 TER, dan catat persetujuan pembayaran gaji staf.",
+            "what_you_accomplish": "Menjalankan siklus penggajian bulanan yang rapi sesuai regulasi pajak Indonesia dan mencatat pengeluaran gaji secara akuntabel.",
+            "prerequisites": [
+              "Peran Admin atau Pemilik",
+              "Data kontrak gaji staf dan status PTKP/BPJS karyawan"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Menu Penggajian (Payroll)",
+                "instruction": "Pada menu bilah samping kiri, klik 'Payroll'."
+              },
+              {
+                "step": 2,
+                "title": "Lengkapi Data Profil Karyawan",
+                "instruction": "Tambahkan staf beserta nama resmi, NIK/NPWP, gaji pokok, tunjangan rutin, dan kategori status PTKP (TK/0, K/1, dsb)."
+              },
+              {
+                "step": 3,
+                "title": "Mulai Siklus Penggajian",
+                "instruction": "Klik 'Jalankan Penggajian Bulanan', tentukan periode bulan gaji, dan tinjau perhitungan tarif efektif rata-rata PPh 21 TER."
+              },
+              {
+                "step": 4,
+                "title": "Setujui & Catat Pembayaran",
+                "instruction": "Periksa total gaji kotor hingga bersih, setujui penggajian, dan tautkan pengeluaran ke rekening bank sumber pembayaran."
+              }
+            ],
+            "expected_result": "Catatan beban gaji tercatat di pembukuan, kewajiban PPh 21 terpantau, dan slip gaji staf dapat diunduh.",
+            "troubleshooting": [
+              {
+                "error": "Status PTKP karyawan berubah di tengah tahun",
+                "solution": "Perbarui status PTKP di menu Direktori Staf; siklus penggajian berikutnya akan otomatis menerapkan persentase tarif TER yang sesuai."
+              }
+            ],
+            "keywords": "penggajian payroll gaji karyawan pph 21 ter ptkp slip gaji"
+          },
+          "ru": {
+            "title": "Настройка сотрудников и начисление ежемесячной зарплаты",
+            "summary": "Учет окладов, предварительный расчет индонезийского налога PPh 21 TER и утверждение зарплатных выплат.",
+            "what_you_accomplish": "Ежемесячный расчет зарплат в соответствии с индонезийскими налоговыми правилами и прозрачная фиксация выплат в учете.",
+            "prerequisites": [
+              "Роль Admin или Owner",
+              "Трудовые договоры, оклады и налоговые статусы PTKP сотрудников"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте раздел Зарплата (Payroll)",
+                "instruction": "В левом меню навигации выберите раздел 'Payroll'."
+              },
+              {
+                "step": 2,
+                "title": "Заполните карточки сотрудников",
+                "instruction": "Внесите имя по паспорту/KTP, налоговый номер, оклад, надбавки и семейный налоговый статус PTKP."
+              },
+              {
+                "step": 3,
+                "title": "Запустите зарплатный цикл",
+                "instruction": "Нажмите 'Рассчитать зарплату', выберите месяц и проверьте автоматический расчет удержания налога PPh 21 TER."
+              },
+              {
+                "step": 4,
+                "title": "Утвердите выплату",
+                "instruction": "Проверьте итоговые суммы к выплате, утвердите расчет и привяжите списание к расчетному счету."
+              }
+            ],
+            "expected_result": "Затраты на ФОТ отражаются в расходах компании, налог PPh 21 фиксируется к оплате, формируются зарплатные ведомости.",
+            "troubleshooting": [
+              {
+                "error": "Изменился семейный статус PTKP сотрудника",
+                "solution": "Отредактируйте статус в профиле сотрудника; при следующем начислении зарплаты будет применен обновленный процент TER."
+              }
+            ],
+            "keywords": "зарплата начисление payroll pph 21 ter сотрудники оклады налоги индонезия"
+          }
+        }
+      },
+      {
+        "id": "art-help-12",
+        "slug": "ai-cfo",
+        "category_id": "ai-cfo-accountant",
+        "featured": false,
+        "read_time": "4 min",
+        "order": 12,
+        "review_status": "published",
+        "screenshot": "/assets/screens/AICFO.png",
+        "translations": {
+          "en": {
+            "title": "Using AI CFO for Financial Queries and Runway Insights",
+            "summary": "How to ask plain-language questions about cash flow, burn rate, and vendor spending trends.",
+            "what_you_accomplish": "Get instant plain-language answers about your finances without building manual pivot tables or running formulas.",
+            "prerequisites": [
+              "Active CFO AI workspace with recorded transactions",
+              "Viewer, Accountant, Admin, or Owner role"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open AI CFO Console",
+                "instruction": "Click 'AI CFO' in the navigation bar."
+              },
+              {
+                "step": 2,
+                "title": "Enter Natural-Language Prompt",
+                "instruction": "Type your query, e.g. 'What was our total software spend in Q1?' or 'What is our current cash runway in days?'"
+              },
+              {
+                "step": 3,
+                "title": "Inspect Cited Calculations",
+                "instruction": "Review the AI summary alongside clickable references to the specific ledger entries and accounts used in the answer."
+              }
+            ],
+            "expected_result": "Clear, verifiable analysis grounded strictly in your company's isolated financial ledger data.",
+            "troubleshooting": [
+              {
+                "error": "Prompt asks for external tax advice",
+                "solution": "AI CFO is strictly bounded to analyze your internal transactions. For statutory tax filing opinions, consult your licensed Konsultan Pajak."
+              }
+            ],
+            "keywords": "ai cfo query prompt analysis insight runway trends chat assistant"
+          },
+          "id": {
+            "title": "Menggunakan AI CFO untuk Kueri Keuangan & Analisis Runway",
+            "summary": "Cara mengajukan pertanyaan bahasa sehari-hari tentang arus kas, laju pengeluaran, dan tren biaya vendor.",
+            "what_you_accomplish": "Mendapatkan jawaban ringkas seketika tentang kondisi keuangan tanpa harus membuat rumus spreadsheet yang rumit.",
+            "prerequisites": [
+              "Ruang kerja CFO AI aktif dengan data transaksi tercatat",
+              "Peran Viewer, Akuntan, Admin, atau Pemilik"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Konsol AI CFO",
+                "instruction": "Klik menu 'AI CFO' pada bilah navigasi."
+              },
+              {
+                "step": 2,
+                "title": "Ajukan Pertanyaan Bahasa Sehari-hari",
+                "instruction": "Ketik pertanyaan seperti 'Berapa total belanja perangkat lunak kuartal ini?' atau 'Berapa hari sisa runway kas kita?'"
+              },
+              {
+                "step": 3,
+                "title": "Tinjau Sitasi & Rujukan Data",
+                "instruction": "Periksa rangkuman jawaban beserta rujukan transaksi pembukuan nyata yang mendasari analisis tersebut."
+              }
+            ],
+            "expected_result": "Analisis akurat yang bersumber secara ketat dari data pembukuan internal perusahaan Anda yang terisolasi aman.",
+            "troubleshooting": [
+              {
+                "error": "Pertanyaan meminta opini hukum perpajakan",
+                "solution": "AI CFO dibatasi secara tegas hanya untuk menganalisis data pembukuan Anda. Untuk nasihat hukum pajak, konsultasikan dengan konsultan pajak terdaftar."
+              }
+            ],
+            "keywords": "ai cfo asisten kueri analisis arus kas tren pengeluaran runway tanya keuangan"
+          },
+          "ru": {
+            "title": "Использование AI CFO для финансовых вопросов и анализа runway",
+            "summary": "Как задавать вопросы на естественном языке об остатках денег, расходах по поставщикам и динамике затрат.",
+            "what_you_accomplish": "Быстрые ответы на управленческие вопросы о финансах без необходимости строить сводные таблицы в Excel.",
+            "prerequisites": [
+              "Активное рабочее пространство с внесенными операциями",
+              "Роль Viewer, Accountant, Admin или Owner"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте консоль AI CFO",
+                "instruction": "В верхнем меню выберите раздел 'AI CFO'."
+              },
+              {
+                "step": 2,
+                "title": "Задайте вопрос на обычном языке",
+                "instruction": "Напишите, например: 'Сколько мы потратили на софт в прошлом месяце?' или 'Какой у нас текущий запас денег в днях?'"
+              },
+              {
+                "step": 3,
+                "title": "Ознакомьтесь с обоснованием ответа",
+                "instruction": "Изучите краткий вывод и проверьте прямые ссылки на строки выписок и счетов, по которым сделан расчет."
+              }
+            ],
+            "expected_result": "Точный структурированный ответ, основанный исключительно на подтвержденных данных из книг вашей компании.",
+            "troubleshooting": [
+              {
+                "error": "Вопрос касается юридической консультации по налогам",
+                "solution": "AI CFO анализирует только фактические данные вашей компании. За официальными налоговыми разъяснениями обращайтесь к Konsultan Pajak."
+              }
+            ],
+            "keywords": "ai cfo финансовый ассистент вопросы аналитика runway расходы анализ трендов"
+          }
+        }
+      },
+      {
+        "id": "art-help-13",
+        "slug": "ai-accountant",
+        "category_id": "ai-cfo-accountant",
+        "featured": false,
+        "read_time": "4 min",
+        "order": 13,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Accountant.png",
+        "translations": {
+          "en": {
+            "title": "AI Accountant: Reviewing Auto-Categorization & Tax Suggestions",
+            "summary": "Reviewing proposed transaction categories and understanding the boundary between AI suggestions and human approval.",
+            "what_you_accomplish": "Speed up categorization while maintaining absolute human authority over financial and tax ledger records.",
+            "prerequisites": [
+              "Accountant, Admin, or Owner role"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open Accountant Workbench",
+                "instruction": "Navigate to Accountant > Auto-Categorization Queue."
+              },
+              {
+                "step": 2,
+                "title": "Inspect Proposed Categories",
+                "instruction": "Review transactions where AI has suggested account codes based on vendor history and description."
+              },
+              {
+                "step": 3,
+                "title": "One-Click Confirm or Adjust",
+                "instruction": "Click 'Approve' to commit the category, or select a different account from the dropdown."
+              }
+            ],
+            "expected_result": "Transactions are categorized under human supervision with zero automated unilateral changes to statutory tax accounts.",
+            "troubleshooting": [
+              {
+                "error": "AI suggests incorrect expense category",
+                "solution": "Simply select the correct account; the system remembers your preference for future transactions with that vendor."
+              }
+            ],
+            "keywords": "ai accountant categorization review suggestions approval tax boundary"
+          },
+          "id": {
+            "title": "AI Akuntan: Meninjau Saran Kategorisasi Otomatis & Pajak",
+            "summary": "Meninjau usulan kategori transaksi dan memahami batasan antara rekomendasi AI dan persetujuan oleh manusia.",
+            "what_you_accomplish": "Mempercepat proses pembukuan tanpa menghilangkan kendali penuh manusia atas pengesahan pencatatan keuangan.",
+            "prerequisites": [
+              "Peran Akuntan, Admin, atau Pemilik"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Meja Kerja AI Akuntan",
+                "instruction": "Buka menu Akuntan > Antrean Kategorisasi Otomatis."
+              },
+              {
+                "step": 2,
+                "title": "Tinjau Usulan Kategori",
+                "instruction": "Periksa transaksi yang diberi saran kode akun oleh AI berdasarkan riwayat transaksi vendor serupa."
+              },
+              {
+                "step": 3,
+                "title": "Konfirmasi Satu Ketukan atau Ubah",
+                "instruction": "Klik 'Setujui' untuk menyepakati usulan, atau pilih akun beban lain dari menu pilihan."
+              }
+            ],
+            "expected_result": "Transaksi tercatat rapi di bawah pengawasan manusia tanpa ada perubahan sepihak yang tidak disetujui pengguna.",
+            "troubleshooting": [
+              {
+                "error": "Saran kategori AI kurang tepat",
+                "solution": "Cukup pilih akun yang benar secara manual; sistem akan mengingat pilihan Anda untuk transaksi mendatang dari vendor tersebut."
+              }
+            ],
+            "keywords": "ai akuntan kategorisasi otomatis saran persetujuan manusia pajak verifikasi"
+          },
+          "ru": {
+            "title": "AI Бухгалтер: проверка авто-категоризации и налоговых предложений",
+            "summary": "Проверка предложенных статей расходов и соблюдение принципа контроля человеком любых проводок.",
+            "what_you_accomplish": "Ускорение классификации расходов при сохранении 100% контроля человеком над бухгалтерскими записями.",
+            "prerequisites": [
+              "Роль Accountant, Admin или Owner"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте очередь категоризации",
+                "instruction": "Перейдите в раздел Бухгалтер > Очередь авто-категоризации."
+              },
+              {
+                "step": 2,
+                "title": "Ознакомьтесь с предложенными статьями",
+                "instruction": "Изучите подсказки системы, составленные на основе назначения платежа и истории контрагента."
+              },
+              {
+                "step": 3,
+                "title": "Подтвердите или измените статью",
+                "instruction": "Нажмите 'Утвердить' в один клик или выберите другую статью затрат из выпадающего списка."
+              }
+            ],
+            "expected_result": "Проводки разносятся по счетам строго под контролем пользователя, исключая несогласованные авто-изменения.",
+            "troubleshooting": [
+              {
+                "error": "ИИ предложил неподходящую статью затрат",
+                "solution": "Просто выберите нужную статью вручную; алгоритм учтет эту корректировку для будущих платежей контрагенту."
+              }
+            ],
+            "keywords": "ai бухгалтер автокатегоризация статьи расходов проверка утверждение контроль"
+          }
+        }
+      },
+      {
+        "id": "art-help-14",
+        "slug": "subscription-security",
+        "category_id": "account-support",
+        "featured": false,
+        "read_time": "4 min",
+        "order": 14,
+        "review_status": "published",
+        "screenshot": "/assets/screens/Settings.png",
+        "translations": {
+          "en": {
+            "title": "Managing Your Subscription, Trial, and Account Security",
+            "summary": "Information on 7-day free trial terms, plan upgrading, password security, and contacting support.",
+            "what_you_accomplish": "Understand commercial plan limits ($59 Starter, $149 Control, $249 Pro), security protections, and support channels.",
+            "prerequisites": [
+              "Owner role for subscription and billing management"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Open Billing Settings",
+                "instruction": "In the sidebar, navigate to Settings > Subscription & Billing."
+              },
+              {
+                "step": 2,
+                "title": "Review Plan & Trial Status",
+                "instruction": "Check your active 7-day trial countdown or current tier limits (accounts, monthly bank rows, team seats)."
+              },
+              {
+                "step": 3,
+                "title": "Upgrade or Manage Billing",
+                "instruction": "Select an upgraded plan (Starter, Control, or Pro) with monthly or annual billing options."
+              },
+              {
+                "step": 4,
+                "title": "Contact Support Desk",
+                "instruction": "If you have questions, email support@cfo-ai.site or sales@cfo-ai.site for prompt operational assistance."
+              }
+            ],
+            "expected_result": "Transparent subscription management with verified bank-grade data security and direct access to human support.",
+            "troubleshooting": [
+              {
+                "error": "Need to update company invoice billing details",
+                "solution": "Under Settings > Billing Details, enter your corporate billing entity name and tax number for monthly payment invoices."
+              }
+            ],
+            "keywords": "subscription pricing trial plan upgrade security password support billing"
+          },
+          "id": {
+            "title": "Mengelola Langganan, Uji Coba & Keamanan Akun",
+            "summary": "Informasi mengenai ketentuan uji coba 7 hari, peningkatan paket langganan, keamanan data, dan layanan dukungan.",
+            "what_you_accomplish": "Memahami batas kuota paket komersial ($59 Starter, $149 Control, $249 Pro), perlindungan keamanan, dan saluran bantuan.",
+            "prerequisites": [
+              "Peran Pemilik (Owner) untuk pengelolaan langganan dan pembayaran"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Buka Pengaturan Langganan",
+                "instruction": "Pada menu samping, buka Pengaturan > Langganan & Tagihan (Subscription & Billing)."
+              },
+              {
+                "step": 2,
+                "title": "Periksa Status Uji Coba & Kuota",
+                "instruction": "Cek masa berlaku uji coba 7 hari dan batas penggunaan (jumlah rekening, batas baris mutasi bank, dan kuota tim)."
+              },
+              {
+                "step": 3,
+                "title": "Tingkatkan Paket Langganan",
+                "instruction": "Pilih paket yang sesuai (Starter, Control, atau Pro) dengan skema pembayaran bulanan atau tahunan."
+              },
+              {
+                "step": 4,
+                "title": "Hubungi Layanan Bantuan",
+                "instruction": "Untuk pertanyaan atau kendala operasional, hubungi support@cfo-ai.site atau sales@cfo-ai.site."
+              }
+            ],
+            "expected_result": "Pengelolaan langganan yang transparan dengan perlindungan keamanan data standar perbankan dan akses bantuan manusia.",
+            "troubleshooting": [
+              {
+                "error": "Perlu mengubah identitas pada kuitansi langganan",
+                "solution": "Di menu Pengaturan > Rincian Tagihan, masukkan nama badan usaha resmi dan NPWP Anda agar tercantum pada invoice bulanan."
+              }
+            ],
+            "keywords": "langganan paket uji coba gratis upgrade keamanan akun bantuan kontak billing"
+          },
+          "ru": {
+            "title": "Управление подпиской, пробным периодом и безопасность",
+            "summary": "Информация об условиях 7-дневного триала, смене тарифов ($59, $149, $249), защите данных и обращении в поддержку.",
+            "what_you_accomplish": "Контроль коммерческих лимитов тарифа, понимание мер безопасности данных и оперативная связь со службой поддержки.",
+            "prerequisites": [
+              "Роль Owner для управления подпиской и платежами"
+            ],
+            "steps": [
+              {
+                "step": 1,
+                "title": "Откройте настройки подписки",
+                "instruction": "В боковом меню перейдите в Настройки > Подписка и биллинг."
+              },
+              {
+                "step": 2,
+                "title": "Проверьте статус триала и квоты",
+                "instruction": "Оцените оставшееся время 7-дневного пробного периода и текущие лимиты (число счетов, строк выписок, мест команды)."
+              },
+              {
+                "step": 3,
+                "title": "Смените тарифный план",
+                "instruction": "Выберите план (Starter $59, Control $149 или Pro $249) с ежемесячной или годовой оплатой."
+              },
+              {
+                "step": 4,
+                "title": "Свяжитесь со службой поддержки",
+                "instruction": "При возникновении вопросов напишите нам на support@cfo-ai.site или sales@cfo-ai.site для быстрой помощи."
+              }
+            ],
+            "expected_result": "Прозрачное управление подпиской, гарантия изоляции данных и прямой контакт с командой поддержки.",
+            "troubleshooting": [
+              {
+                "error": "Требуется изменить реквизиты в счетах за подписку",
+                "solution": "В разделе Настройки > Реквизиты для счетов укажите наименование компании и NPWP для корректных инвойсов."
+              }
+            ],
+            "keywords": "подписка тарифы триал 7 дней безопасность поддержка контакты биллинг"
+          }
+        }
+      }
+    ],
+    "navigation": {
+      "header": {
+        "logo_text": "CFO AI",
+        "logo_tagline": "Financial Operating System",
+        "links": [
+          {
+            "label": "Platform",
+            "url": "/platform",
+            "is_external": false
+          },
+          {
+            "label": "Document Intelligence",
+            "url": "/document-intelligence",
+            "is_external": false
+          },
+          {
+            "label": "Tax & Compliance",
+            "url": "/compliance",
+            "is_external": false
+          },
+          {
+            "label": "Knowledge Hub",
+            "url": "/blog",
+            "is_external": false
+          },
+          {
+            "label": "Pricing",
+            "url": "/pricing",
+            "is_external": false
+          }
+        ],
+        "login_button": {
+          "label": "Log in",
+          "url": "https://app.cfo-ai.site/login"
+        },
+        "cta_button": {
+          "label": "Start Free Trial",
+          "url": "https://app.cfo-ai.site/login"
+        }
+      },
+      "footer": {
+        "brand_description": "AI-powered financial operating system for businesses operating in Indonesia. Real-time cash visibility, document intelligence, automated bank reconciliation, and regulatory monitoring.",
+        "columns": [
+          {
+            "title": "Platform",
+            "links": [
+              {
+                "label": "Pulse Command Center",
+                "url": "/platform#pulse"
+              },
+              {
+                "label": "Radar Cash Trajectory",
+                "url": "/platform#radar"
+              },
+              {
+                "label": "Document Intelligence",
+                "url": "/document-intelligence"
+              },
+              {
+                "label": "Bank Reconciliation",
+                "url": "/platform#bank-import"
+              },
+              {
+                "label": "Pricing & Plans",
+                "url": "/pricing"
+              }
+            ]
+          },
+          {
+            "title": "Knowledge Hub",
+            "links": [
+              {
+                "label": "All Tax & Business Guides",
+                "url": "/blog"
+              },
+              {
+                "label": "PT PMA Compliance Guide",
+                "url": "/blog/pt-pma-tax-compliance-guide-2026"
+              },
+              {
+                "label": "PPh 21 TER Formulas",
+                "url": "/blog/pph-21-ter-calculation-rules-indonesia"
+              },
+              {
+                "label": "CoreTax PMK 81/2024",
+                "url": "/blog/coretax-pmk-81-2024-transition-guide"
+              }
+            ]
+          },
+          {
+            "title": "Compliance & Security",
+            "links": [
+              {
+                "label": "Indonesian Tax Radar",
+                "url": "/compliance"
+              },
+              {
+                "label": "CoreTax Integration",
+                "url": "/compliance#coretax"
+              },
+              {
+                "label": "Security & Tenant Isolation",
+                "url": "/platform#security"
+              },
+              {
+                "label": "Statutory Disclaimers",
+                "url": "/compliance#disclaimers"
+              }
+            ]
+          },
+          {
+            "title": "Company",
+            "links": [
+              {
+                "label": "Sign In to Application",
+                "url": "https://app.cfo-ai.site/login"
+              },
+              {
+                "label": "7-Day Free Trial",
+                "url": "https://app.cfo-ai.site/login"
+              },
+              {
+                "label": "Status & Uptime",
+                "url": "#"
+              },
+              {
+                "label": "Privacy Policy",
+                "url": "#"
+              }
+            ]
+          }
+        ],
+        "copyright": "© 2026 CFO AI Indonesia. All rights reserved.",
+        "statutory_note": "CFO AI is a financial management and operational accounting preparation software. It does not issue statutory audit opinions or replace a registered Indonesian tax consultant (Konsultan Pajak)."
+      }
+    },
+    "seo": {
+      "site_name": "CFO AI Indonesia",
+      "base_url": "https://cfo-ai.site",
+      "default_title": "CFO AI — Financial Operating System for Indonesia",
+      "default_description": "AI-powered financial management, automated bank statement reconciliation, document intelligence, and Indonesian tax compliance for PT and PT PMA companies.",
+      "default_og_image": "https://cfo-ai.site/assets/product/dashboard-pulse.svg",
+      "twitter_handle": "@cfo_ai_id",
+      "robots_directives": {
+        "allow_all_crawlers": true,
+        "disallow_paths": [
+          "/admin/",
+          "/api/cms/",
+          "/preview/"
+        ],
+        "sitemap_url": "https://cfo-ai.site/sitemap.xml"
+      },
+      "redirects": [
+        {
+          "from": "/signup",
+          "to": "https://app.cfo-ai.site/login",
+          "status": 301
+        },
+        {
+          "from": "/register",
+          "to": "https://app.cfo-ai.site/login",
+          "status": 301
+        },
+        {
+          "from": "/features",
+          "to": "/platform",
+          "status": 301
+        },
+        {
+          "from": "/tax-compliance",
+          "to": "/compliance",
+          "status": 301
+        },
+        {
+          "from": "/ocr",
+          "to": "/document-intelligence",
+          "status": 301
+        },
+        {
+          "from": "/blog/pt-pma-tax-guide-2025",
+          "to": "/blog/pt-pma-tax-compliance-guide-2026",
+          "status": 301
+        }
+      ],
+      "pages_meta": {
+        "home": {
+          "title": "CFO AI — Financial Operating System for Indonesia",
+          "description": "Real-time cash visibility, document OCR, automated bank reconciliation, and Indonesian tax compliance for PT and PT PMA companies.",
+          "canonical": "https://cfo-ai.site/"
+        },
+        "pricing": {
+          "title": "Transparent Subscription Pricing — CFO AI Indonesia",
+          "description": "Simple B2B SaaS pricing ($59, $149, $249/mo) with full usage limits and feature comparison for Indonesian businesses. 7-day free trial.",
+          "canonical": "https://cfo-ai.site/pricing"
+        },
+        "platform": {
+          "title": "Platform Tour & Architecture — CFO AI Indonesia",
+          "description": "Explore CFO AI's core modules: Pulse Cash Command, Radar Forecasts, AI Executive Briefings, and Bank Import Reconciliation.",
+          "canonical": "https://cfo-ai.site/platform"
+        },
+        "document-intelligence": {
+          "title": "Document Intelligence & OCR Verification — CFO AI",
+          "description": "Automated invoice and receipt processing with DPP and PPN 11% extraction, human-in-the-loop review drawer, and bank matching.",
+          "canonical": "https://cfo-ai.site/document-intelligence"
+        },
+        "compliance": {
+          "title": "Indonesian Tax & CoreTax PMK 81/2024 Radar — CFO AI",
+          "description": "Statutory compliance tracking for PPh 21 TER, PPh 23, PPN 11%, and DJP CoreTax transition workflows in Indonesia.",
+          "canonical": "https://cfo-ai.site/compliance"
+        },
+        "hub": {
+          "title": "Knowledge Hub & Tax Guides — CFO AI Indonesia",
+          "description": "Authoritative guides on Indonesian corporate tax compliance, PPh 21 TER calculations, bank reconciliation, and business operations.",
+          "canonical": "https://cfo-ai.site/blog"
+        }
+      }
+    },
+    "locales": [
+      {
+        "code": "en",
+        "name": "English",
+        "nativeName": "English",
+        "status": "published",
+        "isDefault": true,
+        "direction": "ltr"
+      },
+      {
+        "code": "id",
+        "name": "Indonesian",
+        "nativeName": "Bahasa Indonesia",
+        "status": "published",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "ru",
+        "name": "Russian",
+        "nativeName": "Русский",
+        "status": "published",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "fr",
+        "name": "French",
+        "nativeName": "Français",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "de",
+        "name": "German",
+        "nativeName": "Deutsch",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "es",
+        "name": "Spanish",
+        "nativeName": "Español",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "it",
+        "name": "Italian",
+        "nativeName": "Italiano",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "zh-cn",
+        "name": "Simplified Chinese",
+        "nativeName": "简体中文",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "ja",
+        "name": "Japanese",
+        "nativeName": "日本語",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "th",
+        "name": "Thai",
+        "nativeName": "ไทย",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      },
+      {
+        "code": "vi",
+        "name": "Vietnamese",
+        "nativeName": "Tiếng Việt",
+        "status": "staged",
+        "isDefault": false,
+        "direction": "ltr"
+      }
+    ]
+  }
+}

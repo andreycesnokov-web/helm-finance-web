@@ -2,11 +2,16 @@
   {
     "id": "usr-01",
     "name": "Alexandre (Owner)",
-    "email": "owner@cfo-ai.site",
+    "email": "admin@cfo-ai.site",
     "role": "owner",
     "avatar": "/assets/avatars/owner.png",
     "created_at": "2026-10-15T00:00:00Z",
-    "status": "active"
+    "status": "active",
+    "password_hash": "9ed8cfb61b2ffd01efde4e490606484fbea6ac552ca5b91cc2d2515dfd98df84782c326313e4a1d72a74f65a87189c49bae5c635ee4b2bcceedcb8f322065466",
+    "password_salt": "1691d49e36e66ca9b4d7f9f46a4c368c",
+    "updated_at": "2026-10-24T12:54:25.526Z",
+    "reset_token": null,
+    "reset_token_expires": null
   },
   {
     "id": "usr-02",

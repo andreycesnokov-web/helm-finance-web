@@ -2,13 +2,14 @@ module.exports = {
   "nav": {
     "home": "Home",
     "platform": "Platform",
-    "doc_intelligence": "Document Intelligence",
-    "compliance": "Tax & Compliance",
-    "hub": "Knowledge Hub",
+    "doc_intelligence": "Documents",
+    "compliance": "Compliance",
+    "hub": "Guides",
+    "help": "Help",
     "pricing": "Pricing",
     "about": "About",
     "login": "Log In",
-    "trial_cta": "Start Free Trial (7 Days)",
+    "trial_cta": "Start Free Trial",
     "app_link": "Open CFO AI Application"
   },
   "announcement": {
@@ -890,7 +891,7 @@ module.exports = {
     "contact_support_title": "Customer Support",
     "contact_support_desc": "For technical inquiries, account setup questions, or bug reports:",
     "contact_support_email": "support@cfo-ai.site",
-    "contact_support_time": "Typical response within 1 business day (Monday – Friday).",
+    "contact_support_time": "Dedicated team support desk (Monday – Friday).",
     "contact_sales_title": "Sales & Enterprise Walkthroughs",
     "contact_sales_desc": "For multi-entity onboarding or partnership inquiries:",
     "contact_sales_email": "sales@cfo-ai.site",

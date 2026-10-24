@@ -150,54 +150,164 @@
     </main>
   </div>
 
-  <!-- IN-APP CMS LOGIN MODAL -->
-  <div id="cms-login-modal" class="fixed inset-0 bg-[#001428]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl border border-slate-200">
-      <div class="text-center mb-6">
-        <div class="inline-flex items-center gap-2 mb-2">
-          <img src="/assets/brand/logo_dark_bg_white_text.svg" alt="CFO AI Studio" class="h-8 w-auto rounded bg-[#002244] p-1">
-          <span class="font-black text-xl text-[#003366] tracking-tight">Studio Sign In</span>
+  <!-- IN-APP CMS AUTHENTICATION MODAL -->
+  <div id="cms-login-modal" class="fixed inset-0 bg-[#001428]/85 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl border border-slate-200 relative">
+      
+      <!-- 1. SIGN IN VIEW (Default) -->
+      <div id="auth-view-login">
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center gap-2 mb-2">
+            <img src="/assets/brand/logo_dark_bg_white_text.svg" alt="CFO AI Studio" class="h-8 w-auto rounded bg-[#002244] p-1">
+            <span class="font-black text-xl text-[#003366] tracking-tight">Studio Sign In</span>
+          </div>
+          <p class="text-xs text-slate-500">Sign in to manage website content, help center, and media</p>
         </div>
-        <p class="text-xs text-slate-500">Sign in to manage website content, 16 locales, and pricing</p>
+
+        <div id="login-error-msg" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium"></div>
+        <div id="login-success-msg" class="hidden mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg font-medium"></div>
+
+        <form onsubmit="handleFormLogin(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+            <input type="email" id="login-email" required placeholder="admin@cfo-ai.site" autocomplete="username" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono-num">
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-semibold text-slate-700">Password</label>
+              <button type="button" onclick="showAuthView('forgot')" class="text-[11px] text-[#1565C0] hover:underline font-semibold">Forgot Password?</button>
+            </div>
+            <div class="relative">
+              <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono-num pr-10">
+              <button type="button" onclick="togglePasswordVisibility('login-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1" title="Show/Hide Password" aria-label="Toggle password visibility">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="login-submit-btn" class="w-full py-2.5 px-4 bg-[#1565C0] hover:bg-[#0052CC] text-white font-bold text-xs rounded-lg transition shadow">
+            Sign In to Studio
+          </button>
+        </form>
+
+        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Protected by Rate Limiting &amp; PBKDF2</span>
+          <button type="button" onclick="checkAuthStatus(true)" class="text-slate-500 hover:underline">Setup / Reset</button>
+        </div>
       </div>
 
-      <div id="login-error-msg" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg"></div>
-
-      <!-- Quick Role Selectors -->
-      <div class="mb-5">
-        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Quick Role Access</label>
-        <div class="grid grid-cols-3 gap-2">
-          <button type="button" onclick="quickFillLogin('owner@cfo-ai.site')" class="p-2 border border-blue-200 hover:border-blue-500 hover:bg-blue-50 rounded-lg text-center transition">
-            <div class="text-xs font-bold text-[#003366]">Owner</div>
-            <div class="text-[9px] text-slate-400">Full Access</div>
-          </button>
-          <button type="button" onclick="quickFillLogin('editor@cfo-ai.site')" class="p-2 border border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded-lg text-center transition">
-            <div class="text-xs font-bold text-[#003366]">Editor</div>
-            <div class="text-[9px] text-slate-400">Content Only</div>
-          </button>
-          <button type="button" onclick="quickFillLogin('reviewer@cfo-ai.site')" class="p-2 border border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded-lg text-center transition">
-            <div class="text-xs font-bold text-[#003366]">Reviewer</div>
-            <div class="text-[9px] text-slate-400">Audit / Read</div>
-          </button>
+      <!-- 2. FORGOT PASSWORD REQUEST VIEW -->
+      <div id="auth-view-forgot" class="hidden">
+        <div class="text-center mb-5">
+          <div class="inline-flex items-center gap-2 mb-2">
+            <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">?</div>
+            <span class="font-black text-lg text-[#003366] tracking-tight">Reset Password</span>
+          </div>
+          <p class="text-xs text-slate-500">Enter your account email to receive a secure reset token</p>
         </div>
+
+        <div id="forgot-error-msg" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium"></div>
+        <div id="forgot-success-msg" class="hidden mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg font-medium"></div>
+
+        <form onsubmit="handleForgotPassword(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Account Email</label>
+            <input type="email" id="forgot-email" required placeholder="admin@cfo-ai.site" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono-num">
+          </div>
+          <button type="submit" id="forgot-submit-btn" class="w-full py-2.5 px-4 bg-[#1565C0] hover:bg-[#0052CC] text-white font-bold text-xs rounded-lg transition shadow">
+            Generate Reset Token
+          </button>
+          <div class="flex items-center justify-between pt-2">
+            <button type="button" onclick="showAuthView('login')" class="text-xs text-slate-500 hover:text-slate-800">&larr; Back to Sign In</button>
+            <button type="button" onclick="showAuthView('reset')" class="text-xs text-[#1565C0] hover:underline">Have a token? Reset &rarr;</button>
+          </div>
+        </form>
       </div>
 
-      <form onsubmit="handleFormLogin(event)" class="space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
-          <input type="email" id="login-email" required value="owner@cfo-ai.site" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono-num">
+      <!-- 3. RESET PASSWORD TOKEN SUBMISSION VIEW -->
+      <div id="auth-view-reset" class="hidden">
+        <div class="text-center mb-5">
+          <div class="inline-flex items-center gap-2 mb-2">
+            <span class="font-black text-lg text-[#003366] tracking-tight">Set New Password</span>
+          </div>
+          <p class="text-xs text-slate-500">Enter your reset token and your new password</p>
         </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-          <input type="password" id="login-password" required value="password123" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono-num">
-        </div>
-        <button type="submit" id="login-submit-btn" class="w-full py-2.5 px-4 bg-[#1565C0] hover:bg-[#0052CC] text-white font-bold text-xs rounded-lg transition shadow">
-          Sign In to Studio
-        </button>
-      </form>
-      <div class="mt-4 text-center">
-        <span class="text-[10px] text-slate-400 font-mono">CFO AI CMS Isolated RBAC Security</span>
+
+        <div id="reset-error-msg" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium"></div>
+        <div id="reset-success-msg" class="hidden mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg font-medium"></div>
+
+        <form onsubmit="handleResetPassword(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Reset Token</label>
+            <input type="text" id="reset-token" required placeholder="Paste token here" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">New Password (min 8 chars)</label>
+            <div class="relative">
+              <input type="password" id="reset-new-password" required minlength="8" placeholder="••••••••" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono pr-10">
+              <button type="button" onclick="togglePasswordVisibility('reset-new-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Confirm New Password</label>
+            <div class="relative">
+              <input type="password" id="reset-confirm-password" required minlength="8" placeholder="••••••••" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono pr-10">
+              <button type="button" onclick="togglePasswordVisibility('reset-confirm-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="reset-submit-btn" class="w-full py-2.5 px-4 bg-[#1565C0] hover:bg-[#0052CC] text-white font-bold text-xs rounded-lg transition shadow">
+            Update Password &amp; Sign In
+          </button>
+          <div class="pt-2 text-center">
+            <button type="button" onclick="showAuthView('login')" class="text-xs text-slate-500 hover:text-slate-800">&larr; Back to Sign In</button>
+          </div>
+        </form>
       </div>
+
+      <!-- 4. INITIAL SETUP / SET OWNER PASSWORD VIEW (Triggered if no password exists) -->
+      <div id="auth-view-setup" class="hidden">
+        <div class="text-center mb-5">
+          <div class="inline-flex items-center gap-2 mb-2">
+            <span class="font-black text-lg text-[#003366] tracking-tight">Studio Setup: Owner Account</span>
+          </div>
+          <p class="text-xs text-slate-500">Configure your primary administrative owner email and password</p>
+        </div>
+
+        <div id="setup-error-msg" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg font-medium"></div>
+
+        <form onsubmit="handleInitialSetup(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Owner Email Address</label>
+            <input type="email" id="setup-email" required value="admin@cfo-ai.site" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono-num">
+            <p class="text-[10px] text-slate-500 mt-1">Default is admin@cfo-ai.site or enter your preferred address.</p>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Create Password (min 8 chars)</label>
+            <div class="relative">
+              <input type="password" id="setup-password" required minlength="8" placeholder="••••••••" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono pr-10">
+              <button type="button" onclick="togglePasswordVisibility('setup-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Confirm Password</label>
+            <div class="relative">
+              <input type="password" id="setup-confirm-password" required minlength="8" placeholder="••••••••" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono pr-10">
+              <button type="button" onclick="togglePasswordVisibility('setup-confirm-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="setup-submit-btn" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition shadow">
+            Complete Setup &amp; Sign In
+          </button>
+        </form>
+      </div>
+
     </div>
   </div>
 

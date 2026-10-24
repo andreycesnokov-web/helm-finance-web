@@ -10,37 +10,65 @@ let currentTab = 'dashboard';
 
 // --- AUTHENTICATION & INITIALIZATION ---
 async function initApp() {
-  if (!currentToken || !currentUser) {
-    // If no stored credentials, attempt auto-login as Owner or show modal
-    const autoSuccess = await loginUser('owner@cfo-ai.site', 'password123');
-    if (!autoSuccess) {
-      showLoginModal();
-      return;
+  if (currentToken) {
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        headers: { 'Authorization': `Bearer ${currentToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        currentUser = data.user;
+        localStorage.setItem('cfo_cms_user', JSON.stringify(currentUser));
+        hideLoginModal();
+        updateUserHeader();
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialTab = urlParams.get('tab') || window.location.hash.substring(1) || 'dashboard';
+        switchTab(initialTab);
+        return;
+      }
+    } catch (err) {
+      console.warn('Token validation failed:', err);
     }
   }
 
-  // Verify current token validity
+  // If no valid session, check system auth status
+  checkAuthStatus();
+}
+
+async function checkAuthStatus(forceShow = false) {
   try {
-    const res = await fetch(`${API_BASE}/auth/me`, {
-      headers: { 'Authorization': `Bearer ${currentToken}` }
-    });
+    const res = await fetch(`${API_BASE}/auth/status`);
     if (res.ok) {
       const data = await res.json();
-      currentUser = data.user;
-      localStorage.setItem('cfo_cms_user', JSON.stringify(currentUser));
-      hideLoginModal();
-      updateUserHeader();
-      const urlParams = new URLSearchParams(window.location.search);
-      const initialTab = urlParams.get('tab') || window.location.hash.substring(1) || 'dashboard';
-      switchTab(initialTab);
-    } else {
-      showLoginModal('Session expired. Please sign in to continue.');
+      if (!data.hasPassword) {
+        showAuthView('setup');
+        showLoginModal();
+        return;
+      }
     }
   } catch (err) {
-    console.warn('Auth verification network issue, falling back to cached profile:', err);
-    updateUserHeader();
-    switchTab('dashboard');
+    console.warn('Status check failed:', err);
   }
+  showAuthView('login');
+  showLoginModal();
+}
+
+function showAuthView(viewName) {
+  const views = ['login', 'forgot', 'reset', 'setup'];
+  views.forEach(v => {
+    const el = document.getElementById(`auth-view-${v}`);
+    if (el) {
+      if (v === viewName) el.classList.remove('hidden');
+      else el.classList.add('hidden');
+    }
+  });
+  // Clear any existing error or success messages
+  ['login', 'forgot', 'reset', 'setup'].forEach(v => {
+    const err = document.getElementById(`${v}-error-msg`);
+    if (err) err.classList.add('hidden');
+    const succ = document.getElementById(`${v}-success-msg`);
+    if (succ) succ.classList.add('hidden');
+  });
 }
 
 function showLoginModal(msg = '') {
@@ -62,62 +90,238 @@ function hideLoginModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-function quickFillLogin(email) {
-  const emailInput = document.getElementById('login-email');
-  const passInput = document.getElementById('login-password');
-  if (emailInput) emailInput.value = email;
-  if (passInput) passInput.value = 'password123';
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.innerHTML = `<svg class="w-4 h-4 text-[#1565C0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>`;
+  } else {
+    input.type = 'password';
+    btn.innerHTML = `<svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>`;
+  }
 }
 
 async function handleFormLogin(event) {
   if (event) event.preventDefault();
-  const email = document.getElementById('login-email').value;
-  const password = document.getElementById('login-password').value;
+  const emailInput = document.getElementById('login-email');
+  const passInput = document.getElementById('login-password');
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passInput ? passInput.value : '';
   const btn = document.getElementById('login-submit-btn');
+  const errEl = document.getElementById('login-error-msg');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (!email || !password) {
+    if (errEl) {
+      errEl.innerText = 'Please enter both email and password.';
+      errEl.classList.remove('hidden');
+    }
+    return;
+  }
+
   if (btn) btn.innerText = 'Signing In...';
 
-  const ok = await loginUser(email, password);
-  if (btn) btn.innerText = 'Sign In to Studio';
-
-  if (ok) {
-    hideLoginModal();
-    updateUserHeader();
-    switchTab(currentTab || 'dashboard');
-  } else {
-    showLoginModal('Invalid credentials. Please verify your email and password.');
-  }
-}
-
-async function loginUser(email, password) {
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    if (res.ok) {
-      const data = await res.json();
+    const data = await res.json();
+    if (res.ok && (data.success || data.token)) {
       currentToken = data.token;
       currentUser = data.user;
       localStorage.setItem('cfo_cms_token', currentToken);
       localStorage.setItem('cfo_cms_user', JSON.stringify(currentUser));
+      hideLoginModal();
       updateUserHeader();
-      return true;
+      switchTab(currentTab || 'dashboard');
+    } else {
+      if (errEl) {
+        errEl.innerText = data.error || 'Invalid email or password.';
+        errEl.classList.remove('hidden');
+      }
     }
   } catch (err) {
-    console.error('Login error:', err);
+    if (errEl) {
+      errEl.innerText = 'Network connection error. Please try again.';
+      errEl.classList.remove('hidden');
+    }
+  } finally {
+    if (btn) btn.innerText = 'Sign In to Studio';
   }
-  return false;
 }
 
-function handleLogout() {
+async function handleForgotPassword(event) {
+  if (event) event.preventDefault();
+  const email = document.getElementById('forgot-email').value.trim();
+  const btn = document.getElementById('forgot-submit-btn');
+  const errEl = document.getElementById('forgot-error-msg');
+  const succEl = document.getElementById('forgot-success-msg');
+  if (errEl) errEl.classList.add('hidden');
+  if (succEl) succEl.classList.add('hidden');
+
+  if (!email) {
+    errEl.innerText = 'Please enter your email.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  if (btn) btn.innerText = 'Processing...';
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      succEl.innerHTML = `<strong>Reset Token Generated:</strong><br><span class="font-mono text-xs select-all bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-950 font-bold">${data.resetToken || 'Token sent'}</span><br><span class="text-[10px] text-slate-500">Valid for 15 minutes.</span><div class="mt-2"><button type="button" onclick="prefillResetToken('${data.resetToken}')" class="underline font-bold text-emerald-800 text-xs">Proceed to Set New Password &rarr;</button></div>`;
+      succEl.classList.remove('hidden');
+    } else {
+      errEl.innerText = data.error || 'Failed to generate reset token.';
+      errEl.classList.remove('hidden');
+    }
+  } catch (err) {
+    errEl.innerText = 'Network connection error. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    if (btn) btn.innerText = 'Generate Reset Token';
+  }
+}
+
+function prefillResetToken(token) {
+  showAuthView('reset');
+  const tokenInput = document.getElementById('reset-token');
+  if (tokenInput && token) tokenInput.value = token;
+}
+
+async function handleResetPassword(event) {
+  if (event) event.preventDefault();
+  const token = document.getElementById('reset-token').value.trim();
+  const newPassword = document.getElementById('reset-new-password').value;
+  const confirmPassword = document.getElementById('reset-confirm-password').value;
+  const btn = document.getElementById('reset-submit-btn');
+  const errEl = document.getElementById('reset-error-msg');
+  const succEl = document.getElementById('reset-success-msg');
+  if (errEl) errEl.classList.add('hidden');
+  if (succEl) succEl.classList.add('hidden');
+
+  if (!token) {
+    errEl.innerText = 'Please enter your reset token.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    errEl.innerText = 'Passwords do not match.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (newPassword.length < 8) {
+    errEl.innerText = 'Password must be at least 8 characters long.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  if (btn) btn.innerText = 'Updating Password...';
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      currentToken = data.token;
+      currentUser = data.user;
+      localStorage.setItem('cfo_cms_token', currentToken);
+      localStorage.setItem('cfo_cms_user', JSON.stringify(currentUser));
+      hideLoginModal();
+      updateUserHeader();
+      switchTab(currentTab || 'dashboard');
+    } else {
+      errEl.innerText = data.error || 'Invalid or expired reset token.';
+      errEl.classList.remove('hidden');
+    }
+  } catch (err) {
+    errEl.innerText = 'Network connection error. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    if (btn) btn.innerText = 'Update Password & Sign In';
+  }
+}
+
+async function handleInitialSetup(event) {
+  if (event) event.preventDefault();
+  const email = document.getElementById('setup-email').value.trim();
+  const password = document.getElementById('setup-password').value;
+  const confirmPassword = document.getElementById('setup-confirm-password').value;
+  const btn = document.getElementById('setup-submit-btn');
+  const errEl = document.getElementById('setup-error-msg');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (!email) {
+    errEl.innerText = 'Please enter an owner email.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (password !== confirmPassword) {
+    errEl.innerText = 'Passwords do not match.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (password.length < 8) {
+    errEl.innerText = 'Password must be at least 8 characters long.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  if (btn) btn.innerText = 'Setting up Owner Account...';
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/initial-setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      currentToken = data.token;
+      currentUser = data.user;
+      localStorage.setItem('cfo_cms_token', currentToken);
+      localStorage.setItem('cfo_cms_user', JSON.stringify(currentUser));
+      hideLoginModal();
+      updateUserHeader();
+      switchTab(currentTab || 'dashboard');
+    } else {
+      errEl.innerText = data.error || 'Setup failed. Please try again.';
+      errEl.classList.remove('hidden');
+    }
+  } catch (err) {
+    errEl.innerText = 'Network connection error. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    if (btn) btn.innerText = 'Complete Setup & Sign In';
+  }
+}
+
+async function handleLogout() {
+  try {
+    await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+  } catch (err) {
+    console.warn('Logout request failed:', err);
+  }
   localStorage.removeItem('cfo_cms_token');
   localStorage.removeItem('cfo_cms_user');
   currentToken = '';
   currentUser = null;
   document.getElementById('top-user-name').innerText = 'Signed Out';
   document.getElementById('top-user-role').innerText = 'NO ACTIVE SESSION';
-  showLoginModal('You have been signed out. Please sign in again.');
+  showAuthView('login');
+  showLoginModal('You have been signed out.');
 }
 
 function updateUserHeader() {

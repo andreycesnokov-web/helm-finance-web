@@ -3,6 +3,8 @@
  * Tests all 17 functional requirements specified in Phase 11.
  */
 
+process.env.NODE_ENV = 'test';
+
 const { createApp } = require('./server/index');
 const http = require('http');
 

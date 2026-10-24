@@ -80,56 +80,12 @@ function createAdminApp(contentStore) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Gateway Protection Middleware
+  // Security Headers for Admin Portal
   app.use((req, res, next) => {
-    if (req.path === '/healthz') return next();
-
-    // Check Gateway Cookie
-    const cookies = parseCookies(req);
-    const gateCookie = cookies[GATEWAY_COOKIE_NAME];
-    if (gateCookie && verifyGatewayToken(gateCookie)) {
-      return next();
-    }
-
-    // Check Basic Auth
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.startsWith('Basic ')) {
-      const credentials = authHeader.split(' ')[1];
-      if (credentials) {
-        const decoded = Buffer.from(credentials, 'base64').toString('utf8');
-        const [user, pass] = decoded.split(':');
-        if (user === STAGING_BASIC_USER && pass && EFFECTIVE_BASIC_PASS) {
-          const passBuffer = Buffer.from(pass);
-          const effectiveBuffer = Buffer.from(EFFECTIVE_BASIC_PASS);
-          if (passBuffer.length === effectiveBuffer.length && crypto.timingSafeEqual(passBuffer, effectiveBuffer)) {
-            const token = createGatewayToken();
-            res.setHeader('Set-Cookie', `${GATEWAY_COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`);
-            return next();
-          }
-        }
-      }
-      res.setHeader('WWW-Authenticate', 'Basic realm="CFO AI Staging Admin"');
-      return res.status(401).send('Invalid staging credentials.');
-    }
-
-    // For API calls (/api/cms/...) without cookie or basic auth:
-    if (req.path.startsWith('/api/cms')) {
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const cmsJwt = authHeader.substring(7);
-        if (verifyCmsToken(cmsJwt)) {
-          return next();
-        }
-      }
-      if (req.path === '/api/cms/auth/login') {
-        return next();
-      }
-      // Return 401 JSON without WWW-Authenticate: Basic header to prevent browser dialog
-      return res.status(401).json({ error: 'Staging session required.' });
-    }
-
-    // For non-API requests (HTML/static), prompt HTTP Basic Auth
-    res.setHeader('WWW-Authenticate', 'Basic realm="CFO AI Staging Admin"');
-    return res.status(401).send('Staging authentication required.');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
   });
 
   app.get('/healthz', (req, res) => res.json({ status: 'ok', surface: 'admin', timestamp: new Date().toISOString() }));

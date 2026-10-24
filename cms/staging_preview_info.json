@@ -1,21 +1,21 @@
 {
-  "generated_at": "2026-10-24T08:20:20.080Z",
+  "generated_at": "2026-10-24T12:42:14.018Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com",
-      "english_homepage": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en",
-      "indonesian_homepage": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/id",
-      "about_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/about",
-      "help_center_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/help",
-      "pricing_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/pricing",
-      "hub_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/blog",
-      "verified_https": true,
+      "https_url": "https://idaho-below-rapid-linking.trycloudflare.com",
+      "english_homepage": "https://idaho-below-rapid-linking.trycloudflare.com/en",
+      "indonesian_homepage": "https://idaho-below-rapid-linking.trycloudflare.com/id",
+      "about_url": "https://idaho-below-rapid-linking.trycloudflare.com/en/about",
+      "help_center_url": "https://idaho-below-rapid-linking.trycloudflare.com/en/help",
+      "pricing_url": "https://idaho-below-rapid-linking.trycloudflare.com/en/pricing",
+      "hub_url": "https://idaho-below-rapid-linking.trycloudflare.com/en/blog",
+      "verified_https": false,
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://challenging-sink-campbell-transmission.trycloudflare.com",
-      "admin_login_url": "https://challenging-sink-campbell-transmission.trycloudflare.com/admin/",
+      "https_url": "https://vegetables-essex-laughing-repairs.trycloudflare.com",
+      "admin_login_url": "https://vegetables-essex-laughing-repairs.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
         "username": "admin",
@@ -38,7 +38,7 @@
           "permissions": "Read-only preview, audit inspect"
         }
       ],
-      "verified_https": true,
+      "verified_https": false,
       "local_port": 3003
     }
   }

@@ -5,10 +5,11 @@ module.exports = {
     "doc_intelligence": "Документы",
     "compliance": "Налоги",
     "hub": "База знаний",
+    "help": "Помощь",
     "pricing": "Тарифы",
     "about": "О нас",
     "login": "Войти",
-    "trial_cta": "Попробовать бесплатно",
+    "trial_cta": "Попробовать",
     "app_link": "Открыть приложение CFO AI"
   },
   "announcement": {
@@ -890,7 +891,7 @@ module.exports = {
     "contact_support_title": "Служба поддержки",
     "contact_support_desc": "По техническим вопросам, настройке аккаунта и устранению сбоев:",
     "contact_support_email": "support@cfo-ai.site",
-    "contact_support_time": "Ответ в течение 1 рабочего дня (понедельник – пятница).",
+    "contact_support_time": "Служба поддержки работает (понедельник – пятница).",
     "contact_sales_title": "Отдел продаж и демо-сессии",
     "contact_sales_desc": "По вопросам холдинговых подключений и партнерских программ:",
     "contact_sales_email": "sales@cfo-ai.site",
