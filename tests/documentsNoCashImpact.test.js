@@ -46,7 +46,10 @@ ok('archive uses RPC', /supabase\.rpc\('rpc_document_archive'/.test(block));
 ok('metadata uses RPC', /supabase\.rpc\('rpc_document_update_metadata'/.test(block));
 ok('link uses RPC', /supabase\.rpc\('rpc_document_link'/.test(block));
 ok('unlink uses RPC', /supabase\.rpc\('rpc_document_unlink'/.test(block));
-ok('best-effort audit only for signed_url', (block.match(/await logDocumentAudit\(/g) || []).length === 1 && /signed_url_issued/.test(block));
+// Best-effort audit is for READ access only (a signed URL issued, an original downloaded for the accountant
+// package); every write is audited atomically through its RPC.
+ok('best-effort audit only for read access (signed_url, file_downloaded)', (block.match(/await logDocumentAudit\(/g) || []).length === 2
+  && /action: 'signed_url_issued'/.test(block) && /action: 'file_downloaded'/.test(block));
 ok('health reports rpc_functions readiness', /rpc_functions/.test(block) && /rpc_functions_missing/.test(block));
 
 console.log(`\n${fail === 0 ? 'ALL PASS' : 'FAIL'} — ${pass} passed, ${fail} failed`);
