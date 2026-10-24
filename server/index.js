@@ -1084,9 +1084,9 @@ app.get('/api/pulse', auth, async (req, res) => {
     const bizOr = bizOrFilter(biz);
 
     // ALL transactions ever · for total balance
-    let allTxQuery = supabase.from('transactions').select('*').or(bizOr);
-    if (scope !== 'all') allTxQuery = allTxQuery.eq('scope', scope);
-    const { data: allTxs } = await allTxQuery;
+    // AC-0 / I-13: every row, page by page — PostgREST caps one select at max_rows (1000 on hosted Supabase), and a
+    // company past that would see a truncated balance, burn and runway. A read failure stays an empty list, as before.
+    const allTxs = await WL.fetchAllRows(() => { let q = supabase.from('transactions').select('*').or(bizOr); if (scope !== 'all') q = q.eq('scope', scope); return q.order('id'); }).catch(() => null);
 
     // This month transactions · for the MTD KPIs.
     // Derived from allTxs rather than re-queried on created_at: a back-dated entry
@@ -8267,9 +8267,12 @@ app.get('/api/transactions', auth, async (req, res) => {
     || (beforeId !== null && (!Number.isSafeInteger(beforeId) || beforeId < 1))))
     return res.status(400).json({ error: 'invalid_transaction_page' });
 
+  const build = () => {
   let query = supabase.from('transactions').select(sourceRead.select('transactions', recordId))
     .or(bizOrFilter(biz))
     .order(paged ? 'id' : 'created_at', { ascending: false });
+  // AC-0 / I-13: a stable order across pages (created_at alone can tie).
+  if (!paged) query = query.order('id', { ascending: false });
   query = sourceRead.scope(query, recordId, biz.business.id);
 
   // Period filter — 'all' skips date filter entirely (used by Payroll page)
@@ -8290,8 +8293,13 @@ app.get('/api/transactions', auth, async (req, res) => {
     if (beforeId !== null) query = query.lt('id', beforeId);
     query = query.limit(pageLimit);
   }
+  return query;
+  };
 
-  const { data: sourceData, error } = await query;
+  // AC-0 / I-13: the unpaged list returns every row (page by page past PostgREST's max_rows); a cursor page and a
+  // single-record read keep their own bound.
+  const { data: sourceData, error } = paged || recordId ? await build()
+    : await WL.fetchAllRows(build).then((data) => ({ data, error: null }), (error) => ({ data: null, error }));
   if (error) return res.status(500).json({ error: error.message });
   const data = sourceRead.decode(sourceData, 'transactions', recordId);
 
@@ -12540,7 +12548,8 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     { data: wallets   },
     accessData,
   ] = await Promise.all([
-    scopeQ(supabase.from('transactions').select('id,type,amount_original,amount_idr,currency_original,created_at,transaction_date,category,cashflow_category_id,description,is_opening_balance,transfer_id,wallet_id,source,scope')).order('created_at', { ascending: false }),
+    // AC-0 / I-13: all rows (paged); order does not matter here — every use filters and sums.
+    WL.fetchAllRows(() => scopeQ(supabase.from('transactions').select('id,type,amount_original,amount_idr,currency_original,created_at,transaction_date,category,cashflow_category_id,description,is_opening_balance,transfer_id,wallet_id,source,scope')).order('id')).then((data) => ({ data }), () => ({ data: null })),
     scopeQ(supabase.from('debts').select('*')).or('is_training.is.null,is_training.eq.false'),
     scopeQ(supabase.from('wallets').select('id,name,currency,type,scope')).eq('is_active', true),
     getCurrentAccess(biz ? biz.ownerUserId : userId),

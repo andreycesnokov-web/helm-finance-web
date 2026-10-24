@@ -16,11 +16,12 @@ const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 const dayDiff = (a, b) => Math.round((Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10)) - Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10))) / 86400000);
 
 (async () => {
-  assert.ok(BIZ && OTHER && E.FI_EMAIL && E.FI_OTHER_EMAIL, 'FI_* variables are required');
+  // FI_TOKEN / FI_OTHER_TOKEN (an existing session of each person) can stand in for email + password.
+  assert.ok(BIZ && OTHER && (E.FI_EMAIL || E.FI_TOKEN) && (E.FI_OTHER_EMAIL || E.FI_OTHER_TOKEN), 'FI_* variables are required');
   await db.connect();
   assert.equal((await db.query('SELECT system_identifier::text id FROM pg_control_system()')).rows[0].id, E.EXPECTED_PG_SYSTEM_ID, 'isolated test cluster only');
   const q = async (s, p) => (await db.query(s, p)).rows;
-  const tok = await login(E.FI_EMAIL, E.FI_PASSWORD), other = await login(E.FI_OTHER_EMAIL, E.FI_OTHER_PASSWORD);
+  const tok = E.FI_TOKEN || await login(E.FI_EMAIL, E.FI_PASSWORD), other = E.FI_OTHER_TOKEN || await login(E.FI_OTHER_EMAIL, E.FI_OTHER_PASSWORD);
   const now = new Date(), today = iso(now);
   const R = await import('../../../client/src/v2/lib/radarSeries.js');
 
