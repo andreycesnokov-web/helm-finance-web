@@ -1,8 +1,8 @@
 {
-  "release_id": "rel-1792847730329-1ff6ca48",
-  "version": "v202610241315",
+  "release_id": "rel-1792847838030-1ff6ca48",
+  "version": "v202610241317",
   "hash": "1ff6ca48",
-  "activated_at": "2026-10-24T13:15:30.329Z",
+  "activated_at": "2026-10-24T13:17:18.030Z",
   "activated_by": "test-runner",
   "notes": "Verify integrations & help preservation"
 }
