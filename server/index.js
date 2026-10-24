@@ -14933,6 +14933,38 @@ app.post('/api/documents/:id/signed-url', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/documents/:id/content — the original file's bytes from the app's OWN origin, for the accountant
+// package (a page cannot read a storage URL on another origin unless that storage sends CORS headers, so the
+// package must not depend on it). Same role, Document Center, scope and per-document checks as a signed URL,
+// and the same audit trail. Always a download (attachment + nosniff), never rendered.
+const DOC_CONTENT_MAX_BYTES = 30 * 1024 * 1024;
+app.get('/api/documents/:id/content', auth, async (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  try {
+    const biz = await requireBusiness(req, res); if (!biz) return;
+    if (!canViewBusinessFinance(biz.role) && !canUploadDocument(biz.role)) return res.status(403).json({ error: 'Your role cannot view documents' });
+    if (!await hasDocumentsAccess(biz)) return res.status(403).json({ error: 'Document Center is not enabled', upgrade_required: true });
+    if (await blockIfStorageNotReady(res)) return;
+    const doc = await loadDocumentScoped(biz, req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    const [docWithLinks] = await attachLinks(biz, [doc]);
+    if (!await userCanAccessDoc(biz, req.user.userId, biz.role, docWithLinks))
+      return res.status(403).json({ error: 'You do not have access to this document' });
+    const { data: fileRows } = await supabase.from('document_files').select('storage_path, file_name, file_size').eq('id', doc.file_id).limit(1);
+    if (!fileRows?.length) return res.status(404).json({ error: 'File not found' });
+    if (Number(fileRows[0].file_size) > DOC_CONTENT_MAX_BYTES) return res.status(413).json({ error: 'file_too_large' });
+    const { data, error } = await supabase.storage.from(DOC_BUCKET).download(fileRows[0].storage_path);
+    if (error || !data) return res.status(502).json({ error: 'storage_unavailable' });
+    const buf = Buffer.from(await data.arrayBuffer());
+    if (buf.length > DOC_CONTENT_MAX_BYTES) return res.status(413).json({ error: 'file_too_large' });
+    const purpose = req.query.purpose === 'accountant_package' ? 'accountant_package' : 'download';
+    await logDocumentAudit(biz, { document_id: doc.id, actor_user_id: req.user.userId, action: 'file_downloaded', channel: 'web', metadata: { purpose, bytes: buf.length } });
+    const safeName = String(fileRows[0].file_name || 'document').replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 120) || 'document';
+    res.set({ 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${safeName}"`, 'X-Content-Type-Options': 'nosniff', 'Content-Length': String(buf.length) });
+    res.send(buf);
+  } catch (e) { res.status(500).json({ error: 'document_content_unavailable' }); }
+});
+
 // PATCH /api/documents/:id — safe metadata only.
 app.patch('/api/documents/:id', auth, async (req, res) => {
   try {

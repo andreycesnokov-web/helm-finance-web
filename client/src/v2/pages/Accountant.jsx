@@ -17,7 +17,9 @@ import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '..
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason, UNRECONCILED_REASONS, reasonMeta } from '../lib/accounting'
-import { documentFileUrl } from '../lib/actions'
+import { documentFileUrl, packageSource, documentContentBytes } from '../lib/actions'
+import { useBusinessRequest } from '../lib/useBusinessRequest'
+import { quarterOf, reportingPeriod } from '../lib/accountantRegisters'
 import { money, shortDate } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
@@ -359,8 +361,12 @@ function CloseTab({ month, onOpenChatModal }) {
   const { token } = useAuth()
   const [askQuery, setAskQuery] = useState('')
   const [exportLang, setExportLang] = useState('id')
+  const request = useBusinessRequest()
+  // Package period: the selected month, or the quarter that contains it (?period=2026-Q3 opens it directly).
+  const [packageKind, setPackageKind] = useState(() => { try { return /^d{4}-Q[1-4]$/.test(new URLSearchParams(window.location.search).get('period') || '') ? 'quarter' : 'month' } catch { return 'month' } })
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState(null)
+  const [lastPackage, setLastPackage] = useState(null)
   const [selectedTxId, setSelectedTxId] = useState(null)
   const [expandedReasons, setExpandedReasons] = useState({})
   const exportControllerRef = useRef(null)
@@ -477,14 +483,35 @@ function CloseTab({ month, onOpenChatModal }) {
     const currentBizId = active?.id
     const currentMonth = month
     const packageLang = exportLang || 'id'
+    const periodKey = packageKind === 'quarter' ? quarterOf(currentMonth) : currentMonth
+    const period = reportingPeriod(periodKey)
 
     setExporting(true)
     setExportError(null)
     try {
       const rawDocs = Array.isArray(docs.data?.documents) ? docs.data.documents : []
       const companyName = active?.name || 'Company'
+      // Every register reads the same company-scoped APIs; a source that fails is named in the package.
+      const sourceErrors = []
+      const get = (name, path) => packageSource(request, path, controller.signal)
+        .catch((e) => { if (e?.name === 'AbortError') throw e; sourceErrors.push(name); return null })
+      const [runs, fund, pnl, prof, ...opDocsByMonth] = await Promise.all([
+        get('payroll', '/payroll/runs'),
+        get('financing', '/business-funding'),
+        get('profit and loss', `/pulse/profit-loss?month=${period.months[period.months.length - 1]}&currency=IDR&months=${period.months.join(',')}`),
+        get('tax profile', '/accountant/profile'),
+        ...period.months.map((m) => (m === currentMonth && operationDocs.data ? Promise.resolve(operationDocs.data) : get(`operation documents ${m}`, `/accountant/operation-documents/package?month=${encodeURIComponent(m)}`))),
+      ])
+      if (controller.signal.aborted) return
       const res = await createAccountantZipPackage({
         month: currentMonth,
+        period: periodKey,
+        operationDocumentsByMonth: opDocsByMonth,
+        payrollRuns: runs?.runs || [],
+        funding: fund,
+        pnl,
+        profile: prof?.profile || null,
+        sourceErrors,
         companyName,
         businessId: currentBizId,
         transactions: Array.isArray(tx.data) ? tx.data : [],
@@ -496,6 +523,11 @@ function CloseTab({ month, onOpenChatModal }) {
         token,
         lang: packageLang,
         signal: controller.signal,
+        // Same-origin bytes: no dependency on the storage service sending CORS headers to this page.
+        fetchDocumentBytes: async (docId, bizId, sig) => {
+          if (bizId && String(bizId) !== String(currentBizId)) return null
+          return documentContentBytes(request, docId, sig || controller.signal).catch((e) => { if (e?.name === 'AbortError') throw e; return null })
+        },
         fetchSignedUrl: async (docId, mode = 'download', bizId, sig) => {
           // The scope header is the active business; a switch aborts the export.
           if (bizId && String(bizId) !== String(currentBizId)) return null
@@ -506,6 +538,7 @@ function CloseTab({ month, onOpenChatModal }) {
 
       if (controller.signal.aborted) return
       if (active?.id !== currentBizId || month !== currentMonth) return
+      setLastPackage({ name: res.filename, complete: res.isComplete, period: periodKey })
       if (!res?.zipBytes) return
 
       const blob = new Blob([res.zipBytes], { type: 'application/zip' })
@@ -555,6 +588,13 @@ function CloseTab({ month, onOpenChatModal }) {
           <div className="v2-acct-actions">
             <NotYet note={t('acct.reviewSoon')}>{t('acct.sendToAccountant')}</NotYet>
             <div className="v2-acct-lang">
+              <label htmlFor="accountant-export-period">{t('acct.packagePeriod')}</label>
+              <select id="accountant-export-period" data-acct-period className="v2-select" value={packageKind} disabled={exporting} onChange={(e) => setPackageKind(e.target.value)}>
+                <option value="month">{t('acct.periodMonth', { m: monthLabel(month, lang) })}</option>
+                <option value="quarter">{t('acct.periodQuarter', { q: quarterOf(month), from: reportingPeriod(quarterOf(month)).start, to: reportingPeriod(quarterOf(month)).end })}</option>
+              </select>
+            </div>
+            <div className="v2-acct-lang">
               <label htmlFor="accountant-export-lang">{t('acct.exportLang')}</label>
               <select
                 id="accountant-export-lang"
@@ -572,10 +612,17 @@ function CloseTab({ month, onOpenChatModal }) {
               className="v2-btn v2-btn-secondary"
               disabled={exporting}
               onClick={handleDownload}
+              data-acct-download
             >
               {exporting ? '…' : t('acct.download')}
             </button>
           </div>
+          {lastPackage && !exportError && (
+            <div className={'v2-acct-note ' + (lastPackage.complete ? 'v2-acct-note-ok' : 'v2-acct-note-warn')} role="status" data-acct-package-done>
+              <I.check size={16} />
+              <span>{t(lastPackage.complete ? 'acct.packageReady' : 'acct.packageIncomplete', { f: lastPackage.name })} {t('acct.packageNotFiled')}</span>
+            </div>
+          )}
           {exportError && (
             <div className="v2-acct-note v2-acct-note-crit" role="alert">
               <I.warn size={16} />

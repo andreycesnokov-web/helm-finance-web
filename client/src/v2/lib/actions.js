@@ -346,6 +346,12 @@ export const updateEmployee = (token, id, body) =>
 export const archiveEmployee = (token, id, body = {}) =>
   apiFetch('/payroll/employees/' + encodeURIComponent(id), token, { method: 'DELETE', body })
 
+// Accountant package (reads only, pinned to the request's business like every v2 call): its sources and the
+// original bytes of each linked document from this origin (no dependency on storage CORS headers).
+export const packageSource = (request, path, signal) => apiFetch(path, request, { signal })
+export const documentContentBytes = (request, id, signal) =>
+  apiFetch(`/documents/${encodeURIComponent(id)}/content?purpose=accountant_package`, request, { responseType: 'document_bytes', signal })
+
 export const savePayrollRun = (token, body) =>
   apiFetch('/payroll/runs/action', token, { method: 'POST', body })
 

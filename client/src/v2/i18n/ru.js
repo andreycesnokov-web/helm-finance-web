@@ -335,6 +335,7 @@ export default {
     closed: 'Месяц закрыт бухгалтером',
     incompleteDownloadWarning: 'Внимание: пакет содержит неполные данные (осталось закрыть пунктов: {k}). Пакет выгружается с ограничениями для предварительной сверки.',
     recordsComplete: 'Готовых записей: {n} из {m}', sendToAccountant: 'Отправить бухгалтеру на проверку', reviewSoon: 'Проверка бухгалтером пока недоступна',
+    packagePeriod: 'Период пакета', periodMonth: 'Месяц · {m}', periodQuarter: 'Квартал · {q} ({from} – {to})', packageReady: 'Скачан {f}: подготовлен для проверки бухгалтером.', packageIncomplete: 'Скачан {f}: НЕПОЛНЫЙ — в пакете перечислено, чего не хватает.', packageNotFiled: 'Ничего не подано: отчётность подаёт бухгалтер в Coretax DJP (LKPM — в OSS).',
     download: 'Скачать пакет (PDF + файлы)', exportLang: 'Язык пакета', packageSoon: 'Пока недоступно', toFinish: 'Чтобы закрыть {m}',
     unlinked: {
       title: 'Несверенные банковские операции',

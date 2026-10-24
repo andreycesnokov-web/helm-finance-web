@@ -335,6 +335,7 @@ export default {
     closed: 'Bulan ditutup oleh akuntan',
     incompleteDownloadWarning: 'Perhatian: Berkas memuat data yang belum lengkap (tersisa {k} pemeriksaan). Diunduh dengan batasan untuk verifikasi awal.',
     recordsComplete: '{n} dari {m} catatan lengkap', sendToAccountant: 'Kirim ke akuntan untuk ditinjau', reviewSoon: 'Alur tinjauan akuntan belum tersedia',
+    packagePeriod: 'Periode paket', periodMonth: 'Bulan · {m}', periodQuarter: 'Kuartal · {q} ({from} – {to})', packageReady: 'Diunduh {f}: disiapkan untuk ditinjau akuntan.', packageIncomplete: 'Diunduh {f}: BELUM LENGKAP — paket mencantumkan yang kurang.', packageNotFiled: 'Belum ada yang dilaporkan: akuntan melapor di Coretax DJP (LKPM di OSS).',
     download: 'Unduh paket (PDF + berkas)', exportLang: 'Bahasa paket', packageSoon: 'Belum tersedia', toFinish: 'Untuk menutup {m}',
     unlinked: {
       title: 'Transaksi bank belum terekonsiliasi',

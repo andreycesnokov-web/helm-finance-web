@@ -121,6 +121,13 @@ async function performApiFetch(path, token, options = {}, journal = null, assert
     assertCurrent()
     return image
   }
+  // The accountant package reads a document's original bytes from this origin; only this GET may return them.
+  if (/^\/documents\/[^/?]+\/content\?purpose=accountant_package$/.test(path) && String(options.method || 'GET').toUpperCase() === 'GET' && options.responseType === 'document_bytes' && res.ok) {
+    assertCurrent()
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    assertCurrent()
+    return bytes
+  }
   let data = null
   const text = await res.text().catch((e) => { assertCurrent(); return unconfirmed(e) })
   assertCurrent()

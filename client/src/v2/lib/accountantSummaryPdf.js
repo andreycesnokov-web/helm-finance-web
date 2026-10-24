@@ -300,6 +300,40 @@ export function resolveUnavailableReason(rawReason, lang = 'ru') {
 
 export { I18N }
 
+// Accountant handoff block (period, totals, tax preparation). The label stays in English as well: it is the
+// statement an accountant checks before using any file of the package.
+const HANDOFF = {
+  en: { title: 'Accountant handoff — period totals', label: 'Prepared for Accountant Review — Not a Direct Coretax Import File', item: 'Item', amount: 'Recorded amount',
+    ops: 'Operations', moneyIn: 'Money in', moneyOut: 'Money out', gross: 'Payroll gross', pph: 'PPh 21 entered (not calculated)', kes: 'BPJS Kesehatan', jp: 'BPJS TK JP', jht: 'BPJS TK JHT',
+    net: 'Payroll net', unpaid: 'Payroll net not yet paid', fin: 'Financing received (not income)', rep: 'Loan principal repaid', ar: 'Open receivables', ap: 'Open payables', miss: 'Operations without a document', review: 'Items for manual verification',
+    tax: 'Tax preparation (for review)', profile: 'Tax profile fields not recorded', basis: 'Cash-basis estimate, not a statutory accrual statement. No general ledger, trial balance or balance sheet.' },
+  ru: { title: 'Передача бухгалтеру — итоги периода', label: 'Prepared for Accountant Review — Not a Direct Coretax Import File (подготовлено для проверки бухгалтером, это не файл импорта в Coretax)', item: 'Показатель', amount: 'Записанная сумма',
+    ops: 'Операции', moneyIn: 'Поступления', moneyOut: 'Списания', gross: 'Начислено по зарплате', pph: 'PPh 21 внесён (не рассчитан)', kes: 'BPJS Kesehatan', jp: 'BPJS TK JP', jht: 'BPJS TK JHT',
+    net: 'Зарплата на руки', unpaid: 'Зарплата к выплате (не оплачено)', fin: 'Получено финансирования (не доход)', rep: 'Погашено тела кредита', ar: 'Открытая дебиторка', ap: 'Открытая кредиторка', miss: 'Операции без документа', review: 'Требуют ручной проверки',
+    tax: 'Подготовка налогов (для проверки)', profile: 'Не заполнено в налоговом профиле', basis: 'Оценка кассовым методом, не бухгалтерская отчётность по начислению. Главной книги, оборотно-сальдовой ведомости и баланса нет.' },
+  id: { title: 'Serah terima ke akuntan — total periode', label: 'Prepared for Accountant Review — Not a Direct Coretax Import File (disiapkan untuk ditinjau akuntan, bukan berkas impor Coretax)', item: 'Pos', amount: 'Jumlah tercatat',
+    ops: 'Transaksi', moneyIn: 'Uang masuk', moneyOut: 'Uang keluar', gross: 'Gaji bruto', pph: 'PPh 21 diisi (tidak dihitung)', kes: 'BPJS Kesehatan', jp: 'BPJS TK JP', jht: 'BPJS TK JHT',
+    net: 'Gaji bersih', unpaid: 'Gaji bersih belum dibayar', fin: 'Pendanaan diterima (bukan pendapatan)', rep: 'Pokok pinjaman dibayar', ar: 'Piutang terbuka', ap: 'Utang terbuka', miss: 'Transaksi tanpa dokumen', review: 'Perlu verifikasi manual',
+    tax: 'Persiapan pajak (untuk ditinjau)', profile: 'Kolom profil pajak belum diisi', basis: 'Estimasi basis kas, bukan laporan keuangan akrual. Tidak ada buku besar, neraca saldo, atau neraca.' },
+}
+const fmt = (v) => (typeof v === 'number' ? v.toLocaleString('en-US', { maximumFractionDigits: 2 }) : String(v ?? ''))
+function handoffSection(h, lang) {
+  const t = HANDOFF[lang] || HANDOFF.en, x = h.totals
+  const rows = [[t.ops, x.transactions.count], [t.moneyIn, x.transactions.money_in], [t.moneyOut, x.transactions.money_out], [t.gross, x.payroll.gross], [t.pph, x.payroll.pph21_entered],
+    [t.kes, x.payroll.bpjs_kesehatan], [t.jp, x.payroll.bpjs_tk_jp], [t.jht, x.payroll.bpjs_tk_jht], [t.net, x.payroll.net], [t.unpaid, x.payroll.unpaid_net], [t.fin, x.financing.received],
+    [t.rep, x.financing.principal_repaid], [t.ar, x.receivables_open], [t.ap, x.payables_open], [t.miss, x.missing_documents], [t.review, x.review_items]]
+  const taxRows = (h.taxRows || []).slice(0, 14).map((r) => [String(r[0]), String(r[1]), String(r[2]), fmt(r[3]), String(r[5] || r[4] || '')])
+  return [
+    { text: t.label, bold: true, fontSize: 9.5, color: '#9a3412', margin: [0, 0, 0, 6] },
+    { text: t.title, fontSize: 12, bold: true, color: '#0f172a', margin: [0, 4, 0, 6] },
+    { table: { headerRows: 1, widths: ['65%', '35%'], body: [[{ text: t.item, bold: true }, { text: t.amount, bold: true, alignment: 'right' }], ...rows.map(([k, v]) => [k, { text: fmt(v), alignment: 'right' }])] }, layout: 'lightHorizontalLines', margin: [0, 0, 0, 6] },
+    { text: t.basis, fontSize: 8.5, color: '#475569', margin: [0, 0, 0, 8] },
+    ...(taxRows.length ? [{ text: t.tax, fontSize: 11, bold: true, color: '#0f172a', margin: [0, 4, 0, 4] },
+      { table: { headerRows: 1, widths: ['12%', '22%', '28%', '14%', '24%'], body: [['', '', '', '', ''].map((_, i) => ({ text: ['Period', 'Item', 'Filed in', 'Amount', 'Basis / gaps'][i], bold: true, fontSize: 8 })), ...taxRows.map((r) => r.map((c) => ({ text: c, fontSize: 8 })))] }, layout: 'lightHorizontalLines', margin: [0, 0, 0, 6] }] : []),
+    ...(h.missingProfile?.length ? [{ text: `${t.profile}: ${h.missingProfile.join('; ')}`, fontSize: 8.5, color: '#b45309', margin: [0, 0, 0, 10] }] : []),
+  ]
+}
+
 /**
  * Builds and returns a Uint8Array containing accountant-summary.pdf.
  * Formatted from the exact snapshot of summary.json and discrepancies.json.
@@ -311,6 +345,7 @@ export async function generateAccountantSummaryPdf({
   attachedFiles = [],
   wallets = [],
   lang = 'ru',
+  handoff = null,
 }) {
   const t = I18N[lang] || I18N.ru
   const readiness = summary?.readiness || {}
@@ -567,7 +602,8 @@ export async function generateAccountantSummaryPdf({
     content: [
       // Title
       { text: t.title, fontSize: 18, bold: true, color: '#0f172a', margin: [0, 0, 0, 2] },
-      { text: t.subTitle(summary.month || ''), fontSize: 11, color: '#475569', margin: [0, 0, 0, 10] },
+      { text: t.subTitle(handoff ? `${handoff.period.key} (${handoff.period.start} – ${handoff.period.end})` : (summary.month || '')), fontSize: 11, color: '#475569', margin: [0, 0, 0, 10] },
+      ...(handoff ? handoffSection(handoff, lang) : []),
 
       // Notice Callout (Month not closed until accountant verification)
       {

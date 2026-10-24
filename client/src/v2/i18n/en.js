@@ -335,6 +335,7 @@ export default {
     closed: 'Month closed by accountant',
     incompleteDownloadWarning: 'Notice: Package contains incomplete data ({k} check(s) remaining). Exported with limitations for preliminary verification.',
     recordsComplete: '{n} of {m} records complete', sendToAccountant: 'Send to your accountant for review', reviewSoon: 'Review workflow not available yet',
+    packagePeriod: 'Package period', periodMonth: 'Month · {m}', periodQuarter: 'Quarter · {q} ({from} – {to})', packageReady: 'Downloaded {f}: prepared for the accountant to review.', packageIncomplete: 'Downloaded {f}: INCOMPLETE — the package lists what is missing.', packageNotFiled: 'Nothing has been filed: the accountant files in Coretax DJP (or OSS for LKPM).',
     download: 'Download package (PDF + files)', exportLang: 'Package language', packageSoon: 'Not available yet', toFinish: 'To finish {m}',
     unlinked: {
       title: 'Unreconciled bank transactions',

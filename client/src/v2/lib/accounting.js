@@ -575,7 +575,20 @@ export function eventStage(e) {
 }
 
 /** Zero-dependency ZIP generator creating valid STORE archives (CRC-32 + local headers + central directory + EOCD) */
-export function createZip(files) {
+export function createZip(files, { date = new Date() } = {}) {
+  // DOS date/time of the archive entries (local time, 2-second resolution); a zero date is invalid (month 0).
+  const d = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date()
+  const dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds() / 2)
+  const dosDate = ((Math.max(1980, d.getFullYear()) - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()
+  // Entry names must stay inside the archive: no absolute paths, drive letters, backslashes or "..".
+  const seenNames = new Set()
+  for (const f of files) {
+    const n = String(f.name || '')
+    if (!n || n.startsWith('/') || /^[a-zA-Z]:/.test(n) || n.includes('\\') || n.split('/').some((part) => part === '..' || part === '.') || /[\u0000-\u001f]/.test(n))
+      throw new Error('unsafe_zip_entry_name')
+    if (seenNames.has(n)) throw new Error('duplicate_zip_entry_name')
+    seenNames.add(n)
+  }
   const CRC_TABLE = new Uint32Array(256)
   for (let i = 0; i < 256; i++) {
     let c = i
@@ -603,10 +616,10 @@ export function createZip(files) {
     const dv = new DataView(local.buffer)
     dv.setUint32(0, 0x04034b50, true)
     dv.setUint16(4, 20, true)
-    dv.setUint16(6, 0, true)
+    dv.setUint16(6, 0x0800, true)
     dv.setUint16(8, 0, true)
-    dv.setUint16(10, 0, true)
-    dv.setUint16(12, 0, true)
+    dv.setUint16(10, dosTime, true)
+    dv.setUint16(12, dosDate, true)
     dv.setUint32(14, f.crc, true)
     dv.setUint32(18, f.size, true)
     dv.setUint32(22, f.size, true)
@@ -620,10 +633,10 @@ export function createZip(files) {
     cdv.setUint32(0, 0x02014b50, true)
     cdv.setUint16(4, 20, true)
     cdv.setUint16(6, 20, true)
-    cdv.setUint16(8, 0, true)
+    cdv.setUint16(8, 0x0800, true)
     cdv.setUint16(10, 0, true)
-    cdv.setUint16(12, 0, true)
-    cdv.setUint16(14, 0, true)
+    cdv.setUint16(12, dosTime, true)
+    cdv.setUint16(14, dosDate, true)
     cdv.setUint32(16, f.crc, true)
     cdv.setUint32(20, f.size, true)
     cdv.setUint32(24, f.size, true)
@@ -793,14 +806,18 @@ export function packageExportData({ month, companyName = '', businessId = '', tr
 }
 
 /**
- * Creates downloadable ZIP accountant package with:
- * - summary.json
- * - discrepancies.json (including unavailable_files)
- * - records_registry.json
- * - documents/ folder with available original files
+ * Creates the downloadable accountant handoff ZIP for a month ('2026-09') or a quarter ('2026-Q3'):
+ * - accountant-summary.pdf (readiness, checks, exceptions, period totals, tax preparation)
+ * - registers/*.csv and <name>_Registers.xlsx (transactions, accounts, cash-basis P&L, financing,
+ *   receivables/payables, payroll with BPJS split, missing documents, review items, document map, tax preparation)
+ * - documents/ originals as uploaded, under safe unique names
+ * - summary.json, discrepancies.json (incl. unavailable_files), records_registry.json, operation-documents.json
+ * - README.txt (scope, limitations, where filings happen) and manifest.json / manifest.csv (SHA-256, counts, totals)
+ * Nothing here files, calculates or certifies a tax; an incomplete period is never labelled complete.
  */
 export async function createAccountantZipPackage({
   month,
+  period = null,
   companyName = '',
   businessId = '',
   transactions = [],
@@ -809,32 +826,54 @@ export async function createAccountantZipPackage({
   wallets = [],
   documents = [],
   operationDocuments = null,
+  operationDocumentsByMonth = null,
+  payrollRuns = [],
+  funding = null,
+  pnl = null,
+  profile = null,
+  sourceErrors = [],
   token = null,
   fetchSignedUrl = null,
+  fetchDocumentBytes = null,
   signal = null,
   lang = 'ru',
+  now = new Date(),
 }) {
-  if (signal?.aborted) {
-    const err = new Error('Export aborted')
-    err.name = 'AbortError'
-    throw err
+  const abortIfNeeded = () => {
+    if (signal?.aborted) {
+      const err = new Error('Export aborted')
+      err.name = 'AbortError'
+      throw err
+    }
   }
+  abortIfNeeded()
+  const R = await import('./accountantRegisters.js')
+  const p = R.reportingPeriod(period || month)
+  const months = p.months
+  const opDocsList = Array.isArray(operationDocumentsByMonth) && operationDocumentsByMonth.length
+    ? operationDocumentsByMonth
+    : operationDocuments ? [operationDocuments] : []
+  const opDocsFor = (m) => opDocsList.find((o) => o?.month === m) || (months.length === 1 ? opDocsList[0] || null : null)
 
-  const exportData = packageExportData({ month, companyName, businessId, transactions, debts, batches, wallets, operationDocuments })
+  const perMonth = months.map((m) => packageExportData({ month: m, companyName, businessId, transactions, debts, batches, wallets, operationDocuments: opDocsFor(m) }))
+  const exportData = perMonth.length === 1 ? perMonth[0] : mergePeriodExport(perMonth, p)
   const unavailableFiles = []
   const filesToZip = [
-    ...(operationDocuments ? [{name:'operation-documents.json',data:JSON.stringify(operationDocuments,null,2)}] : []),
-    { name: 'documents/README.txt', data: `Financial documents for ${month} month close.\nUnavailable files are listed in discrepancies.json.\n` },
+    ...opDocsList.filter(Boolean).map((od, i) => ({ name: opDocsList.length > 1 ? `operation-documents-${od.month || i + 1}.json` : 'operation-documents.json', data: JSON.stringify(od, null, 2) })),
+    { name: 'documents/README.txt', data: `Financial documents for ${p.key} (${p.start} to ${p.end}).\nUnavailable files are listed in discrepancies.json.\n` },
   ]
   const addedZipPaths = new Set(['documents/README.txt'])
+  const docPaths = {}
+  const zipPathFor = (rawName, id) => 'documents/' + R.uniqueName(R.safeFileName(rawName, `${id}.bin`), addedZipPaths, String(id).slice(0, 8))
 
-  const inM = (iso) => inMonth(iso, month)
-  const monthDebtIds = new Set(operationDocuments ? operationDocuments.operations.flatMap(o=>o.invoice?[String(o.invoice.id)]:[]) : exportData.records_registry.filter((r) => r.type === 'bill_or_invoice').map((r) => String(r.id)))
-  const monthTxIds = new Set(operationDocuments ? operationDocuments.operations.flatMap(o=>o.payments.map(p=>String(p.id))) : exportData.records_registry.filter((r) => r.type === 'transaction').map((r) => String(r.id)))
+  const monthSet = new Set(months)
+  const inM = (iso) => monthSet.has(String(iso || '').slice(0, 7))
+  const monthDebtIds = new Set(opDocsList.length ? opDocsList.flatMap((od) => (od?.operations || []).flatMap((o) => (o.invoice ? [String(o.invoice.id)] : []))) : exportData.records_registry.filter((r) => r.type === 'bill_or_invoice').map((r) => String(r.id)))
+  const monthTxIds = new Set(opDocsList.length ? opDocsList.flatMap((od) => (od?.operations || []).flatMap((o) => o.payments.map((pay) => String(pay.id)))) : exportData.records_registry.filter((r) => r.type === 'transaction').map((r) => String(r.id)))
 
-  // Scope documents to selected company and month
+  // Scope documents to selected company and period
   const matchBiz = (item) => !businessId || !item.business_id || String(item.business_id) === String(businessId)
-  const isDocInMonth = (doc) => {
+  const isDocInPeriod = (doc) => {
     if (!matchBiz(doc)) return false
     if (inM(doc.document_date || doc.created_at)) return true
     if (doc.debt_id && monthDebtIds.has(String(doc.debt_id))) return true
@@ -844,238 +883,141 @@ export async function createAccountantZipPackage({
       (l.target_type === 'transaction' && monthTxIds.has(String(l.target_id)))
     )) return true
     if (Array.isArray(doc.debt_links) && doc.debt_links.some((l) => monthDebtIds.has(String(l.debt_id || l)))) return true
-    const inRegistry = exportData.records_registry.some((r) =>
-      Array.isArray(r.document_links) && r.document_links.some((dl) => String(dl.document_id || dl.id) === String(doc.id))
-    )
-    if (inRegistry) return true
-    return false
+    return exportData.records_registry.some((r) =>
+      Array.isArray(r.document_links) && r.document_links.some((dl) => String(dl.document_id || dl.id) === String(doc.id)))
   }
 
-  const targetDocs = operationDocuments ? [...new Map(operationDocuments.operations.flatMap(o=>[...o.documents,...o.bank_rows.map(r=>operationDocuments.available_documents.find(d=>d.id===r.document_id)).filter(Boolean)]).map(d=>[d.id,d])).values()] : documents.filter(isDocInMonth)
+  const targetDocs = opDocsList.length
+    ? [...new Map(opDocsList.filter(Boolean).flatMap((od) => (od.operations || []).flatMap((o) => [...o.documents, ...o.bank_rows.map((r) => (od.available_documents || []).find((d) => d.id === r.document_id)).filter(Boolean)])).map((d) => [d.id, d])).values()]
+    : documents.filter(isDocInPeriod)
 
-  // 1. Process Financial Documents (Invoices, Receipts, etc.)
-  for (const doc of targetDocs) {
-    if (signal?.aborted) {
-      const err = new Error('Export aborted')
-      err.name = 'AbortError'
-      throw err
+  // Bytes of one stored original: inline content, the same-origin content route, or a signed URL.
+  const inlineBytes = (holder) => {
+    const raw = holder.file_content || holder.content || holder.raw_csv
+    const b64 = holder.content_base64 || (typeof raw === 'string' && raw.startsWith('data:') ? raw.split(',')[1] : null)
+    if (b64) { const bin = atob(b64), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out }
+    if (raw?.data && Array.isArray(raw.data)) return new Uint8Array(raw.data)
+    if (typeof raw === 'string' || raw instanceof Uint8Array) return raw
+    return null
+  }
+  const remoteBytes = async (docId) => {
+    if (typeof fetchDocumentBytes === 'function') {
+      try { const b = await fetchDocumentBytes(docId, businessId, signal); if (b) return b instanceof Uint8Array ? b : new Uint8Array(b) }
+      catch (e) { if (signal?.aborted || e?.name === 'AbortError') throw e }
     }
-    const fileName = doc.file?.file_name || doc.file_name || `${doc.id}.bin`
-    const zipPath = `documents/${fileName}`
-    const rawContent = doc.file_content || doc.content
-    const base64Content = doc.content_base64 || (typeof rawContent === 'string' && rawContent.startsWith('data:') ? rawContent.split(',')[1] : null)
-
-    if (base64Content) {
+    if (typeof fetchSignedUrl === 'function') {
       try {
-        const binStr = atob(base64Content)
-        const bytes = new Uint8Array(binStr.length)
-        for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
-        filesToZip.push({ name: zipPath, data: bytes })
-        addedZipPaths.add(zipPath)
-      } catch {
-        unavailableFiles.push({ document_id: doc.id, file_name: fileName, reason: 'Failed to decode base64 file content' })
-      }
-    } else if (rawContent?.data && Array.isArray(rawContent.data)) {
-      filesToZip.push({ name: zipPath, data: new Uint8Array(rawContent.data) })
-      addedZipPaths.add(zipPath)
-    } else if (typeof rawContent === 'string') {
-      filesToZip.push({ name: zipPath, data: rawContent })
-      addedZipPaths.add(zipPath)
-    } else if (rawContent instanceof Uint8Array) {
-      filesToZip.push({ name: zipPath, data: rawContent })
-      addedZipPaths.add(zipPath)
-    } else {
-      let downloaded = false
-      if (typeof fetchSignedUrl === 'function') {
-        try {
-          const url = await fetchSignedUrl(doc.id, 'download', businessId, signal)
-          if (url && typeof fetch === 'function') {
-            const resp = await fetch(url, { signal })
-            if (resp.ok) {
-              const buf = await resp.arrayBuffer()
-              filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
-              addedZipPaths.add(zipPath)
-              downloaded = true
-            }
-          }
-        } catch (fetchErr) {
-          if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
-        }
-      }
-
-      if (!downloaded) {
-        unavailableFiles.push({
-          document_id: doc.id,
-          file_name: fileName,
-          reason: 'Original file could not be retrieved from authorized storage or signed URL was unavailable',
-        })
-      }
+        const url = await fetchSignedUrl(docId, 'download', businessId, signal)
+        if (url && typeof fetch === 'function') { const resp = await fetch(url, { signal }); if (resp.ok) return new Uint8Array(await resp.arrayBuffer()) }
+      } catch (e) { if (signal?.aborted || e?.name === 'AbortError') throw e }
     }
+    return null
   }
 
-  // 2. Process Bank Statements (Originals of selected company and period)
-  const isBatchInMonth = (b) => {
-    if (!b) return false
-    if (!matchBiz(b)) return false
-    if (['cancelled', 'failed'].includes(b.status)) return false
-    if (b.month && b.month === month) return true
-    const bStart = b.statement_start ? String(b.statement_start).slice(0, 7) : null
-    const bEnd = b.statement_end ? String(b.statement_end).slice(0, 7) : null
-    if (bStart && bEnd) {
-      if (bStart <= month && bEnd >= month) return true
-    } else if (bStart && bStart === month) {
-      return true
-    } else if (bEnd && bEnd === month) {
-      return true
-    }
-    if (b.created_at && inM(b.created_at)) return true
-    return false
-  }
-
-  const targetBatches = batches.filter(isBatchInMonth)
-
-  for (const b of targetBatches) {
-    if (signal?.aborted) {
-      const err = new Error('Export aborted')
-      err.name = 'AbortError'
-      throw err
-    }
-    const batchFileName = b.file?.file_name || b.file_name || `bank_statement_${b.id}.${b.file_type || 'csv'}`
-    const zipPath = `documents/${batchFileName}`
-
-    if (addedZipPaths.has(zipPath)) {
-      // Already packed via documents intake
+  // 1. Financial documents (invoices, receipts, etc.)
+  for (const doc of targetDocs) {
+    abortIfNeeded()
+    const fileName = doc.file?.file_name || doc.file_name || `${doc.id}.bin`
+    let bytes = null
+    try { bytes = inlineBytes(doc) } catch { unavailableFiles.push({ document_id: doc.id, file_name: fileName, reason: 'Failed to decode base64 file content' }); continue }
+    if (bytes == null) bytes = await remoteBytes(doc.id)
+    if (bytes == null) {
+      unavailableFiles.push({ document_id: doc.id, file_name: fileName, reason: 'Original file could not be retrieved from authorized storage or signed URL was unavailable' })
       continue
     }
+    const zipPath = zipPathFor(fileName, doc.id)
+    filesToZip.push({ name: zipPath, data: bytes })
+    docPaths[String(doc.id)] = zipPath
+  }
 
-    let downloaded = false
+  // 2. Bank statements (originals of the selected company and period)
+  const isBatchInPeriod = (b) => {
+    if (!b || !matchBiz(b) || ['cancelled', 'failed'].includes(b.status)) return false
+    if (b.month && monthSet.has(b.month)) return true
+    const bStart = b.statement_start ? String(b.statement_start).slice(0, 7) : null
+    const bEnd = b.statement_end ? String(b.statement_end).slice(0, 7) : null
+    if (bStart && bEnd) { if (months.some((m) => bStart <= m && bEnd >= m)) return true }
+    else if (bStart && monthSet.has(bStart)) return true
+    else if (bEnd && monthSet.has(bEnd)) return true
+    return !!(b.created_at && inM(b.created_at))
+  }
+  for (const b of batches.filter(isBatchInPeriod)) {
+    abortIfNeeded()
+    const batchFileName = b.file?.file_name || b.file_name || `bank_statement_${b.id}.${b.file_type || 'csv'}`
     const docMatch = documents.find((d) => b.document_id && String(d.id) === String(b.document_id))
-
-    if (docMatch) {
-      const rawDocContent = docMatch.file_content || docMatch.content
-      const base64Doc = docMatch.content_base64 || (typeof rawDocContent === 'string' && rawDocContent.startsWith('data:') ? rawDocContent.split(',')[1] : null)
-      if (base64Doc) {
-        try {
-          const binStr = atob(base64Doc)
-          const bytes = new Uint8Array(binStr.length)
-          for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
-          filesToZip.push({ name: zipPath, data: bytes })
-          addedZipPaths.add(zipPath)
-          downloaded = true
-        } catch {}
-      } else if (rawDocContent?.data && Array.isArray(rawDocContent.data)) {
-        filesToZip.push({ name: zipPath, data: new Uint8Array(rawDocContent.data) })
-        addedZipPaths.add(zipPath)
-        downloaded = true
-      } else if (typeof rawDocContent === 'string') {
-        filesToZip.push({ name: zipPath, data: rawDocContent })
-        addedZipPaths.add(zipPath)
-        downloaded = true
-      } else if (rawDocContent instanceof Uint8Array) {
-        filesToZip.push({ name: zipPath, data: rawDocContent })
-        addedZipPaths.add(zipPath)
-        downloaded = true
-      }
-
-      if (!downloaded) {
-        if (typeof fetchSignedUrl === 'function') {
-          try {
-            const url = await fetchSignedUrl(docMatch.id, 'download', businessId, signal)
-            if (url && typeof fetch === 'function') {
-              const resp = await fetch(url, { signal })
-              if (resp.ok) {
-                const buf = await resp.arrayBuffer()
-                filesToZip.push({ name: zipPath, data: new Uint8Array(buf) })
-                addedZipPaths.add(zipPath)
-                downloaded = true
-              }
-            }
-          } catch (fetchErr) {
-            if (signal?.aborted || fetchErr?.name === 'AbortError') throw fetchErr
-          }
-        }
-      }
+    if (docMatch && docPaths[String(docMatch.id)]) continue // already packed as a document
+    let bytes = null
+    if (docMatch) { try { bytes = inlineBytes(docMatch) } catch { bytes = null } if (bytes == null) bytes = await remoteBytes(docMatch.id) }
+    if (bytes == null) {
+      try { bytes = inlineBytes(b) } catch { unavailableFiles.push({ batch_id: b.id, file_name: batchFileName, reason: 'Failed to decode base64 statement file content' }); continue }
     }
-
-    if (!downloaded) {
-      // Fallback for tests providing inline raw content directly on batch
-      const rawBatchContent = b.file_content || b.content || b.raw_csv
-      const base64Batch = b.content_base64 || (typeof rawBatchContent === 'string' && rawBatchContent.startsWith('data:') ? rawBatchContent.split(',')[1] : null)
-
-      if (base64Batch) {
-        try {
-          const binStr = atob(base64Batch)
-          const bytes = new Uint8Array(binStr.length)
-          for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i)
-          filesToZip.push({ name: zipPath, data: bytes })
-          addedZipPaths.add(zipPath)
-          downloaded = true
-        } catch {
-          unavailableFiles.push({ batch_id: b.id, file_name: batchFileName, reason: 'Failed to decode base64 statement file content' })
-        }
-      } else if (rawBatchContent?.data && Array.isArray(rawBatchContent.data)) {
-        filesToZip.push({ name: zipPath, data: new Uint8Array(rawBatchContent.data) })
-        addedZipPaths.add(zipPath)
-        downloaded = true
-      } else if (typeof rawBatchContent === 'string') {
-        filesToZip.push({ name: zipPath, data: rawBatchContent })
-        addedZipPaths.add(zipPath)
-        downloaded = true
-      } else if (rawBatchContent instanceof Uint8Array) {
-        filesToZip.push({ name: zipPath, data: rawBatchContent })
-        addedZipPaths.add(zipPath)
-        downloaded = true
-      }
+    if (bytes == null) {
+      unavailableFiles.push({ batch_id: b.id, file_name: batchFileName, wallet_id: b.wallet_id || null, statement_period: `${b.statement_start || ''}..${b.statement_end || ''}`, reason: 'Original bank statement file is unavailable or could not be retrieved from storage' })
+      continue
     }
-
-    if (!downloaded) {
-      unavailableFiles.push({
-        batch_id: b.id,
-        file_name: batchFileName,
-        wallet_id: b.wallet_id || null,
-        statement_period: `${b.statement_start || ''}..${b.statement_end || ''}`,
-        reason: 'Original bank statement file is unavailable or could not be retrieved from storage',
-      })
-    }
+    const zipPath = zipPathFor(batchFileName, docMatch?.id || b.id)
+    filesToZip.push({ name: zipPath, data: bytes })
+    if (docMatch) docPaths[String(docMatch.id)] = zipPath
   }
 
   const filesAvailable = unavailableFiles.length === 0
-  const isComplete = filesAvailable && exportData.readiness.is_closed === true
+  // A source that could not be read makes its register incomplete: say so, never present it as empty.
+  const sourcesComplete = sourceErrors.length === 0
+  const isComplete = filesAvailable && sourcesComplete && exportData.readiness.is_closed === true
 
   const summary = {
-    package_version: exportData.package_version,
-    generated_at: exportData.generated_at,
-    month: exportData.month,
+    package_version: '2.0',
+    generated_at: now.toISOString(),
+    month: p.kind === 'month' ? p.key : null,
+    period: { kind: p.kind, key: p.key, start: p.start, end: p.end, months },
+    label: R.PACKAGE_LABEL,
     company: exportData.company,
     is_complete: isComplete,
     files_available: filesAvailable,
-    readiness: {
-      ...exportData.readiness,
-      is_complete: isComplete,
-      files_available: filesAvailable,
-    },
+    filed: false,
+    readiness: { ...exportData.readiness, is_complete: isComplete, files_available: filesAvailable },
+    readiness_by_month: perMonth.length > 1 ? perMonth.map((x) => ({ month: x.month, ...x.readiness, checks: undefined })) : undefined,
     bank_accounts: exportData.bank_accounts,
-    limitations: exportData.limitations || [],
+    limitations: [...(exportData.limitations || []), ...sourceErrors.map((n) => `Source not available when the package was built: ${n}. Its register is incomplete.`)],
+    sources_complete: sourcesComplete,
   }
-
   const discrepancies = {
     company_name: exportData.company.name,
-    month: exportData.month,
+    month: summary.month,
+    period: summary.period,
     is_complete: isComplete,
     files_available: filesAvailable,
-    limitations: exportData.limitations || [],
+    limitations: summary.limitations,
+    unavailable_sources: sourceErrors,
     ...exportData.discrepancies,
     unavailable_files: unavailableFiles,
+  }
+
+  // 3. Registers for the accountant, from the same snapshot.
+  const reg = R.buildRegisters({ period: p, company: { name: companyName, business_id: businessId }, profile, transactions, wallets, debts, payrollRuns, funding, pnl, operationDocuments: opDocsList, docPaths })
+  summary.totals = reg.totals
+  summary.tax_profile_missing = reg.tax.missing_profile
+  reg.tables.forEach((tbl, i) => filesToZip.push({ name: `registers/${String(i + 1).padStart(2, '0')}_${tbl.name}.csv`, data: R.toCsv(tbl) }))
+  const safeComp = (companyName || 'company').normalize('NFKD').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'company'
+  const base = `CFO_AI_${safeComp}_${p.key}`
+  try {
+    const XLSX = await import('xlsx')
+    const lib = XLSX.utils ? XLSX : XLSX.default
+    const wb = lib.utils.book_new()
+    for (const tbl of reg.tables) lib.utils.book_append_sheet(wb, lib.utils.aoa_to_sheet([tbl.columns, ...tbl.rows]), tbl.name.slice(0, 31))
+    filesToZip.push({ name: `${base}_Registers.xlsx`, data: new Uint8Array(lib.write(wb, { type: 'array', bookType: 'xlsx', compression: true })) })
+  } catch (e) {
+    if (signal?.aborted || e?.name === 'AbortError') throw e
+    summary.limitations.push('XLSX workbook could not be generated; the CSV registers carry the same data.')
   }
 
   filesToZip.push({ name: 'summary.json', data: JSON.stringify(summary, null, 2) })
   filesToZip.push({ name: 'discrepancies.json', data: JSON.stringify(discrepancies, null, 2) })
   filesToZip.push({ name: 'records_registry.json', data: JSON.stringify(exportData.records_registry, null, 2) })
+  filesToZip.push({ name: 'README.txt', data: R.readmeText({ period: p, company: { name: companyName }, totals: reg.totals, missingProfile: reg.tax.missing_profile, unavailable: unavailableFiles.length, unavailableSources: sourceErrors, isComplete, generatedAt: summary.generated_at }) })
 
   // Dynamically import PDF generator on demand (code-splitting)
   const { generateAccountantSummaryPdf } = await import('./accountantSummaryPdf.js')
-
-  // Generate accountant-summary.pdf from the exact same snapshot
   const summaryPdfBytes = await generateAccountantSummaryPdf({
     summary,
     discrepancies,
@@ -1083,12 +1025,28 @@ export async function createAccountantZipPackage({
     attachedFiles: filesToZip,
     wallets,
     lang,
+    handoff: { period: p, totals: reg.totals, taxRows: reg.tax.table.rows, missingProfile: reg.tax.missing_profile },
   })
   filesToZip.push({ name: 'accountant-summary.pdf', data: summaryPdfBytes })
 
-  const zipBytes = createZip(filesToZip)
-  const safeComp = (companyName || 'company').replace(/[^a-zA-Z0-9_-]/g, '_')
-  const filename = `accountant-package-${safeComp}-${month}.zip`
+  // 4. Manifest: every file with its SHA-256, plus the record counts and totals it was built from.
+  const enc = new TextEncoder()
+  const manifestFiles = []
+  for (const f of filesToZip) {
+    const bytes = typeof f.data === 'string' ? enc.encode(f.data) : f.data
+    manifestFiles.push({ path: f.name, bytes: bytes.length, sha256: await R.sha256Hex(bytes) })
+  }
+  const manifest = {
+    package: R.PACKAGE_LABEL, package_version: summary.package_version, generated_at: summary.generated_at,
+    company: summary.company, period: summary.period, is_complete: isComplete, filed: false,
+    record_counts: Object.fromEntries(reg.tables.map((tbl) => [tbl.name, tbl.rows.length])),
+    totals: reg.totals, source_ids: { documents: Object.keys(docPaths) }, files: manifestFiles,
+  }
+  filesToZip.push({ name: 'manifest.json', data: JSON.stringify(manifest, null, 2) })
+  filesToZip.push({ name: 'manifest.csv', data: R.toCsv({ columns: ['path', 'bytes', 'sha256'], rows: manifestFiles.map((f) => [f.path, f.bytes, f.sha256]) }) })
+
+  const zipBytes = createZip(filesToZip, { date: now })
+  const filename = `${base}_Accountant_Package.zip`
 
   return {
     zipBytes,
@@ -1096,10 +1054,45 @@ export async function createAccountantZipPackage({
     summary,
     discrepancies,
     recordsRegistry: exportData.records_registry,
+    registers: reg,
+    manifest,
     unavailableFiles,
     filesAvailable,
     isComplete,
     summaryPdfBytes,
+  }
+}
+
+// A quarter's export from its three months: records and gaps concatenated, readiness checks summed; the period
+// is complete only when every month is.
+function mergePeriodExport(perMonth, p) {
+  const checks = new Map()
+  for (const x of perMonth) for (const c of x.readiness.checks || []) {
+    const prev = checks.get(c.key) || { ...c, ok: 0, total: 0, done: true, missing: [] }
+    checks.set(c.key, { ...prev, ok: (prev.ok || 0) + (c.ok || 0), total: (prev.total || 0) + (c.total || 0), done: prev.done && !!c.done, missing: [...(prev.missing || []), ...(c.missing || [])] })
+  }
+  const sum = (k) => perMonth.reduce((s, x) => s + (Number(x.readiness[k]) || 0), 0)
+  const records = sum('total_records'), complete = sum('complete_records')
+  const all = (k) => perMonth.every((x) => x.readiness[k] === true)
+  const status = perMonth.every((x) => x.readiness.status === 'prepared_for_review') ? 'prepared_for_review' : perMonth.some((x) => x.readiness.status === 'in_progress') ? 'in_progress' : perMonth[0].readiness.status
+  const cat = (k) => perMonth.flatMap((x) => (x.discrepancies[k] || []).map((v) => (v && typeof v === 'object' ? { month: x.month, ...v } : { month: x.month, value: v })))
+  return {
+    package_version: perMonth[0].package_version, package_kind: 'preliminary', month: null, period: p.key,
+    generated_at: perMonth[0].generated_at, company: perMonth[0].company,
+    readiness: {
+      percent: records ? Math.round((complete / records) * 100) : null, complete_records: complete, total_records: records,
+      is_closed: all('is_closed'), automated_checks_passed: all('automated_checks_passed'), status,
+      bank_reconciliation_status: perMonth.every((x) => x.readiness.bank_reconciliation_status === 'reconciled') ? 'reconciled' : 'unreconciled',
+      checks: [...checks.values()],
+    },
+    bank_accounts: perMonth[perMonth.length - 1].bank_accounts,
+    discrepancies: {
+      missing_bank_statements: cat('missing_bank_statements'), unreconciled_bank_statements: cat('unreconciled_bank_statements'),
+      unlinked_transactions: cat('unlinked_transactions'), bills_without_documents: cat('bills_without_documents'),
+      operations_with_document_gaps: cat('operations_with_document_gaps'), uncategorised_transactions: cat('uncategorised_transactions'),
+    },
+    limitations: [...new Set(perMonth.flatMap((x) => (x.limitations || []).map((l) => `${x.month}: ${l}`)))],
+    records_registry: perMonth.flatMap((x) => x.records_registry.map((r) => ({ month: x.month, ...r }))),
   }
 }
 
