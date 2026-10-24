@@ -28,6 +28,16 @@ jobs:
       - name: Server syntax check
         run: node --check server/index.js
 
+      # Financial integrity audit 2026-10-24: cash forecast, payroll dates, loan schedule and tax stages.
+      - name: Cash forecast and financial integrity regressions
+        run: |
+          node tests/financialIntegrityAudit.test.js
+          node tests/design/v2CashGapScenarios.test.mjs
+          node tests/design/v2RadarSeries.test.mjs
+          node tests/design/v2PulseModel.test.mjs
+          node tests/design/v2Accounting.test.mjs
+          node tests/businessFunding.test.js
+
       - name: Install client deps
         run: npm install --no-audit --no-fund
         working-directory: client
