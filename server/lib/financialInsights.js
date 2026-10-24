@@ -124,27 +124,53 @@ const hit = (list, s) => list.some((re) => re.test(s));
  *   money received (any amount), the principal for a repayment (a debit above it also carries interest and is left to
  *   the rules below); categoryOf(tx) → { pnl_group } | null for this company's confirmed groups }
  */
+// What words alone suggest, in the order the keyword rules have always used (narrow claims before the general
+// buckets). null when no rule matches. Used on the category a person chose, then on the bank's description.
+function wordsClass(s, type) {
+  if (!s) return null;
+  if (hit(RE.balance_correction, s)) return 'balance_correction';
+  if (hit(RE.opening_balance, s)) return 'opening_balance';
+  if (hit(RE.transfer, s)) return 'transfer';
+  if (hit(RE.capex, s) && !hit(NOT_CAPEX, s)) return 'capex';
+  if (hit(RE.tax, s)) return 'tax';
+  if (hit(RE.interest, s)) return 'interest';
+  if (hit(RE.financing, s)) return 'financing';
+  // Money direction is a strong signal, so revenue is only claimed for inbound rows.
+  if (type === 'income') return hit(RE.revenue, s) ? 'revenue' : null;
+  if (type === 'expense') {
+    if (hit(RE.direct_cost, s)) return 'direct_cost';
+    if (hit(RE.operating_expense, s)) return 'operating_expense';
+  }
+  return null;
+}
+// Words never prove these on their own: a real transfer has its transfer record, a real opening balance its anchor.
+const WORDS_NEED_REVIEW = ['transfer', 'opening_balance', 'balance_correction'];
+
+// Precedence (AC-0 / I-1, 24 Oct 2026), strongest evidence first:
+//   1. facts the ledger records (opening anchor, correction type, transfer record) — never text;
+//   2. the funding register; 3. the business purpose a person set; 4. the category's confirmed P&L group;
+//   5. the category a person chose (its name), payroll by type;
+//   6. the bank description's wording — last, so "TRANSFER OR VIA IB …" on a customer payment can no longer
+//      overrule what the person confirmed. Wording-only transfer / opening / correction stays out of revenue and
+//      costs, as before, but is marked for review.
 function classifyTransaction(tx, evidence = null) {
-  const s = hay(tx);
   const type = (tx && tx.type) || '';
   const src = (tx && tx.source) || '';
   const none = { class: 'unknown', matched_on: 'none', needs_review: true };
 
-  // ── Non-operating checks run FIRST, before the income/expense gate ──────────
-  // These are the rows that must never reach the revenue or OPEX buckets. A wallet
-  // opening balance is written as type='income', so gating on type alone would file
-  // it as revenue — which is exactly the bug this ordering prevents.
+  // ── 1. Ledger facts, before the income/expense gate ─────────────────────────
+  // A wallet opening balance is written as type='income', so gating on type alone would file it as revenue.
   // D4-A: a moved opening anchor (and its reversal) is an opening balance, not a correction.
   if (/^opening_reanchor(_reversal)?$/.test(src))
     return { class: 'opening_balance', matched_on: 'source', needs_review: false };
-  if (type === 'correction' || hit(RE.balance_correction, s))
-    return { class: 'balance_correction', matched_on: 'type_or_keyword', needs_review: false };
-  if (hit(RE.opening_balance, s) || /wallet_opening_balance/i.test(src))
-    return { class: 'opening_balance', matched_on: 'keyword', needs_review: false };
-  if (type === 'transfer' || (tx && tx.transfer_id) || hit(RE.transfer, s))
-    return { class: 'transfer', matched_on: 'type_or_keyword', needs_review: false };
+  if (type === 'correction')
+    return { class: 'balance_correction', matched_on: 'type', needs_review: false };
+  if ((tx && tx.is_opening_balance === true) || /wallet_opening_balance/i.test(src))
+    return { class: 'opening_balance', matched_on: 'source', needs_review: false };
+  if (type === 'transfer' || (tx && tx.transfer_id))
+    return { class: 'transfer', matched_on: 'transfer_record', needs_review: false };
 
-  // Recorded evidence next: the funding register, then a confirmed category group.
+  // ── 2–4. Recorded evidence: the funding register, then a purpose, then a confirmed category group.
   const fundingLimit = evidence && evidence.fundingTx && tx && tx.id != null ? evidence.fundingTx.get(String(tx.id)) : undefined;
   if (fundingLimit !== undefined && (fundingLimit === null || amountOf(tx) <= Number(fundingLimit)))
     return { class: 'financing', matched_on: 'funding_register', needs_review: false };
@@ -155,34 +181,19 @@ function classifyTransaction(tx, evidence = null) {
   const confirmed = evidence && typeof evidence.categoryOf === 'function' ? GROUP_CLASS[evidence.categoryOf(tx)?.pnl_group] : null;
   if (confirmed && confirmed.types.includes(type)) return { class: confirmed.class, matched_on: 'confirmed_category_group', needs_review: false };
 
+  // ── 5. What the operation is by its type, then the category a person chose ──
+  if (type === 'payroll') return { class: 'operating_expense', matched_on: 'type', needs_review: false };
+  const byCategory = wordsClass(String((tx && tx.category) || '').trim(), type);
+  if (byCategory) return { class: byCategory, matched_on: 'category', needs_review: false };
+
+  // ── 6. The description's wording, last ─────────────────────────────────────
+  const s = hay(tx);
   if (!s) return none;
-
-  // Narrow claims next.
-  if (hit(RE.capex, s) && !hit(NOT_CAPEX, s)) return { class: 'capex', matched_on: 'keyword', needs_review: false };
-  if (hit(RE.tax, s)) return { class: 'tax', matched_on: 'keyword', needs_review: false };
-  if (hit(RE.interest, s)) return { class: 'interest', matched_on: 'keyword', needs_review: false };
-  if (hit(RE.financing, s)) return { class: 'financing', matched_on: 'keyword', needs_review: false };
-
-  // Category explicit check for confirmed operating revenue
-  const cat = String((tx && tx.category) || '').trim();
-  if (/^(revenue|sales|operating revenue)$/i.test(cat) && type === 'income') {
-    return { class: 'revenue', matched_on: 'category', needs_review: false };
-  }
-
-  // Money direction is a strong signal, so revenue is only claimed for inbound rows.
-  if (type === 'income') {
-    if (hit(RE.revenue, s)) return { class: 'revenue', matched_on: 'keyword', needs_review: false };
-    // Inbound but unrecognised: real money, unclear source. Never silently revenue.
-    return { class: 'unknown', matched_on: 'income_unmatched', needs_review: true };
-  }
-
-  if (type === 'expense' || type === 'payroll') {
-    if (type === 'payroll') return { class: 'operating_expense', matched_on: 'type', needs_review: false };
-    if (hit(RE.direct_cost, s)) return { class: 'direct_cost', matched_on: 'keyword', needs_review: false };
-    if (hit(RE.operating_expense, s)) return { class: 'operating_expense', matched_on: 'keyword', needs_review: false };
-    return { class: 'unknown', matched_on: 'expense_unmatched', needs_review: true };
-  }
-
+  const byWords = wordsClass(s, type);
+  if (byWords) return { class: byWords, matched_on: 'keyword', needs_review: WORDS_NEED_REVIEW.includes(byWords) };
+  // Real money, unclear source. Never silently revenue or cost.
+  if (type === 'income') return { class: 'unknown', matched_on: 'income_unmatched', needs_review: true };
+  if (type === 'expense') return { class: 'unknown', matched_on: 'expense_unmatched', needs_review: true };
   return none;
 }
 

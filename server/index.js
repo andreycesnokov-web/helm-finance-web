@@ -8278,6 +8278,18 @@ app.get('/api/transactions', auth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   const data = sourceRead.decode(sourceData, 'transactions', recordId);
 
+  // AC-0 / I-1: the server's cash class of each operation, with the evidence the client does not have (funding
+  // register, business purpose, confirmed category groups), so Pulse, Performance and the server figures classify
+  // the same operation the same way (client/src/v2/lib/cashClass.js prefers it). Optional: on a read failure the
+  // client keeps its own rules.
+  if (Array.isArray(data) && data.length && biz.business && biz.business.type !== 'personal') {
+    try {
+      const evidence = { ...(await CATGROUPS.loadInsightEvidence(supabase, biz.business.id)),
+        purposeOf: TCLASS.purposeResolver((await TCLASS.loadClassifications(supabase, biz.business.id)).byTx) };
+      for (const t of data) t.cash_class = FININ.classifyTransaction(t, evidence).class;
+    } catch { /* classes are an enrichment, never a reason to fail the list */ }
+  }
+
   // Enrich bank-statement linking metadata for returned transactions
   if(paged && req.query.include_document_status==='true' && Array.isArray(data))
     await require('./lib/transactionDocumentStatus').enrich(supabase,biz.business.id,data);
@@ -12505,7 +12517,7 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     { data: wallets   },
     accessData,
   ] = await Promise.all([
-    scopeQ(supabase.from('transactions').select('type,amount_original,amount_idr,currency_original,created_at,transaction_date,category,transfer_id,wallet_id,source,scope')).order('created_at', { ascending: false }),
+    scopeQ(supabase.from('transactions').select('id,type,amount_original,amount_idr,currency_original,created_at,transaction_date,category,cashflow_category_id,description,is_opening_balance,transfer_id,wallet_id,source,scope')).order('created_at', { ascending: false }),
     scopeQ(supabase.from('debts').select('*')).or('is_training.is.null,is_training.eq.false'),
     scopeQ(supabase.from('wallets').select('id,name,currency,type,scope')).eq('is_active', true),
     getCurrentAccess(biz ? biz.ownerUserId : userId),
@@ -12610,15 +12622,17 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
     return !Number.isNaN(d.getTime()) && d.getFullYear() === monthStartD.getFullYear() && d.getMonth() === monthStartD.getMonth();
   });
   const bizMonthTxs   = monthTxs.filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
-  const isXfer = (t) => t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
-  const isOpening = (t) => FININ.classifyTransaction(t).class === 'opening_balance';
-  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type) && !isXfer(t) && !isOpening(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
-  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type) && !isXfer(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  // Same classification evidence as Pulse (funding register, confirmed groups), so AI CFO / MCP report the same
+  // runway, and the month's money in/out leaves out exactly what Pulse leaves out (AC-0 / I-1): transfers between
+  // own accounts, opening balances and balance corrections. Loans and capital stay money in, as on Pulse.
+  const burnEvidence = biz ? await CATGROUPS.loadInsightEvidence(supabase, biz.business.id) : null;
+  const NOT_A_MOVE = ['opening_balance', 'transfer', 'balance_correction'];
+  const moves = (t) => !NOT_A_MOVE.includes(FININ.classifyTransaction(t, burnEvidence).class);
+  const monthIncome   = bizMonthTxs.filter(t => CASH_IN.includes(t.type) && moves(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
+  const monthExpenses = bizMonthTxs.filter(t => CASH_OUT.includes(t.type) && moves(t)).reduce((s,t) => s + Number(t.amount_idr ?? t.amount_original ?? 0), 0);
 
   // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
   const bizTxs      = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
-  // Same classification evidence as Pulse, so AI CFO / MCP report the same runway.
-  const burnEvidence = biz ? await CATGROUPS.loadInsightEvidence(supabase, biz.business.id) : null;
   const burnMetrics = computeBurnAndRunway(bizTxs, totalBalance, null, { evidence: burnEvidence });
   const burnRate    = burnMetrics.burn_rate_daily;
 
@@ -12789,7 +12803,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
     supabase.from('wallets').select('id,name,currency,type,scope').or(bizOr).eq('is_active', true),
     // transaction_date/category/transfer_id: burn is measured by the booked date and class, as on Pulse
     // (an imported statement is created today but dated in the past).
-    WL.fetchAllRows(() => supabase.from('transactions').select('id,type,amount_original,amount_idr,created_at,transaction_date,category,transfer_id,wallet_id,source,scope').or(bizOr).order('id')).then((data) => ({ data })),
+    WL.fetchAllRows(() => supabase.from('transactions').select('id,type,amount_original,amount_idr,created_at,transaction_date,category,cashflow_category_id,description,is_opening_balance,transfer_id,wallet_id,source,scope').or(bizOr).order('id')).then((data) => ({ data })),
     supabase.from('debts').select('*').or(bizOr).or('is_training.is.null,is_training.eq.false'),
     supabase.from('payroll_employees').select('default_salary,pay_day,status').or(bizOr).neq('status', 'archived'),
     // Tax obligations: only verified-source, reviewed/owner-confirmed, unpaid ones
