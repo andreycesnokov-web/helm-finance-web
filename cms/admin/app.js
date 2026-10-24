@@ -36,6 +36,19 @@ async function initApp() {
 }
 
 async function checkAuthStatus(forceShow = false) {
+  // Check if URL has #reset=<token> from activation/reset email
+  const hash = window.location.hash || '';
+  if (hash.includes('reset=')) {
+    const token = hash.split('reset=')[1]?.split('&')[0];
+    if (token) {
+      showAuthView('reset');
+      showLoginModal();
+      const tokenInput = document.getElementById('reset-token');
+      if (tokenInput) tokenInput.value = decodeURIComponent(token);
+      return;
+    }
+  }
+
   try {
     const res = await fetch(`${API_BASE}/auth/status`);
     if (res.ok) {
@@ -178,7 +191,11 @@ async function handleForgotPassword(event) {
     });
     const data = await res.json();
     if (res.ok) {
-      succEl.innerHTML = `<strong>Reset Token Generated:</strong><br><span class="font-mono text-xs select-all bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-950 font-bold">${data.resetToken || 'Token sent'}</span><br><span class="text-[10px] text-slate-500">Valid for 15 minutes.</span><div class="mt-2"><button type="button" onclick="prefillResetToken('${data.resetToken}')" class="underline font-bold text-emerald-800 text-xs">Proceed to Set New Password &rarr;</button></div>`;
+      if (data.resetToken) {
+        succEl.innerHTML = `<strong>Reset Token Generated:</strong><br><span class="font-mono text-xs select-all bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-950 font-bold">${data.resetToken}</span><br><span class="text-[10px] text-slate-500">Valid for 15 minutes.</span><div class="mt-2"><button type="button" onclick="prefillResetToken('${data.resetToken}')" class="underline font-bold text-emerald-800 text-xs">Proceed to Set New Password &rarr;</button></div>`;
+      } else {
+        succEl.innerHTML = `<strong>Password Reset Requested:</strong><br><span class="text-xs text-slate-600">${data.message || 'If your email is registered, instructions have been sent.'}</span>`;
+      }
       succEl.classList.remove('hidden');
     } else {
       errEl.innerText = data.error || 'Failed to generate reset token.';

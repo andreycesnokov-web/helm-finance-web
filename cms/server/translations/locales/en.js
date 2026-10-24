@@ -891,15 +891,15 @@ module.exports = {
     "contact_support_title": "Customer Support",
     "contact_support_desc": "For technical inquiries, account setup questions, or bug reports:",
     "contact_support_email": "support@cfo-ai.site",
-    "contact_support_time": "Dedicated team support desk (Monday – Friday).",
+    "contact_support_time": "Team support desk for operational inquiries.",
     "contact_sales_title": "Sales & Enterprise Walkthroughs",
     "contact_sales_desc": "For multi-entity onboarding or partnership inquiries:",
     "contact_sales_email": "sales@cfo-ai.site",
-    "contact_sales_time": "Schedule a 20-minute tailored platform walkthrough with our team.",
+    "contact_sales_time": "Schedule a tailored platform walkthrough with our team.",
     "contact_admin_title": "Administrative & Corporate",
     "contact_admin_desc": "For billing inquiries, vendor registration, and general correspondence:",
     "contact_admin_email": "admin@cfo-ai.site",
-    "contact_admin_time": "Operational corporate communications desk."
+    "contact_admin_time": "Corporate communications and administrative inquiries."
   },
   "footer": {
     "about_text": "Financial clarity, document management, and cash-flow visibility for growing businesses in Indonesia.",

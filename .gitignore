@@ -17,3 +17,6 @@ client/.env.*.local
 # FX cache files (transient runtime cache, never tracked in git)
 server/data/*.json
 !server/data/.gitkeep
+
+# Executables
+*.exe

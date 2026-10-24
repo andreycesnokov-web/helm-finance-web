@@ -891,15 +891,15 @@ module.exports = {
     "contact_support_title": "Dukungan Pelanggan",
     "contact_support_desc": "Untuk kendala teknis, panduan penyiapan akun, atau laporan perbaikan:",
     "contact_support_email": "support@cfo-ai.site",
-    "contact_support_time": "Layanan bantuan aktif (Senin – Jumat).",
+    "contact_support_time": "Layanan bantuan tim untuk pertanyaan operasional.",
     "contact_sales_title": "Penjualan & Tur Platform",
     "contact_sales_desc": "Untuk orientasi multi-entitas atau kemitraan bisnis:",
     "contact_sales_email": "sales@cfo-ai.site",
-    "contact_sales_time": "Jadwalkan demo platform 20 menit bersama tim kami.",
+    "contact_sales_time": "Jadwalkan demo platform bersama tim kami.",
     "contact_admin_title": "Administrasi & Korporat",
     "contact_admin_desc": "Untuk faktur tagihan langganan, pendaftaran vendor, dan surat resmi:",
     "contact_admin_email": "admin@cfo-ai.site",
-    "contact_admin_time": "Meja komunikasi korporat operasional."
+    "contact_admin_time": "Komunikasi korporat dan korespondensi administratif."
   },
   "footer": {
     "about_text": "Kejelasan finansial, manajemen dokumen, dan visibilitas arus kas untuk bisnis berkembang di Indonesia.",

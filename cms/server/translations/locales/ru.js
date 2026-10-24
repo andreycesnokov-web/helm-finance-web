@@ -891,15 +891,15 @@ module.exports = {
     "contact_support_title": "Служба поддержки",
     "contact_support_desc": "По техническим вопросам, настройке аккаунта и устранению сбоев:",
     "contact_support_email": "support@cfo-ai.site",
-    "contact_support_time": "Служба поддержки работает (понедельник – пятница).",
+    "contact_support_time": "Служба поддержки для операционных вопросов.",
     "contact_sales_title": "Отдел продаж и демо-сессии",
     "contact_sales_desc": "По вопросам холдинговых подключений и партнерских программ:",
     "contact_sales_email": "sales@cfo-ai.site",
-    "contact_sales_time": "Запишитесь на 20-минутное индивидуальное демо системы.",
+    "contact_sales_time": "Запишитесь на индивидуальное демо системы.",
     "contact_admin_title": "Административный отдел",
     "contact_admin_desc": "Для выставления инвойсов юрлицам, договоров и официальной корреспонденции:",
     "contact_admin_email": "admin@cfo-ai.site",
-    "contact_admin_time": "Корпоративный отдел документооборота."
+    "contact_admin_time": "Корпоративные и административные запросы."
   },
   "footer": {
     "about_text": "Финансовая ясность, контроль документов и прозрачность ликвидности для бизнеса в Индонезии.",

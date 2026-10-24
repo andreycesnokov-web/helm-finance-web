@@ -58,7 +58,7 @@ function createCmsRoutes(contentStore) {
   });
 
   router.post('/auth/initial-setup', (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, setupToken } = req.body;
     if (!password || password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
     }
@@ -69,6 +69,20 @@ function createCmsRoutes(contentStore) {
     // If password already configured, block initial setup
     if (owner && owner.password_hash) {
       return res.status(400).json({ error: 'Initial administrator setup has already been completed. Please log in.' });
+    }
+
+    // Protection against unauthorized account claiming over public internet
+    const expectedSetupKey = process.env.CMS_SETUP_KEY;
+    const providedKey = req.headers['x-cms-setup-key'];
+    const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1' || !req.ip || req.ip === 'unknown';
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    const tokenMatches = setupToken && owner && owner.reset_token === setupToken && new Date(owner.reset_token_expires) > new Date();
+    const keyMatches = expectedSetupKey && providedKey === expectedSetupKey;
+
+    if (!isTestEnv && !isLocalhost && !tokenMatches && !keyMatches) {
+      return res.status(403).json({
+        error: 'Public account claiming is disabled. Please run "node cms/bin/activate_owner.js <email>" on the server or provide the CMS setup key.'
+      });
     }
 
     const salt = generateSalt();
@@ -182,11 +196,43 @@ function createCmsRoutes(contentStore) {
       contentStore.saveUser(user, 'forgot_password');
       contentStore.logAudit(user.email, 'request_password_reset', 'auth');
 
+      // If Resend API Key is configured in production, send transactional email
+      if (process.env.RESEND_API_KEY) {
+        try {
+          const resetUrl = `https://admin.cfo-ai.site/admin/#reset=${token}`;
+          fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: 'CFO AI Security <security@auth.cfo-ai.site>',
+              to: [user.email],
+              subject: 'CFO AI CMS — Password Reset Link',
+              html: `<p>A password reset was requested for your CFO AI CMS account.</p><p><a href="${resetUrl}">Click here to reset your password</a></p><p>This link is valid for 15 minutes.</p>`
+            })
+          }).catch(err => console.error('[Resend Error]', err.message));
+        } catch (e) {
+          console.error('[Email Dispatch Failed]', e.message);
+        }
+      } else {
+        console.log(`[CMS Auth] Password reset link for ${user.email}: /admin/#reset=${token}`);
+      }
+
+      // Return token in response ONLY if in test mode (for test suite assertions)
+      if (process.env.NODE_ENV === 'test') {
+        return res.json({
+          success: true,
+          message: 'If this email is registered, password setup instructions have been sent.',
+          resetToken: token,
+          resetUrl: `/admin/#reset=${token}`
+        });
+      }
+
       return res.json({
         success: true,
-        message: 'A secure password setup link has been generated. Valid for 15 minutes.',
-        resetToken: token,
-        resetUrl: `/admin/#reset=${token}`
+        message: 'If this email is registered, password setup instructions have been sent.'
       });
     }
 
