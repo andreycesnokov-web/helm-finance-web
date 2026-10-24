@@ -1,333 +1,349 @@
 -- Rollback of 20261025090000_public_role_least_privilege.sql: restores exactly the grants anon, authenticated and
--- PUBLIC held in schema public before it (generated 24 Oct 2026 from the pre-patch catalog, whose privilege
+-- PUBLIC held in schema public before it (captured 24 Oct 2026 from the pre-patch catalog, whose privilege
 -- fingerprint is identical on production ihvciomcvadjdtskcekb and the local runner database), and the postgres
--- default privileges. The explicit service_role EXECUTE grants added by the migration are kept (service_role had the
--- same access through PUBLIC). Use only to undo the hardening; it re-opens the exposure described there.
+-- default privileges. An object that does not exist in the target database is skipped. The explicit service_role
+-- EXECUTE grants added by the migration are kept (service_role had the same access through PUBLIC). Use only to undo
+-- the hardening; it re-opens the exposure described there.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
-GRANT EXECUTE ON FUNCTION public.audit_events_no_mutate() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.audit_events_no_mutate() TO anon;
-GRANT EXECUTE ON FUNCTION public.audit_events_no_mutate() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_access_audit_no_mutate() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_access_audit_no_mutate() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_access_audit_no_mutate() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_business_code_default() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_business_code_default() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_business_code_default() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_business_code_immutable() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_business_code_immutable() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_business_code_immutable() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_business_member_notification_grants_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_business_member_notification_grants_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_business_member_notification_grants_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_debt_settlement_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_debt_settlement_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_debt_settlement_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_deposit_balance(p_account uuid) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_deposit_balance(p_account uuid) TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_deposit_balance(p_account uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_document_audit_no_mutate() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_document_audit_no_mutate() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_document_audit_no_mutate() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_email_identity_set_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_email_identity_set_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_email_identity_set_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_ic_funding_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_ic_funding_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_ic_funding_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_ic_settlement_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_ic_settlement_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_ic_settlement_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_incoming_payment_candidate_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_incoming_payment_candidate_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_incoming_payment_candidate_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_incoming_payments_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_incoming_payments_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_incoming_payments_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_assets() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_assets() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_assets() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_bank_import_batch_document() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_bank_import_batch_document() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_bank_import_batch_document() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_business_funding_records() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_business_funding_records() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_business_funding_records() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_business_funding_repayments() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_business_funding_repayments() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_business_funding_repayments() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_counterparty_bank_accounts() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_counterparty_bank_accounts() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_counterparty_bank_accounts() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_comp_links() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_comp_links() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_comp_links() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_debt_links() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_debt_links() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_debt_links() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_tx_links() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_tx_links() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_doc_tx_links() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_document_links() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_document_links() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_document_links() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_financial_documents() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_financial_documents() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_financial_documents() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_tax_treatments() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_tax_treatments() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_tax_treatments() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_iso_withholding() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_iso_withholding() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_iso_withholding() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_onboarding_touch_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_onboarding_touch_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_onboarding_touch_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_payment_credential_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_payment_credential_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_payment_credential_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_payment_provider_connections_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_payment_provider_connections_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_payment_provider_connections_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_personal_v1_owner_only_membership() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_personal_v1_owner_only_membership() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_personal_v1_owner_only_membership() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_support_conversation_created_event() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_support_conversation_created_event() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_support_conversation_created_event() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_support_conversations_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_support_conversations_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_support_conversations_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_support_message_touch_conversation() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_support_message_touch_conversation() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_support_message_touch_conversation() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_tax_billing_alloc_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_tax_billing_alloc_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_tax_billing_alloc_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_tax_deposit_alloc_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_tax_deposit_alloc_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_tax_deposit_alloc_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_telegram_user_state_set_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_telegram_user_state_set_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_telegram_user_state_set_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_user_channel_state_set_updated_at() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_user_channel_state_set_updated_at() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_user_channel_state_set_updated_at() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_wht_payment_guard() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.fn_wht_payment_guard() TO anon;
-GRANT EXECUTE ON FUNCTION public.fn_wht_payment_guard() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.next_app_user_id() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.next_app_user_id() TO anon;
-GRANT EXECUTE ON FUNCTION public.next_app_user_id() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO anon;
-GRANT EXECUTE ON FUNCTION public.rls_auto_enable() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_document_archive(p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.rpc_document_archive(p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text) TO anon;
-GRANT EXECUTE ON FUNCTION public.rpc_document_archive(p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_document_finalize_upload(p_file jsonb, p_doc jsonb, p_actor bigint, p_channel text) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.rpc_document_finalize_upload(p_file jsonb, p_doc jsonb, p_actor bigint, p_channel text) TO anon;
-GRANT EXECUTE ON FUNCTION public.rpc_document_finalize_upload(p_file jsonb, p_doc jsonb, p_actor bigint, p_channel text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_document_link(p_document_id uuid, p_business_id uuid, p_target_type text, p_target_id text, p_actor bigint, p_channel text) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.rpc_document_link(p_document_id uuid, p_business_id uuid, p_target_type text, p_target_id text, p_actor bigint, p_channel text) TO anon;
-GRANT EXECUTE ON FUNCTION public.rpc_document_link(p_document_id uuid, p_business_id uuid, p_target_type text, p_target_id text, p_actor bigint, p_channel text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_document_unlink(p_link_id uuid, p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.rpc_document_unlink(p_link_id uuid, p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text) TO anon;
-GRANT EXECUTE ON FUNCTION public.rpc_document_unlink(p_link_id uuid, p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_document_update_metadata(p_document_id uuid, p_business_id uuid, p_actor bigint, p_patch jsonb, p_channel text) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.rpc_document_update_metadata(p_document_id uuid, p_business_id uuid, p_actor bigint, p_patch jsonb, p_channel text) TO anon;
-GRANT EXECUTE ON FUNCTION public.rpc_document_update_metadata(p_document_id uuid, p_business_id uuid, p_actor bigint, p_patch jsonb, p_channel text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_reset_business_financial(p_business uuid, p_actor_user_id bigint) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION public.rpc_reset_business_financial(p_business uuid, p_actor_user_id bigint) TO anon;
-GRANT EXECUTE ON FUNCTION public.rpc_reset_business_financial(p_business uuid, p_actor_user_id bigint) TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.accounts_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.accounts_id_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.app_user_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.app_user_id_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.business_code_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.business_code_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.business_member_notification_grants_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.business_member_notification_grants_id_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.categories_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.categories_id_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.debts_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.debts_id_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.reminders_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.reminders_id_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.transactions_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.transactions_id_seq TO authenticated;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.user_channel_links_id_seq TO anon;
-GRANT SELECT, UPDATE, USAGE ON SEQUENCE public.user_channel_links_id_seq TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.access_audit TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.access_audit TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.accounts TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.accounts TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.activity_types TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.activity_types TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.ai_usage_events TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.ai_usage_events TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.assets TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.assets TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.audit_events TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.audit_events TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_import_batches TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_import_batches TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_import_matches TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_import_matches TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_import_rows TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_import_rows TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_reconciliations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.bank_reconciliations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_addons TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_addons TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_directions TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_directions TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_funding_records TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_funding_records TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_funding_repayments TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_funding_repayments TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_invites TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_invites TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_member_notification_grants TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_member_notification_grants TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_members TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_members TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_relationships TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.business_relationships TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.businesses TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.businesses TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.cashflow_categories TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.cashflow_categories TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.categories TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.categories TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.cfo_migration_ledger TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.cfo_migration_ledger TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.channel_link_tokens TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.channel_link_tokens TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.classification_feedback TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.classification_feedback TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.classification_rules TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.classification_rules TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.compliance_events TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.compliance_events TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.counterparties TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.counterparties TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.counterparty_bank_accounts TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.counterparty_bank_accounts TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.debt_payment_idempotency TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.debt_payment_idempotency TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.debt_settlement_allocations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.debt_settlement_allocations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.debts TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.debts TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_audit TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_audit TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_compliance_links TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_compliance_links TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_debt_links TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_debt_links TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_files TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_files TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_links TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_links TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_transaction_links TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.document_transaction_links TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.email_login_codes TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.email_login_codes TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.financial_documents TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.financial_documents TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.incoming_payment_match_candidates TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.incoming_payment_match_candidates TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.incoming_payments TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.incoming_payments TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.industry_templates TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.industry_templates TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.intercompany_balances TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.intercompany_balances TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.intercompany_funding_records TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.intercompany_funding_records TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.intercompany_settlement_allocations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.intercompany_settlement_allocations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_clients TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_clients TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_codes TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_codes TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_requests TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_requests TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_tokens TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.mcp_oauth_tokens TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.official_sources TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.official_sources TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_context_snapshots TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_context_snapshots TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_events TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_events TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_flows TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_flows TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_progress TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_progress TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_step_progress TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_step_progress TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_steps TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.onboarding_steps TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payment_provider_connections TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payment_provider_connections TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payment_provider_credentials TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payment_provider_credentials TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payroll_employees TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payroll_employees TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payroll_payment_items TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payroll_payment_items TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payroll_payments TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.payroll_payments TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.plan_limits TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.plan_limits TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.reminders TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.reminders TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_conversations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_conversations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_escalations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_escalations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_events TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_events TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_messages TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.support_messages TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_billing_allocations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_billing_allocations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_deposit_accounts TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_deposit_accounts TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_deposit_allocations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_deposit_allocations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_deposit_entries TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_deposit_entries TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_profiles TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_profiles TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_rule_reviews TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_rule_reviews TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_rules TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_rules TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_treatments TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.tax_treatments TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.telegram_user_state TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.telegram_user_state TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.transactions TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.transactions TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_channel_links TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_channel_links TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_channel_state TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_channel_state TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_email_identities TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_email_identities TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_profiles TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.user_profiles TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.users TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.users TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.wallets TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.wallets TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.withholding_payment_allocations TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.withholding_payment_allocations TO authenticated;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.withholding_records TO anon;
-GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE public.withholding_records TO authenticated;
+DO $$
+DECLARE g record; v_fn text;
+BEGIN
+  FOR g IN SELECT * FROM (VALUES
+    ('FUNCTION', 'public.audit_events_no_mutate()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.audit_events_no_mutate()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.audit_events_no_mutate()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_access_audit_no_mutate()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_access_audit_no_mutate()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_access_audit_no_mutate()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_business_code_default()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_business_code_default()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_business_code_default()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_business_code_immutable()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_business_code_immutable()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_business_code_immutable()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_business_member_notification_grants_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_business_member_notification_grants_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_business_member_notification_grants_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_debt_settlement_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_debt_settlement_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_debt_settlement_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_deposit_balance(p_account uuid)', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_deposit_balance(p_account uuid)', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_deposit_balance(p_account uuid)', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_document_audit_no_mutate()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_document_audit_no_mutate()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_document_audit_no_mutate()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_email_identity_set_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_email_identity_set_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_email_identity_set_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_ic_funding_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_ic_funding_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_ic_funding_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_ic_settlement_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_ic_settlement_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_ic_settlement_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_incoming_payment_candidate_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_incoming_payment_candidate_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_incoming_payment_candidate_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_incoming_payments_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_incoming_payments_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_incoming_payments_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_assets()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_assets()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_assets()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_bank_import_batch_document()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_bank_import_batch_document()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_bank_import_batch_document()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_business_funding_records()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_business_funding_records()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_business_funding_records()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_business_funding_repayments()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_business_funding_repayments()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_business_funding_repayments()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_counterparty_bank_accounts()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_counterparty_bank_accounts()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_counterparty_bank_accounts()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_doc_comp_links()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_doc_comp_links()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_doc_comp_links()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_doc_debt_links()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_doc_debt_links()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_doc_debt_links()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_doc_tx_links()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_doc_tx_links()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_doc_tx_links()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_document_links()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_document_links()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_document_links()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_financial_documents()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_financial_documents()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_financial_documents()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_tax_treatments()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_tax_treatments()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_tax_treatments()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_iso_withholding()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_iso_withholding()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_iso_withholding()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_onboarding_touch_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_onboarding_touch_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_onboarding_touch_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_payment_credential_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_payment_credential_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_payment_credential_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_payment_provider_connections_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_payment_provider_connections_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_payment_provider_connections_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_personal_v1_owner_only_membership()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_personal_v1_owner_only_membership()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_personal_v1_owner_only_membership()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_support_conversation_created_event()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_support_conversation_created_event()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_support_conversation_created_event()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_support_conversations_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_support_conversations_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_support_conversations_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_support_message_touch_conversation()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_support_message_touch_conversation()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_support_message_touch_conversation()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_tax_billing_alloc_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_tax_billing_alloc_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_tax_billing_alloc_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_tax_deposit_alloc_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_tax_deposit_alloc_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_tax_deposit_alloc_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_telegram_user_state_set_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_telegram_user_state_set_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_telegram_user_state_set_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_user_channel_state_set_updated_at()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_user_channel_state_set_updated_at()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_user_channel_state_set_updated_at()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.fn_wht_payment_guard()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.fn_wht_payment_guard()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.fn_wht_payment_guard()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.next_app_user_id()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.next_app_user_id()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.next_app_user_id()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.rls_auto_enable()', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.rls_auto_enable()', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.rls_auto_enable()', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.rpc_document_archive(p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text)', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.rpc_document_archive(p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text)', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.rpc_document_archive(p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text)', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.rpc_document_finalize_upload(p_file jsonb, p_doc jsonb, p_actor bigint, p_channel text)', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.rpc_document_finalize_upload(p_file jsonb, p_doc jsonb, p_actor bigint, p_channel text)', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.rpc_document_finalize_upload(p_file jsonb, p_doc jsonb, p_actor bigint, p_channel text)', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.rpc_document_link(p_document_id uuid, p_business_id uuid, p_target_type text, p_target_id text, p_actor bigint, p_channel text)', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.rpc_document_link(p_document_id uuid, p_business_id uuid, p_target_type text, p_target_id text, p_actor bigint, p_channel text)', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.rpc_document_link(p_document_id uuid, p_business_id uuid, p_target_type text, p_target_id text, p_actor bigint, p_channel text)', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.rpc_document_unlink(p_link_id uuid, p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text)', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.rpc_document_unlink(p_link_id uuid, p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text)', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.rpc_document_unlink(p_link_id uuid, p_document_id uuid, p_business_id uuid, p_actor bigint, p_channel text)', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.rpc_document_update_metadata(p_document_id uuid, p_business_id uuid, p_actor bigint, p_patch jsonb, p_channel text)', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.rpc_document_update_metadata(p_document_id uuid, p_business_id uuid, p_actor bigint, p_patch jsonb, p_channel text)', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.rpc_document_update_metadata(p_document_id uuid, p_business_id uuid, p_actor bigint, p_patch jsonb, p_channel text)', 'EXECUTE', 'authenticated'),
+    ('FUNCTION', 'public.rpc_reset_business_financial(p_business uuid, p_actor_user_id bigint)', 'EXECUTE', 'PUBLIC'),
+    ('FUNCTION', 'public.rpc_reset_business_financial(p_business uuid, p_actor_user_id bigint)', 'EXECUTE', 'anon'),
+    ('FUNCTION', 'public.rpc_reset_business_financial(p_business uuid, p_actor_user_id bigint)', 'EXECUTE', 'authenticated'),
+    ('SEQUENCE', 'public.accounts_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.accounts_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.app_user_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.app_user_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.business_code_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.business_code_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.business_member_notification_grants_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.business_member_notification_grants_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.categories_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.categories_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.debts_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.debts_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.reminders_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.reminders_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.transactions_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.transactions_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('SEQUENCE', 'public.user_channel_links_id_seq', 'SELECT, UPDATE, USAGE', 'anon'),
+    ('SEQUENCE', 'public.user_channel_links_id_seq', 'SELECT, UPDATE, USAGE', 'authenticated'),
+    ('TABLE', 'public.access_audit', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.access_audit', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.accounts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.accounts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.activity_types', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.activity_types', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.ai_usage_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.ai_usage_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.assets', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.assets', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.audit_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.audit_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.bank_import_batches', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.bank_import_batches', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.bank_import_matches', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.bank_import_matches', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.bank_import_rows', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.bank_import_rows', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.bank_reconciliations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.bank_reconciliations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_addons', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_addons', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_directions', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_directions', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_funding_records', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_funding_records', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_funding_repayments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_funding_repayments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_invites', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_invites', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_member_notification_grants', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_member_notification_grants', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_members', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_members', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.business_relationships', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.business_relationships', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.businesses', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.businesses', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.cashflow_categories', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.cashflow_categories', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.categories', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.categories', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.cfo_migration_ledger', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.cfo_migration_ledger', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.channel_link_tokens', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.channel_link_tokens', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.classification_feedback', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.classification_feedback', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.classification_rules', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.classification_rules', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.compliance_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.compliance_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.counterparties', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.counterparties', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.counterparty_bank_accounts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.counterparty_bank_accounts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.debt_payment_idempotency', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.debt_payment_idempotency', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.debt_settlement_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.debt_settlement_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.debts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.debts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.document_audit', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.document_audit', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.document_compliance_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.document_compliance_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.document_debt_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.document_debt_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.document_files', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.document_files', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.document_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.document_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.document_transaction_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.document_transaction_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.email_login_codes', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.email_login_codes', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.financial_documents', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.financial_documents', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.incoming_payment_match_candidates', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.incoming_payment_match_candidates', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.incoming_payments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.incoming_payments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.industry_templates', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.industry_templates', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.intercompany_balances', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.intercompany_balances', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.intercompany_funding_records', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.intercompany_funding_records', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.intercompany_settlement_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.intercompany_settlement_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.mcp_oauth_clients', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.mcp_oauth_clients', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.mcp_oauth_codes', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.mcp_oauth_codes', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.mcp_oauth_requests', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.mcp_oauth_requests', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.mcp_oauth_tokens', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.mcp_oauth_tokens', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.official_sources', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.official_sources', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.onboarding_context_snapshots', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.onboarding_context_snapshots', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.onboarding_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.onboarding_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.onboarding_flows', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.onboarding_flows', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.onboarding_progress', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.onboarding_progress', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.onboarding_step_progress', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.onboarding_step_progress', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.onboarding_steps', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.onboarding_steps', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.payment_provider_connections', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.payment_provider_connections', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.payment_provider_credentials', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.payment_provider_credentials', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.payroll_employees', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.payroll_employees', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.payroll_payment_items', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.payroll_payment_items', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.payroll_payments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.payroll_payments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.plan_limits', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.plan_limits', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.reminders', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.reminders', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.support_conversations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.support_conversations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.support_escalations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.support_escalations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.support_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.support_events', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.support_messages', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.support_messages', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_billing_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_billing_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_deposit_accounts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_deposit_accounts', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_deposit_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_deposit_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_deposit_entries', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_deposit_entries', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_profiles', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_profiles', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_rule_reviews', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_rule_reviews', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_rules', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_rules', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.tax_treatments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.tax_treatments', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.telegram_user_state', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.telegram_user_state', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.transactions', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.transactions', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.user_channel_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.user_channel_links', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.user_channel_state', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.user_channel_state', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.user_email_identities', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.user_email_identities', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.user_profiles', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.user_profiles', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.users', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.users', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.wallets', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.wallets', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.withholding_payment_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.withholding_payment_allocations', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated'),
+    ('TABLE', 'public.withholding_records', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'anon'),
+    ('TABLE', 'public.withholding_records', 'DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE', 'authenticated')
+  ) AS v(kind, obj, privs, grantee) LOOP
+    IF g.kind IN ('TABLE','SEQUENCE') AND to_regclass(g.obj) IS NOT NULL THEN
+      EXECUTE format('GRANT %s ON %s %s TO %s', g.privs, g.kind, g.obj, g.grantee);
+    ELSIF g.kind = 'FUNCTION' THEN
+      -- The captured signature carries argument names; match it exactly in the catalog.
+      SELECT p.oid::regprocedure::text INTO v_fn FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid)) = g.obj;
+      IF v_fn IS NOT NULL THEN EXECUTE format('GRANT %s ON FUNCTION %s TO %s', g.privs, v_fn, g.grantee); END IF;
+    END IF;
+  END LOOP;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated;

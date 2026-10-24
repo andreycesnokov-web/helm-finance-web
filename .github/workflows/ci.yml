@@ -38,6 +38,9 @@ jobs:
           node tests/design/v2Accounting.test.mjs
           node tests/businessFunding.test.js
           node tests/transactionClassifications.test.js
+          node tests/classificationPrecedence.test.js
+          node tests/design/v2CashClass.test.mjs
+          node tests/fundingRoutesWiring.test.js
 
       - name: Install client deps
         run: npm install --no-audit --no-fund
@@ -124,3 +127,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
         run: node --test tests/integration/postgresTransactionClassifications.test.js
+
+      - name: Verify AC-0 integrity and security hardening (grants, edit/reset audit, atomic funding, settlement, constraints) and their rollback on native PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresAc0Integrity.test.js

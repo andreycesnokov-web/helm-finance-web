@@ -27,7 +27,9 @@ async function fullTarget(prefix) {
   await c.query(read('migrations/074_supabase_auth_password_link.sql'));
   await c.query('SET search_path = "$user", public');
   for (const f of BILLING) await c.query(read(f));
-  for (const f of ['20261022165230_payroll_runs_receipt_contract_compat.sql', '20261024090000_payroll_bpjs_breakdown.sql', '20261024120000_business_category_pnl_groups.sql', '20261024150000_transaction_classifications.sql'])
+  for (const f of ['20261022165230_payroll_runs_receipt_contract_compat.sql', '20261024090000_payroll_bpjs_breakdown.sql', '20261024120000_business_category_pnl_groups.sql', '20261024150000_transaction_classifications.sql',
+    '20261025090000_public_role_least_privilege.sql', '20261025091000_transaction_change_audit.sql', '20261025092000_atomic_funding_creation.sql',
+    '20261025093000_debt_settlement_integrity.sql', '20261025094000_transaction_integrity_constraints.sql'])
     await c.query(read('supabase/migrations/' + f));
   return { db, c };
 }
@@ -73,7 +75,7 @@ test('runner on a fully migrated database: applies nothing, changes no function 
   assert.deepEqual([...new Set(plan.entries.map(e => e.state))], ['APPLIED_UNRECORDED']);
   const r1 = await migrate({ connectionString: db.connectionString, mode: 'apply', log: quiet });
   assert.equal(r1.ok, true, JSON.stringify(r1.postflight.filter(p => !p.ok)));
-  assert.deepEqual(r1.applied, []); assert.equal(r1.adopted.length, 26);
+  assert.deepEqual(r1.applied, []); assert.equal(r1.adopted.length, 31);
   assert.deepEqual(await fnHashes(c), h0, 'no function definition changed');
   assert.deepEqual([await balance(c, s.W), await balance(c, s.V)], b0, 'no balance changed');
   const r2 = await migrate({ connectionString: db.connectionString, mode: 'apply', log: quiet });

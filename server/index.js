@@ -1486,6 +1486,23 @@ async function enrichDebtsFor(businessId, debts) {
   });
 }
 
+// AC-0 / I-12: read-only reconciliation of bills against their payment rows and non-cash settlement
+// (rpc_debt_settlement_reconciliation, migration 20261025093000). Exceptions only; it never writes or moves cash.
+app.get('/api/debts/reconciliation', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'Your role does not allow viewing business finance' });
+    const { data, error } = await supabase.rpc('rpc_debt_settlement_reconciliation', { p_business: biz.business.id });
+    if (error) {
+      if (error.code === 'PGRST202' || /rpc_debt_settlement_reconciliation.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
+        return res.status(503).json({ error: 'migration_not_applied', migration: '20261025093000' });
+      return res.status(500).json({ error: 'reconciliation_failed' });
+    }
+    res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/debts', auth, async (req, res) => {
   const { type } = req.query;
   const biz = await requireBusiness(req, res);
@@ -8456,10 +8473,16 @@ app.patch('/api/transactions/:id', auth, async (req, res) => {
     return res.status(503).json({ error: 'balance_rpc_unavailable', message: 'Atomic transaction update requires migration 070' });
   }
   const financial = ['amount','wallet_id','transaction_date','date','currency'].some(k => k in req.body);
+  // AC-0 / I-5: the RPC writes the audit row (changed fields, actor, role, request id) in the same transaction as
+  // the change; the request id correlates it with this call.
+  const hdrId = req.get('x-request-id');
+  const requestId = typeof hdrId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(hdrId) ? hdrId : crypto.randomUUID();
+  res.set('X-Request-Id', requestId);
   const { data, error } = await supabase.rpc('rpc_patch_business_transaction', {
     p_business_id: biz.business.id, p_user_id: req.user.userId,
     p_transaction_id: existing.id, p_expected_version: expectedVersion,
-    p_updates: updates, p_financial: financial,
+    p_updates: updates, p_financial: financial, p_request_id: requestId,
+    p_channel: req.user.auth_channel === 'telegram' ? 'telegram' : 'web',
   });
   if (error) {
     if (balanceFailure(res, error)) return;
@@ -9211,27 +9234,27 @@ app.post('/api/business-funding', auth, async (req, res) => {
     if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can record funding' });
     const v = BFUND.recordFromBody(req.body || {});
     if (v.error) return res.status(400).json(v);
-    if (v.row.counterparty_id && !(await ownRow('counterparties', v.row.counterparty_id, biz.business.id)))
-      return res.status(404).json({ error: 'counterparty_not_found_in_this_business' });
-    if (v.row.received_transaction_id != null && !(await ownRow('transactions', v.row.received_transaction_id, biz.business.id)))
-      return res.status(404).json({ error: 'transaction_not_found_in_this_business' });
-    const { data: rec, error } = await supabase.from('business_funding_records')
-      .insert({ ...v.row, business_id: biz.business.id, created_by_user_id: req.user.userId }).select('*').single();
-    if (error && fundMissing(error)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
-    if (error) return res.status(500).json({ error: error.message });
-    let schedule = [];
-    if (v.schedule.length) {
-      const { data: reps, error: sErr } = await supabase.from('business_funding_repayments')
-        .insert(v.schedule.map((r) => ({ ...r, business_id: biz.business.id, funding_record_id: rec.id, created_by_user_id: req.user.userId }))).select('*');
-      if (sErr) {
-        await supabase.from('business_funding_records').delete().eq('id', rec.id).eq('business_id', biz.business.id);
-        return res.status(400).json({ error: 'schedule_rejected', detail: sErr.message });
-      }
-      schedule = reps || [];
+    // AC-0 / I-6: record + schedule + audit + receipt in one database transaction (rpc_create_business_funding,
+    // migration 20261025092000). The request key makes a retry of the same intent return the same record.
+    const key = req.body.request_key;
+    if (typeof key !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(key))
+      return res.status(400).json({ error: 'idempotency_key_required', message: 'Keep a stable request_key for this funding record.' });
+    const { data, error } = await supabase.rpc('rpc_create_business_funding', {
+      p_business: biz.business.id, p_actor: req.user.userId, p_request_key: key,
+      p_record: v.row, p_schedule: v.schedule, p_channel: req.user.auth_channel === 'telegram' ? 'telegram' : 'web' });
+    if (error) {
+      if (fundMissing(error) || error.code === 'PGRST202' || /rpc_create_business_funding.*(does not exist|schema cache|could not find)/i.test(error.message || ''))
+        return res.status(503).json({ error: 'migration_not_applied', migration: '20261025092000' });
+      const code = String(error.message || '').split(':')[0].trim();
+      const status = { funding_forbidden: 403, business_workspace_required: 403, transaction_not_found_in_this_business: 404,
+        counterparty_not_found_in_this_business: 404, idempotency_key_reused: 409, transaction_already_linked_to_funding: 409,
+        schedule_exceeds_loan: 400, equity_has_no_repayments: 400, invalid_schedule: 400, invalid_amount: 400,
+        invalid_funding_payload: 400, idempotency_key_required: 400 }[code];
+      if (status) return res.status(status).json({ error: code });
+      if (balanceFailure(res, error)) return;
+      return res.status(500).json({ error: 'funding_create_failed' });
     }
-    await recordAudit({ businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
-      entityType: 'business_funding', entityId: rec.id, action: 'funding_recorded', after: { ...rec, schedule_count: schedule.length } });
-    res.json({ record: rec, repayments: schedule });
+    res.json({ record: data.record, repayments: data.repayments || [], replayed: !!data.replayed });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

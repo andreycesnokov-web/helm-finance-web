@@ -13,13 +13,18 @@ t('every route: Business only, role checked, scoped to the active business', () 
     const h = block(r);
     assert.ok(h.includes('business_workspace_required'), r);
     assert.ok(h.includes('canViewBusinessFinance(biz.role)') || h.includes('BFUND.canEditFunding(biz.role)'), r);
-    assert.ok(/\.eq\('business_id', biz\.business\.id\)|business_id: biz\.business\.id/.test(h), r);
+    assert.ok(/\.eq\('business_id', biz\.business\.id\)|business_id: biz\.business\.id|p_business: biz\.business\.id/.test(h), r);
   }
 });
 
 t('every write is audited', () => {
-  for (const [r, a] of [[routes[1], 'funding_recorded'], [routes[2], 'funding_repayment_scheduled'], [routes[3], 'funding_repayment_paid']])
+  for (const [r, a] of [[routes[2], 'funding_repayment_scheduled'], [routes[3], 'funding_repayment_paid']])
     assert.ok(new RegExp(`recordAudit\\([\\s\\S]*${a}`).test(block(r)), a);
+  // AC-0 / I-6: creation writes record + schedule + audit + receipt in one database transaction.
+  assert.ok(/supabase\.rpc\('rpc_create_business_funding'/.test(block(routes[1])), 'create goes through the atomic RPC');
+  assert.ok(/request_key/.test(block(routes[1])), 'create requires a request key');
+  const mig = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '20261025092000_atomic_funding_creation.sql'), 'utf8');
+  assert.ok(/'funding_recorded'/.test(mig) && /INSERT INTO public\.audit_events/.test(mig), 'the RPC writes the funding_recorded audit row');
 });
 
 t('no link to Personal and not the bridge path', () => {

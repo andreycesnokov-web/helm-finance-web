@@ -11,7 +11,7 @@
 // server flag off the route 404s and the card says to connect a gateway. Money between the
 // owner's own companies comes from both statements (import marks it intercompany); a mirrored
 // loan record across two companies has no server route yet, so none is offered here.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import I from '../icons'
@@ -59,14 +59,20 @@ function RecordForm({ onDone, t }) {
   const [rows, setRows] = useState([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
+  // One request key per intent (AC-0 / I-6): a retry of the same details after a lost response returns the record
+  // already saved; changed details are a new intent with a new key.
+  const intentKey = useRef({ intent: null, key: null })
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
   const loan = f.instrument === 'loan'
   const save = async (e) => {
     e.preventDefault(); if(!f.instrument){setErr(t('fund.chooseInstrument'));return} setBusy(true); setErr(null)
     try {
-      await createFunding(request, { ...f, counterparty_id: f.counterparty_id || null,
+      const body = { ...f, counterparty_id: f.counterparty_id || null,
         interest_rate_annual: loan ? f.interest_rate_annual : null, due_on: loan ? f.due_on : null,
-        schedule: loan && rows.length ? rows : undefined })
+        schedule: loan && rows.length ? rows : undefined }
+      const intent = JSON.stringify(body)
+      if (intentKey.current.intent !== intent) intentKey.current = { intent, key: crypto.randomUUID() }
+      await createFunding(request, { ...body, request_key: intentKey.current.key })
       invalidate(); onDone()
     } catch (x) {
       const code = actionError(x)

@@ -66,9 +66,22 @@ export const MANIFEST = [
   { file: 'supabase/migrations/20261024120000_business_category_pnl_groups.sql', probes: [table('business_category_pnl_groups'), fn('fn_business_category_pnl_group_guard')] },
   { file: 'supabase/migrations/20261024150000_transaction_classifications.sql', probes: [table('transaction_classifications'), fn('fn_transaction_classification_guard')] },
   // AC-0 / I-7: anon and authenticated hold nothing in schema public.
+  // One probe: on every database (Supabase or a plain clean install) anon can execute this function through PUBLIC
+  // until the migration runs; table grants differ by platform, so they cannot tell the state apart.
   { file: 'supabase/migrations/20261025090000_public_role_least_privilege.sql', probes: [
-    `NOT has_table_privilege('anon', 'public.transactions', 'SELECT')`,
     `NOT has_function_privilege('anon', 'public.rpc_reset_business_financial(uuid,bigint)', 'EXECUTE')`] },
+  // AC-0 / I-5: edits, resets and receipts leave an audit trail in the same transaction.
+  { file: 'supabase/migrations/20261025091000_transaction_change_audit.sql', probes: [
+    `to_regprocedure('public.rpc_patch_business_transaction(uuid,bigint,bigint,bigint,jsonb,boolean,text,text)') IS NOT NULL`,
+    trigger('financial_write_requests_append_only')] },
+  // AC-0 / I-6: funding record + schedule + audit in one idempotent operation.
+  { file: 'supabase/migrations/20261025092000_atomic_funding_creation.sql', probes: [table('funding_creation_requests'), fn('rpc_create_business_funding')] },
+  // AC-0 / I-12: payments respect non-cash settlement; read-only reconciliation.
+  { file: 'supabase/migrations/20261025093000_debt_settlement_integrity.sql', probes: [defHas('rpc_record_debt_payment', 'v_noncash'), fn('rpc_debt_settlement_reconciliation')] },
+  // AC-0 / I-11: account of the same company and a known type, enforced by the database.
+  { file: 'supabase/migrations/20261025094000_transaction_integrity_constraints.sql', probes: [
+    `EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.transactions'::regclass AND conname='transactions_wallet_same_business_fkey')`,
+    `EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.transactions'::regclass AND conname='transactions_type_known')`] },
 ];
 
 // Invariants that must hold after the run (by definition, not by table presence).
@@ -105,6 +118,15 @@ export const POSTFLIGHT = [
       OR EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace AND c.relkind='S'
         AND has_sequence_privilege(r.role, c.oid, 'USAGE,SELECT,UPDATE'))
       OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND has_function_privilege(r.role, p.oid, 'EXECUTE'))))`],
+  ['transaction edits are audited in the same transaction', defHas('rpc_patch_business_transaction', 'transaction_financial_update')],
+  ['company financial reset is audited inside its atomic block', defHas('rpc_reset_business_financial', 'financial_data_reset')],
+  ['write receipts are append-only', trigger('financial_write_requests_append_only')],
+  ['funding creation is one idempotent operation; a received payment backs at most one funding record',
+    `(${fn('rpc_create_business_funding')} AND EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='bfr_received_tx_uniq'))`],
+  ['bill payments count non-cash settlement', defHas('rpc_record_debt_payment', 'v_noncash')],
+  ['operations reference an account of their own company and a known type (validated)',
+    `(SELECT count(*)=2 AND bool_and(convalidated) FROM pg_constraint WHERE conrelid='public.transactions'::regclass
+      AND conname IN ('transactions_wallet_same_business_fkey','transactions_type_known'))`],
   ['billing schema versions complete', `(SELECT count(*)=4 FROM public.billing_schema_versions WHERE version IN ('20261015033808','20261017090000','20261017120000','20261018090000'))`],
   ['plan publication requires every metered limit to be decided (absent is never unlimited)', defHas('billing_terms_error', 'An undecided metered limit')],
 ];

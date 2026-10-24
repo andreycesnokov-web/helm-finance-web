@@ -21,7 +21,7 @@ const last=m=>{const [y,mm]=m.split('-').map(Number);return new Date(Date.UTC(y,
  assert.equal(i0.data.metrics.other_cash_movement.funding,0);assert.equal(i0.data.metrics.revenue,0);assert.equal(i0.data.metrics.other_cash_movement.needs_review,120000000);
  pass('an unrecognised inflow is "needs review", not revenue and not yet financing');
  // The owner records it in the funding register, linked to that very operation.
- const f=await api('/business-funding',{method:'POST',body:{source_kind:'bank',instrument:'loan',lender_name:'Synthetic bank '+MONTH,amount:120000000,received_on:MONTH+'-03',received_transaction_id:txId,interest_rate_annual:10,schedule:[{due_on:MONTH+'-28',principal:5000000,interest:1000000}]}});
+ const f=await api('/business-funding',{method:'POST',body:{source_kind:'bank',instrument:'loan',lender_name:'Synthetic bank '+MONTH,amount:120000000,received_on:MONTH+'-03',received_transaction_id:txId,interest_rate_annual:10,schedule:[{due_on:MONTH+'-28',principal:5000000,interest:1000000}],request_key:require('node:crypto').randomUUID()}});
  assert.equal(f.status,200,JSON.stringify(f));
  const i1=await api(span);
  assert.equal(i1.data.metrics.other_cash_movement.funding,120000000);assert.equal(i1.data.metrics.revenue,0);assert.equal(i1.data.metrics.other_cash_movement.needs_review,0);
