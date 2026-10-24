@@ -675,7 +675,7 @@ function CloseTab({ month, onOpenChatModal }) {
         <div className="v2-col v2-acct-side">
           {prep && (
             <Card title={t('acct.prep.title')} aside={<Link to="/business/transactions">{t('nav.transactions')}</Link>}>
-              <dl className="v2-dl v2-dl-tight" data-acct-prep>
+              <dl className="v2-dl v2-dl-tight v2-dl-figures" data-acct-prep>
                 <dt>{t('acct.prep.operations')}</dt><dd className="v2-num v2-r">{prep.operations}</dd>
                 <dt>{t('acct.prep.noDocument')}</dt><dd className="v2-num v2-r">{prep.missing_documents} · {money(prep.missing_documents_amount)}</dd>
                 <dt>{t('acct.prep.docPending')}</dt><dd className="v2-num v2-r">{prep.pending_document_review}</dd>

@@ -48,12 +48,16 @@ let browser, page;
   await page.goto(origin + '/business/accountant', { waitUntil: 'networkidle' });
   const prep = page.locator('[data-acct-prep]'); await prep.waitFor({ timeout: 20000 });
   assert.match(await prep.innerText(), /Marked personal/);
+  // Each figure stays on one line (prod 24 Oct: long labels squeezed the figure column to one character).
+  const wrapped = () => page.evaluate(() => [...document.querySelectorAll('[data-acct-prep] dd')].filter((dd) => { const r = document.createRange(); r.selectNodeContents(dd); return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size > 1; }).map((dd) => dd.textContent));
+  for (const width of [1440, 1100]) { await page.setViewportSize({ width, height: 1000 }); await page.waitForTimeout(300); assert.deepEqual(await wrapped(), [], 'figures wrap at ' + width); }
   await prep.scrollIntoViewIfNeeded(); await page.screenshot({ path: '/evidence/classification-prep-desktop.png' });
   pass('month close shows the accounting-preparation summary');
   await page.setViewportSize({ width: 390, height: 844 });
   for (const path of ['/business/transactions?tx=' + txId, '/business/accountant']) {
     await page.goto(origin + path, { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0, 'no sideways scroll ' + path);
+    if (path === '/business/accountant') { await page.locator('[data-acct-prep]').waitFor(); assert.deepEqual(await wrapped(), [], 'figures wrap on phone'); }
   }
   await page.goto(origin + '/business/transactions?tx=' + txId, { waitUntil: 'networkidle' }); await page.locator('[data-txd-accounting]').scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/evidence/classification-dialog-phone.png' });

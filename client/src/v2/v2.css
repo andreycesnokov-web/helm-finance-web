@@ -574,6 +574,9 @@
 .v2-dl-tight dt, .v2-dl-tight dd { padding: var(--space-2) 0; border-top: 0; }
 .v2-dl-tight { grid-template-columns: minmax(6em, max-content) minmax(0, 1fr); }
 .v2-dl-tight dd { text-align: right; padding-left: var(--space-3); }
+/* Narrow side cards with long labels (accounting preparation): the label wraps, the figure stays on one line. */
+.v2-dl-tight.v2-dl-figures { grid-template-columns: minmax(0, 1fr) max-content; }
+.v2-dl-figures dd { white-space: nowrap; overflow-wrap: normal; }
 .v2-hist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .v2-hist li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--space-3); }
 .v2-hist-at { color: var(--text-secondary); font-size: 13px; }
