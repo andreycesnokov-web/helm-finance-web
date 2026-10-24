@@ -272,6 +272,20 @@ async function buildMarketingSite() {
   const assetDest = path.join(outputDir, 'assets');
   fs.cpSync(assetSrc, assetDest, { recursive: true });
 
+  // If persistent media directory exists and differs from assetSrc/screens, copy uploaded media
+  if (contentStore && contentStore.mediaDir && fs.existsSync(contentStore.mediaDir)) {
+    const screensDest = path.join(assetDest, 'screens');
+    fs.mkdirSync(screensDest, { recursive: true });
+    const mediaFiles = fs.readdirSync(contentStore.mediaDir);
+    for (const f of mediaFiles) {
+      if (!f.startsWith('.')) {
+        try {
+          fs.copyFileSync(path.join(contentStore.mediaDir, f), path.join(screensDest, f));
+        } catch (e) {}
+      }
+    }
+  }
+
   server.close();
 
   // 5. STEP 5: SECURITY AUDIT & OUTPUT VALIDATION

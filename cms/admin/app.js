@@ -485,8 +485,15 @@ async function renderDashboardView(container) {
 }
 
 // ==========================================
-// 2. PAGES MANAGEMENT VIEW
+// 2. PAGES MANAGEMENT VIEW & MULTILINGUAL EDITOR
 // ==========================================
+let activePageLang = 'en';
+
+async function switchPageEditLang(slug, lang) {
+  activePageLang = lang;
+  loadPageEdit(slug);
+}
+
 async function renderPagesView(container) {
   const pages = await apiFetch('/pages');
 
@@ -494,8 +501,8 @@ async function renderPagesView(container) {
     <div class="max-w-6xl mx-auto space-y-8">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-black text-[#003366]">Page Content &amp; Block Editor</h1>
-          <p class="text-xs text-[#5A6E82]">Edit hero headlines, section headings, block ordering, and CTAs across all marketing surfaces.</p>
+          <h1 class="text-2xl font-black text-[#003366]">Page Content &amp; Multilingual Editor</h1>
+          <p class="text-xs text-[#5A6E82]">Edit headlines, section copy, CTA buttons, and contact info across English, Indonesian, and Russian.</p>
         </div>
       </div>
 
@@ -525,56 +532,111 @@ async function renderPagesView(container) {
 async function loadPageEdit(slug) {
   const page = await apiFetch(`/pages/${slug}`);
   const container = document.getElementById('page-editor-container');
+  const lang = activePageLang || 'en';
+  const trans = (page.translations && page.translations[lang]) ? page.translations[lang] : {};
   const heroBlock = page.blocks?.find(b => b.type === 'hero') || {};
+
+  const heroTitle = trans.title || trans.heading || (lang === 'en' ? heroBlock.title : '') || '';
+  const heroSubtitle = trans.subtitle || trans.subheading || (lang === 'en' ? heroBlock.subtitle : '') || '';
+  const heroBadge = trans.badge || (lang === 'en' ? heroBlock.badge : '') || '';
+  const heroCtaText = trans.primary_cta_text || (lang === 'en' ? heroBlock.primary_cta_text : '') || 'Start Free Trial (7 Days)';
+  const heroCtaUrl = trans.primary_cta_url || (lang === 'en' ? heroBlock.primary_cta_url : '') || 'https://app.cfo-ai.site/login';
+
+  const previewUrl = `/${lang}/${slug === 'home' ? '' : slug}`;
 
   container.innerHTML = `
     <div class="space-y-6">
-      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
         <div>
           <h3 class="font-black text-lg text-[#003366]">${page.title}</h3>
           <span class="text-[11px] font-mono text-slate-400">Slug: /${slug === 'home' ? '' : slug}</span>
         </div>
-        <button onclick="savePageChanges('${slug}')" class="text-xs font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-5 py-2.5 rounded-xl shadow-sm">
-          Save Page Changes
+        <div class="flex items-center gap-3">
+          <a href="${previewUrl}" target="_blank" class="text-xs font-bold text-[#1565C0] hover:text-[#0052CC] border border-blue-200 bg-blue-50/50 hover:bg-blue-100/50 px-4 py-2 rounded-xl flex items-center gap-1.5 transition">
+            <span>Preview Draft (${lang.toUpperCase()})</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+          <button onclick="savePageChanges('${slug}')" class="text-xs font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-5 py-2.5 rounded-xl shadow-sm transition">
+            Save Page Changes
+          </button>
+        </div>
+      </div>
+
+      <!-- LANGUAGE SELECTOR TABS -->
+      <div class="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+        <span class="text-slate-400 text-[11px] uppercase mr-2">Language:</span>
+        <button onclick="switchPageEditLang('${slug}', 'en')" class="px-3 py-1.5 rounded-lg transition ${lang === 'en' ? 'bg-[#002244] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+          English (EN)
+        </button>
+        <button onclick="switchPageEditLang('${slug}', 'id')" class="px-3 py-1.5 rounded-lg transition ${lang === 'id' ? 'bg-[#002244] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+          Bahasa Indonesia (ID)
+        </button>
+        <button onclick="switchPageEditLang('${slug}', 'ru')" class="px-3 py-1.5 rounded-lg transition ${lang === 'ru' ? 'bg-[#002244] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+          Russian (RU)
         </button>
       </div>
 
       <!-- EDITABLE HERO BLOCK -->
       <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold uppercase tracking-wider text-[#1565C0]">BLOCK: HERO SECTION</span>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#1565C0]">BLOCK: HERO SECTION (${lang.toUpperCase()})</span>
           <span class="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded font-mono">type: hero</span>
         </div>
 
         <div>
           <label class="block text-xs font-bold text-[#003366] mb-1">Badge Ribbon Text</label>
-          <input type="text" id="edit-hero-badge" value="${heroBlock.badge || ''}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#1565C0]" />
+          <input type="text" id="edit-hero-badge" value="${heroBadge.replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#1565C0]" />
         </div>
 
         <div>
           <label class="block text-xs font-bold text-[#003366] mb-1">Hero Title (H1 Headline)</label>
-          <input type="text" id="edit-hero-title" value="${heroBlock.title || ''}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-bold focus:outline-none focus:border-[#1565C0]" />
+          <input type="text" id="edit-hero-title" value="${heroTitle.replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-bold focus:outline-none focus:border-[#1565C0]" />
         </div>
 
         <div>
           <label class="block text-xs font-bold text-[#003366] mb-1">Subtitle / Value Proposition</label>
-          <textarea id="edit-hero-subtitle" rows="3" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#1565C0] leading-relaxed">${heroBlock.subtitle || ''}</textarea>
+          <textarea id="edit-hero-subtitle" rows="3" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-[#1565C0] leading-relaxed">${heroSubtitle}</textarea>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-bold text-[#003366] mb-1">Primary CTA Button Text</label>
-            <input type="text" id="edit-hero-cta-text" value="${heroBlock.primary_cta_text || 'Start Free Trial (7 Days)'}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white" />
+            <input type="text" id="edit-hero-cta-text" value="${heroCtaText.replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white" />
           </div>
           <div>
             <label class="block text-xs font-bold text-[#003366] mb-1">Primary CTA Destination URL</label>
-            <input type="text" id="edit-hero-cta-url" value="${heroBlock.primary_cta_url || 'https://app.cfo-ai.site/login'}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-mono" />
+            <input type="text" id="edit-hero-cta-url" value="${heroCtaUrl.replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-mono" />
           </div>
         </div>
       </div>
 
+      ${slug === 'about' ? `
+        <!-- ABOUT US SPECIFIC CONTROLS -->
+        <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-[#1565C0]">ABOUT US: CONTACT &amp; MISSION DETAILS (${lang.toUpperCase()})</span>
+            <span class="text-[10px] bg-white border border-slate-200 px-2 py-0.5 rounded font-mono">type: about-info</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-[#003366] mb-1">Support Email</label>
+              <input type="email" id="edit-about-support" value="${(trans.support_email || 'support@cfo-ai.site').replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-mono" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-[#003366] mb-1">Sales Email</label>
+              <input type="email" id="edit-about-sales" value="${(trans.sales_email || 'sales@cfo-ai.site').replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-mono" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-[#003366] mb-1">Admin / Security Email</label>
+              <input type="email" id="edit-about-admin" value="${(trans.admin_email || 'admin@cfo-ai.site').replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white font-mono" />
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
       <div class="text-[11px] text-slate-400">
-        Changes are saved to working draft. To promote changes to the public website, navigate to <strong>Publishing &amp; Rollback</strong>.
+        Changes are saved to working draft for <strong>${lang.toUpperCase()}</strong>. To publish changes live to Cloudflare Pages, navigate to <strong>Publishing &amp; Rollback</strong>.
       </div>
     </div>
   `;
@@ -582,14 +644,41 @@ async function loadPageEdit(slug) {
 
 async function savePageChanges(slug) {
   const page = await apiFetch(`/pages/${slug}`);
-  const heroIndex = page.blocks.findIndex(b => b.type === 'hero');
+  const lang = activePageLang || 'en';
 
-  if (heroIndex >= 0) {
-    page.blocks[heroIndex].badge = document.getElementById('edit-hero-badge').value;
-    page.blocks[heroIndex].title = document.getElementById('edit-hero-title').value;
-    page.blocks[heroIndex].subtitle = document.getElementById('edit-hero-subtitle').value;
-    page.blocks[heroIndex].primary_cta_text = document.getElementById('edit-hero-cta-text').value;
-    page.blocks[heroIndex].primary_cta_url = document.getElementById('edit-hero-cta-url').value;
+  page.translations = page.translations || {};
+  page.translations[lang] = page.translations[lang] || {};
+
+  const badge = document.getElementById('edit-hero-badge')?.value || '';
+  const title = document.getElementById('edit-hero-title')?.value || '';
+  const subtitle = document.getElementById('edit-hero-subtitle')?.value || '';
+  const ctaText = document.getElementById('edit-hero-cta-text')?.value || '';
+  const ctaUrl = document.getElementById('edit-hero-cta-url')?.value || '';
+
+  page.translations[lang].badge = badge;
+  page.translations[lang].title = title;
+  page.translations[lang].subtitle = subtitle;
+  page.translations[lang].primary_cta_text = ctaText;
+  page.translations[lang].primary_cta_url = ctaUrl;
+
+  if (slug === 'about') {
+    page.translations[lang].heading = title;
+    page.translations[lang].subheading = subtitle;
+    page.translations[lang].support_email = document.getElementById('edit-about-support')?.value || 'support@cfo-ai.site';
+    page.translations[lang].sales_email = document.getElementById('edit-about-sales')?.value || 'sales@cfo-ai.site';
+    page.translations[lang].admin_email = document.getElementById('edit-about-admin')?.value || 'admin@cfo-ai.site';
+  }
+
+  // Also update default English heroBlock for backwards compatibility
+  if (lang === 'en') {
+    const heroIndex = page.blocks?.findIndex(b => b.type === 'hero');
+    if (heroIndex >= 0) {
+      page.blocks[heroIndex].badge = badge;
+      page.blocks[heroIndex].title = title;
+      page.blocks[heroIndex].subtitle = subtitle;
+      page.blocks[heroIndex].primary_cta_text = ctaText;
+      page.blocks[heroIndex].primary_cta_url = ctaUrl;
+    }
   }
 
   await apiFetch(`/pages/${slug}`, {
@@ -597,12 +686,19 @@ async function savePageChanges(slug) {
     body: JSON.stringify(page)
   });
 
-  alert(`Page '${slug}' updated successfully!`);
+  alert(`Page '${slug}' (${lang.toUpperCase()}) updated successfully!`);
 }
 
 // ==========================================
-// 3. KNOWLEDGE HUB VIEW & ARTICLE STUDIO
+// 3. KNOWLEDGE HUB VIEW & MULTILINGUAL STUDIO
 // ==========================================
+let activeArticleLang = 'en';
+
+async function switchArticleLang(slug, lang) {
+  activeArticleLang = lang;
+  editArticle(slug);
+}
+
 async function renderHubView(container) {
   const articles = await apiFetch('/hub/articles');
   const categories = await apiFetch('/hub/categories');
@@ -642,12 +738,12 @@ async function renderHubView(container) {
                       <div class="font-bold text-[#003366]">${en.title || art.slug}</div>
                       <div class="text-[10px] font-mono text-slate-400">/blog/${art.slug}</div>
                     </td>
-                    <td class="py-3"><span class="px-2 py-0.5 rounded bg-blue-50 text-[#1565C0] font-semibold text-[10px]">${art.category_name}</span></td>
+                    <td class="py-3"><span class="px-2 py-0.5 rounded bg-blue-50 text-[#1565C0] font-semibold text-[10px]">${art.category_name || art.category}</span></td>
                     <td class="py-3 font-mono font-bold text-slate-600">${art.jurisdiction}</td>
                     <td class="py-3 font-mono text-slate-500">${art.last_legal_review ? art.last_legal_review.split('T')[0] : 'Pending'}</td>
                     <td class="py-3">
                       <span class="px-2 py-0.5 rounded text-[10px] font-bold ${art.review_status === 'published' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}">
-                        ${art.review_status.toUpperCase()}
+                        ${(art.review_status || 'draft').toUpperCase()}
                       </span>
                     </td>
                     <td class="py-3 text-right space-x-2">
@@ -665,30 +761,142 @@ async function renderHubView(container) {
   `;
 }
 
+async function openNewArticleModal() {
+  const categories = await apiFetch('/hub/categories');
+  const existingModal = document.getElementById('new-article-modal');
+  if (existingModal) existingModal.remove();
+
+  const modalWrap = document.createElement('div');
+  modalWrap.id = 'new-article-modal';
+  modalWrap.innerHTML = `
+    <div class="fixed inset-0 bg-[#001428]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <h3 class="font-black text-lg text-[#003366]">Create New Knowledge Hub Guide</h3>
+          <button onclick="document.getElementById('new-article-modal').remove()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
+        </div>
+        <form onsubmit="submitNewArticle(event)" class="space-y-4 text-xs">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Guide Title (Master)</label>
+            <input type="text" id="new-art-title" required placeholder="e.g. Indonesian Corporate Tax Overview" class="w-full p-2.5 border border-slate-200 rounded-lg" />
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">URL Slug</label>
+            <input type="text" id="new-art-slug" required placeholder="e.g. corporate-tax-overview-2026" class="w-full p-2.5 border border-slate-200 rounded-lg font-mono text-[11px]" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Category</label>
+              <select id="new-art-category" class="w-full p-2 border border-slate-200 rounded-lg">
+                ${categories.map(c => `<option value="${c.slug}">${c.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Jurisdiction</label>
+              <input type="text" id="new-art-jurisdiction" value="ID" class="w-full p-2 border border-slate-200 rounded-lg font-mono font-bold" />
+            </div>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Brief Excerpt</label>
+            <textarea id="new-art-excerpt" rows="2" placeholder="Summary of the article..." class="w-full p-2.5 border border-slate-200 rounded-lg"></textarea>
+          </div>
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
+            <button type="button" onclick="document.getElementById('new-article-modal').remove()" class="px-4 py-2 font-semibold text-slate-600 hover:text-slate-800">Cancel</button>
+            <button type="submit" class="px-5 py-2 font-bold bg-[#1565C0] hover:bg-[#0052CC] text-white rounded-xl shadow">Create Draft Guide</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modalWrap);
+}
+
+async function submitNewArticle(e) {
+  e.preventDefault();
+  const title = document.getElementById('new-art-title').value.trim();
+  let slug = document.getElementById('new-art-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const category = document.getElementById('new-art-category').value;
+  const jurisdiction = document.getElementById('new-art-jurisdiction').value;
+  const excerpt = document.getElementById('new-art-excerpt').value.trim();
+
+  const newArticle = {
+    id: `art-${Date.now()}`,
+    slug,
+    category,
+    jurisdiction,
+    reading_time_minutes: 5,
+    publication_date: new Date().toISOString(),
+    last_updated: new Date().toISOString(),
+    review_status: 'draft',
+    translations: {
+      en: {
+        title,
+        excerpt,
+        content_markdown: `# ${title}\n\nDraft content goes here.`
+      }
+    }
+  };
+
+  await apiFetch('/hub/articles', {
+    method: 'POST',
+    body: JSON.stringify(newArticle)
+  });
+
+  const modal = document.getElementById('new-article-modal');
+  if (modal) modal.remove();
+  editArticle(slug);
+}
+
 async function editArticle(slug) {
   const article = await apiFetch(`/hub/articles/${slug}`);
   const categories = await apiFetch('/hub/categories');
-  const en = article.translations?.en || {};
+  const lang = activeArticleLang || 'en';
+  const trans = (article.translations && article.translations[lang]) ? article.translations[lang] : {};
   const container = document.getElementById('main-content-view');
+
+  const enExists = Boolean(article.translations?.en?.title);
+  const idExists = Boolean(article.translations?.id?.title);
+  const ruExists = Boolean(article.translations?.ru?.title);
 
   container.innerHTML = `
     <div class="max-w-4xl mx-auto space-y-6">
-      <div class="flex items-center justify-between pb-4 border-b border-slate-200">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 gap-4">
         <div>
           <button onclick="switchTab('hub')" class="text-xs text-[#1565C0] font-bold hover:underline mb-1">← Back to Articles</button>
-          <h2 class="text-2xl font-black text-[#003366]">Edit Guide: ${en.title || slug}</h2>
+          <h2 class="text-2xl font-black text-[#003366]">Edit Guide: ${article.translations?.en?.title || slug}</h2>
         </div>
         <div class="flex items-center gap-3">
+          <a href="/${lang}/blog/${slug}" target="_blank" class="text-xs font-bold text-[#1565C0] hover:text-[#0052CC] border border-blue-200 bg-blue-50/50 hover:bg-blue-100/50 px-4 py-2 rounded-xl flex items-center gap-1.5 transition">
+            <span>Preview Draft (${lang.toUpperCase()})</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
           <button onclick="saveArticleDraft('${slug}')" class="text-xs font-bold bg-[#1565C0] hover:bg-[#10529C] text-white px-6 py-2.5 rounded-xl shadow-sm">
-            Save Guide
+            Save Guide (${lang.toUpperCase()})
           </button>
         </div>
       </div>
 
+      <!-- LANGUAGE SELECTOR TABS -->
+      <div class="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+        <span class="text-slate-400 text-[11px] uppercase mr-2">Language:</span>
+        <button onclick="switchArticleLang('${slug}', 'en')" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${lang === 'en' ? 'bg-[#002244] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+          <span>English (EN)</span>
+          <span class="w-2 h-2 rounded-full ${enExists ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
+        </button>
+        <button onclick="switchArticleLang('${slug}', 'id')" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${lang === 'id' ? 'bg-[#002244] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+          <span>Bahasa Indonesia (ID)</span>
+          <span class="w-2 h-2 rounded-full ${idExists ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
+        </button>
+        <button onclick="switchArticleLang('${slug}', 'ru')" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${lang === 'ru' ? 'bg-[#002244] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+          <span>Russian (RU)</span>
+          <span class="w-2 h-2 rounded-full ${ruExists ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
+        </button>
+      </div>
+
       <div class="admin-card p-6 space-y-4">
         <div>
-          <label class="block text-xs font-bold text-[#003366] mb-1">Article Title (English Master)</label>
-          <input type="text" id="art-title" value="${en.title || ''}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 font-bold bg-white" />
+          <label class="block text-xs font-bold text-[#003366] mb-1">Article Title (${lang.toUpperCase()})</label>
+          <input type="text" id="art-title" value="${(trans.title || '').replace(/"/g, '&quot;')}" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 font-bold bg-white" />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -724,13 +932,13 @@ async function editArticle(slug) {
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-[#003366] mb-1">Excerpt / Search Snippet</label>
-          <textarea id="art-excerpt" rows="2" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white">${en.excerpt || ''}</textarea>
+          <label class="block text-xs font-bold text-[#003366] mb-1">Excerpt / Search Snippet (${lang.toUpperCase()})</label>
+          <textarea id="art-excerpt" rows="2" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-white">${trans.excerpt || ''}</textarea>
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-[#003366] mb-1">Article Content (Markdown Format)</label>
-          <textarea id="art-content" rows="14" class="w-full text-xs p-3 rounded-lg border border-slate-200 font-mono bg-white leading-relaxed">${en.content_markdown || ''}</textarea>
+          <label class="block text-xs font-bold text-[#003366] mb-1">Article Content Markdown (${lang.toUpperCase()})</label>
+          <textarea id="art-content" rows="14" class="w-full text-xs p-3 rounded-lg border border-slate-200 font-mono bg-white leading-relaxed">${trans.content_markdown || ''}</textarea>
         </div>
       </div>
     </div>
@@ -739,6 +947,7 @@ async function editArticle(slug) {
 
 async function saveArticleDraft(originalSlug) {
   const article = await apiFetch(`/hub/articles/${originalSlug}`);
+  const lang = activeArticleLang || 'en';
   const title = document.getElementById('art-title').value;
   const slug = document.getElementById('art-slug').value;
   const category = document.getElementById('art-category').value;
@@ -754,18 +963,18 @@ async function saveArticleDraft(originalSlug) {
   article.reading_time_minutes = readingTime;
   article.review_status = status;
   article.translations = article.translations || {};
-  article.translations.en = article.translations.en || {};
-  article.translations.en.title = title;
-  article.translations.en.excerpt = excerpt;
-  article.translations.en.content_markdown = content;
+  article.translations[lang] = article.translations[lang] || {};
+  article.translations[lang].title = title;
+  article.translations[lang].excerpt = excerpt;
+  article.translations[lang].content_markdown = content;
 
   await apiFetch('/hub/articles', {
     method: 'POST',
     body: JSON.stringify(article)
   });
 
-  alert('Guide saved successfully!');
-  switchTab('hub');
+  alert(`Guide saved successfully for ${lang.toUpperCase()}!`);
+  editArticle(article.slug);
 }
 
 async function deleteArticle(slug) {
@@ -1040,7 +1249,17 @@ async function publishNewRelease() {
       method: 'POST',
       body: JSON.stringify({ notes })
     });
-    alert(res.message);
+    let details = `${res.message}\n\nVersion: ${res.release?.version}\nHash: ${res.release?.hash}`;
+    if (res.cloudflare && res.cloudflare.deployUrl) {
+      details += `\nCloudflare Pages: ${res.cloudflare.deployUrl}`;
+    }
+    alert(details);
+
+    const topVersionEl = document.getElementById('top-release-version');
+    if (topVersionEl && res.release) {
+      topVersionEl.innerText = `Active: ${res.release.version} (${res.release.hash})`;
+    }
+
     renderReleasesView(document.getElementById('main-content-view'));
   } catch (err) {
     alert(`Publication failed: ${err.message}`);
@@ -1048,10 +1267,20 @@ async function publishNewRelease() {
 }
 
 async function rollbackToRelease(releaseId) {
-  if (confirm(`Are you sure you want to rollback to release ${releaseId}? This will immediately update the live public site.`)) {
+  if (confirm(`Are you sure you want to rollback to release ${releaseId}? This will immediately restore the snapshot and redeploy the live public site.`)) {
     try {
       const res = await apiFetch(`/releases/${releaseId}/rollback`, { method: 'POST' });
-      alert(res.message);
+      let details = res.message;
+      if (res.cloudflare && res.cloudflare.deployUrl) {
+        details += `\nCloudflare Pages deployed: ${res.cloudflare.deployUrl}`;
+      }
+      alert(details);
+
+      const topVersionEl = document.getElementById('top-release-version');
+      if (topVersionEl && res.activePointer) {
+        topVersionEl.innerText = `Active: ${res.activePointer.version} (${res.activePointer.hash})`;
+      }
+
       renderReleasesView(document.getElementById('main-content-view'));
     } catch (err) {
       alert(`Rollback failed: ${err.message}`);
@@ -1894,11 +2123,14 @@ async function renderMediaView(container) {
               <div class="text-[11px] text-slate-500">Allowed formats: PNG, JPG, WEBP, SVG &bull; Maximum file size: 5 MB</div>
             </div>
           </div>
-          <div class="flex items-center gap-3">
-            <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.svg" class="text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#1565C0] file:text-white hover:file:bg-[#0052CC] file:cursor-pointer" />
-            <button onclick="handleMediaUploadSubmit()" id="media-upload-btn" class="text-xs font-bold bg-[#003366] hover:bg-[#002244] text-white px-4 py-2 rounded-xl shadow">
-              Upload
-            </button>
+          <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <input type="text" id="media-upload-alt" placeholder="Alt text description..." class="w-full sm:w-48 text-xs p-2 border border-slate-200 rounded-lg bg-white" />
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+              <input type="file" id="media-upload-input" accept=".png,.jpg,.jpeg,.webp,.svg" class="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#1565C0] file:text-white hover:file:bg-[#0052CC] file:cursor-pointer" />
+              <button onclick="handleMediaUploadSubmit()" id="media-upload-btn" class="text-xs font-bold bg-[#003366] hover:bg-[#002244] text-white px-4 py-2 rounded-xl shadow shrink-0">
+                Upload
+              </button>
+            </div>
           </div>
         </div>
         <div id="media-upload-status" class="mt-2 text-xs font-semibold hidden"></div>
@@ -1912,18 +2144,26 @@ async function renderMediaView(container) {
           return `
             <div class="admin-card p-3 flex flex-col justify-between group hover:shadow-md transition">
               <div class="h-32 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center relative p-2">
-                <img src="${item.path}" alt="${item.name}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition" loading="lazy" />
+                <img src="${item.path}" alt="${(item.alt || item.name).replace(/"/g, '&quot;')}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition" loading="lazy" />
                 <span class="absolute top-2 right-2 text-[9px] bg-slate-900/70 text-white font-mono px-1.5 py-0.5 rounded">
                   ${sizeKb} KB
                 </span>
               </div>
               <div class="mt-3">
                 <div class="font-bold text-xs text-[#003366] truncate" title="${item.name}">${item.name}</div>
-                <div class="text-[10px] text-slate-400 font-mono truncate mb-3">${item.path}</div>
-                <div class="flex items-center justify-between">
-                  <span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">${item.category}</span>
-                  <button onclick="copyMediaAssetUrl('${item.path}', this)" class="text-[10px] font-bold text-[#1565C0] hover:text-[#0052CC] bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded">
+                <div class="text-[10px] text-slate-400 font-mono truncate mb-2">${item.path}</div>
+                <div class="mb-2">
+                  <input type="text" id="media-alt-${item.name}" value="${(item.alt || '').replace(/"/g, '&quot;')}" placeholder="Alternative text (Alt)..." class="w-full text-[10px] p-1.5 border border-slate-200 rounded bg-slate-50" />
+                </div>
+                <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+                  <button onclick="saveMediaAlt('${item.name}')" class="text-[10px] font-bold text-[#1565C0] hover:underline">
+                    Save Alt
+                  </button>
+                  <button onclick="copyMediaAssetUrl('${item.path}', this)" class="text-[10px] font-bold text-[#1565C0] hover:text-[#0052CC] bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded">
                     Copy URL
+                  </button>
+                  <button onclick="deleteMediaAsset('${item.name}')" class="text-[10px] font-bold text-rose-600 hover:underline">
+                    Delete
                   </button>
                 </div>
               </div>
@@ -1952,8 +2192,10 @@ async function handleMediaUploadSubmit() {
   }
 
   const file = input.files[0];
+  const alt = document.getElementById('media-upload-alt')?.value || '';
   const formData = new FormData();
   formData.append('file', file);
+  if (alt) formData.append('alt', alt);
 
   btn.innerText = 'Uploading...';
   btn.disabled = true;
@@ -1972,6 +2214,8 @@ async function handleMediaUploadSubmit() {
       statusEl.innerText = `Asset '${data.filename}' uploaded successfully!`;
       statusEl.className = 'mt-2 text-xs font-semibold text-emerald-600 block';
       input.value = '';
+      const altInput = document.getElementById('media-upload-alt');
+      if (altInput) altInput.value = '';
       setTimeout(() => {
         renderMediaView(document.getElementById('main-content-view'));
       }, 1000);
@@ -1985,6 +2229,32 @@ async function handleMediaUploadSubmit() {
   } finally {
     btn.innerText = 'Upload';
     btn.disabled = false;
+  }
+}
+
+async function saveMediaAlt(filename) {
+  const input = document.getElementById(`media-alt-${filename}`);
+  if (!input) return;
+  const alt = input.value.trim();
+  try {
+    await apiFetch(`/media/${filename}`, {
+      method: 'PUT',
+      body: JSON.stringify({ alt })
+    });
+    alert(`Alt text saved for '${filename}'!`);
+  } catch (err) {
+    alert(`Failed to save alt text: ${err.message}`);
+  }
+}
+
+async function deleteMediaAsset(filename) {
+  if (confirm(`Are you sure you want to delete '${filename}'? This action cannot be undone.`)) {
+    try {
+      await apiFetch(`/media/${filename}`, { method: 'DELETE' });
+      renderMediaView(document.getElementById('main-content-view'));
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`);
+    }
   }
 }
 

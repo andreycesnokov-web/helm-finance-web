@@ -20,7 +20,8 @@ const ContentStore = require('../engine/contentStore');
 
 const targetEmail = process.argv[2] ? process.argv[2].trim().toLowerCase() : null;
 
-const store = new ContentStore(path.join(__dirname, '../data'));
+const dataDir = process.env.CMS_DATA_DIR || path.join(__dirname, '../data');
+const store = new ContentStore(dataDir);
 const users = store.getUsers();
 
 let owner = users.find(u => u.role === 'owner');

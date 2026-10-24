@@ -473,10 +473,11 @@ function createPublicRoutes(contentStore) {
     const t = getT(locale);
     const page = contentStore.getPage('home');
     const heroBlock = page?.blocks?.find(b => b.type === 'hero') || {};
-    const heroTitle = (locale === 'en' && heroBlock.title) ? heroBlock.title : t.hero.title;
-    const heroSubtitle = (locale === 'en' && heroBlock.subtitle) ? heroBlock.subtitle : t.hero.subtitle;
-    const heroBadge = (locale === 'en' && heroBlock.badge) ? heroBlock.badge : t.hero.badge;
-    const heroPrimaryCta = (locale === 'en' && heroBlock.primary_cta_text) ? heroBlock.primary_cta_text : t.hero.primary_cta;
+    const pageTrans = page?.translations?.[locale] || {};
+    const heroTitle = locale === 'en' ? (heroBlock.title || pageTrans.title || t.hero.title) : (pageTrans.title || t.hero.title);
+    const heroSubtitle = locale === 'en' ? (heroBlock.subtitle || pageTrans.subtitle || t.hero.subtitle) : (pageTrans.subtitle || t.hero.subtitle);
+    const heroBadge = locale === 'en' ? (heroBlock.badge || pageTrans.badge || t.hero.badge) : (pageTrans.badge || t.hero.badge);
+    const heroPrimaryCta = locale === 'en' ? (heroBlock.primary_cta_text || pageTrans.primary_cta_text || t.hero.primary_cta) : (pageTrans.primary_cta_text || t.hero.primary_cta);
 
     const articles = contentStore.getHubArticles().slice(0, 3);
     const seo = contentStore.getSeo();
@@ -2113,7 +2114,17 @@ function createPublicRoutes(contentStore) {
     if (!locales.some(l => l.code === locale)) return res.redirect('/id/about');
 
     const t = getT(locale);
-    const ab = t.about_page;
+    const page = contentStore.getPage('about');
+    const pageTrans = page?.translations?.[locale] || {};
+    const ab = {
+      ...t.about_page,
+      ...(pageTrans.heading ? { heading: pageTrans.heading } : {}),
+      ...(pageTrans.subheading ? { subheading: pageTrans.subheading } : {}),
+      ...(pageTrans.badge ? { badge: pageTrans.badge } : {}),
+      ...(pageTrans.support_email ? { contact_support_email: pageTrans.support_email } : {}),
+      ...(pageTrans.sales_email ? { contact_sales_email: pageTrans.sales_email } : {}),
+      ...(pageTrans.admin_email ? { contact_admin_email: pageTrans.admin_email } : {})
+    };
     const title = `${ab.heading} — CFO AI`;
     const description = ab.subheading;
     const canonical = `https://cfo-ai.site/${locale}/about`;

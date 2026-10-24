@@ -10,28 +10,101 @@ const PricingGuard = require('./pricingGuard');
 
 class ContentStore {
   constructor(dataDir) {
-    this.dataDir = dataDir || path.join(__dirname, '../data');
+    this.defaultBaselineDir = path.join(__dirname, '../data');
+    this.dataDir = dataDir || process.env.CMS_DATA_DIR || this.defaultBaselineDir;
     this.releasesDir = path.join(this.dataDir, 'releases');
     this.auditLogPath = path.join(this.dataDir, 'audit_logs.json');
     this.activeReleasePath = path.join(this.dataDir, 'active_release.json');
-    this.pricingGuard = new PricingGuard(path.join(this.dataDir, 'billing_catalog_reference.json'));
+    this.mediaDir = process.env.CMS_MEDIA_DIR || path.join(this.dataDir, 'media');
+    this.mediaMetaPath = path.join(this.dataDir, 'media_metadata.json');
+
+    if (!fs.existsSync(this.dataDir)) {
+      fs.mkdirSync(this.dataDir, { recursive: true });
+    }
 
     if (!fs.existsSync(this.releasesDir)) {
       fs.mkdirSync(this.releasesDir, { recursive: true });
     }
 
+    if (!fs.existsSync(this.mediaDir)) {
+      fs.mkdirSync(this.mediaDir, { recursive: true });
+    }
+
+    // Auto-seed persistent volume if custom mounted volume is empty
+    this.seedFromBaseline();
+
+    this.pricingGuard = new PricingGuard(path.join(this.dataDir, 'billing_catalog_reference.json'));
+
     this.ensureInitialized();
+  }
+
+  seedFromBaseline() {
+    if (path.resolve(this.dataDir) === path.resolve(this.defaultBaselineDir)) {
+      return; // Already using repository baseline data directory
+    }
+
+    if (!fs.existsSync(this.defaultBaselineDir)) {
+      return;
+    }
+
+    const baselineFiles = fs.readdirSync(this.defaultBaselineDir);
+    for (const file of baselineFiles) {
+      if (file.endsWith('.json')) {
+        const destPath = path.join(this.dataDir, file);
+        if (!fs.existsSync(destPath)) {
+          const srcPath = path.join(this.defaultBaselineDir, file);
+          try {
+            fs.copyFileSync(srcPath, destPath);
+            console.log(`[ContentStore] Seeded persistent volume with baseline: ${file}`);
+          } catch (err) {
+            console.error(`[ContentStore] Failed to seed ${file}:`, err.message);
+          }
+        }
+      }
+    }
+
+    // Seed baseline releases if releases directory is empty
+    const baselineReleasesDir = path.join(this.defaultBaselineDir, 'releases');
+    if (fs.existsSync(baselineReleasesDir)) {
+      const releaseFiles = fs.readdirSync(baselineReleasesDir);
+      for (const rf of releaseFiles) {
+        const destRf = path.join(this.releasesDir, rf);
+        if (!fs.existsSync(destRf)) {
+          try {
+            fs.copyFileSync(path.join(baselineReleasesDir, rf), destRf);
+          } catch (e) {}
+        }
+      }
+    }
   }
 
   readJson(filename) {
     const fullPath = path.join(this.dataDir, filename);
     if (!fs.existsSync(fullPath)) return null;
-    return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+    try {
+      return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+    } catch (err) {
+      console.error(`[ContentStore] Error reading JSON from ${filename}:`, err.message);
+      return null;
+    }
   }
 
   writeJson(filename, data) {
     const fullPath = path.join(this.dataDir, filename);
-    fs.writeFileSync(fullPath, JSON.stringify(data, null, 2), 'utf8');
+    const tmpPath = `${fullPath}.tmp.${Date.now()}.${Math.random().toString(36).substr(2, 6)}`;
+    try {
+      fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+      fs.renameSync(tmpPath, fullPath);
+    } catch (err) {
+      // Fallback if atomic rename fails on certain network file systems
+      try {
+        fs.writeFileSync(fullPath, JSON.stringify(data, null, 2), 'utf8');
+      } finally {
+        if (fs.existsSync(tmpPath)) {
+          try { fs.unlinkSync(tmpPath); } catch (e) {}
+        }
+      }
+    }
   }
 
   ensureInitialized() {
@@ -254,6 +327,29 @@ class ContentStore {
     this.writeJson('navigation.json', navData);
     this.logAudit(user, 'update_navigation', 'navigation', {});
     return navData;
+  }
+
+  // --- MEDIA METADATA MANAGEMENT ---
+  getMediaMetadata() {
+    return this.readJson('media_metadata.json') || {};
+  }
+
+  saveMediaMetadata(metadata, user = 'editor') {
+    this.writeJson('media_metadata.json', metadata);
+    this.logAudit(user, 'update_media_metadata', 'media', {});
+    return metadata;
+  }
+
+  updateMediaItemMetadata(filename, itemData, user = 'editor') {
+    const meta = this.getMediaMetadata();
+    meta[filename] = {
+      ...(meta[filename] || {}),
+      ...itemData,
+      updated_at: new Date().toISOString()
+    };
+    this.writeJson('media_metadata.json', meta);
+    this.logAudit(user, 'update_media_item', `media:${filename}`, { alt: itemData.alt });
+    return meta[filename];
   }
 
   // --- INTEGRATIONS MANAGEMENT ---

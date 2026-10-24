@@ -1,0 +1,36 @@
+# ==============================================================================
+# CFO AI — MARKETING CMS & STUDIO SERVICE (cfo-ai-cms)
+# Dedicated Production Container for https://admin.cfo-ai.site
+# Completely isolated from SaaS application core (app.cfo-ai.site)
+# ==============================================================================
+
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+
+# System dependencies for health monitoring
+RUN apk add --no-cache ca-certificates curl
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy application code
+COPY cms/ ./cms/
+COPY website-design/ ./website-design/
+
+# Runtime environment defaults
+ENV NODE_ENV=production
+ENV PORT=3002
+ENV CMS_DATA_DIR=/data/cms
+ENV CMS_MEDIA_DIR=/data/media
+
+# Ensure persistent mount paths exist
+RUN mkdir -p /data/cms /data/media
+
+EXPOSE 3002
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3002/health || exit 1
+
+CMD ["node", "cms/server/index.js"]

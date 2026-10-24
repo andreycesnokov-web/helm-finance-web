@@ -62,8 +62,7 @@ class CloudflarePublisher {
         }
 
         // Extract deployment URL if present in wrangler output
-        const urlMatch = stdout.match(/https:\/\/[a-zA-Z0-9-]+\.cfo-ai-marketing\.pages\.dev/) ||
-                         stdout.match(/https:\/\/cfo-ai-marketing\.pages\.dev/);
+        const urlMatch = stdout.match(/https:\/\/[a-zA-Z0-9.-]+\.pages\.dev/);
         const deployUrl = urlMatch ? urlMatch[0] : 'https://cfo-ai.site';
 
         resolve({

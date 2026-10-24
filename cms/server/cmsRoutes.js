@@ -660,36 +660,36 @@ function createCmsRoutes(contentStore) {
   router.get('/media', requireCmsAuth, (req, res) => {
     const screensDir = path.join(__dirname, '../../website-design/assets/screens');
     const brandDir = path.join(__dirname, '../../website-design/assets/brand');
+    const mediaDir = contentStore.mediaDir;
+    const meta = contentStore.getMediaMetadata();
     const media = [];
+    const seenFiles = new Set();
 
-    if (fs.existsSync(screensDir)) {
-      fs.readdirSync(screensDir).forEach(file => {
-        if (!file.startsWith('.')) {
-          const stat = fs.statSync(path.join(screensDir, file));
-          media.push({
-            name: file,
-            path: `/assets/screens/${file}`,
-            category: 'Screenshots',
-            size: stat.size,
-            updated_at: stat.mtime
-          });
-        }
-      });
+    function addFilesFromDir(dir, category, urlPrefix) {
+      if (fs.existsSync(dir)) {
+        fs.readdirSync(dir).forEach(file => {
+          if (!file.startsWith('.') && !seenFiles.has(file)) {
+            seenFiles.add(file);
+            try {
+              const stat = fs.statSync(path.join(dir, file));
+              media.push({
+                name: file,
+                path: `${urlPrefix}/${file}`,
+                category,
+                size: stat.size,
+                alt: meta[file]?.alt || '',
+                updated_at: stat.mtime
+              });
+            } catch (e) {}
+          }
+        });
+      }
     }
 
-    if (fs.existsSync(brandDir)) {
-      fs.readdirSync(brandDir).forEach(file => {
-        if (!file.startsWith('.')) {
-          const stat = fs.statSync(path.join(brandDir, file));
-          media.push({
-            name: file,
-            path: `/assets/brand/${file}`,
-            category: 'Brand & Logos',
-            size: stat.size,
-            updated_at: stat.mtime
-          });
-        }
-      });
+    addFilesFromDir(screensDir, 'Screenshots', '/assets/screens');
+    addFilesFromDir(brandDir, 'Brand & Logos', '/assets/brand');
+    if (mediaDir && mediaDir !== screensDir) {
+      addFilesFromDir(mediaDir, 'Uploads', '/assets/screens');
     }
 
     res.json(media);
@@ -725,6 +725,15 @@ function createCmsRoutes(contentStore) {
         }
       }
 
+      // Mirror to persistent contentStore.mediaDir if different from upload dir
+      if (contentStore.mediaDir && contentStore.mediaDir !== screensUploadDir) {
+        try {
+          fs.copyFileSync(req.file.path, path.join(contentStore.mediaDir, req.file.filename));
+        } catch (copyErr) {
+          console.warn('Could not mirror uploaded file to persistent media dir:', copyErr.message);
+        }
+      }
+
       // Also mirror to dist_marketing if it exists
       const distScreensDir = path.join(__dirname, '../../dist_marketing/assets/screens');
       if (fs.existsSync(distScreensDir)) {
@@ -735,9 +744,16 @@ function createCmsRoutes(contentStore) {
         }
       }
 
+      // Save alt text metadata if provided
+      const altText = req.body && req.body.alt ? String(req.body.alt).trim() : '';
+      if (altText) {
+        contentStore.updateMediaItemMetadata(req.file.filename, { alt: altText }, req.cmsUser.email);
+      }
+
       contentStore.logAudit(req.cmsUser.email, 'upload_media', `media:${req.file.filename}`, {
         size: req.file.size,
-        path: `/assets/screens/${req.file.filename}`
+        path: `/assets/screens/${req.file.filename}`,
+        alt: altText
       });
 
       res.json({
@@ -745,9 +761,37 @@ function createCmsRoutes(contentStore) {
         message: 'File uploaded successfully.',
         filename: req.file.filename,
         path: `/assets/screens/${req.file.filename}`,
-        size: req.file.size
+        size: req.file.size,
+        alt: altText
       });
     });
+  });
+
+  router.put('/media/:filename', requireCmsAuth, requireCmsRole(['owner', 'editor']), (req, res) => {
+    const filename = path.basename(req.params.filename);
+    const { alt } = req.body;
+    const updated = contentStore.updateMediaItemMetadata(filename, { alt: alt || '' }, req.cmsUser.email);
+    res.json({ success: true, filename, metadata: updated });
+  });
+
+  router.delete('/media/:filename', requireCmsAuth, requireCmsRole(['owner']), (req, res) => {
+    const filename = path.basename(req.params.filename);
+    const screensPath = path.join(screensUploadDir, filename);
+    const persistentPath = contentStore.mediaDir ? path.join(contentStore.mediaDir, filename) : null;
+    let deleted = false;
+
+    if (fs.existsSync(screensPath)) {
+      try { fs.unlinkSync(screensPath); deleted = true; } catch (e) {}
+    }
+    if (persistentPath && fs.existsSync(persistentPath)) {
+      try { fs.unlinkSync(persistentPath); deleted = true; } catch (e) {}
+    }
+
+    if (deleted) {
+      contentStore.logAudit(req.cmsUser.email, 'delete_media', `media:${filename}`, {});
+      return res.json({ success: true, message: `Media '${filename}' deleted.` });
+    }
+    res.status(404).json({ error: 'Media file not found.' });
   });
 
   // --- AUDIT LOGS & USERS ---

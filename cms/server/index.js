@@ -72,6 +72,15 @@ function createApp() {
   // Mount CMS REST API
   app.use('/api/cms', createCmsRoutes(contentStore));
 
+  // If accessing from admin domain or running in admin-dedicated mode, redirect root to /admin
+  app.get('/', (req, res, next) => {
+    const host = (req.headers.host || req.hostname || '').toLowerCase();
+    if (host.startsWith('admin.') || process.env.CMS_MODE === 'admin') {
+      return res.redirect(302, '/admin');
+    }
+    next();
+  });
+
   // Mount Public Website & Knowledge Hub SSR Router
   app.use('/', createPublicRoutes(contentStore));
 
