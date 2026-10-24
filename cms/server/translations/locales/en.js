@@ -2,9 +2,9 @@ module.exports = {
   "nav": {
     "home": "Home",
     "platform": "Platform",
-    "doc_intelligence": "Documents",
-    "compliance": "Compliance",
-    "hub": "Guides",
+    "doc_intelligence": "Document Intelligence",
+    "compliance": "Tax & Compliance",
+    "hub": "Knowledge Hub",
     "help": "Help",
     "pricing": "Pricing",
     "about": "About",

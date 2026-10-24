@@ -2,9 +2,9 @@ module.exports = {
   "nav": {
     "home": "Beranda",
     "platform": "Platform",
-    "doc_intelligence": "Dokumen",
-    "compliance": "Pajak",
-    "hub": "Panduan",
+    "doc_intelligence": "Intelijen Dokumen",
+    "compliance": "Pajak & Kepatuhan",
+    "hub": "Knowledge Hub",
     "help": "Bantuan",
     "pricing": "Harga",
     "about": "Tentang",

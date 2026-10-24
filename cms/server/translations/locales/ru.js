@@ -2,8 +2,8 @@ module.exports = {
   "nav": {
     "home": "Главная",
     "platform": "Платформа",
-    "doc_intelligence": "Документы",
-    "compliance": "Налоги",
+    "doc_intelligence": "Анализ документов",
+    "compliance": "Налоги и комплаенс",
     "hub": "База знаний",
     "help": "Помощь",
     "pricing": "Тарифы",

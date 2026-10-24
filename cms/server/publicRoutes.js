@@ -174,26 +174,17 @@ function createPublicRoutes(contentStore) {
 
   <!-- TOP ANNOUNCEMENT BAR (Dark -> Luminous Navy -> Dark Gradient) -->
   <div class="bg-navy-brand text-white py-2 px-4 text-center text-xs font-semibold tracking-wide border-b border-blue-900/60 shadow-sm">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-      <div class="flex-1 text-center truncate">
+    <div class="max-w-7xl mx-auto flex items-center justify-center">
+      <div class="text-center truncate">
         <span>${t.announcement.text}</span>
         <a href="/${locale}/blog/coretax-pmk-81-2024-transition-guide" class="ml-2 underline font-bold hover:text-blue-200">${t.announcement.link_text} &rarr;</a>
-      </div>
-      <!-- Language Switcher in Header (Compact Active Locales Only) -->
-      <div class="hidden sm:flex items-center gap-1.5 text-xs text-blue-100 ml-4 shrink-0">
-        <svg class="w-3.5 h-3.5 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-        <select onchange="switchLanguage(this.value)" class="bg-[#042C53] text-white text-xs rounded px-2 py-0.5 border border-blue-400/50 focus:outline-none cursor-pointer" aria-label="Select language">
-          <option value="en" ${locale === 'en' ? 'selected' : ''}>English (EN)</option>
-          <option value="id" ${locale === 'id' ? 'selected' : ''}>Bahasa Indonesia (ID)</option>
-          <option value="ru" ${locale === 'ru' ? 'selected' : ''}>Русский (RU)</option>
-        </select>
       </div>
     </div>
   </div>
 
   <!-- NAVIGATION HEADER (White with crisp border, 35% increased official logo) -->
   <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#CBD5E1]">
-    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-22 flex items-center justify-between gap-2.5 lg:gap-4 xl:gap-6">
+    <div class="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-6 2xl:px-8 h-20 sm:h-22 flex items-center justify-between gap-2 xl:gap-3 2xl:gap-6">
       <div class="flex items-center min-w-0">
         <!-- Official Logo increased by 35% on left -->
         <a href="/${locale}" class="flex items-center py-2 shrink-0" aria-label="CFO AI Homepage">
@@ -201,7 +192,7 @@ function createPublicRoutes(contentStore) {
         </a>
 
         <!-- Desktop Navigation shifted slightly right (xl:flex avoids 1024px crowding across EN/ID/RU) -->
-        <nav class="hidden xl:flex items-center gap-2 xl:gap-2.5 2xl:gap-4 text-xs xl:text-sm font-semibold text-[#06366B] ml-3.5 xl:ml-5 2xl:ml-8">
+        <nav class="hidden xl:flex items-center gap-1.5 xl:gap-2 2xl:gap-3.5 text-xs xl:text-[13px] 2xl:text-sm font-semibold text-[#06366B] ml-2 xl:ml-3 2xl:ml-6 shrink-0">
           <a href="/${locale}" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'home' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.home}</a>
           <a href="/${locale}/platform" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'platform' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.platform}</a>
           <a href="/${locale}/document-intelligence" class="whitespace-nowrap hover:text-[#318FF4] transition-colors ${activeTab === 'doc' ? 'text-[#318FF4] font-bold' : ''}">${t.nav.doc_intelligence}</a>
@@ -297,7 +288,7 @@ function createPublicRoutes(contentStore) {
           <div class="flex items-center gap-2.5">
             <img src="/assets/brand/logo_dark_bg_white_text.svg" alt="CFO AI Indonesia" class="h-7 w-auto rounded">
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed max-w-xs">
+          <p class="text-sm text-slate-300 leading-relaxed max-w-xs">
             ${t.footer.about_text}
           </p>
         </div>
@@ -344,7 +335,7 @@ function createPublicRoutes(contentStore) {
         <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-center md:text-left">
           <span class="font-medium text-slate-300">${t.footer.copyright}</span>
           <span class="hidden md:inline text-slate-600">&bull;</span>
-          <span class="max-w-xl text-slate-400">${t.footer.disclaimer}</span>
+          <span class="max-w-xl text-slate-300 text-xs sm:text-[13px]">${t.footer.disclaimer}</span>
         </div>
         <button onclick="scrollToTop()" class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 min-h-[32px]" aria-label="${t.footer.back_to_top}">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
@@ -511,19 +502,19 @@ function createPublicRoutes(contentStore) {
           <h1 class="text-4xl sm:text-6xl font-black text-[#06366B] tracking-tight max-w-4xl mx-auto mb-6 leading-tight">
             ${heroTitle}
           </h1>
-          <p class="text-base sm:text-lg text-[#042C53] max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p class="text-lg sm:text-xl text-[#042C53] max-w-3xl mx-auto mb-10 leading-relaxed">
             ${heroSubtitle}
           </p>
 
           <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
-            <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-8 py-4 rounded-xl shadow-lg transition-all min-h-[44px] flex items-center justify-center">
+            <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto text-sm sm:text-base font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-8 py-4 rounded-xl shadow-lg transition-all min-h-[44px] flex items-center justify-center">
               ${heroPrimaryCta}
             </a>
-            <a href="/${locale}/platform" class="w-full sm:w-auto text-sm font-bold bg-white hover:bg-slate-50 text-[#06366B] border border-[#CBD5E1] px-8 py-4 rounded-xl transition-all min-h-[44px] flex items-center justify-center shadow-sm">
+            <a href="/${locale}/platform" class="w-full sm:w-auto text-sm sm:text-base font-bold bg-white hover:bg-slate-50 text-[#06366B] border border-[#CBD5E1] px-8 py-4 rounded-xl transition-all min-h-[44px] flex items-center justify-center shadow-sm">
               ${t.hero.secondary_cta} &rarr;
             </a>
           </div>
-          <div class="text-xs text-slate-600 font-medium">
+          <div class="text-sm text-slate-600 font-medium">
             ${t.hero.disclaimer}
           </div>
 
@@ -532,22 +523,22 @@ function createPublicRoutes(contentStore) {
             <div class="bento-card p-4 sm:p-5">
               <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.runway_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-[#06366B] font-mono-num">${t.kpis.runway_val}</div>
-              <div class="text-xs sm:text-sm text-emerald-800 font-bold mt-1">${t.kpis.runway_sub}</div>
+              <div class="text-sm text-emerald-800 font-bold mt-1">${t.kpis.runway_sub}</div>
             </div>
             <div class="bento-card p-4 sm:p-5">
               <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.net_flow_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-[#06366B] font-mono-num">${t.kpis.net_flow_val}</div>
-              <div class="text-xs sm:text-sm text-emerald-800 font-bold mt-1">${t.kpis.net_flow_sub}</div>
+              <div class="text-sm text-emerald-800 font-bold mt-1">${t.kpis.net_flow_sub}</div>
             </div>
             <div class="bento-card p-4 sm:p-5">
               <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.recon_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-[#06366B] font-mono-num">${t.kpis.recon_val}</div>
-              <div class="text-xs sm:text-sm text-[#1768C9] font-bold mt-1">${t.kpis.recon_sub}</div>
+              <div class="text-sm text-[#1768C9] font-bold mt-1">${t.kpis.recon_sub}</div>
             </div>
             <div class="bento-card p-4 sm:p-5">
               <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">${t.kpis.tax_label}</div>
               <div class="text-2xl sm:text-3xl font-black text-emerald-800 font-mono-num">${t.kpis.tax_val}</div>
-              <div class="text-xs sm:text-sm text-slate-700 font-bold mt-1">${t.kpis.tax_sub}</div>
+              <div class="text-sm text-slate-700 font-bold mt-1">${t.kpis.tax_sub}</div>
             </div>
           </div>
 
@@ -578,7 +569,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-16">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.pillars.badge}</span>
             <h2 class="text-3xl sm:text-4xl font-black text-[#06366B] mt-2 mb-4">${t.pillars.heading}</h2>
-            <p class="text-sm text-slate-600">${t.pillars.subheading}</p>
+            <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${t.pillars.subheading}</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -586,10 +577,10 @@ function createPublicRoutes(contentStore) {
               <div class="bento-card p-6 flex flex-col justify-between">
                 <div>
                   <div class="w-10 h-10 rounded-xl bg-blue-50 text-[#1768C9] flex items-center justify-center font-bold text-sm mb-4 font-mono">${p.num}</div>
-                  <h3 class="font-black text-lg text-[#06366B] mb-2">${p.title}</h3>
-                  <p class="text-xs text-slate-600 leading-relaxed mb-6">${p.desc}</p>
+                  <h3 class="font-black text-xl text-[#06366B] mb-2">${p.title}</h3>
+                  <p class="text-sm sm:text-base text-slate-700 leading-relaxed mb-6">${p.desc}</p>
                 </div>
-                <a href="/${locale}/platform" class="text-xs font-bold text-[#1768C9] hover:underline mt-4 inline-block">${p.link} &rarr;</a>
+                <a href="/${locale}/platform" class="text-sm font-bold text-[#1768C9] hover:underline mt-4 inline-block">${p.link} &rarr;</a>
               </div>
             `).join('')}
           </div>
@@ -603,7 +594,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-14">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.personas.badge}</span>
             <h2 class="text-3xl font-black text-[#06366B] mt-2 mb-4">${t.personas.heading}</h2>
-            <p class="text-sm text-slate-600">${t.personas.subheading}</p>
+            <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${t.personas.subheading}</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -612,8 +603,8 @@ function createPublicRoutes(contentStore) {
                 ${c.badge ? `<div class="absolute -top-3 left-6 bg-[#1768C9] text-white text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded">${c.badge}</div>` : ''}
                 <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider block mb-2">${c.role}</span>
                 <h3 class="text-xl font-black text-[#06366B] mb-3">${c.title}</h3>
-                <p class="text-xs text-slate-600 leading-relaxed mb-6">${c.desc}</p>
-                <ul class="text-xs space-y-2 text-slate-700">
+                <p class="text-sm sm:text-base text-slate-700 leading-relaxed mb-6">${c.desc}</p>
+                <ul class="text-sm space-y-2.5 text-slate-700">
                   ${c.bullets.map(b => `<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#1768C9] shrink-0"></span>${b}</li>`).join('')}
                 </ul>
               </div>
@@ -628,7 +619,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-16">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.scenarios.badge}</span>
             <h2 class="text-3xl font-black text-[#06366B] mt-2 mb-4">${t.scenarios.heading}</h2>
-            <p class="text-sm text-slate-600">${t.scenarios.subheading}</p>
+            <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${t.scenarios.subheading}</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -636,11 +627,11 @@ function createPublicRoutes(contentStore) {
               <div class="bento-card p-6 flex flex-col justify-between">
                 <div>
                   <div class="text-xs font-bold text-[#1768C9] mb-1 font-mono">${s.location}</div>
-                  <h3 class="font-black text-base text-[#06366B] mb-1">${s.company}</h3>
+                  <h3 class="font-black text-lg text-[#06366B] mb-1">${s.company}</h3>
                   <div class="text-xs sm:text-sm text-slate-600 italic mb-4">${s.profile}</div>
-                  <p class="text-xs text-slate-600 leading-relaxed mb-6">"${s.quote}"</p>
+                  <p class="text-sm sm:text-base text-slate-700 leading-relaxed mb-6">"${s.quote}"</p>
                 </div>
-                <div class="border-t border-slate-100 pt-4 text-xs sm:text-sm text-emerald-800 font-semibold">
+                <div class="border-t border-slate-100 pt-4 text-sm sm:text-[15px] text-emerald-800 font-semibold">
                   ${s.outcome}
                 </div>
               </div>
@@ -655,14 +646,14 @@ function createPublicRoutes(contentStore) {
           <div class="text-center mb-12">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.faqs.badge}</span>
             <h2 class="text-3xl font-black text-[#06366B] mt-2 mb-3">${t.faqs.heading}</h2>
-            <p class="text-sm text-slate-600">${t.faqs.subheading}</p>
+            <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${t.faqs.subheading}</p>
           </div>
 
           <div class="space-y-4 text-left">
             ${t.faqs.items.map(f => `
               <div class="bento-card p-6">
-                <h3 class="font-black text-sm text-[#06366B] mb-2">${f.q}</h3>
-                <p class="text-xs text-slate-600 leading-relaxed">${f.a}</p>
+                <h3 class="font-black text-base sm:text-lg text-[#06366B] mb-2">${f.q}</h3>
+                <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${f.a}</p>
               </div>
             `).join('')}
           </div>
@@ -677,7 +668,7 @@ function createPublicRoutes(contentStore) {
               <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">KNOWLEDGE HUB</span>
               <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-1">Authoritative Indonesian Tax &amp; Finance Guides</h2>
             </div>
-            <a href="/${locale}/blog" class="text-xs font-bold text-[#1768C9] hover:underline mt-4 sm:mt-0">
+            <a href="/${locale}/blog" class="text-xs sm:text-sm font-bold text-[#1768C9] hover:underline mt-4 sm:mt-0">
               Browse all 12 guides &rarr;
             </a>
           </div>
@@ -695,11 +686,11 @@ function createPublicRoutes(contentStore) {
                     <h3 class="font-black text-base text-[#06366B] mb-2 leading-snug">
                       <a href="/${locale}/blog/${art.slug}" class="hover:text-[#1768C9]">${trans.title || art.slug}</a>
                     </h3>
-                    <p class="text-xs text-slate-600 line-clamp-3 leading-relaxed mb-6">
+                    <p class="text-sm sm:text-base text-slate-700 line-clamp-3 leading-relaxed mb-6">
                       ${trans.excerpt || ''}
                     </p>
                   </div>
-                  <div class="border-t border-slate-100 pt-4 flex items-center justify-between text-xs text-slate-500">
+                  <div class="border-t border-slate-100 pt-4 flex items-center justify-between text-xs sm:text-sm text-slate-500">
                     <span>${art.author?.name}</span>
                     <a href="/${locale}/blog/${art.slug}" class="font-bold text-[#1768C9] hover:underline">Read &rarr;</a>
                   </div>
@@ -717,13 +708,13 @@ function createPublicRoutes(contentStore) {
             ${renderWatermark({ color: '#FFFFFF', opacity: '0.035', size: 'w-64 h-64', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
             <div class="max-w-3xl mx-auto relative z-10">
               <h2 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight mb-1.5 text-white">${t.cta_section.heading}</h2>
-              <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-3.5 leading-normal sm:leading-relaxed">${t.cta_section.subheading}</p>
+              <p class="text-sm sm:text-base text-slate-200 max-w-xl mx-auto mb-3.5 leading-relaxed">${t.cta_section.subheading}</p>
               <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
+                <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-sm sm:text-base font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
                   ${t.hero.primary_cta} &rarr;
                 </a>
               </div>
-              <div class="text-xs sm:text-sm text-slate-600 mt-2 font-medium">${t.cta_section.note}</div>
+              <div class="text-xs sm:text-sm text-slate-300 mt-2 font-medium">${t.cta_section.note}</div>
             </div>
           </div>
         </div>
@@ -809,7 +800,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${cw.eyebrow}</span>
             <h2 class="text-2xl sm:text-4xl font-black text-[#06366B] mt-2 mb-3 tracking-tight">${cw.heading}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto leading-relaxed">${cw.subheading}</p>
+            <p class="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">${cw.subheading}</p>
           </div>
 
           <!-- LEVEL 1: INPUT & INTERACTION CHANNELS -->
@@ -853,8 +844,8 @@ function createPublicRoutes(contentStore) {
                           ${ch.status}
                         </span>
                       </div>
-                      <div class="text-[11px] font-medium text-slate-500 mb-2">${ch.subtitle}</div>
-                      <p class="text-xs text-slate-600 line-clamp-2 leading-snug">${ch.example}</p>
+                      <div class="text-xs font-medium text-slate-500 mb-2">${ch.subtitle}</div>
+                      <p class="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-snug">${ch.example}</p>
                     </div>
                     <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-[#1768C9]">
                       <span>${ui.inspect_flow || 'Inspect flow'}</span>
@@ -894,7 +885,7 @@ function createPublicRoutes(contentStore) {
                       <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${ui.level_2_pill || 'AI Suggests • User Confirms'}</span>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black text-[#06366B] tracking-tight">${cw.intelligence_engine.title}</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">${cw.intelligence_engine.subtitle}</p>
+                    <p class="text-sm sm:text-base text-slate-600 mt-0.5">${cw.intelligence_engine.subtitle}</p>
                   </div>
                 </div>
                 <div class="shrink-0 flex items-center gap-2">
@@ -911,9 +902,9 @@ function createPublicRoutes(contentStore) {
                   <div class="bg-slate-50/80 rounded-xl border border-slate-200/80 p-4 hover:bg-slate-50 transition-colors">
                     <div class="flex items-center gap-2 mb-2">
                       <span class="w-6 h-6 rounded-full bg-[#1768C9] text-white font-mono font-bold text-xs flex items-center justify-center shrink-0">0${capIdx + 1}</span>
-                      <h4 class="text-xs font-bold text-[#06366B] leading-tight">${cap.title}</h4>
+                      <h4 class="text-xs sm:text-sm font-bold text-[#06366B] leading-tight">${cap.title}</h4>
                     </div>
-                    <p class="text-[11px] text-slate-600 leading-relaxed">${cap.desc}</p>
+                    <p class="text-xs text-slate-600 leading-relaxed">${cap.desc}</p>
                   </div>
                 `).join('')}
               </div>
@@ -1131,7 +1122,7 @@ function createPublicRoutes(contentStore) {
         <div class="max-w-7xl mx-auto text-center relative z-10">
           <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.platform.badge}</span>
           <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4">${t.platform.heading}</h1>
-          <p class="text-sm text-slate-700 max-w-2xl mx-auto mb-10">${t.platform.subheading}</p>
+          <p class="text-base sm:text-lg text-slate-700 max-w-2xl mx-auto mb-10 leading-relaxed">${t.platform.subheading}</p>
         </div>
       </section>
 
@@ -1144,7 +1135,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-14">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.platform.how_it_works_badge || 'END-TO-END BUSINESS WORKFLOWS'}</span>
             <h2 class="text-2xl sm:text-4xl font-black text-[#06366B] mt-1.5 mb-3">${t.platform.how_it_works_heading}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto leading-relaxed">${t.platform.how_it_works_subheading}</p>
+            <p class="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">${t.platform.how_it_works_subheading}</p>
           </div>
 
           <!-- 3 Workflows -->
@@ -1159,7 +1150,7 @@ function createPublicRoutes(contentStore) {
                       <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-100 text-[#06366B] border border-slate-200">${wf.badge}</span>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black text-[#06366B] tracking-tight">${wf.title}</h3>
-                    <p class="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl leading-relaxed">${wf.desc}</p>
+                    <p class="text-sm sm:text-base text-slate-700 mt-1 max-w-3xl leading-relaxed">${wf.desc}</p>
                   </div>
                   <div class="shrink-0">
                     <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
@@ -1191,7 +1182,7 @@ function createPublicRoutes(contentStore) {
                           </div>
                           <span class="text-[10px] font-bold text-[#1768C9] uppercase tracking-wider block mb-1">${st.label}</span>
                           <h4 class="text-sm font-black text-[#06366B] mb-2 leading-snug">${st.title}</h4>
-                          <p class="text-xs text-slate-600 leading-relaxed">${st.desc}</p>
+                          <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">${st.desc}</p>
                         </div>
                         
                         ${!isLast ? `
@@ -1215,7 +1206,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-12">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">PRIMARY INTERFACE SHOWCASE</span>
             <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-1 mb-2">${t.platform.primary_heading}</h2>
-            <p class="text-xs text-slate-600">${t.platform.primary_subheading}</p>
+            <p class="text-sm sm:text-base text-slate-600 leading-relaxed">${t.platform.primary_subheading}</p>
           </div>
 
           <div class="space-y-16">
@@ -1231,7 +1222,7 @@ function createPublicRoutes(contentStore) {
                         <span class="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${t.platform.authentic_tag}</span>
                       </div>
                       <h3 class="text-2xl font-black text-[#06366B] mb-3">${mod.title}</h3>
-                      <p class="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">${mod.desc}</p>
+                      <p class="text-sm sm:text-base text-slate-700 leading-relaxed mb-6">${mod.desc}</p>
                       <button onclick="openLightbox('${m.img}', '${mod.title}', '${mod.desc.replace(/'/g, "\\'")}', '${t.platform.authentic_tag}')" class="inline-flex items-center gap-2 text-xs font-bold text-[#1768C9] hover:underline cursor-pointer min-h-[44px]">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/></svg>
                         <span>${t.platform.click_to_enlarge} &rarr;</span>
@@ -1268,7 +1259,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-12">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">SPECIALIZED MODULES</span>
             <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-1 mb-2">${t.platform.secondary_heading}</h2>
-            <p class="text-xs text-slate-600">${t.platform.secondary_subheading}</p>
+            <p class="text-sm sm:text-base text-slate-600 leading-relaxed">${t.platform.secondary_subheading}</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -1282,7 +1273,7 @@ function createPublicRoutes(contentStore) {
                       <span class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">${t.platform.authentic_tag}</span>
                     </div>
                     <h3 class="font-black text-lg text-[#06366B] mb-2">${mod.title}</h3>
-                    <p class="text-xs text-slate-600 leading-relaxed mb-6">${mod.desc}</p>
+                    <p class="text-sm sm:text-base text-slate-700 leading-relaxed mb-6">${mod.desc}</p>
                   </div>
 
                   <div class="border-t border-slate-100 pt-4">
@@ -1312,13 +1303,13 @@ function createPublicRoutes(contentStore) {
             ${renderWatermark({ color: '#FFFFFF', opacity: '0.035', size: 'w-64 h-64', className: 'absolute -right-8 -bottom-8 pointer-events-none select-none z-0' })}
             <div class="max-w-3xl mx-auto relative z-10">
               <h2 class="text-lg sm:text-xl md:text-2xl font-black tracking-tight mb-1.5 text-white">${t.cta_section.heading}</h2>
-              <p class="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto mb-3.5 leading-normal sm:leading-relaxed">${t.cta_section.subheading}</p>
+              <p class="text-sm sm:text-base text-slate-200 max-w-xl mx-auto mb-3.5 leading-relaxed">${t.cta_section.subheading}</p>
               <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
+                <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto inline-flex items-center justify-center text-sm sm:text-base font-bold bg-[#1768C9] hover:bg-[#318FF4] text-white px-6 py-2.5 rounded-xl shadow-md transition-all min-h-[40px]">
                   ${t.hero.primary_cta} &rarr;
                 </a>
               </div>
-              <div class="text-xs sm:text-sm text-slate-600 mt-2 font-medium">${t.cta_section.note}</div>
+              <div class="text-xs sm:text-sm text-slate-300 mt-2 font-medium">${t.cta_section.note}</div>
             </div>
           </div>
         </div>
@@ -1385,8 +1376,8 @@ function createPublicRoutes(contentStore) {
       const rows = capabilities.map(r => `
         <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-colors">
           <td class="p-3.5 sm:p-4 font-semibold text-[#06366B]">
-            <div class="font-bold text-xs">${r.name}</div>
-            ${r.desc ? `<div class="text-[11px] text-slate-500 font-normal leading-tight mt-0.5">${r.desc}</div>` : ''}
+            <div class="font-bold text-xs sm:text-sm">${r.name}</div>
+            ${r.desc ? `<div class="text-xs sm:text-[13px] text-slate-600 font-normal leading-snug mt-0.5">${r.desc}</div>` : ''}
           </td>
           <td class="p-3.5 sm:p-4 text-center">
             ${renderCell(r.starter)}
@@ -1419,8 +1410,8 @@ function createPublicRoutes(contentStore) {
       const rows = quotas.map(r => `
         <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-colors">
           <td class="p-3.5 sm:p-4 font-semibold text-[#06366B]">
-            <div class="font-bold text-xs">${r.name}</div>
-            ${r.desc ? `<div class="text-[11px] text-slate-500 font-normal leading-tight mt-0.5">${r.desc}</div>` : ''}
+            <div class="font-bold text-xs sm:text-sm">${r.name}</div>
+            ${r.desc ? `<div class="text-xs sm:text-[13px] text-slate-600 font-normal leading-snug mt-0.5">${r.desc}</div>` : ''}
           </td>
           <td class="p-3.5 sm:p-4 text-center">
             ${renderCell(r.starter)}
@@ -1456,12 +1447,12 @@ function createPublicRoutes(contentStore) {
         <div class="max-w-7xl mx-auto text-center relative z-10">
           <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.badge}</span>
           <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4 tracking-tight">${pPage.heading}</h1>
-          <p class="text-sm sm:text-base text-slate-700 max-w-2xl mx-auto mb-8 leading-relaxed">${pPage.subheading || pPage.subheadline}</p>
+          <p class="text-base sm:text-lg text-slate-700 max-w-2xl mx-auto mb-8 leading-relaxed">${pPage.subheading || pPage.subheadline}</p>
 
           <!-- VALUE PILLS -->
           <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-14 max-w-4xl mx-auto">
             ${(pPage.pills || []).map(pill => `
-              <div class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-[#CBD5E1] shadow-xs text-xs font-semibold text-[#06366B]">
+              <div class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-[#CBD5E1] shadow-xs text-xs sm:text-sm font-semibold text-[#06366B]">
                 <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                 <span>${pill}</span>
               </div>
@@ -1479,19 +1470,19 @@ function createPublicRoutes(contentStore) {
                     <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">${pPage.trial_badge}</span>
                   </div>
                   <h3 class="text-xl font-black text-[#06366B] mb-2">${p.outcome}</h3>
-                  <p class="text-xs text-slate-600 mb-6 leading-relaxed">${p.desc}</p>
+                  <p class="text-sm sm:text-base text-slate-700 mb-6 leading-relaxed">${p.desc}</p>
                   
                   <div class="flex items-baseline gap-1 mb-4">
                     <span class="text-4xl font-black text-[#06366B] font-mono-num plan-price">${p.price_val}</span>
                     <span class="text-xs text-slate-500 plan-interval">${pPage.per_month}</span>
                   </div>
 
-                  <div class="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-xs text-[#06366B] font-semibold mb-6 flex items-center gap-2">
+                  <div class="p-3 rounded-xl bg-blue-50/60 border border-blue-100 text-xs sm:text-sm text-[#06366B] font-semibold mb-6 flex items-center gap-2">
                     <svg class="w-4 h-4 text-[#1768C9] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     <span>${p.limits_highlight}</span>
                   </div>
 
-                  <ul class="space-y-2.5 text-xs text-slate-700 mb-8">
+                  <ul class="space-y-3 text-sm sm:text-[15px] text-slate-700 mb-8">
                     ${p.benefits.map(b => `
                       <li class="flex items-start gap-2.5">
                         <svg class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
@@ -1513,7 +1504,7 @@ function createPublicRoutes(contentStore) {
             <div class="text-center mb-10 max-w-3xl mx-auto">
               <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.team_workflow.eyebrow}</span>
               <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.team_workflow.title}</h2>
-              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.team_workflow.subtitle}</p>
+              <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${pPage.team_workflow.subtitle}</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1525,7 +1516,7 @@ function createPublicRoutes(contentStore) {
                       <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">${s.phase}</span>
                     </div>
                     <h3 class="text-lg font-black text-[#06366B] mb-2">${s.title}</h3>
-                    <p class="text-sm text-slate-700 leading-relaxed">
+                    <p class="text-sm sm:text-base text-slate-700 leading-relaxed">
                   ${s.desc}</p>
                   </div>
                 </div>
@@ -1538,7 +1529,7 @@ function createPublicRoutes(contentStore) {
             <div class="text-center mb-10 max-w-3xl mx-auto">
               <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.platform_foundation.eyebrow}</span>
               <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.platform_foundation.title}</h2>
-              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.platform_foundation.subtitle}</p>
+              <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${pPage.platform_foundation.subtitle}</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1547,8 +1538,8 @@ function createPublicRoutes(contentStore) {
                   <div class="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1768C9] mb-3 shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                   </div>
-                  <h4 class="font-bold text-xs sm:text-sm text-[#06366B] mb-1.5">${item.title}</h4>
-                  <p class="text-xs text-slate-600 leading-relaxed">${item.desc}</p>
+                  <h4 class="font-bold text-base text-[#06366B] mb-1.5">${item.title}</h4>
+                  <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${item.desc}</p>
                 </div>
               `).join('')}
             </div>
@@ -1559,7 +1550,7 @@ function createPublicRoutes(contentStore) {
             <div class="text-center mb-8 max-w-3xl mx-auto">
               <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">COMPREHENSIVE PLAN COMPARISON</span>
               <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.comparison.title}</h2>
-              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.comparison.subtitle}</p>
+              <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${pPage.comparison.subtitle}</p>
             </div>
 
             <!-- LEVEL A: BUSINESS CAPABILITIES TABLE -->
@@ -1570,7 +1561,7 @@ function createPublicRoutes(contentStore) {
               </div>
 
               <div class="bento-card overflow-x-auto shadow-sm rounded-2xl bg-white border border-[#CBD5E1]">
-                <table class="w-full text-xs text-left border-collapse min-w-[680px]">
+                <table class="w-full text-xs sm:text-sm text-left border-collapse min-w-[680px]">
                   <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B]">
                       <th class="p-4 text-left font-bold text-xs uppercase tracking-wider w-2/5">${pPage.comparison.th_feature}</th>
@@ -1611,7 +1602,7 @@ function createPublicRoutes(contentStore) {
                 </span>
               </summary>
               <div class="border-t border-slate-200 overflow-x-auto">
-                <table class="w-full text-xs text-left border-collapse min-w-[680px]">
+                <table class="w-full text-xs sm:text-sm text-left border-collapse min-w-[680px]">
                   <thead>
                     <tr class="bg-slate-50 border-b border-slate-200 text-[#06366B]">
                       <th class="p-4 text-left font-bold text-xs uppercase tracking-wider w-2/5">${pPage.comparison.th_quota}</th>
@@ -1642,7 +1633,7 @@ function createPublicRoutes(contentStore) {
             <div class="text-center mb-10 max-w-3xl mx-auto">
               <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${pPage.connected_channels.eyebrow}</span>
               <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.connected_channels.title}</h2>
-              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.connected_channels.subtitle}</p>
+              <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${pPage.connected_channels.subtitle}</p>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
@@ -1658,10 +1649,10 @@ function createPublicRoutes(contentStore) {
                       </span>
                     </div>
                     <div class="flex items-baseline gap-1.5 mb-1">
-                      <h4 class="font-bold text-xs sm:text-sm text-[#06366B]">${ch.name}</h4>
+                      <h4 class="font-bold text-sm text-[#06366B]">${ch.name}</h4>
                     </div>
                     <div class="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded inline-block mb-2">${ch.type}</div>
-                    <p class="text-xs text-slate-600 mb-4 leading-relaxed">${ch.desc}</p>
+                    <p class="text-xs sm:text-sm text-slate-700 mb-4 leading-relaxed">${ch.desc}</p>
                   </div>
                   <div class="pt-3 border-t border-slate-100 text-[11px] font-semibold text-[#1768C9] flex items-center gap-1.5">
                     <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -1670,7 +1661,7 @@ function createPublicRoutes(contentStore) {
                 </div>
               `).join('')}
             </div>
-            <p class="text-xs text-slate-500 text-center max-w-2xl mx-auto">${pPage.connected_channels.hint}</p>
+            <p class="text-xs sm:text-sm text-slate-500 text-center max-w-2xl mx-auto">${pPage.connected_channels.hint}</p>
           </div>
 
           <!-- SOFTWARE SUBSCRIPTION VS PROFESSIONAL ACCOUNTING SERVICES NOTICE -->
@@ -1679,7 +1670,7 @@ function createPublicRoutes(contentStore) {
               <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">${pPage.accountant_notice.eyebrow}</span>
             </div>
             <h3 class="text-xl sm:text-2xl font-black text-[#06366B] mb-2">${pPage.accountant_notice.title}</h3>
-            <p class="text-xs sm:text-sm text-slate-700 font-semibold mb-6 p-3 bg-white border border-slate-200 rounded-xl leading-relaxed">
+            <p class="text-sm sm:text-base text-slate-700 font-semibold mb-6 p-4 bg-white border border-slate-200 rounded-xl leading-relaxed">
               ${pPage.accountant_notice.statement}
             </p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1687,9 +1678,9 @@ function createPublicRoutes(contentStore) {
                 <div class="p-4 bg-white rounded-xl border border-slate-200">
                   <div class="flex items-center gap-2 mb-1.5">
                     <span class="text-xs font-mono font-bold text-[#1768C9] bg-blue-50 px-2 py-0.5 rounded">${d.num}</span>
-                    <h4 class="font-bold text-xs sm:text-sm text-[#06366B]">${d.title}</h4>
+                    <h4 class="font-bold text-sm sm:text-base text-[#06366B]">${d.title}</h4>
                   </div>
-                  <p class="text-xs text-slate-600 leading-relaxed">${d.desc}</p>
+                  <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">${d.desc}</p>
                 </div>
               `).join('')}
             </div>
@@ -1700,19 +1691,19 @@ function createPublicRoutes(contentStore) {
             <div class="text-center mb-10 max-w-3xl mx-auto">
               <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">FREQUENTLY ASKED QUESTIONS</span>
               <h2 class="text-2xl sm:text-3xl font-black text-[#06366B] mt-2 mb-2 tracking-tight">${pPage.faqs.title}</h2>
-              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">${pPage.faqs.subtitle}</p>
+              <p class="text-base sm:text-lg text-slate-600 leading-relaxed">${pPage.faqs.subtitle}</p>
             </div>
 
             <div class="space-y-3">
               ${pPage.faqs.items.map((item, idx) => `
                 <details class="group bg-white rounded-xl border border-[#CBD5E1] p-4 sm:p-5 transition-all hover:border-blue-300 shadow-2xs" data-faq-index="${idx}">
-                  <summary class="flex items-center justify-between cursor-pointer font-bold text-xs sm:text-sm text-[#06366B] select-none list-none">
+                  <summary class="flex items-center justify-between cursor-pointer font-bold text-sm sm:text-base text-[#06366B] select-none list-none">
                     <span class="pr-4 leading-snug">${item.q}</span>
                     <span class="shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 group-open:bg-blue-50 group-open:text-[#1768C9] transition-transform group-open:rotate-180">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </span>
                   </summary>
-                  <div class="mt-3 pt-3 border-t border-slate-100 text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  <div class="mt-3 pt-3 border-t border-slate-100 text-sm sm:text-base text-slate-700 leading-relaxed">
                     ${item.a}
                   </div>
                 </details>
@@ -1726,8 +1717,8 @@ function createPublicRoutes(contentStore) {
             <div class="relative z-10">
               <span class="text-[10px] font-black uppercase tracking-wider text-[#1768C9] bg-blue-50 px-3 py-1 rounded-full mb-3 inline-block">CUSTOM MULTI-ENTITY DEPLOYMENT</span>
               <h3 class="text-xl sm:text-2xl font-black text-[#06366B] mb-2.5">${pPage.custom_enterprise_title}</h3>
-              <p class="text-xs sm:text-sm text-[#475569] max-w-xl mx-auto mb-6 leading-relaxed">${pPage.custom_enterprise_desc}</p>
-              <a href="mailto:enterprise@cfo-ai.site" data-track-cta="pricing-enterprise-contact" class="inline-flex items-center justify-center text-xs sm:text-sm font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-7 py-3.5 rounded-xl shadow-sm transition-all min-h-[44px]">
+              <p class="text-sm sm:text-base text-[#475569] max-w-xl mx-auto mb-6 leading-relaxed">${pPage.custom_enterprise_desc}</p>
+              <a href="mailto:enterprise@cfo-ai.site" data-track-cta="pricing-enterprise-contact" class="inline-flex items-center justify-center text-sm sm:text-base font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-7 py-3.5 rounded-xl shadow-sm transition-all min-h-[44px]">
                 ${pPage.custom_enterprise_btn} &rarr;
               </a>
             </div>
@@ -1774,7 +1765,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-3xl mx-auto mb-12">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">CFO AI KNOWLEDGE HUB</span>
             <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4">Indonesian Tax &amp; Finance Authority</h1>
-            <p class="text-sm text-slate-700 leading-relaxed">
+            <p class="text-base sm:text-lg text-slate-700 leading-relaxed">
               Clear, practical regulatory and operational intelligence for PT and PT PMA business directors, in-house finance teams, and licensed Konsultan Pajak.
             </p>
           </div>
@@ -1805,7 +1796,7 @@ function createPublicRoutes(contentStore) {
                       <h3 class="font-black text-lg text-[#06366B] mb-3 leading-snug">
                         <a href="/${locale}/blog/${art.slug}" class="hover:text-[#1768C9]">${trans.title || art.slug}</a>
                       </h3>
-                      <p class="text-xs text-slate-600 line-clamp-3 leading-relaxed mb-6">
+                      <p class="text-sm sm:text-base text-slate-700 line-clamp-3 leading-relaxed mb-6">
                         ${trans.excerpt || ''}
                       </p>
                     </div>
@@ -1828,7 +1819,7 @@ function createPublicRoutes(contentStore) {
           <!-- 9 UPCOMING TOPIC BRIEFS -->
           <div>
             <h2 class="text-xl font-black text-[#06366B] mb-2">Operational Library &amp; Executive Briefs</h2>
-            <p class="text-xs text-slate-600 mb-6">Curated compliance memoranda prepared by our tax and finance research team.</p>
+            <p class="text-sm text-slate-600 mb-6">Curated compliance memoranda prepared by our tax and finance research team.</p>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               ${briefs.map(b => `
@@ -1838,7 +1829,7 @@ function createPublicRoutes(contentStore) {
                     <span>${b.reading_time_minutes} min</span>
                   </div>
                   <h3 class="font-bold text-sm text-[#06366B] mb-2">${b.title}</h3>
-                  <p class="text-xs text-slate-600 leading-relaxed line-clamp-2">${b.summary}</p>
+                  <p class="text-sm text-slate-700 leading-relaxed line-clamp-2">${b.summary}</p>
                 </div>
               `).join('')}
             </div>
@@ -1904,7 +1895,7 @@ function createPublicRoutes(contentStore) {
               ${trans.title}
             </h1>
 
-            <p class="text-base sm:text-lg text-slate-700 leading-relaxed mb-8 border-l-4 border-[#1768C9] pl-4 italic">
+            <p class="text-lg sm:text-xl text-slate-700 leading-relaxed mb-8 border-l-4 border-[#1768C9] pl-4 italic">
               ${trans.excerpt}
             </p>
 
@@ -1926,7 +1917,7 @@ function createPublicRoutes(contentStore) {
           </header>
 
           <!-- BODY CONTENT -->
-          <div class="prose prose-slate max-w-none text-slate-700 text-sm leading-relaxed space-y-6">
+          <div class="prose prose-slate max-w-none text-slate-800 text-[17px] sm:text-lg leading-[1.7] space-y-6">
             ${(trans.content_markdown || trans.body_markdown || '').split('\n\n').map(p => {
               if (p.startsWith('# ')) return '';
               if (p.startsWith('## ')) return `<h2 class="text-2xl font-black text-[#06366B] pt-6 pb-2 border-b border-slate-100">${p.replace('## ', '')}</h2>`;
@@ -1945,7 +1936,7 @@ function createPublicRoutes(contentStore) {
             <div class="bento-card p-6 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-6">
               <div>
                 <h4 class="font-black text-sm text-[#06366B] mb-1">Automate Indonesian Tax &amp; Cash Flow Workflows</h4>
-                <p class="text-xs text-slate-600">CFO AI automates PPh 21 TER, bank reconciliation, and CoreTax readiness for your company.</p>
+                <p class="text-sm text-slate-600">CFO AI automates PPh 21 TER, bank reconciliation, and CoreTax readiness for your company.</p>
               </div>
               <a href="https://app.cfo-ai.site/login" class="text-xs font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-6 py-3 rounded-xl shadow-sm whitespace-nowrap min-h-[44px] flex items-center justify-center">
                 Start 7-Day Free Trial &rarr;
@@ -1990,14 +1981,14 @@ function createPublicRoutes(contentStore) {
         <div class="max-w-7xl mx-auto text-center relative z-10">
           <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.doc_page.badge}</span>
           <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4">${t.doc_page.heading}</h1>
-          <p class="text-sm text-slate-700 max-w-2xl mx-auto mb-12">${t.doc_page.subheading}</p>
+          <p class="text-base sm:text-lg text-slate-700 max-w-2xl mx-auto mb-12 leading-relaxed">${t.doc_page.subheading}</p>
 
           <div class="browser-frame max-w-4xl mx-auto mb-16 text-left cursor-zoom-in" onclick="openLightbox('/assets/screens/Documents.png', 'Document Review Drawer', 'Multimodal OCR parsing of Faktur Pajak with DPP, PPN 11%, and QR verification.', 'AUTHENTIC V2 SCREEN')">
             <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
               <span class="font-mono font-bold text-[#06366B]">Verification Workbench — Side-by-Side Review Drawer</span>
               <div class="flex items-center gap-2">
                 <span class="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">100% Tax Line Match</span>
-                <span class="text-[#1768C9] font-bold text-[11px] hover:underline">Click to Enlarge &rarr;</span>
+                <span class="text-[#1768C9] font-bold text-xs hover:underline">Click to Enlarge &rarr;</span>
               </div>
             </div>
             <div class="p-3 sm:p-5 bg-white">
@@ -2008,22 +1999,22 @@ function createPublicRoutes(contentStore) {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left max-w-5xl mx-auto mb-16">
             <div class="bento-card p-6">
               <span class="text-xs font-mono font-bold text-[#1768C9] block mb-2">FEATURE 01</span>
-              <h3 class="font-black text-base text-[#06366B] mb-2">${t.doc_page.faktur_title}</h3>
-              <p class="text-xs text-slate-600 leading-relaxed">${t.doc_page.faktur_desc}</p>
+              <h3 class="font-black text-lg text-[#06366B] mb-2">${t.doc_page.faktur_title}</h3>
+              <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${t.doc_page.faktur_desc}</p>
             </div>
             <div class="bento-card p-6">
               <span class="text-xs font-mono font-bold text-[#1768C9] block mb-2">FEATURE 02</span>
-              <h3 class="font-black text-base text-[#06366B] mb-2">${t.doc_page.intake_title}</h3>
-              <p class="text-xs text-slate-600 leading-relaxed">${t.doc_page.intake_desc}</p>
+              <h3 class="font-black text-lg text-[#06366B] mb-2">${t.doc_page.intake_title}</h3>
+              <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${t.doc_page.intake_desc}</p>
             </div>
             <div class="bento-card p-6">
               <span class="text-xs font-mono font-bold text-[#1768C9] block mb-2">FEATURE 03</span>
-              <h3 class="font-black text-base text-[#06366B] mb-2">${t.doc_page.review_title}</h3>
-              <p class="text-xs text-slate-600 leading-relaxed">${t.doc_page.review_desc}</p>
+              <h3 class="font-black text-lg text-[#06366B] mb-2">${t.doc_page.review_title}</h3>
+              <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${t.doc_page.review_desc}</p>
             </div>
           </div>
 
-          <a href="https://app.cfo-ai.site/login" class="inline-block text-xs font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-8 py-3.5 rounded-xl shadow-md min-h-[44px]">
+          <a href="https://app.cfo-ai.site/login" class="inline-block text-sm sm:text-base font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-8 py-3.5 rounded-xl shadow-md min-h-[44px]">
             ${t.hero.primary_cta} &rarr;
           </a>
         </div>
@@ -2064,14 +2055,14 @@ function createPublicRoutes(contentStore) {
         <div class="max-w-7xl mx-auto text-center relative z-10">
           <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${t.tax_page.badge}</span>
           <h1 class="text-3xl sm:text-5xl font-black text-[#06366B] mt-2 mb-4">${t.tax_page.heading}</h1>
-          <p class="text-sm text-slate-700 max-w-2xl mx-auto mb-12">${t.tax_page.subheading}</p>
+          <p class="text-base sm:text-lg text-slate-700 max-w-2xl mx-auto mb-12 leading-relaxed">${t.tax_page.subheading}</p>
 
           <div class="browser-frame max-w-4xl mx-auto mb-16 text-left cursor-zoom-in" onclick="openLightbox('/assets/screens/AccountantTaxes.png', 'Indonesian Tax Radar', 'Calculation worksheets for PPh 21 TER, PPh 23 withholding, and PPN 11% reconciliation.', 'AUTHENTIC V2 SCREEN')">
             <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
               <span class="font-mono font-bold text-[#06366B]">Statutory Tax Worksheets — PPh 21 TER, PPh 23, PPN 11%</span>
               <div class="flex items-center gap-2">
                 <span class="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">Current Period Verified</span>
-                <span class="text-[#1768C9] font-bold text-[11px] hover:underline">Click to Enlarge &rarr;</span>
+                <span class="text-[#1768C9] font-bold text-xs hover:underline">Click to Enlarge &rarr;</span>
               </div>
             </div>
             <div class="p-3 sm:p-5 bg-white">
@@ -2082,22 +2073,22 @@ function createPublicRoutes(contentStore) {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-left max-w-5xl mx-auto mb-16">
             <div class="bento-card p-6">
               <span class="text-xs font-mono font-bold text-[#1768C9] block mb-2">TAX REGIME 01</span>
-              <h3 class="font-black text-base text-[#06366B] mb-2">${t.tax_page.pph21_title}</h3>
-              <p class="text-xs text-slate-600 leading-relaxed">${t.tax_page.pph21_desc}</p>
+              <h3 class="font-black text-lg text-[#06366B] mb-2">${t.tax_page.pph21_title}</h3>
+              <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${t.tax_page.pph21_desc}</p>
             </div>
             <div class="bento-card p-6">
               <span class="text-xs font-mono font-bold text-[#1768C9] block mb-2">TAX REGIME 02</span>
-              <h3 class="font-black text-base text-[#06366B] mb-2">${t.tax_page.pph23_title}</h3>
-              <p class="text-xs text-slate-600 leading-relaxed">${t.tax_page.pph23_desc}</p>
+              <h3 class="font-black text-lg text-[#06366B] mb-2">${t.tax_page.pph23_title}</h3>
+              <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${t.tax_page.pph23_desc}</p>
             </div>
             <div class="bento-card p-6">
               <span class="text-xs font-mono font-bold text-[#1768C9] block mb-2">TAX REGIME 03</span>
-              <h3 class="font-black text-base text-[#06366B] mb-2">${t.tax_page.ppn_title}</h3>
-              <p class="text-xs text-slate-600 leading-relaxed">${t.tax_page.ppn_desc}</p>
+              <h3 class="font-black text-lg text-[#06366B] mb-2">${t.tax_page.ppn_title}</h3>
+              <p class="text-sm sm:text-base text-slate-700 leading-relaxed">${t.tax_page.ppn_desc}</p>
             </div>
           </div>
 
-          <a href="https://app.cfo-ai.site/login" class="inline-block text-xs font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-8 py-3.5 rounded-xl shadow-md min-h-[44px]">
+          <a href="https://app.cfo-ai.site/login" class="inline-block text-sm sm:text-base font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-8 py-3.5 rounded-xl shadow-md min-h-[44px]">
             ${t.hero.primary_cta} &rarr;
           </a>
         </div>
@@ -2156,7 +2147,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-2xl mx-auto mb-10">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${ab.problem_badge || 'THE PROBLEM'}</span>
             <h2 class="font-brand text-2xl sm:text-3xl text-[#021B36] mt-1">${ab.problem_heading}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 mt-2">
+            <p class="text-sm sm:text-base text-slate-600 mt-2 leading-relaxed">
               ${ab.problem_subheading}
             </p>
           </div>
@@ -2167,8 +2158,8 @@ function createPublicRoutes(contentStore) {
                 <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg mb-4">
                   ${idx + 1}
                 </div>
-                <h3 class="font-bold text-sm text-[#021B36] mb-2">${p.title}</h3>
-                <p class="text-sm text-slate-700 leading-relaxed">
+                <h3 class="font-bold text-base sm:text-lg text-[#021B36] mb-2">${p.title}</h3>
+                <p class="text-base text-slate-700 leading-relaxed">
                   ${p.desc}
                 </p>
               </div>
@@ -2183,7 +2174,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-2xl mx-auto mb-12">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${ab.capabilities_badge || 'PRODUCT CAPABILITIES'}</span>
             <h2 class="font-brand text-2xl sm:text-3xl text-[#021B36] mt-1">${ab.capabilities_heading}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 mt-2">
+            <p class="text-sm sm:text-base text-slate-600 mt-2 leading-relaxed">
               ${ab.capabilities_subheading}
             </p>
           </div>
@@ -2198,8 +2189,8 @@ function createPublicRoutes(contentStore) {
                     <div class="w-10 h-10 rounded-xl ${colorClass} flex items-center justify-center font-bold text-sm mb-4">
                       0${idx + 1}
                     </div>
-                    <h3 class="font-bold text-sm text-[#021B36] mb-2">${c.title}</h3>
-                    <p class="text-sm text-slate-700 leading-relaxed">${c.desc}</p>
+                    <h3 class="font-bold text-base sm:text-lg text-[#021B36] mb-2">${c.title}</h3>
+                    <p class="text-base text-slate-700 leading-relaxed">${c.desc}</p>
                   </div>
                 </div>
               `;
@@ -2214,13 +2205,13 @@ function createPublicRoutes(contentStore) {
           <div class="lg:col-span-7 space-y-4">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${ab.local_badge || 'LOCAL FOCUS'}</span>
             <h2 class="font-brand text-2xl sm:text-3xl text-[#021B36]">${ab.local_heading}</h2>
-            <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+            <p class="text-base sm:text-lg text-slate-700 leading-relaxed">
               ${ab.local_p1}
             </p>
-            <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+            <p class="text-base sm:text-lg text-slate-700 leading-relaxed">
               ${ab.local_p2}
             </p>
-            <div class="p-4 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-slate-700 leading-relaxed">
+            <div class="p-4 sm:p-5 rounded-xl bg-blue-50/70 border border-blue-200 text-sm sm:text-base text-slate-700 leading-relaxed">
               ${ab.local_boundary}
             </div>
           </div>
@@ -2243,7 +2234,7 @@ function createPublicRoutes(contentStore) {
           <div class="text-center max-w-2xl mx-auto mb-10">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${ab.security_badge || 'TRUST & GOVERNANCE'}</span>
             <h2 class="font-brand text-2xl sm:text-3xl text-[#021B36] mt-1">${ab.security_heading}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 mt-2">
+            <p class="text-sm sm:text-base text-slate-600 mt-2 leading-relaxed">
               ${ab.security_subheading}
             </p>
           </div>
@@ -2251,8 +2242,8 @@ function createPublicRoutes(contentStore) {
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             ${(ab.security_items || []).map(s => `
               <div class="bento-card p-5">
-                <div class="font-bold text-xs text-[#06366B] mb-2">${s.title}</div>
-                <p class="text-sm text-slate-700 leading-relaxed">
+                <div class="font-bold text-base text-[#06366B] mb-2">${s.title}</div>
+                <p class="text-base text-slate-700 leading-relaxed">
                   ${s.desc}
                 </p>
               </div>
@@ -2267,37 +2258,37 @@ function createPublicRoutes(contentStore) {
           <div class="text-center mb-8">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">${ab.contact_badge || 'GET IN TOUCH'}</span>
             <h2 class="font-brand text-2xl sm:text-3xl text-[#021B36] mt-1">${ab.contact_heading}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 mt-2">
+            <p class="text-sm sm:text-base text-slate-600 mt-2 leading-relaxed">
               ${ab.contact_subheading}
             </p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bento-card p-6 space-y-2">
-              <div class="font-bold text-sm text-[#06366B]">${ab.contact_support_title}</div>
-              <p class="text-sm text-slate-700 leading-relaxed">${ab.contact_support_desc}</p>
-              <div class="text-xs font-bold text-blue-700 font-mono select-all">
+              <div class="font-bold text-base text-[#06366B]">${ab.contact_support_title}</div>
+              <p class="text-base text-slate-700 leading-relaxed">${ab.contact_support_desc}</p>
+              <div class="text-sm font-bold text-blue-700 font-mono select-all">
                 <a href="mailto:${ab.contact_support_email}">${ab.contact_support_email}</a>
               </div>
-              <p class="text-[11px] text-slate-500">${ab.contact_support_time}</p>
+              <p class="text-xs sm:text-sm text-slate-500">${ab.contact_support_time}</p>
             </div>
 
             <div class="bento-card p-6 space-y-2">
-              <div class="font-bold text-sm text-[#06366B]">${ab.contact_sales_title}</div>
-              <p class="text-sm text-slate-700 leading-relaxed">${ab.contact_sales_desc}</p>
-              <div class="text-xs font-bold text-blue-700 font-mono select-all">
+              <div class="font-bold text-base text-[#06366B]">${ab.contact_sales_title}</div>
+              <p class="text-base text-slate-700 leading-relaxed">${ab.contact_sales_desc}</p>
+              <div class="text-sm font-bold text-blue-700 font-mono select-all">
                 <a href="mailto:${ab.contact_sales_email}">${ab.contact_sales_email}</a>
               </div>
-              <p class="text-[11px] text-slate-500">${ab.contact_sales_time}</p>
+              <p class="text-xs sm:text-sm text-slate-500">${ab.contact_sales_time}</p>
             </div>
 
             <div class="bento-card p-6 space-y-2">
-              <div class="font-bold text-sm text-[#06366B]">${ab.contact_admin_title}</div>
-              <p class="text-sm text-slate-700 leading-relaxed">${ab.contact_admin_desc}</p>
-              <div class="text-xs font-bold text-blue-700 font-mono select-all">
+              <div class="font-bold text-base text-[#06366B]">${ab.contact_admin_title}</div>
+              <p class="text-base text-slate-700 leading-relaxed">${ab.contact_admin_desc}</p>
+              <div class="text-sm font-bold text-blue-700 font-mono select-all">
                 <a href="mailto:${ab.contact_admin_email}">${ab.contact_admin_email}</a>
               </div>
-              <p class="text-[11px] text-slate-500">${ab.contact_admin_time}</p>
+              <p class="text-xs sm:text-sm text-slate-500">${ab.contact_admin_time}</p>
             </div>
           </div>
         </div>
@@ -2306,17 +2297,17 @@ function createPublicRoutes(contentStore) {
       <!-- 7. FINAL CTA -->
       <section class="py-16 text-center max-w-4xl mx-auto px-4 sm:px-6">
         <h2 class="font-brand text-2xl sm:text-3xl text-[#021B36] mb-3">Ready for Financial Clarity?</h2>
-        <p class="text-xs sm:text-sm text-slate-600 mb-8 max-w-xl mx-auto">
+        <p class="text-base sm:text-lg text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">
           Start your 7-day free trial today. Organize your cash flow, review transactions, and streamline document management in one unified workspace.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto px-6 py-3 bg-[#1768C9] hover:bg-[#06366B] text-white font-bold text-xs sm:text-sm rounded-xl shadow transition-colors min-h-[44px] flex items-center justify-center">
+          <a href="https://app.cfo-ai.site/login" class="w-full sm:w-auto px-6 py-3 bg-[#1768C9] hover:bg-[#06366B] text-white font-bold text-sm sm:text-base rounded-xl shadow transition-colors min-h-[44px] flex items-center justify-center">
             ${t.nav.trial_cta}
           </a>
-          <a href="/${locale}/platform" class="w-full sm:w-auto px-6 py-3 bg-white border border-slate-300 hover:border-blue-400 text-[#06366B] font-bold text-xs sm:text-sm rounded-xl transition-colors min-h-[44px] flex items-center justify-center">
+          <a href="/${locale}/platform" class="w-full sm:w-auto px-6 py-3 bg-white border border-slate-300 hover:border-blue-400 text-[#06366B] font-bold text-sm sm:text-base rounded-xl transition-colors min-h-[44px] flex items-center justify-center">
             ${t.nav.platform}
           </a>
-          <a href="/${locale}/help" class="w-full sm:w-auto px-6 py-3 text-slate-600 hover:text-blue-600 font-semibold text-xs sm:text-sm transition-colors">
+          <a href="/${locale}/help" class="w-full sm:w-auto px-6 py-3 text-slate-600 hover:text-blue-600 font-semibold text-sm sm:text-base transition-colors">
             ${t.footer.link_help_center || 'Browse Help Center'} &rarr;
           </a>
         </div>
@@ -2389,7 +2380,7 @@ function createPublicRoutes(contentStore) {
           <h1 class="font-brand text-3xl sm:text-5xl text-[#021B36] tracking-tight mb-4">
             ${locale === 'id' ? 'Bagaimana Kami Dapat Membantu Anda?' : locale === 'ru' ? 'Чем мы можем вам помочь?' : 'How Can We Help You Today?'}
           </h1>
-          <p class="text-sm sm:text-base text-slate-600 mb-8 max-w-2xl mx-auto">
+          <p class="text-base sm:text-lg text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">
             ${locale === 'id' ? 'Cari panduan langkah demi langkah, petunjuk rekonsiliasi bank, alur verifikasi dokumen, dan pengaturan sistem.' :
               locale === 'ru' ? 'Ищите пошаговые инструкции по банковской сверке, загрузке чеков, расчету зарплат и настройкам компании.' :
               'Search step-by-step guides, bank import instructions, document review workflows, and workspace settings.'}
@@ -2447,13 +2438,13 @@ function createPublicRoutes(contentStore) {
                   <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wide">${g.category}</span>
                   <span class="text-[10px] text-slate-400 font-mono">${g.readTime}</span>
                 </div>
-                <h3 class="font-bold text-sm text-[#021B36] group-hover:text-blue-600 mt-1 mb-1 transition-colors leading-snug">
+                <h3 class="font-bold text-base text-[#021B36] group-hover:text-blue-600 mt-1 mb-1 transition-colors leading-snug">
                   ${g.title}
                 </h3>
-                <p class="text-xs text-slate-500 leading-relaxed mb-3 line-clamp-2">
+                <p class="text-sm sm:text-base text-slate-600 leading-relaxed mb-3 line-clamp-2">
                   ${g.desc}
                 </p>
-                <span class="text-xs font-semibold text-blue-600 flex items-center gap-1">${locale === 'id' ? 'Baca Panduan' : locale === 'ru' ? 'Читать' : 'Read Guide'} &rarr;</span>
+                <span class="text-xs sm:text-sm font-semibold text-blue-600 flex items-center gap-1">${locale === 'id' ? 'Baca Panduan' : locale === 'ru' ? 'Читать' : 'Read Guide'} &rarr;</span>
               </a>
             `).join('')}
           </div>
@@ -2463,7 +2454,7 @@ function createPublicRoutes(contentStore) {
         <div>
           <div class="mb-6">
             <h2 class="font-brand text-2xl text-[#021B36]">${locale === 'id' ? 'Jelajahi Berdasarkan Kategori' : locale === 'ru' ? 'Категории базы знаний' : 'Browse by Category'}</h2>
-            <p class="text-xs sm:text-sm text-slate-600 mt-1">${locale === 'id' ? 'Seluruh dokumentasi terorganisir rapi menurut domain operasional.' : locale === 'ru' ? 'Все инструкции сгруппированы по функциональным разделам.' : 'Explore all documentation organized across operational domains.'}</p>
+            <p class="text-sm sm:text-base text-slate-600 mt-1 leading-relaxed">${locale === 'id' ? 'Seluruh dokumentasi terorganisir rapi menurut domain operasional.' : locale === 'ru' ? 'Все инструкции сгруппированы по функциональным разделам.' : 'Explore all documentation organized across operational domains.'}</p>
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -2476,12 +2467,12 @@ function createPublicRoutes(contentStore) {
                     0${idx + 1}
                   </div>
                   <div>
-                    <h3 class="font-bold text-sm text-[#021B36]">${trans.name || cat.id}</h3>
-                    <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    <h3 class="font-bold text-base text-[#021B36]">${trans.name || cat.id}</h3>
+                    <p class="text-sm text-slate-600 mt-1 leading-relaxed">
                       ${trans.description || ''}
                     </p>
                   </div>
-                  <ul class="text-xs space-y-1.5 text-blue-700 font-medium pt-2 border-t border-slate-100">
+                  <ul class="text-sm space-y-2 text-blue-700 font-medium pt-2 border-t border-slate-100">
                     ${catArticles.map(a => `
                       <li><a href="${a.url}" class="hover:underline block truncate">&bull; ${a.title}</a></li>
                     `).join('')}
@@ -2499,10 +2490,10 @@ function createPublicRoutes(contentStore) {
             <h3 class="font-brand text-xl text-[#021B36] mt-1 mb-2">
               ${locale === 'id' ? 'Tidak Menemukan yang Anda Cari?' : locale === 'ru' ? 'Не нашли ответ на свой вопрос?' : "Can't Find What You're Looking For?"}
             </h3>
-            <p class="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+            <p class="text-base text-slate-700 leading-relaxed mb-4">
               ${locale === 'id' ? 'Tim spesialis dukungan teknis dan operasional kami siap membantu Anda.' : locale === 'ru' ? 'Наша служба поддержки готова ответить на ваши вопросы и помочь с настройкой.' : 'Our customer support and engineering teams are available to assist with onboarding and workspace questions.'}
             </p>
-            <div class="flex flex-wrap items-center gap-4 text-xs">
+            <div class="flex flex-wrap items-center gap-4 text-xs sm:text-sm">
               <a href="mailto:support@cfo-ai.site" class="inline-flex items-center gap-2 font-bold bg-[#1768C9] hover:bg-[#06366B] text-white px-4 py-2.5 rounded-xl transition">
                 <span>support@cfo-ai.site</span>
               </a>
@@ -2689,19 +2680,19 @@ function createPublicRoutes(contentStore) {
               <h1 class="font-brand text-2xl sm:text-4xl text-[#021B36] tracking-tight leading-tight mb-3">
                 ${trans.title}
               </h1>
-              <p class="text-sm text-slate-600 leading-relaxed">
+              <p class="text-base sm:text-lg text-slate-600 leading-relaxed">
                 ${trans.summary}
               </p>
             </div>
 
             <!-- Section 1: Accomplish & Prerequisites -->
             <section id="what-you-accomplish" class="space-y-3 scroll-mt-24">
-              <h2 class="text-lg font-bold text-[#06366B]">${locale === 'id' ? 'Tujuan & Prasyarat' : locale === 'ru' ? 'Цель и предварительные требования' : 'What You Will Accomplish'}</h2>
-              <p class="text-sm text-slate-700 leading-relaxed">
+              <h2 class="text-xl font-bold text-[#06366B]">${locale === 'id' ? 'Tujuan & Prasyarat' : locale === 'ru' ? 'Цель и предварительные требования' : 'What You Will Accomplish'}</h2>
+              <p class="text-[17px] text-slate-700 leading-relaxed">
                 ${trans.what_you_accomplish}
               </p>
               ${trans.prerequisites && trans.prerequisites.length > 0 ? `
-                <div class="p-4 rounded-xl bg-blue-50/80 border border-blue-200 text-xs text-blue-900 leading-relaxed space-y-1">
+                <div class="p-4 rounded-xl bg-blue-50/80 border border-blue-200 text-sm text-blue-900 leading-relaxed space-y-1.5">
                   <strong>${locale === 'id' ? 'Prasyarat:' : locale === 'ru' ? 'Необходимые условия:' : 'Prerequisites:'}</strong>
                   <ul class="list-disc list-inside space-y-1 text-slate-700 mt-1">
                     ${trans.prerequisites.map(p => `<li>${p}</li>`).join('')}
@@ -2712,14 +2703,14 @@ function createPublicRoutes(contentStore) {
 
             <!-- Section 2: Step-by-Step Instructions -->
             <section id="step-by-step" class="space-y-6 scroll-mt-24">
-              <h2 class="text-lg font-bold text-[#06366B]">${locale === 'id' ? 'Langkah demi Langkah' : locale === 'ru' ? 'Пошаговые действия' : 'Step-by-Step Instructions'}</h2>
+              <h2 class="text-xl font-bold text-[#06366B]">${locale === 'id' ? 'Langkah demi Langkah' : locale === 'ru' ? 'Пошаговые действия' : 'Step-by-Step Instructions'}</h2>
               ${(trans.steps || []).map((st, idx) => `
                 <div class="space-y-2">
                   <div class="flex items-center gap-2">
                     <span class="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 font-mono">${st.step || idx + 1}</span>
-                    <h3 class="font-bold text-sm text-[#021B36]">${st.title}</h3>
+                    <h3 class="font-bold text-base text-[#021B36]">${st.title}</h3>
                   </div>
-                  <p class="text-sm text-slate-700 pl-8 leading-relaxed">
+                  <p class="text-[17px] text-slate-700 pl-8 leading-relaxed">
                     ${st.instruction}
                   </p>
                 </div>
@@ -2739,8 +2730,8 @@ function createPublicRoutes(contentStore) {
 
             <!-- Section 3: Expected Result -->
             <section id="expected-result" class="space-y-3 scroll-mt-24">
-              <h2 class="text-lg font-bold text-[#06366B]">${locale === 'id' ? 'Hasil yang Diharapkan' : locale === 'ru' ? 'Ожидаемый результат' : 'Expected Result'}</h2>
-              <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs sm:text-sm text-emerald-950 leading-relaxed">
+              <h2 class="text-xl font-bold text-[#06366B]">${locale === 'id' ? 'Hasil yang Diharapkan' : locale === 'ru' ? 'Ожидаемый результат' : 'Expected Result'}</h2>
+              <div class="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 text-base text-emerald-950 leading-relaxed">
                 ${trans.expected_result}
               </div>
             </section>
@@ -2748,12 +2739,12 @@ function createPublicRoutes(contentStore) {
             <!-- Section 4: Troubleshooting -->
             ${trans.troubleshooting && trans.troubleshooting.length > 0 ? `
               <section id="troubleshooting" class="space-y-3 scroll-mt-24">
-                <h2 class="text-lg font-bold text-[#06366B]">${locale === 'id' ? 'Kendala Umum & Solusi' : locale === 'ru' ? 'Частые ошибки и решение' : 'Common Errors & Troubleshooting'}</h2>
-                <div class="space-y-3 text-xs sm:text-sm text-slate-700">
+                <h2 class="text-xl font-bold text-[#06366B]">${locale === 'id' ? 'Kendala Umum & Solusi' : locale === 'ru' ? 'Частые ошибки и решение' : 'Common Errors & Troubleshooting'}</h2>
+                <div class="space-y-3 text-base text-slate-700">
                   ${trans.troubleshooting.map(tb => `
                     <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                       <strong class="text-slate-900 block mb-1">&bull; ${tb.error}</strong>
-                      <p class="text-sm text-slate-700 leading-relaxed">${tb.solution}</p>
+                      <p class="text-[16px] text-slate-700 leading-relaxed">${tb.solution}</p>
                     </div>
                   `).join('')}
                 </div>
@@ -2854,7 +2845,7 @@ function createPublicRoutes(contentStore) {
 
     const contentHtml = `
       <section class="py-16 px-4 sm:px-6 lg:px-8 bg-white border-b border-[#CBD5E1]">
-        <div class="max-w-4xl mx-auto text-left text-xs leading-relaxed text-slate-700 space-y-6">
+        <div class="max-w-4xl mx-auto text-left text-base sm:text-[17px] leading-relaxed text-slate-700 space-y-6">
           <div class="border-b border-slate-200 pb-6 mb-8">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">LEGAL &bull; UU PDP COMPLIANCE</span>
             <h1 class="text-3xl font-black text-[#06366B] mt-2">Privacy Policy &amp; Data Protection</h1>
@@ -2925,7 +2916,7 @@ function createPublicRoutes(contentStore) {
 
     const contentHtml = `
       <section class="py-16 px-4 sm:px-6 lg:px-8 bg-white border-b border-[#CBD5E1]">
-        <div class="max-w-4xl mx-auto text-left text-xs leading-relaxed text-slate-700 space-y-6">
+        <div class="max-w-4xl mx-auto text-left text-base sm:text-[17px] leading-relaxed text-slate-700 space-y-6">
           <div class="border-b border-slate-200 pb-6 mb-8">
             <span class="text-xs font-bold text-[#1768C9] uppercase tracking-wider">LEGAL &bull; USER AGREEMENT</span>
             <h1 class="text-3xl font-black text-[#06366B] mt-2">Terms of Service</h1>
