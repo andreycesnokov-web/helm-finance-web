@@ -111,3 +111,18 @@ Local evidence already gathered (disposable GoTrue v2.195.0, Mailpit, no real em
 `tests/passwordAuth.test.js` (11) and the rehearsal `tests/rehearsal/auth_e2e.cjs` cover 1–6 against a real GoTrue;
 forwarding on/off is covered by the rehearsal (see `V2_BILLING_TEST_REPORT.md`). Local evidence does **not** close
 AUTH-CFG-01 — the hosted settings are what production depends on.
+
+Release candidate 2026-10-24 (branch `claude/v2-stabilization-20261024`), NON-production evidence against a real
+GoTrue v2.197.0 behind the candidate backend (local isolated stack, auto-confirm, no mail server):
+- `tests/integration/rcAcceptance/auth-password-http.cjs` (7): neutral registration answer and password rules,
+  `email_not_confirmed` for an unconfirmed account, identical `invalid_credentials` for wrong password and unknown
+  email, the existing email user keeps the same app identity, no Supabase token in any response, logout revokes the
+  server session, reset answers identical for known/unknown addresses, lockout after 10 failures (429, even with the
+  right password).
+- `tests/integration/rcAcceptance/browser-auth-password.cjs` (4): release build screens on desktop and phone,
+  register → "Confirm your email" without a session, wrong/right password, sign-out revokes the token.
+- Fixed in this candidate: `/api/auth/password/forgot` and `/resend` answered 503 when Auth failed to SEND the email
+  (only possible for a real account) and 200 for unknown addresses — account enumeration. They now answer the same
+  and log the failure; a hosted SMTP outage therefore shows in the backend log (`[password-auth] forgot failed`),
+  not to the user. Alert on that log line (runbook Section 10).
+Still required before production (needs the owner): steps 1–8 above on the hosted project with a real test inbox.

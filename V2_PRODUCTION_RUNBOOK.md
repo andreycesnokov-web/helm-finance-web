@@ -114,6 +114,13 @@ Rehearsed end to end on a disposable local stack: `bash tests/rehearsal/run_all.
 | 18 | `supabase/migrations/20261015033808_cfo_commercial_trial.sql` | 8, 042 | `billing_schema_versions` row `20261015033808`, table `billing_accounts` | **no** |
 | 19 | `supabase/migrations/20261017090000_billing_management_center.sql` | 18 | row `20261017090000`, table `billing_overrides` | rehearsal only (refuses if terms would be lost) |
 | 20 | `supabase/migrations/20261017120000_billing_enforcement.sql` | 19 | row `20261017120000`, function `billing_usage` | rehearsal only (refuses if usage exists) |
+| 21 | `supabase/migrations/20261022165230_payroll_runs_receipt_contract_compat.sql` | D4 (15), receipts (5, 13) | table `payroll_runs`, `rpc_payroll_run_action`, `payroll_payments.run_id` | no (forward only; refuses on an evolved receipt contract) |
+| 22 | `supabase/migrations/20261024090000_payroll_bpjs_breakdown.sql` | 21 | `rpc_payroll_run_action` contains `bpjs_kes` | yes: `_down` restores the function of 21 byte for byte |
+| 23 | `supabase/migrations/20261024120000_business_category_pnl_groups.sql` | `cashflow_categories` | table `business_category_pnl_groups`, `fn_business_category_pnl_group_guard` | yes: `_down` drops the table (no other object touched) |
+
+The runner also carries `074` and `20261018090000` (rows 15b/20b in `scripts/migrate-v2.mjs`). **Never apply
+`migrations/20261020163121_payroll_runs_no_cash.sql`**: it is superseded by #21 and aborts on the D4 receipt contract
+(`payroll_receipt_contract_review_required`). Release checklist for this candidate: `V2_RC_20261024_RELEASE_CHECKLIST.md`.
 
 Notes:
 - **073 is mandatory after 072.** 072 alone cancels every `DELETE` on `platform_admins` (orphaned, still-active admin rows after a user is deleted) and allows two concurrent revocations to remove every super_admin. 073 is forward-only and idempotent; it also removes and audits orphans left by 072.
