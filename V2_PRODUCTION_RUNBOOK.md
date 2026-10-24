@@ -117,6 +117,7 @@ Rehearsed end to end on a disposable local stack: `bash tests/rehearsal/run_all.
 | 21 | `supabase/migrations/20261022165230_payroll_runs_receipt_contract_compat.sql` | D4 (15), receipts (5, 13) | table `payroll_runs`, `rpc_payroll_run_action`, `payroll_payments.run_id` | no (forward only; refuses on an evolved receipt contract) |
 | 22 | `supabase/migrations/20261024090000_payroll_bpjs_breakdown.sql` | 21 | `rpc_payroll_run_action` contains `bpjs_kes` | yes: `_down` restores the function of 21 byte for byte |
 | 23 | `supabase/migrations/20261024120000_business_category_pnl_groups.sql` | `cashflow_categories` | table `business_category_pnl_groups`, `fn_business_category_pnl_group_guard` | yes: `_down` drops the table (no other object touched) |
+| 24 | `supabase/migrations/20261024150000_transaction_classifications.sql` | `transactions`, `users` | table `transaction_classifications`, `fn_transaction_classification_guard` | yes: `_down.sql` (drops the table only) |
 
 The runner also carries `074` and `20261018090000` (rows 15b/20b in `scripts/migrate-v2.mjs`). **Never apply
 `migrations/20261020163121_payroll_runs_no_cash.sql`**: it is superseded by #21 and aborts on the D4 receipt contract

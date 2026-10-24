@@ -24,6 +24,7 @@ Applied ONLY with the guarded runner (`node scripts/migrate-v2.mjs --plan`, then
 | 21 | `supabase/migrations/20261022165230_payroll_runs_receipt_contract_compat.sql` | Payroll runs (draft → approve → link bank debit), no cash movement | none (forward only); before go-live only, by restoring the backup into a NEW database |
 | 22 | `supabase/migrations/20261024090000_payroll_bpjs_breakdown.sql` | BPJS Kesehatan / TK JP / TK JHT kept per line | `…_down.sql` restores #21's function byte for byte (existing split rows stay valid) |
 | 23 | `supabase/migrations/20261024120000_business_category_pnl_groups.sql` | Per-company P&L group of shared system categories | `…_down.sql` drops the table only |
+| 24 | `supabase/migrations/20261024150000_transaction_classifications.sql` | Business purpose / accountant review marks of operations (management vs accounting preparation) | `…_down.sql` drops the table only; operations keep their category treatment |
 
 - **Never apply `migrations/20261020163121_payroll_runs_no_cash.sql`** (superseded; aborts on the D4 receipt contract).
 - #21 refuses to run if `payroll_runs` already exists or the receipt contract/reader differs from the inspected one
@@ -72,6 +73,7 @@ Applied ONLY with the guarded runner (`node scripts/migrate-v2.mjs --plan`, then
 | Client regression only | Redeploy the previous client build (build-time flags); backend unchanged. |
 | Backend defect, schema healthy | Roll forward with a fix. Previous signed-off build of the SAME schema generation only; never `dd9b569`/pre-V2 (runbook 9.1). |
 | P&L group overlay misbehaves | Leave data; deploy a backend that ignores the overlay, or run `20261024120000_…_down.sql` (drops only the overlay table; operations of system categories return to Needs review). |
+| Operation classification misbehaves | Leave data; run `20261024150000_…_down.sql` (drops only the marks table; every operation, amount and balance is untouched and P&L returns to category-based treatment) |
 | BPJS split misbehaves | `20261024090000_…_down.sql` restores the compat function; stored split rows remain valid deductions. |
 | Proven data corruption | Runbook 9.3 state D (restore into a NEW database, reconcile writes since the backup). Never `pg_restore --clean` into the live database. |
 

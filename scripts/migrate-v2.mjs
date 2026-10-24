@@ -64,6 +64,7 @@ export const MANIFEST = [
   { file: 'supabase/migrations/20261022165230_payroll_runs_receipt_contract_compat.sql', probes: [table('payroll_runs'), fn('rpc_payroll_run_action'), column('payroll_payments', 'run_id')] },
   { file: 'supabase/migrations/20261024090000_payroll_bpjs_breakdown.sql', probes: [defHas('rpc_payroll_run_action', 'bpjs_kes')] },
   { file: 'supabase/migrations/20261024120000_business_category_pnl_groups.sql', probes: [table('business_category_pnl_groups'), fn('fn_business_category_pnl_group_guard')] },
+  { file: 'supabase/migrations/20261024150000_transaction_classifications.sql', probes: [table('transaction_classifications'), fn('fn_transaction_classification_guard')] },
 ];
 
 // Invariants that must hold after the run (by definition, not by table presence).
@@ -87,10 +88,11 @@ export const POSTFLIGHT = [
       OR has_table_privilege(r.role, 'public.auth_app_sessions', 'SELECT,INSERT,UPDATE,DELETE')
       OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'rpc\\_auth\\_%'
         AND has_function_privilege(r.role, p.oid, 'EXECUTE'))))`],
-  ['payroll and per-company P&L groups are service_role only (closed to anon/authenticated)',
+  ['payroll, per-company P&L groups and operation classifications are service_role only (closed to anon/authenticated)',
     `NOT EXISTS (SELECT 1 FROM unnest(ARRAY['anon','authenticated']) r(role) WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r.role) AND (
       has_table_privilege(r.role, 'public.payroll_runs', 'SELECT,INSERT,UPDATE,DELETE')
       OR has_table_privilege(r.role, 'public.business_category_pnl_groups', 'SELECT,INSERT,UPDATE,DELETE')
+      OR has_table_privilege(r.role, 'public.transaction_classifications', 'SELECT,INSERT,UPDATE,DELETE')
       OR has_function_privilege(r.role, 'public.rpc_payroll_run_action(uuid,bigint,text,jsonb)', 'EXECUTE')))`],
   ['billing schema versions complete', `(SELECT count(*)=4 FROM public.billing_schema_versions WHERE version IN ('20261015033808','20261017090000','20261017120000','20261018090000'))`],
   ['plan publication requires every metered limit to be decided (absent is never unlimited)', defHas('billing_terms_error', 'An undecided metered limit')],

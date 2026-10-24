@@ -32,6 +32,7 @@ export const WRITE_ALLOW = [
   { method: 'POST', path: "'/admin/billing/catalog/'" },
   { method: 'POST', path: "'/admin/billing/companies/'" },
   { method: 'POST', path: "'/accountant/operation-documents/action'" }, // Scoped invoker RPC: link + audit; no money writes.
+  { method: 'PUT', path: '/classification`' }, // PUT /api/transactions/:id/classification — purpose / review mark / note; audited, no money writes.
   { method: 'POST', path: "'/me/avatar'" },
   { method: 'POST', path: "'/business-directions'" },
   { method: 'PATCH', path: '`/business-directions/' },
@@ -232,7 +233,8 @@ t('every allowed write exists on the server (batch 8 routes are the approved one
     /app\.post\('\/api\/documents\/:id\/extract'/, /app\.post\('\/api\/debts'/, /app\.patch\('\/api\/debts\/:id'/,
     /app\.post\('\/api\/counterparties\/:id\/archive'/, /app\.delete\('\/api\/counterparties\/:id\/bank-accounts\/:accountId'/,
     /app\.post\('\/api\/payroll\/employees'/, /app\.patch\('\/api\/payroll\/employees\/:id'/, /app\.delete\('\/api\/payroll\/employees\/:id'/, /app\.post\('\/api\/payroll\/payments'/,
-    /app\.post\('\/api\/wallets\/transfer'/, /app\.post\('\/api\/decisions\/debts\/:id\/payment'/, /app\.post\('\/api\/debts\/:id\/pay'/]) {
+    /app\.post\('\/api\/wallets\/transfer'/, /app\.post\('\/api\/decisions\/debts\/:id\/payment'/, /app\.post\('\/api\/debts\/:id\/pay'/,
+    /app\.put\('\/api\/transactions\/:id\/classification'/]) {
     assert.ok(r.test(server), `server route ${r} missing`)
   }
 })

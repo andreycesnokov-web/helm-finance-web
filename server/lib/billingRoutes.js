@@ -40,12 +40,14 @@ const ROUTES = [
   rule(READ, '/pulse/advanced-insights', need('radar')),
   rule(READ, '/accountant/(?:tax-knowledge/cards|rules|sources|applicability)', need('tax_compliance')),
   // ── Own data and basic views: always readable (incl. tax obligations, deadlines, history, export package) ──
-  rule(READ, '/(?:health|access/status|profile|pulse|transactions|wallets|debts|documents|bank-import|bank-imports|cashflow-categories|classification-rules|counterparties|pnl-mapping|reminders|assets|business-funding|business|team|payroll|incoming-payments|payment-connections|invoices|decisions|withholding-slips|audit)(?:/.*)?', OPEN),
+  rule(READ, '/(?:health|access/status|profile|pulse|transactions|transaction-classifications|wallets|debts|documents|bank-import|bank-imports|cashflow-categories|classification-rules|counterparties|pnl-mapping|reminders|assets|business-funding|business|team|payroll|incoming-payments|payment-connections|invoices|decisions|withholding-slips|audit)(?:/.*)?', OPEN),
   rule(READ, '/accountant/(?:obligations|calendar|tax-calendar|summary|status|profile(?:/requests/[^/]+)?|operation-documents(?:/package)?)', OPEN),
 
   // ── Transactions ──
   rule('POST', '/transactions/batch', meter(['transactions'], 'transactions', { units: rowsOf })),
   rule('PATCH', `/transactions/${ID}`, need('transactions')),
+  // Purpose / accountant review / note of an operation: a mark, not a new operation — never metered.
+  rule('PUT', `/transactions/${ID}/classification`, need('transactions')),
   // ── Accounts ──
   rule('POST', '/wallets/transfer', meter(['accounts'], 'transactions')),
   rule('POST', `/wallets/${ID}/adjust-balance`, meter(['accounts'], 'transactions')),

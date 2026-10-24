@@ -407,6 +407,7 @@ export default {
     done: 'Selesai', notDone: 'belum selesai', seePackages: 'Lihat folder',
     taxesDue: 'Pajak jatuh tempo di {m}', fullCalendar: 'Kalender lengkap', noEvents: 'Tidak ada batas waktu pajak bulan ini.',
     taxNote: 'Batas waktu mengikuti aturan umum (PMK 81/2024); jumlah dari data dan dokumen Anda. Akuntan mengonfirmasi sebelum pembayaran.',
+    prep: { title: 'Persiapan untuk akuntan · bulan ini', operations: 'Transaksi (semua tetap dicatat)', noDocument: 'Tanpa dokumen pendukung', docPending: 'Dokumen menunggu pemeriksaan', personal: 'Ditandai pribadi / non-bisnis', needsReview: 'Ditandai “perlu ditinjau”', reviewed: 'Sudah diperiksa akuntan', note: 'Setiap transaksi tetap ada di catatan dan di kas. Dokumen yang kurang dan tanda pemeriksaan masuk ke paket akuntan (register 11); perlakuan pajak diputuskan akuntan.' },
     stage: { done: 'SPT dilaporkan', paid: 'Dibayar · SPT belum dilapor', overdue: 'Terlambat', calculated: 'Dihitung', todo: 'Disiapkan' },
     pay: { recorded: 'Pembayaran tercatat', overdue: 'Pembayaran belum tercatat, batas bayar lewat', due: 'Pembayaran belum tercatat' },
     file: { filed: 'SPT dilaporkan', overdue: 'SPT belum dilapor, tenggat lewat', due: 'SPT belum dilapor' },
@@ -1002,6 +1003,7 @@ export default {
   },
   txd: {
     reloadFirst: "Muat ulang transaksi sebelum mengedit.",
+    acc: { title: 'Untuk akuntan', purpose: 'Tujuan bisnis', fromCategory: 'Mengikuti kategori (belum diatur)', note: 'Catatan untuk akuntan', reviewed: 'Sudah diperiksa akuntan', reviewedBy: 'oleh {who} pada {d}', taxNote: 'Perlakuan pajak ditentukan oleh akuntan Anda. Struk saja tidak membuat biaya dapat dikurangkan. Jumlah dan kas tidak berubah.', p: { operating: 'Pendapatan atau biaya operasional bisnis', personal: 'Pribadi / non-bisnis (dibayar dari rekening perusahaan)', capital: 'Pembelian aset tetap', non_pnl: 'Pendanaan, transfer atau pergerakan lain di luar laba', needs_review: 'Perlu ditinjau' } },
     desc: 'Deskripsi',
     date: 'Tanggal',
     sameCcy: 'Hanya rekening dengan mata uang sama',

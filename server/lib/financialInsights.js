@@ -25,17 +25,19 @@
  *  `operating_expense` count as operating cash out. Everything else is real money
  *  that moved but is NOT operating performance — it is reported separately as other
  *  cash movement so it can never inflate revenue, OPEX or EBITDA. */
+const { PURPOSE_CLASS } = require('./transactionClassifications');
+
 const CLASSES = [
   'revenue', 'direct_cost', 'operating_expense', 'capex',
   'tax', 'interest', 'financing',
   'opening_balance', 'transfer', 'balance_correction',
-  'other', 'unknown',
+  'other', 'unknown', 'personal',
 ];
 
 /** Classes that are cash movement but never operating performance. */
 const NON_OPERATING = Object.freeze([
   'capex', 'tax', 'interest', 'financing',
-  'opening_balance', 'transfer', 'balance_correction', 'other',
+  'opening_balance', 'transfer', 'balance_correction', 'other', 'personal',
 ]);
 
 /**
@@ -146,6 +148,10 @@ function classifyTransaction(tx, evidence = null) {
   const fundingLimit = evidence && evidence.fundingTx && tx && tx.id != null ? evidence.fundingTx.get(String(tx.id)) : undefined;
   if (fundingLimit !== undefined && (fundingLimit === null || amountOf(tx) <= Number(fundingLimit)))
     return { class: 'financing', matched_on: 'funding_register', needs_review: false };
+  // A business purpose a person set on the operation (lib/transactionClassifications.js) comes next: personal
+  // money paid from a company account is never an operating cost. 'operating' sets no class; the category decides.
+  const purpose = evidence && typeof evidence.purposeOf === 'function' ? evidence.purposeOf(tx) : null;
+  if (purpose && PURPOSE_CLASS[purpose]) return { class: PURPOSE_CLASS[purpose], matched_on: 'business_purpose', needs_review: purpose === 'needs_review' };
   const confirmed = evidence && typeof evidence.categoryOf === 'function' ? GROUP_CLASS[evidence.categoryOf(tx)?.pnl_group] : null;
   if (confirmed && confirmed.types.includes(type)) return { class: confirmed.class, matched_on: 'confirmed_category_group', needs_review: false };
 
@@ -201,7 +207,7 @@ function computeInsights(transactions = [], opts = {}) {
 
   const zero = () => ({
     revenue: 0, direct_costs: 0, opex: 0, capex: 0, tax_expense: 0, interest_expense: 0,
-    unknown: 0, financing: 0, opening_balance: 0, transfer: 0, balance_correction: 0, other: 0,
+    unknown: 0, financing: 0, opening_balance: 0, transfer: 0, balance_correction: 0, other: 0, personal: 0,
   });
   const total = zero();
   const byMonth = new Map();
@@ -214,7 +220,7 @@ function computeInsights(transactions = [], opts = {}) {
     revenue: 'revenue', direct_cost: 'direct_costs', operating_expense: 'opex',
     capex: 'capex', tax: 'tax_expense', interest: 'interest_expense',
     financing: 'financing', opening_balance: 'opening_balance', transfer: 'transfer',
-    balance_correction: 'balance_correction', other: 'other', unknown: 'unknown',
+    balance_correction: 'balance_correction', other: 'other', unknown: 'unknown', personal: 'personal',
   };
 
   for (const t of rows) {
@@ -262,7 +268,8 @@ function computeInsights(transactions = [], opts = {}) {
         tax: b.tax_expense,
         capex: b.capex,
         needs_review: b.unknown,
-        total: b.opening_balance + b.financing + b.transfer + b.balance_correction + b.unknown,
+        personal: b.personal,
+        total: b.opening_balance + b.financing + b.transfer + b.balance_correction + b.unknown + b.personal,
       },
     };
   };

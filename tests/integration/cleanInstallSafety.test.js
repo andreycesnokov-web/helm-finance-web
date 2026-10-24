@@ -41,7 +41,7 @@ test('empty database: baseline + reference data + V2 chain + postflight, clean o
   const r1 = await mod.install({ connectionString: url, mode: 'install', skipStorage: true, log: quiet });
   assert.equal(r1.ok, true, JSON.stringify(r1));
   const step = (r, name) => r.steps.find((s) => s.name.startsWith(name));
-  assert.match(step(r1, 'V2 migration chain').note, /^25 applied/);
+  assert.match(step(r1, 'V2 migration chain').note, /^26 applied/);
   assert.equal(step(r1, 'no customer or test data').note, 'clean');
   const r2 = await mod.install({ connectionString: url, mode: 'install', skipStorage: true, log: quiet });
   assert.equal(r2.ok, true, JSON.stringify(r2)); assert.equal(r2.state, 'INSTALLED');

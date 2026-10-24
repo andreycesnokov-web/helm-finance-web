@@ -605,6 +605,9 @@
 /* Forms */
 .v2-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; min-width: 0; }
 .v2-field-label { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+/* The accounting-preparation section of the transaction window: a plain section, not a boxed form group. */
+.v2-txd-acc { border: 0; border-top: 1px solid var(--border-subtle); margin: 8px 0 0; padding: 12px 0 0; min-width: 0; display: grid; gap: 10px; }
+.v2-txd-acc > legend { float: left; width: 100%; padding: 0; margin: 0 0 4px; }
 .v2-field-row { display: grid; gap: 0 var(--space-3); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .v2-fieldset { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
 .v2-fieldset legend { padding: 0; margin-bottom: 6px; }

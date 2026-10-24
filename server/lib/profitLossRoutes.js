@@ -1,6 +1,7 @@
 'use strict';
 const {buildReport,options}=require('./profitLoss');
 const {loadSystemMapping}=require('./categoryGroups');
+const {loadClassifications}=require('./transactionClassifications');
 const PAGE=500,MAX=25000;
 // Explicit select list: never return document extraction text, bucket paths or credentials.
 const TABLES={
@@ -54,7 +55,9 @@ function install(app,{auth,requireBusiness,canViewBusinessFinance,supabase}) {
       // Shared system categories count only with THIS company's confirmed group (none before the migration).
       const sys=await loadSystemMapping(supabase,biz.business.id,controller.signal);
       input.systemCategories=sys.systemCategories;input.categoryGroups=sys.categoryGroups;
-      res.json({...buildReport(input,{businessId:biz.business.id,...opt}),system_category_mapping:sys.available,read_started_at:started,read_finished_at:new Date().toISOString()});
+      // Business purpose / accountant review marks of THIS company (none before migration 20261024150000).
+      const cls=await loadClassifications(supabase,biz.business.id);input.classifications=[...cls.byTx.values()];
+      res.json({...buildReport(input,{businessId:biz.business.id,...opt}),system_category_mapping:sys.available,transaction_classifications:cls.available,read_started_at:started,read_finished_at:new Date().toISOString()});
     }catch(e){
       controller.abort();
       const code=['report_row_limit','report_changed_during_read','source_read_incomplete'].includes(e.message)?e.message:'profit_loss_unavailable';

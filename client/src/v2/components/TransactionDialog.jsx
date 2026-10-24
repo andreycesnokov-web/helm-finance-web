@@ -1,14 +1,18 @@
 // The transaction window (design w2/D1) — opened by a row in Transactions; replaces the classic
 // list with editing. PATCH /api/transactions/:id through lib/actions (updateTransaction); the
 // server refuses amount / account / date changes for statement rows and bill payments.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { useT, useLang } from '../i18n'
 import { money, shortDate } from '../lib/format'
 import { txSource, txDate } from '../lib/obligations'
 import Modal from './Modal'
-import { updateTransaction } from '../lib/actions'
+import { updateTransaction, classifyOperation } from '../lib/actions'
+import { useApi } from '../data'
+
+// Business purpose for the management view (never a tax decision). '' = not set: the category decides.
+const PURPOSES = ['operating', 'personal', 'capital', 'non_pnl', 'needs_review']
 import { catLabel } from '../lib/categoryLabel'
 import { useWorkspace } from '../../shell/WorkspaceProvider'
 import { canRecordCompanyMoney } from '../lib/financePermissions'
@@ -30,6 +34,13 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], i
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // Accounting preparation marks (GET /api/transaction-classifications): purpose, note, accountant review.
+  const clsApi = useApi('/transaction-classifications')
+  const cls = clsApi.data?.classifications?.find((c) => c.transaction_id === String(tx.id)) || null
+  const clsOn = clsApi.data?.available === true
+  const [cf, setCf] = useState({ purpose: '', note: '', reviewed: false })
+  useEffect(() => { setCf({ purpose: cls?.business_purpose || '', note: cls?.note || '', reviewed: !!cls?.accountant_reviewed_at }) },
+    [cls?.business_purpose, cls?.note, cls?.accountant_reviewed_at])
   const sameCcy = wallets.filter((w) => String(w.currency || 'IDR') === cur)
   const cats = categories.filter((c) => c.group_type === (isIn ? 'inflow' : 'outflow'))
   const save = async () => {
@@ -43,10 +54,21 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], i
       if (f.date && f.date !== String(txDate(tx) || '').slice(0, 10)) body.transaction_date = f.date
       if (f.amount !== '' && Number(f.amount) !== Number(tx.amount_original)) body.amount = Number(f.amount)
     }
-    if (!Object.keys(body).length) { onClose(); return }
-    if (tx.balance_version == null) { setErr(t('txd.reloadFirst')); setBusy(false); return }
-    body.expected_version = tx.balance_version
-    try { await updateTransaction(request, tx.id, body); onSaved?.(); onClose() }
+    // Only what changed; the review mark is sent only by a role that may set it.
+    const clsBody = {}
+    if (clsOn && clsApi.data?.can_classify) {
+      if (cf.purpose !== (cls?.business_purpose || '')) clsBody.business_purpose = cf.purpose || null
+      if ((cf.note.trim() || null) !== (cls?.note || null)) clsBody.note = cf.note.trim() || null
+    }
+    if (clsOn && clsApi.data?.can_review && cf.reviewed !== !!cls?.accountant_reviewed_at) clsBody.accountant_reviewed = cf.reviewed
+    if (!Object.keys(body).length && !Object.keys(clsBody).length) { onClose(); return }
+    if (Object.keys(body).length && tx.balance_version == null) { setErr(t('txd.reloadFirst')); setBusy(false); return }
+    if (Object.keys(body).length) body.expected_version = tx.balance_version
+    try {
+      if (Object.keys(body).length) await updateTransaction(request, tx.id, body)
+      if (Object.keys(clsBody).length) await classifyOperation(request, tx.id, clsBody)
+      clsApi.reload?.(); onSaved?.(); onClose()
+    }
     catch (x) {
       const code = x?.data?.error
       setErr(code === 'statement_transaction_locked' ? t('txd.locked') : code === 'debt_payment_amount_immutable' ? t('txd.billLocked')
@@ -79,6 +101,22 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], i
           <input className="v2-input v2-num" inputMode="decimal" value={f.amount} disabled={locked || !canWrite} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label>
       </div>
       <p className="v2-small">{t('txd.docs')} <Link to="/business/documents?tab=look">{t('txd.attach')}</Link></p>
+      {clsOn && (
+        <fieldset className="v2-field v2-txd-acc" data-txd-accounting>
+          <legend className="v2-h3">{t('txd.acc.title')}</legend>
+          <label className="v2-field"><span className="v2-field-label">{t('txd.acc.purpose')}</span>
+            <select className="v2-select" value={cf.purpose} disabled={!clsApi.data?.can_classify} onChange={(e) => setCf({ ...cf, purpose: e.target.value })} data-txd-purpose>
+              <option value="">{t('txd.acc.fromCategory')}</option>
+              {PURPOSES.map((p) => <option key={p} value={p}>{t(`txd.acc.p.${p}`)}</option>)}
+            </select></label>
+          <label className="v2-field"><span className="v2-field-label">{t('txd.acc.note')}</span>
+            <input className="v2-input" maxLength={500} value={cf.note} disabled={!clsApi.data?.can_classify} onChange={(e) => setCf({ ...cf, note: e.target.value })} data-txd-note /></label>
+          <label className="v2-pe-sug-row">
+            <input type="checkbox" checked={cf.reviewed} disabled={!clsApi.data?.can_review} onChange={(e) => setCf({ ...cf, reviewed: e.target.checked })} data-txd-reviewed />
+            <span>{t('txd.acc.reviewed')}{cls?.accountant_reviewed_at ? ` · ${t('txd.acc.reviewedBy', { who: cls.accountant_reviewed_by_name || '—', d: shortDate(cls.accountant_reviewed_at, lang) })}` : ''}</span></label>
+          <p className="v2-muted v2-small">{t('txd.acc.taxNote')}</p>
+        </fieldset>
+      )}
       {locked && <p className="v2-muted v2-small">{t(src === 'opening' ? 'txd.openingNote' : 'txd.bankNote')}</p>}
       {!canWrite && <p className="v2-muted v2-small">{t('accd.noRights')}</p>}
       {err && <p className="v2-inline-err" role="alert">{err}</p>}

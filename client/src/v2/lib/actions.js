@@ -50,6 +50,11 @@ export const requestDebtInfo = (token, id, note) =>
 export const updateTransaction = (token, id, body) =>
   apiFetch(`/transactions/${encodeURIComponent(id)}`, token, { method: 'PATCH', body })
 
+// Business purpose / accountant review / note of an operation (PUT /api/transactions/:id/classification).
+// The server records who and when; nothing here changes the operation, its amount or its cash effect.
+export const classifyOperation = (token, id, body) =>
+  apiFetch(`/transactions/${encodeURIComponent(id)}/classification`, token, { method: 'PUT', body })
+
 export const setTransactionCategory = (token, id, category, expectedVersion) => {
   if (expectedVersion == null) return Promise.reject(new Error('Reload the transaction before editing.'))
   return updateTransaction(token, id, { category, expected_version: expectedVersion })

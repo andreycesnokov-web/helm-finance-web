@@ -841,6 +841,8 @@ export async function createAccountantZipPackage({
   companyName = '',
   businessId = '',
   transactions = [],
+  // Business purpose / accountant review marks (GET /api/transaction-classifications) for register 11.
+  classifications = [],
   debts = [],
   batches = [],
   wallets = [],
@@ -1014,7 +1016,7 @@ export async function createAccountantZipPackage({
   }
 
   // 3. Registers for the accountant, from the same snapshot.
-  const reg = R.buildRegisters({ period: p, company: { name: companyName, business_id: businessId }, profile, transactions, wallets, debts, payrollRuns, funding, pnl, operationDocuments: opDocsList, docPaths })
+  const reg = R.buildRegisters({ period: p, company: { name: companyName, business_id: businessId }, profile, transactions, wallets, debts, payrollRuns, funding, pnl, operationDocuments: opDocsList, docPaths, classifications })
   summary.totals = reg.totals
   summary.tax_profile_missing = reg.tax.missing_profile
   reg.tables.forEach((tbl, i) => filesToZip.push({ name: `registers/${String(i + 1).padStart(2, '0')}_${tbl.name}.csv`, data: R.toCsv(tbl) }))

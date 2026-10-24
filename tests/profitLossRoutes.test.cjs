@@ -5,16 +5,16 @@ const express=require('express'),{createClient}=require('@supabase/supabase-js')
 const {install,readAll,NAMES}=require('../server/lib/profitLossRoutes');
 const {fixture,B,OTHER,tx}=require('./fixtures/profitLoss.cjs');
 function transport(f,mode='ok'){
- const logs=[];const tables=Object.fromEntries(Object.entries(f).filter(([k])=>!['systemCategories','categoryGroups'].includes(k)).map(([k,v])=>[NAMES[k]||k,v]));
- tables.business_category_pnl_groups=f.categoryGroups||[];
+ const logs=[];const tables=Object.fromEntries(Object.entries(f).filter(([k])=>!['systemCategories','categoryGroups','classifications'].includes(k)).map(([k,v])=>[NAMES[k]||k,v]));
+ tables.business_category_pnl_groups=f.categoryGroups||[];tables.transaction_classifications=f.classifications||[];
  return {logs,fetch:async(url,init)=>{
   const u=new URL(url),table=u.pathname.split('/').at(-1);logs.push({table,method:init.method||'GET',query:u.search});
   assert.equal(init.method,'GET');
   // The ONE unscoped read: shared system categories (business_id IS NULL, is_system). Every other read is this company's.
   const system=table==='cashflow_categories'&&u.searchParams.get('business_id')==='is.null';
   if(system)assert.equal(u.searchParams.get('is_system'),'eq.true');else assert.equal(u.searchParams.get('business_id'),'eq.'+B);
-  assert.equal(u.searchParams.get('order'),table==='business_category_pnl_groups'?'category_id.asc':'id.asc');
-  if(table==='business_category_pnl_groups'&&mode==='nooverlay')return new Response(JSON.stringify({code:'42P01',message:'relation does not exist'}),{status:404,headers:{'content-type':'application/json'}});
+  assert.equal(u.searchParams.get('order'),table==='business_category_pnl_groups'?'category_id.asc':table==='transaction_classifications'?'transaction_id.asc':'id.asc');
+  if(['business_category_pnl_groups','transaction_classifications'].includes(table)&&mode==='nooverlay')return new Response(JSON.stringify({code:'42P01',message:'relation does not exist'}),{status:404,headers:{'content-type':'application/json'}});
   if(system)return new Response(JSON.stringify(f.systemCategories||[]),{status:200,headers:{'content-type':'application/json'}});
   if(mode==='fail')return new Response(JSON.stringify({code:'42703',message:'private database failure detail'}),{status:400,headers:{'content-type':'application/json'}});
   let rows=(tables[table]||[]).filter(x=>x.business_id===B).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
@@ -41,7 +41,7 @@ async function server(mode,fn){
 test('HTTP report uses current resolved company and safe exact selects; no writes',async()=>server('ok',async({f,wire,request})=>{
  const before=JSON.stringify(f),res=await request('month=2026-08&business_id='+OTHER);assert.equal(res.status,200);assert.equal(res.headers.get('cache-control'),'no-store');
  const body=await res.json();assert.equal(body.business_id,B);assert.equal(body.periods['2026-08'].totals.revenue,'975.1');assert.equal(JSON.stringify(f),before);
- assert.equal(wire.logs.length,15);
+ assert.equal(wire.logs.length,16); // + one read of this company's operation classifications
  assert.deepEqual(wire.logs.filter(l=>['cashflow_categories','business_category_pnl_groups'].includes(l.table)).map(l=>[l.table,new URLSearchParams(l.query).get('business_id')]),
   [['cashflow_categories','eq.'+B],['cashflow_categories','is.null'],['business_category_pnl_groups','eq.'+B]]);assert.ok(wire.logs.every(l=>l.method==='GET'));assert.ok(decodeURIComponent(wire.logs[0].query).includes('amount_original::text'));
  assert.ok(!JSON.stringify(body).includes('synthetic-key'));

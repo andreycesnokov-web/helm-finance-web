@@ -19,7 +19,7 @@ import { useApi } from '../data'
 import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, taxProgress, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason, UNRECONCILED_REASONS, reasonMeta } from '../lib/accounting'
 import { documentFileUrl, packageSource, documentContentBytes } from '../lib/actions'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
-import { quarterOf, reportingPeriod } from '../lib/accountantRegisters'
+import { quarterOf, reportingPeriod, classificationRegister } from '../lib/accountantRegisters'
 import { money, shortDate } from '../lib/format'
 import { askAccountant } from '../lib/ask'
 import AccountantTabs from '../components/AccountantTabs'
@@ -392,6 +392,13 @@ function CloseTab({ month, onOpenChatModal }) {
   }, [active?.id, month])
   const operationDocs = useApi(`/accountant/operation-documents/package?month=${encodeURIComponent(month)}`)
   const tx = useApi('/transactions?period=all')
+  // Accounting preparation for this month: every operation, its purpose, document and review state (register 11).
+  const opCls = useApi('/transaction-classifications')
+  const prep = useMemo(() => {
+    if (!Array.isArray(tx.data) || opCls.data?.available !== true) return null
+    const txs = tx.data.filter((x) => x.is_training !== true && String(x.transaction_date || x.created_at || '').slice(0, 7) === month)
+    return classificationRegister({ txs, classifications: opCls.data.classifications || [], operationDocuments: [operationDocs.data] }).summary
+  }, [tx.data, opCls.data, operationDocs.data, month])
   const debts = useApi('/debts')
   const batches = useApi('/bank-import/batches')
   const wallets = useApi('/wallets')
@@ -498,11 +505,12 @@ function CloseTab({ month, onOpenChatModal }) {
       const sourceErrors = []
       const get = (name, path) => packageSource(request, path, controller.signal)
         .catch((e) => { if (e?.name === 'AbortError') throw e; sourceErrors.push(name); return null })
-      const [runs, fund, pnl, prof, ...opDocsByMonth] = await Promise.all([
+      const [runs, fund, pnl, prof, cls, ...opDocsByMonth] = await Promise.all([
         get('payroll', '/payroll/runs'),
         get('financing', '/business-funding'),
         get('profit and loss', `/pulse/profit-loss?month=${period.months[period.months.length - 1]}&currency=IDR&months=${period.months.join(',')}`),
         get('tax profile', '/accountant/profile'),
+        get('operation classifications', '/transaction-classifications'),
         ...period.months.map((m) => (m === currentMonth && operationDocs.data ? Promise.resolve(operationDocs.data) : get(`operation documents ${m}`, `/accountant/operation-documents/package?month=${encodeURIComponent(m)}`))),
       ])
       if (controller.signal.aborted) return
@@ -514,6 +522,7 @@ function CloseTab({ month, onOpenChatModal }) {
         funding: fund,
         pnl,
         profile: prof?.profile || null,
+        classifications: cls?.classifications || [],
         sourceErrors,
         companyName,
         businessId: currentBizId,
@@ -659,11 +668,24 @@ function CloseTab({ month, onOpenChatModal }) {
             ))}
             <li>
               <span className="v2-check-mark" aria-hidden="true" />
-              <span className="v2-check-text"><span>{t('acct.check.review')}</span><span className="v2-muted v2-small">{t('bill.doc.notTracked')}</span></span>
+              <span className="v2-check-text"><span>{t('acct.check.review')}</span><span className="v2-muted v2-small">{prep ? `${t('acct.prep.reviewed')}: ${prep.accountant_reviewed} / ${prep.operations}` : t('bill.doc.notTracked')}</span></span>
             </li>
           </ul>
         </Card>
         <div className="v2-col v2-acct-side">
+          {prep && (
+            <Card title={t('acct.prep.title')} aside={<Link to="/business/transactions">{t('nav.transactions')}</Link>}>
+              <dl className="v2-dl v2-dl-tight" data-acct-prep>
+                <dt>{t('acct.prep.operations')}</dt><dd className="v2-num v2-r">{prep.operations}</dd>
+                <dt>{t('acct.prep.noDocument')}</dt><dd className="v2-num v2-r">{prep.missing_documents} · {money(prep.missing_documents_amount)}</dd>
+                <dt>{t('acct.prep.docPending')}</dt><dd className="v2-num v2-r">{prep.pending_document_review}</dd>
+                <dt>{t('acct.prep.personal')}</dt><dd className="v2-num v2-r">{prep.personal} · {money(prep.personal_amount)}</dd>
+                <dt>{t('acct.prep.needsReview')}</dt><dd className="v2-num v2-r">{prep.purpose_marked_needs_review}</dd>
+                <dt>{t('acct.prep.reviewed')}</dt><dd className="v2-num v2-r">{prep.accountant_reviewed} / {prep.operations}</dd>
+              </dl>
+              <p className="v2-muted v2-small">{t('acct.prep.note')}</p>
+            </Card>
+          )}
           <Card title={t('acct.taxesDue', { m: monthLabel(next, lang) })} aside={<Link to="/business/accountant?tab=taxes">{t('acct.fullCalendar')}</Link>}>
             {dueSum > 0 && <p className="v2-stat-mid v2-num">{money(dueSum)}</p>}
             <TaxList events={due} lang={lang} t={t} limit={8} />

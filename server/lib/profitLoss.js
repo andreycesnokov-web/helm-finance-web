@@ -3,6 +3,7 @@
 'use strict';
 const M = require('./transactionClass');
 const CG = require('./categoryGroups');
+const CP = require('./transactionClassifications');
 const GROUPS = ['revenue', 'direct_cost', 'operating_cost', 'other_income', 'interest', 'tax'];
 const CURRENCY=/^[A-Z][A-Z0-9]{2,9}$/; // Native codes, including existing USDT; no FX conversion.
 const norm = v => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -54,6 +55,8 @@ function buildReport(input, { businessId, ...query }) {
     if(a.purchase_transaction_id != null) assetTx.add(String(a.purchase_transaction_id));
     if(a.purchase_debt_id != null) assetDebt.add(String(a.purchase_debt_id));
   }
+  // Business purpose and accountant review a person set (lib/transactionClassifications.js). No row = unchanged.
+  const classified=new Map(own(input.classifications,businessId).map(c=>[String(c.transaction_id),c]));
   const fundingTx=new Set(own(input.funding,businessId).map(f=>String(f.received_transaction_id)));
   // A repayment can mix principal and interest. Do not guess a cash split from a schedule.
   const repayments=new Set(own(input.repayments,businessId).map(f=>String(f.paid_transaction_id)));
@@ -79,7 +82,11 @@ function buildReport(input, { businessId, ...query }) {
       bills:ds.map(d=>({id:String(d.id),number:d.invoice_number,type:d.type,status:d.status,approval_status:d.approval_status})),
       payroll:(pByTx.get(String(t.id))||[]).map(p=>({id:p.id,period:p.period_month,status:p.status})),
       bank_review:(bByTx.get(String(t.id))||[]).map(b=>({batch_id:b.batch_id,review_status:b.review_status,match_status:b.match_status})),
-      review_status:'not_accountant_approved', reconciliation_status:bByTx.has(String(t.id))?'statement_linked_not_reconciled':'not_verified' };
+      business_purpose:classified.get(String(t.id))?.business_purpose||null,
+      // An accountant's review mark is shown as such; it is never an approval of the books or of tax treatment.
+      review_status:classified.get(String(t.id))?.accountant_reviewed_at?'accountant_reviewed':'not_accountant_approved',
+      accountant_reviewed_at:classified.get(String(t.id))?.accountant_reviewed_at||null,
+      reconciliation_status:bByTx.has(String(t.id))?'statement_linked_not_reconciled':'not_verified' };
     const except = reason => exceptions.push({...ref,reason});
     const exclude = reason => excluded.push({...ref,reason});
     if (!dateOK(t.transaction_date)) {except('missing_transaction_date');continue;}
@@ -92,6 +99,10 @@ function buildReport(input, { businessId, ...query }) {
     if(repayments.has(String(t.id))) {except('repayment_split_not_verified');continue;}
     if(ds.some(d=>assetDebt.has(String(d.id)))&&ds.some(d=>!assetDebt.has(String(d.id)))) {except('mixed_asset_allocation');continue;}
     if(assetTx.has(String(t.id))||ds.some(d=>assetDebt.has(String(d.id)))) {exclude('capital_purchase');continue;}
+    // A purpose set by a person, after the recorded evidence above (a purpose never turns financing into profit).
+    const purposeRule=CP.PURPOSE_PNL[ref.business_purpose];
+    if(purposeRule?.exclude) {exclude(purposeRule.exclude);continue;}
+    if(purposeRule?.exception) {except(purposeRule.exception);continue;}
     if(ds.some(d=>d.status==='cancelled'||d.approval_status==='rejected'||d.approval_status==='pending_approval'||d.is_training)) {except('linked_bill_not_approved');continue;}
     let amount;
     try{amount=exact(t.amount_original);}catch{except('invalid_or_inexact_amount');continue;}

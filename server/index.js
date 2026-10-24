@@ -1062,6 +1062,7 @@ async function requireBusiness(req, res) {
 const burnRunway = require('./lib/burnRunway');
 const computeBurnAndRunway = burnRunway.computeBurnAndRunway;
 const { payrollSchedule } = require('./lib/payrollSchedule');
+const TCLASS = require('./lib/transactionClassifications');
 
 
 // --- Pulse API -------------------------------------------------------------
@@ -1256,7 +1257,10 @@ app.get('/api/pulse', auth, async (req, res) => {
     // reported separately below rather than hidden.
     // Recorded evidence (funding register, confirmed category groups) outranks keywords, as in Advanced Insights.
     const insightEvidence = await CATGROUPS.loadInsightEvidence(supabase, biz.business.id);
-    const monthInsights = FININ.computeInsights(txs || [], { evidence: insightEvidence });
+    // The month figures (management view) also read the business purpose a person set; the burn below does not:
+    // the cash forecast counts every movement as cash, whatever it was for.
+    const purposes = await TCLASS.loadClassifications(supabase, biz.business.id);
+    const monthInsights = FININ.computeInsights(txs || [], { evidence: { ...insightEvidence, purposeOf: TCLASS.purposeResolver(purposes.byTx) } });
     const income   = monthInsights.metrics.operating_revenue;
     const expenses = monthInsights.metrics.operating_cash_out;
 
@@ -3193,8 +3197,9 @@ app.get('/api/pulse/advanced-insights', auth, async (req, res) => {
     const insights = FININ.computeInsights(data || [], {
       from: req.query.from || null,
       to: req.query.to || null,
-      // The funding register and confirmed category groups classify before keywords.
-      evidence: await CATGROUPS.loadInsightEvidence(supabase, biz.business.id),
+      // The funding register, a business purpose a person set and confirmed category groups classify before keywords.
+      evidence: { ...(await CATGROUPS.loadInsightEvidence(supabase, biz.business.id)),
+        purposeOf: TCLASS.purposeResolver((await TCLASS.loadClassifications(supabase, biz.business.id)).byTx) },
     });
     res.json({ ok: true, business_id: biz.business.id, ...insights });
   } catch (e) {
@@ -8555,6 +8560,66 @@ app.post('/api/parse', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Business purpose and accountant review of an operation (lib/transactionClassifications.js) ──────────────
+// Management vs accounting preparation: what the money was for, and whether an accountant reviewed it. Never a
+// tax decision, never a hidden or second record: the operation, its amount and its cash effect are unchanged.
+// GET  /api/transaction-classifications            this company's marks (+ reviewer names)
+// PUT  /api/transactions/:id/classification        { business_purpose?, accountant_reviewed?, note? }
+app.get('/api/transaction-classifications', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!canViewBusinessFinance(biz.role)) return res.status(403).json({ error: 'business_finance_forbidden' });
+    const { available, byTx } = await TCLASS.loadClassifications(supabase, biz.business.id);
+    const ids = [...new Set([...byTx.values()].flatMap((r) => [r.accountant_reviewed_by, r.purpose_set_by]).filter((x) => x != null).map(String))];
+    const names = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await resolveUserDisplayName(id)])));
+    res.set('Cache-Control', 'no-store');
+    res.json({ available, purposes: TCLASS.PURPOSES, can_review: TCLASS.canReview(biz.role), can_classify: canCreateConfirmedFinancialRecord(biz.role),
+      classifications: [...byTx.values()].map((r) => ({ transaction_id: String(r.transaction_id), business_purpose: r.business_purpose, purpose_set_at: r.purpose_set_at,
+        purpose_set_by_name: r.purpose_set_by != null ? names[String(r.purpose_set_by)] : null, accountant_reviewed_at: r.accountant_reviewed_at,
+        accountant_reviewed_by_name: r.accountant_reviewed_by != null ? names[String(r.accountant_reviewed_by)] : null, note: r.note })) });
+  } catch (e) { res.status(500).json({ error: 'classifications_unavailable' }); }
+});
+
+app.put('/api/transactions/:id/classification', auth, async (req, res) => {
+  try {
+    const biz = await requireBusiness(req, res);
+    if (!biz) return;
+    if (biz.business?.type === 'personal') return res.status(403).json({ error: 'business_workspace_required' });
+    if (!/^\d+$/.test(String(req.params.id))) return res.status(400).json({ error: 'invalid_transaction_id' });
+    const v = TCLASS.bodyFrom(req.body || {});
+    if (v.error) return res.status(400).json(v);
+    // Purpose and note: the roles that record company money. The review mark: accounting roles only. The server
+    // records who and when; a client can never send either.
+    if (('business_purpose' in v.value || 'note' in v.value) && !canCreateConfirmedFinancialRecord(biz.role))
+      return res.status(403).json({ error: 'Your role does not allow classifying operations' });
+    if ('accountant_reviewed' in v.value && !TCLASS.canReview(biz.role))
+      return res.status(403).json({ error: 'Only an accountant, owner, admin or CFO can mark an operation reviewed' });
+    const { data: txRows, error: tErr } = await supabase.from('transactions').select('id, business_id, is_training')
+      .eq('id', Number(req.params.id)).eq('business_id', biz.business.id).limit(1);
+    if (tErr) return res.status(500).json({ error: 'transaction_read_failed' });
+    const tx = txRows?.[0];
+    if (!tx || tx.is_training) return res.status(404).json({ error: 'Transaction not found' });
+    const { data: prevRows, error: pErr } = await supabase.from(TCLASS.TABLE).select('*').eq('transaction_id', tx.id).eq('business_id', biz.business.id).limit(1);
+    if (pErr) return res.status(TCLASS.isMissingTable(pErr) ? 409 : 500).json({ error: TCLASS.isMissingTable(pErr) ? 'migration_not_applied' : 'classification_read_failed', migration: '20261024150000' });
+    const prev = prevRows?.[0] || null;
+    const row = TCLASS.nextRow(prev, v.value, { userId: req.user.userId, businessId: biz.business.id, transactionId: tx.id });
+    const { data: saved, error: wErr } = await supabase.from(TCLASS.TABLE).upsert(row, { onConflict: 'transaction_id' }).select('*').single();
+    if (wErr) return res.status(500).json({ error: 'classification_write_failed' });
+    // The audit record is required, not best-effort: without it the change is undone.
+    const { error: aErr } = await supabase.from('audit_events').insert({ business_id: biz.business.id, actor_user_id: req.user.userId, actor_role: biz.role,
+      channel: 'web', entity_type: 'transaction_classification', entity_id: String(tx.id), action: 'transaction_classified', before_json: prev, after_json: saved });
+    if (aErr) {
+      if (prev) await supabase.from(TCLASS.TABLE).upsert(prev, { onConflict: 'transaction_id' });
+      else await supabase.from(TCLASS.TABLE).delete().eq('transaction_id', tx.id).eq('business_id', biz.business.id);
+      return res.status(503).json({ error: 'audit_unavailable', message: 'Nothing was changed.' });
+    }
+    res.json({ classification: { transaction_id: String(saved.transaction_id), business_purpose: saved.business_purpose, purpose_set_at: saved.purpose_set_at,
+      accountant_reviewed_at: saved.accountant_reviewed_at, note: saved.note, review_cleared: !!prev?.accountant_reviewed_at && !saved.accountant_reviewed_at } });
+  } catch (e) { res.status(500).json({ error: 'classification_failed' }); }
 });
 
 app.post('/api/transactions/batch', auth, async (req, res) => {

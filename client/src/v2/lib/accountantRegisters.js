@@ -48,7 +48,7 @@ export function uniqueName(name, taken, suffix) {
 }
 
 /** Builds every register for the period from the scoped API data. */
-export function buildRegisters({ period, company = {}, profile = null, transactions = [], wallets = [], debts = [], payrollRuns = [], funding = null, pnl = null, operationDocuments = [], docPaths = {} }) {
+export function buildRegisters({ period, company = {}, profile = null, transactions = [], wallets = [], debts = [], payrollRuns = [], funding = null, pnl = null, operationDocuments = [], docPaths = {}, classifications = [] }) {
   const biz = company.business_id
   const mine = (x) => !biz || !x?.business_id || String(x.business_id) === String(biz)
   const walletById = new Map(wallets.filter(mine).map((w) => [String(w.id), w]))
@@ -186,6 +186,8 @@ export function buildRegisters({ period, company = {}, profile = null, transacti
   }
   // 10. Tax preparation schedule: only what the data supports; nothing here is a calculated or certified tax.
   const tax = taxPreparation({ period, profile, payroll: P, transactions: T, debts: D })
+  // 11. Classification and evidence: EVERY operation of the period (none is left out for a missing document).
+  const C = classificationRegister({ txs, classifications, operationDocuments, docsByTx, docPaths, pnlById, walletOf })
 
   const sum = (rows, i, f = () => true) => fromCents(rows.filter(f).reduce((s, r) => s + cents(r[i]), 0))
   const totals = {
@@ -194,8 +196,66 @@ export function buildRegisters({ period, company = {}, profile = null, transacti
     financing: { received: sum(F.rows, 6, (r) => r[4] === 'received'), principal_repaid: sum(F.rows, 6, (r) => r[4] === 'repayment paid'), interest_paid: sum(F.rows, 7, (r) => r[4] === 'repayment paid') },
     receivables_open: sum(D.rows, 8, (r) => r[1] === 'receivable'), payables_open: sum(D.rows, 8, (r) => r[1] === 'payable'),
     missing_documents: M.rows.length, review_items: E.rows.length,
+    classification: C.summary,
   }
-  return { tables: [T, A, R, F, D, P, M, E, Dm, tax.table], totals, tax }
+  return { tables: [T, A, R, F, D, P, M, E, Dm, tax.table, C.table], totals, tax }
+}
+
+// Business purpose of an operation for the accountant (management vs accounting preparation, 24 Oct 2026):
+// what a person set (GET /api/transaction-classifications), else what the server's P&L did with it. Labels only;
+// nothing here decides tax treatment — a receipt never makes an expense deductible.
+const PURPOSE_FROM_PNL = [[/^included: /, 'operating'], [/^excluded: (capital_purchase|asset_purchase)/, 'capital'],
+  [/^excluded: personal_non_business/, 'personal'], [/^excluded: (financing|funding|own_account_transfer|transfer|non_pnl_movement|opening_or_correction)/, 'non_pnl'],
+  [/^needs review: /, 'needs_review']]
+const DOC_STATE = { complete: 'present', missing: 'missing', clarification: 'pending review' }
+
+export function classificationRegister({ txs = [], classifications = [], operationDocuments = [], docsByTx = new Map(), docPaths = {}, pnlById = new Map(), walletOf = () => null }) {
+  const cls = new Map(classifications.map((c) => [String(c.transaction_id), c]))
+  const opStatus = new Map(), opDocs = new Map()
+  for (const od of operationDocuments.filter(Boolean)) for (const o of od.operations || []) for (const p of o.payments || []) {
+    opStatus.set(String(p.id), o.status)
+    opDocs.set(String(p.id), [...new Set([...(opDocs.get(String(p.id)) || []), ...(o.documents || []).map((d) => String(d.id))])])
+  }
+  const docsOf = (id) => docsByTx.get(id) || opDocs.get(id) || []
+  const table = { name: 'classification_evidence', title: 'Classification and evidence register',
+    columns: ['transaction_id', 'date', 'direction', 'amount', 'currency', 'account', 'counterparty', 'category', 'business_purpose', 'purpose_source', 'pnl_treatment',
+      'documents', 'document_files', 'accountant_review', 'reviewed_by', 'reviewed_at', 'tax_treatment', 'notes'], rows: [] }
+  const s = { operations: 0, purpose_set: 0, purpose_marked_needs_review: 0, needs_review: 0, personal: 0, personal_amount: 0, missing_documents: 0, missing_documents_amount: 0,
+    pending_document_review: 0, accountant_reviewed: 0, accountant_review_pending: 0, possible_fiscal_adjustment: 0 }
+  for (const t of txs) {
+    const id = String(t.id), c = cls.get(id) || null, pnl = pnlById.get(id) || ''
+    const dir = t.type === 'income' ? 'in' : ['expense', 'payroll', 'bank_fee', 'fx_fee', 'network_fee'].includes(t.type) ? 'out' : 'other'
+    const derived = (PURPOSE_FROM_PNL.find(([re]) => re.test(pnl)) || [])[1] || ''
+    const purpose = c?.business_purpose || derived
+    const ownMove = !!t.transfer_id || t.type === 'transfer' || t.source === 'wallet_opening_balance' || t.type === 'correction'
+    const docs = docsOf(id)
+    const docState = DOC_STATE[opStatus.get(id)] || (docs.length ? 'present' : ownMove ? 'not required' : 'missing')
+    const reviewed = !!c?.accountant_reviewed_at
+    const notes = []
+    if (c?.note) notes.push(c.note)
+    if (purpose === 'personal') notes.push('personal / non-business: not an operating cost')
+    if (purpose === 'needs_review' || !purpose) notes.push('business purpose unresolved')
+    // Flagged by the FACT that no document is linked (whatever the evidence engine still asks): the accountant decides.
+    const adjust = purpose === 'operating' && dir === 'out' && !docs.length && docState !== 'not required'
+    if (adjust) notes.push('possible fiscal adjustment: no supporting document (accountant decides)')
+    const amount = num(t.amount_original)
+    table.rows.push([id, day(t), dir, amount, t.currency_original || 'IDR', walletOf(t)?.name || t.source || '', t.counterparty_name || t.counterparty || '',
+      t.category || '', purpose || 'not determined', c?.business_purpose ? 'set by user' : derived ? 'from category / P&L' : 'not determined', pnl || 'not in report period/currency',
+      docState, docs.map((d) => docPaths[d]).filter(Boolean).join('; '), reviewed ? 'reviewed' : 'pending accountant review',
+      reviewed ? c.accountant_reviewed_by_name || '' : '', reviewed ? String(c.accountant_reviewed_at).slice(0, 19) : '',
+      purpose === 'personal' ? 'not a business expense — accountant review' : 'undetermined — accountant review', notes.join('; ')])
+    s.operations++
+    if (c?.business_purpose) s.purpose_set++
+    if (c?.business_purpose === 'needs_review') s.purpose_marked_needs_review++
+    if (purpose === 'needs_review' || !purpose) s.needs_review++
+    if (purpose === 'personal') { s.personal++; s.personal_amount += Math.round(amount * 100) }
+    if (docState === 'missing' && dir !== 'other') { s.missing_documents++; s.missing_documents_amount += Math.round(amount * 100) }
+    if (docState === 'pending review') s.pending_document_review++
+    if (reviewed) s.accountant_reviewed++; else s.accountant_review_pending++
+    if (adjust) s.possible_fiscal_adjustment++
+  }
+  s.personal_amount /= 100; s.missing_documents_amount /= 100
+  return { table, summary: s }
 }
 
 /** What the accountant may need to prepare, from the data AND the company's recorded tax profile. */
@@ -261,6 +321,15 @@ export function readmeText({ period, company, totals, missingProfile = [], unava
     `  Financing (not income): received ${totals.financing.received} · principal repaid ${totals.financing.principal_repaid} · interest paid ${totals.financing.interest_paid}`,
     `  Receivables still open ${totals.receivables_open} · payables still open ${totals.payables_open} (invoiced by ${period.end}, unpaid when this package was built)`,
     `  Operations without a document: ${totals.missing_documents} · items for manual verification: ${totals.review_items} · originals not retrievable: ${unavailable}`,
+    ...(totals.classification ? [
+      '',
+      'CLASSIFICATION AND EVIDENCE (registers/11_classification_evidence.csv — every operation, none left out)',
+      `  Operations ${totals.classification.operations} · business purpose set by a person ${totals.classification.purpose_set} · purpose unresolved ${totals.classification.needs_review}`,
+      `  Personal / non-business paid from company accounts: ${totals.classification.personal} (${totals.classification.personal_amount}) — not operating costs`,
+      `  Without a supporting document: ${totals.classification.missing_documents} (${totals.classification.missing_documents_amount}) · document check pending: ${totals.classification.pending_document_review}`,
+      `  Accountant review: ${totals.classification.accountant_reviewed} reviewed · ${totals.classification.accountant_review_pending} pending · possible fiscal adjustments flagged: ${totals.classification.possible_fiscal_adjustment}`,
+      '  Tax treatment is undetermined for every operation: a receipt does not make an expense deductible; the accountant decides.',
+    ] : []),
     '',
     'LIMITATIONS — THE ACCOUNTANT MUST CHECK',
     '  * The P&L is a CASH-BASIS estimate from classified money movements. It is NOT a statutory accrual income statement.',

@@ -37,6 +37,7 @@ jobs:
           node tests/design/v2PulseModel.test.mjs
           node tests/design/v2Accounting.test.mjs
           node tests/businessFunding.test.js
+          node tests/transactionClassifications.test.js
 
       - name: Install client deps
         run: npm install --no-audit --no-fund
@@ -118,3 +119,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
         run: node --test tests/integration/postgresPnlSystemMapping.test.js
+
+      - name: Verify operation purpose and accountant review marks and their rollback on native PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/testdb
+        run: node --test tests/integration/postgresTransactionClassifications.test.js
