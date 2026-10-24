@@ -360,6 +360,27 @@ function createCmsRoutes(contentStore) {
         return res.status(400).json({ error: 'No file provided.' });
       }
 
+      // Security: Validate SVG safety against XSS and script injection
+      const fileExt = path.extname(req.file.originalname).toLowerCase();
+      if (fileExt === '.svg') {
+        const svgContent = fs.readFileSync(req.file.path, 'utf8');
+        const dangerousPatterns = [
+          /<script[\s>]/i,
+          /<\/script>/i,
+          /javascript\s*:/i,
+          /\bon\w+\s*=/i, // onload=, onerror=, onclick=, etc.
+          /<foreignobject[\s>]/i,
+          /<!ENTITY/i,
+          /<!DOCTYPE/i
+        ];
+        for (const pattern of dangerousPatterns) {
+          if (pattern.test(svgContent)) {
+            try { fs.unlinkSync(req.file.path); } catch (e) {}
+            return res.status(400).json({ error: 'Security violation: Uploaded SVG contains disallowed scripts or event handlers.' });
+          }
+        }
+      }
+
       // Also mirror to dist_marketing if it exists
       const distScreensDir = path.join(__dirname, '../../dist_marketing/assets/screens');
       if (fs.existsSync(distScreensDir)) {

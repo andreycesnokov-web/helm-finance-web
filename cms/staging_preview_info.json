@@ -1,19 +1,21 @@
 {
-  "generated_at": "2026-10-18T10:24:41.806Z",
+  "generated_at": "2026-10-24T08:20:20.080Z",
   "status": "ONLINE",
   "surfaces": {
     "public_website": {
-      "https_url": "https://brandon-blind-markets-empty.trycloudflare.com",
-      "english_homepage": "https://brandon-blind-markets-empty.trycloudflare.com/en",
-      "indonesian_homepage": "https://brandon-blind-markets-empty.trycloudflare.com/id",
-      "pricing_url": "https://brandon-blind-markets-empty.trycloudflare.com/en/pricing",
-      "hub_url": "https://brandon-blind-markets-empty.trycloudflare.com/en/blog",
-      "verified_https": false,
+      "https_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com",
+      "english_homepage": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en",
+      "indonesian_homepage": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/id",
+      "about_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/about",
+      "help_center_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/help",
+      "pricing_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/pricing",
+      "hub_url": "https://bacterial-threats-occupational-melbourne.trycloudflare.com/en/blog",
+      "verified_https": true,
       "local_port": 3002
     },
     "cms_studio": {
-      "https_url": "https://manhattan-img-surprising-crown.trycloudflare.com",
-      "admin_login_url": "https://manhattan-img-surprising-crown.trycloudflare.com/admin/",
+      "https_url": "https://challenging-sink-campbell-transmission.trycloudflare.com",
+      "admin_login_url": "https://challenging-sink-campbell-transmission.trycloudflare.com/admin/",
       "staging_gateway_protection": {
         "auth_type": "HTTP Basic Auth",
         "username": "admin",
@@ -36,7 +38,7 @@
           "permissions": "Read-only preview, audit inspect"
         }
       ],
-      "verified_https": false,
+      "verified_https": true,
       "local_port": 3003
     }
   }

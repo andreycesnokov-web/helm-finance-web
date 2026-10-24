@@ -240,7 +240,7 @@ async function startStagingPreview() {
   // Admin probe (with basic auth)
   let adminVerified = false;
   try {
-    const authHeader = 'Basic ' + Buffer.from(`${STAGING_BASIC_USER}:${STAGING_BASIC_PASS}`).toString('base64');
+    const authHeader = 'Basic ' + Buffer.from(`${STAGING_BASIC_USER}:${EFFECTIVE_BASIC_PASS}`).toString('base64');
     const admRes = await fetch(`${adminTunnel.assignedUrl}/admin/`, {
       headers: { 'Authorization': authHeader }
     });
@@ -263,6 +263,8 @@ async function startStagingPreview() {
         https_url: publicTunnel.assignedUrl,
         english_homepage: `${publicTunnel.assignedUrl}/en`,
         indonesian_homepage: `${publicTunnel.assignedUrl}/id`,
+        about_url: `${publicTunnel.assignedUrl}/en/about`,
+        help_center_url: `${publicTunnel.assignedUrl}/en/help`,
         pricing_url: `${publicTunnel.assignedUrl}/en/pricing`,
         hub_url: `${publicTunnel.assignedUrl}/en/blog`,
         verified_https: publicVerified,
