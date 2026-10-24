@@ -17,7 +17,7 @@ import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate } from '../lib/format'
 import BarChart from '../charts/BarChart'
-import { cashItems, forecast, isCounted } from '../lib/radarSeries'
+import { cashItems, forecast, forecastBurn, isCounted } from '../lib/radarSeries'
 import { readDrill, drillLink } from '../lib/aiLinks'
 import { txDate } from '../lib/obligations'
 import {
@@ -210,14 +210,21 @@ function CashTab({ rows, sel, cash, t, lang }) {
 function ForecastTab({ pulse, obligations, repayments = [], burnMonthly, t, lang }) {
   const p = pulse
   // Pending approval is not counted (DECISIONS.md q2), same as Pulse and Radar.
-  const items = cashItems({ debts: p.debts, obligations, repayments }).items.filter(isCounted)
-  const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
+  const burnRate = forecastBurn(p)
+  const items = cashItems({ debts: p.debts, obligations, repayments, payroll: p.payroll_schedule }).items.filter(isCounted)
+  const f = forecast({ balance: p.totalBalance, burnRate, items })
+  // The cash-out date and the month ends walk 90 days of dated items (loan repayments, bills and
+  // payroll after day 30 included), then the average burn.
+  const f90 = forecast({ balance: p.totalBalance, burnRate, horizon: 90,
+    items: cashItems({ debts: p.debts, obligations, repayments, payroll: p.payroll_schedule, horizon: 90 }).items.filter(isCounted) })
   const ins = items.filter((i) => i.dir === 'in'), outs = items.filter((i) => i.dir === 'out')
   const sum = (xs) => xs.reduce((s, x) => s + x.amount, 0)
   const lateIn = ins.filter((i) => i.tag === 'late')
-  const out = cashOutDate({ days: f.days, burnMonthly })
+  const out = cashOutDate({ days: f90.days, burnMonthly })
   const weeks = weekBuckets(items).map((w) => ({ key: w.from, label: `${shortDate(w.from, lang)}–${shortDate(w.to, lang)}`, values: { in: w.in, out: -w.out } }))
-  const three = threeMonths({ days: f.days, burnMonthly }).map((m) => ({ key: m.month, label: mName(m.month, lang), short: mName(m.month, lang, 'short'), values: { cash: m.cash } }))
+  const three = threeMonths({ days: f90.days, burnMonthly }).map((m) => ({ key: m.month, label: mName(m.month, lang), short: mName(m.month, lang, 'short'), values: { cash: m.cash } }))
+  // No burn measured and nothing dated sends cash below zero: not enough data to say "not in sight".
+  const outText = out ? `≈ ${shortDate(out.date, lang)}` : burnMonthly == null ? t('perf.fc.notMeasured') : t('perf.fc.notRunningOut')
   const List = ({ xs }) => (
     <ul className="v2-moves">{xs.map((x) => <li key={x.key}><span>{x.label}<span className="v2-muted"> · {shortDate(x.date, lang)}</span></span><span className="v2-num">{money(x.amount)}</span></li>)}</ul>
   )
@@ -227,7 +234,7 @@ function ForecastTab({ pulse, obligations, repayments = [], burnMonthly, t, lang
         <Kpi label={t('perf.fc.owed')} value={money(sum(ins), { sign: true })} sub={lateIn.length ? t('perf.fc.alreadyLate', { v: money(sum(lateIn)) }) : null} />
         <Kpi label={t('perf.fc.toPay')} value={money(-sum(outs), { sign: true })} sub={t('perf.fc.toPaySub')} />
         <Kpi label={t('perf.fc.cashOn', { d: shortDate(f.end.date, lang) })} value={money(f.end.value)} sub={<Link to="/business/radar">{t('perf.fc.withBurn')}</Link>} />
-        <Kpi label={t('perf.fc.runsOut')} value={out ? `≈ ${shortDate(out.date, lang)}` : t('perf.fc.notRunningOut')} sub={out ? t(out.from === 'radar' ? 'perf.fc.inRadar' : 'perf.fc.ifBurn', { v: money(burnMonthly) }) : null} tone={out ? 'v2-neg' : ''} />
+        <Kpi label={t('perf.fc.runsOut')} value={outText} sub={out ? t(out.from === 'radar' ? 'perf.fc.inRadar' : 'perf.fc.ifBurn', { v: money(burnMonthly) }) : null} tone={out ? 'v2-neg' : ''} />
       </div>
       <div className="v2-grid-2">
         <Card title={t('perf.fc.byWeek')}><p className="v2-muted v2-small">{t('perf.fc.byWeekSub')}</p>

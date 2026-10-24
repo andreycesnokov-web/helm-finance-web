@@ -1,6 +1,6 @@
 // AI Accountant helpers. Run: node tests/design/v2Accounting.test.mjs
 import assert from 'node:assert'
-import { monthOptions, defaultCloseMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage } from '../../client/src/v2/lib/accounting.js'
+import { monthOptions, defaultCloseMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, taxProgress } from '../../client/src/v2/lib/accounting.js'
 
 let pass = 0, fail = 0
 const t = (name, fn) => { try { fn(); pass++; console.log(`  ok  ${name}`) } catch (e) { fail++; console.log(`  XX  ${name}\n      ${e.message}`) } }
@@ -92,7 +92,12 @@ t('calendar grid is Monday-first and whole weeks', () => {
 t('events: merged, de-duplicated, sorted; stage from stored status only', () => {
   const ev = complianceEvents({ overdue: [{ id: 1, due_date: '2026-09-15' }], upcoming: [{ id: 2, due_date: '2026-10-15' }, { id: 1, due_date: '2026-09-15' }] })
   assert.deepStrictEqual(ev.map((e) => e.id), [1, 2])
-  assert.strictEqual(eventStage({ payment_status: 'paid' }), 'done')
+  // Paid is not filed (financial integrity audit 2026-10-24): before, a recorded payment showed "done".
+  assert.strictEqual(eventStage({ payment_status: 'paid', due_date: '2026-10-20' }, '2026-10-18'), 'paid')
+  assert.strictEqual(eventStage({ payment_status: 'paid', due_date: '2026-10-20' }, '2026-10-24'), 'overdue') // return deadline passed
+  assert.strictEqual(eventStage({ filing_status: 'filed', payment_status: 'paid', due_date: '2026-10-20' }, '2026-10-24'), 'done')
+  assert.strictEqual(eventStage({ pay_by: '2026-10-15', due_date: '2026-10-20' }, '2026-10-17'), 'overdue') // pay-by passed, nothing recorded
+  assert.deepStrictEqual(taxProgress({ pay_by: '2026-10-15', due_date: '2026-10-20' }, '2026-10-17'), { payment: 'overdue', filing: 'due' })
   assert.strictEqual(eventStage({ days: -1 }), 'overdue')
   assert.strictEqual(eventStage({ estimated_amount: 10, days: 3 }), 'calculated')
   assert.strictEqual(eventStage({ days: 3 }), 'todo')

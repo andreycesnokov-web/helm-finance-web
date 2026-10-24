@@ -206,6 +206,9 @@ export default function Funding() {
       <IncomingPayments t={t} lang={lang} />
       {reg.data?.upcoming?.length > 0 && (
         <Card title={t('fund.upcomingTitle')} aside={<Link to="/business/radar">{t('nav.radar')}</Link>}>
+          {Number(tot?.schedule_excess) > 0 && (
+            <p data-fund-schedule-excess><Pill tone="warn">{t('fund.scheduleExcess', { v: money(tot.schedule_excess), o: money(tot.loans_outstanding) })}</Pill></p>
+          )}
           <ul className="v2-moves">{reg.data.upcoming.slice(0, 8).map((u) => (
             <li key={u.id}><span>{shortDate(u.due_on, lang)} · {u.lender || t('fund.loan')}{u.overdue && <> · <Pill tone="crit">{t('radar.tag.late')}</Pill></>}</span>
               <span className="v2-num">{money(u.amount)} <span className="v2-muted v2-small">{t('fund.split', { p: money(u.principal), i: money(u.interest) })}</span></span></li>

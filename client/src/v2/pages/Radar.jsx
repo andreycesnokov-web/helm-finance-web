@@ -15,12 +15,12 @@ import { money, shortDate } from '../lib/format'
 import ForecastChart from '../charts/ForecastChart'
 import { useAsk, useAskContext } from '../ai/AskContext'
 import {
-  cashItems, forecast, keyDates, applyScenario, withCashAfter, scenarioChips, pendingSummary, isCounted,
+  cashItems, forecast, forecastBurn, keyDates, applyScenario, withCashAfter, scenarioChips, pendingSummary, isCounted,
   KEY_DATE_MIN_IDR, DEFAULT_HORIZON,
 } from '../lib/radarSeries'
 
 const HORIZONS = [30, 60, 90]
-const TAG_TONE = { scheduled: 'neutral', expected: 'good', approval: 'info', late: 'crit', deadline: 'warn' }
+const TAG_TONE = { scheduled: 'neutral', expected: 'good', approval: 'info', late: 'crit', deadline: 'warn', estimated: 'info' }
 
 export function TagPill({ it }) {
   const t = useT()
@@ -55,14 +55,17 @@ export default function Radar() {
   const model = useMemo(() => {
     if (!pulse.data) return null
     const p = pulse.data
-    const { items, excluded } = cashItems({ debts: p.debts, obligations: obl.data?.obligations || [], repayments: fund.data?.upcoming || [], horizon, rates: p.rates })
+    const { items, excluded } = cashItems({ debts: p.debts, obligations: obl.data?.obligations || [], repayments: fund.data?.upcoming || [], payroll: p.payroll_schedule, horizon, rates: p.rates })
     const chips = scenarioChips(items)
     const active = scenario.kind === 'worst' ? null : scenario
     const used = applyScenario(items, active)
-    const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: used, horizon })
+    // Day-to-day spending without the salaries that now sit on their pay dates (radarSeries header).
+    const burnRate = forecastBurn(p)
+    const f = forecast({ balance: p.totalBalance, burnRate, items: used, horizon })
     const collect = chips.find((c) => c.kind === 'collect')
-    const fCollect = collect ? forecast({ balance: p.totalBalance, burnRate: p.burnRate, items: applyScenario(items, collect), horizon }) : null
-    const listed = withCashAfter(used.filter((it) => it.day <= horizon).sort((a, b) => a.day - b.day), { balance: p.totalBalance, burnRate: p.burnRate })
+    const fCollect = collect ? forecast({ balance: p.totalBalance, burnRate, items: applyScenario(items, collect), horizon }) : null
+    const listed = withCashAfter(used.filter((it) => it.day <= horizon).sort((a, b) => a.day - b.day), { balance: p.totalBalance, burnRate })
+    // "Days of spending" left counts all measured spending, salaries included.
     return { items: listed, excluded, chips, f, collect, fCollect, burn: Number(p.burnRate) || 0, pending: pendingSummary(used) }
   }, [pulse.data, obl.data, fund.data, horizon, scenario])
 
@@ -123,6 +126,16 @@ export default function Radar() {
             <span className="v2-stat-sub">{f.worstLowest.day === 0 ? t('radar.today') : shortDate(f.worstLowest.date, lang)} · {t('radar.worstRule')}</span>
           </div>
         </div>
+
+        {f.firstShortfall && (
+          <p className="v2-radar-gap" role="alert" data-radar-shortfall>
+            <Pill tone="crit">{t('radar.gap.title')}</Pill>{' '}
+            {t('radar.gap.text', { d: f.firstShortfall.day === 0 ? t('radar.today') : shortDate(f.firstShortfall.date, lang), low: money(f.lowest.value), lowD: shortDate(f.lowest.date, lang) })}{' '}
+            {f.firstShortfall.recovers
+              ? t('radar.gap.recovers', { d: shortDate(f.firstShortfall.recovers.date, lang) })
+              : t('radar.gap.noRecovery', { n: horizon })}
+          </p>
+        )}
 
         <ForecastChart days={f.days} lowest={f.lowest} worstLowest={f.worstLowest} />
 
@@ -190,6 +203,7 @@ export default function Radar() {
                   {it.source === 'debt' && it.type === 'payable'
                     ? <Link to={`/business/payables/${it.id}`}>{it.label}</Link>
                     : it.source === 'funding' ? <Link to="/business/funding-investors">{t('fund.repaymentTo', { who: it.label || t('fund.loan') })}</Link>
+                    : it.source === 'payroll' ? <Link to="/business/payroll">{t(it.status === 'estimate' ? 'radar.payrollEstimate' : 'radar.payroll', { m: it.label, from: it.note })}</Link>
                     : it.label}
                 </span>
                 <span role="cell" className="v2-kd-status"><TagPill it={it} /></span>

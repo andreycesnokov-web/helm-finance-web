@@ -133,8 +133,10 @@ export function weekBuckets(items = [], { horizon = 30, today = new Date() } = {
 }
 
 /**
- * Cash-out date: walk the Radar series; if cash stays above zero for 30 days, continue
- * from day 30 at the average burn. Null when there is no burn (cash is not running out).
+ * Cash-out date: walk the Radar series (the Forecast tab passes 90 days, so loan repayments,
+ * bills and payroll after day 30 count); if cash stays above zero to its end, continue from the
+ * last day at the average burn. Null when there is no burn — the caller tells "not burning"
+ * from "not measured" (burnMonthly == null) itself.
  */
 export function cashOutDate({ days = [], burnMonthly, today = new Date() }) {
   const hit = days.find((d) => d.expected < 0)
@@ -146,18 +148,23 @@ export function cashOutDate({ days = [], burnMonthly, today = new Date() }) {
   return { date: d.toISOString().slice(0, 10), from: 'burn' }
 }
 
-/** Month-end cash for the next 3 months: Radar for this month's end, then the average burn. */
+/**
+ * Month-end cash for the next 3 months, read from the Radar series (dated invoices, bills, loan
+ * repayments, payroll and day-to-day spending). A month end past the series' last day continues
+ * from it at the average burn (source 'burn'). Before, months 2 and 3 were the average burn only,
+ * so a loan repayment in them was missing.
+ */
 export function threeMonths({ days = [], burnMonthly, today = new Date() }) {
   const out = []
   if (!days.length) return out
-  const end0 = monthEnd(`${today.getFullYear()}-${pad(today.getMonth() + 1)}`)
-  const at = days.find((d) => d.date === end0) || days[days.length - 1]
-  let cash = at.expected
-  out.push({ month: end0.slice(0, 7), cash, source: 'radar' })
-  for (let i = 1; i < 3; i++) {
+  const last = days[days.length - 1]
+  for (let i = 0; i < 3; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() + i, 1)
-    cash -= burnMonthly > 0 ? burnMonthly : 0
-    out.push({ month: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, cash, source: 'burn' })
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`
+    const at = days.find((x) => x.date === monthEnd(key))
+    if (at) { out.push({ month: key, cash: at.expected, source: 'radar' }); continue }
+    const extra = Math.max(0, Math.round((new Date(monthEnd(key)) - new Date(last.date)) / 86400000))
+    out.push({ month: key, cash: last.expected - (burnMonthly > 0 ? (burnMonthly / 30) * extra : 0), source: 'burn' })
   }
   return out
 }

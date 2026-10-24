@@ -567,9 +567,29 @@ export function complianceEvents(summary) {
 // movements; they never have a statement line and must not make a month unreconciled.
 export const OPENING_ANCHOR_SOURCES = Object.freeze(['opening_reanchor','opening_reanchor_reversal','bank_import_opening'])
 
-export function eventStage(e) {
-  if (['paid', 'filed'].includes(e?.payment_status) || ['paid', 'filed'].includes(e?.status)) return 'done'
-  if (e?.days != null && e.days < 0) return 'overdue'
+/**
+ * Payment and filing of a tax obligation, kept apart (financial integrity audit 2026-10-24): money
+ * paid is not a filed return, and a filed return is never assumed from a payment.
+ *   payment  'recorded' (payment_status / status 'paid') | 'overdue' (pay-by date passed) | 'due'
+ *   filing   'filed' (filing_status / status 'filed', or the legacy payment_status 'filed') | 'overdue' | 'due'
+ * Same rule as the server (GET /api/accountant/tax-calendar, taxStages in server/lib/taxDeadlines.js).
+ */
+export function taxProgress(e, today = new Date().toISOString().slice(0, 10)) {
+  const paid = e?.payment_status === 'paid' || e?.status === 'paid'
+  const filed = e?.filing_status === 'filed' || e?.status === 'filed' || e?.payment_status === 'filed'
+  const payBy = String(e?.pay_by || e?.due_date || '').slice(0, 10)
+  const fileBy = String(e?.due_date || '').slice(0, 10)
+  return {
+    payment: paid ? 'recorded' : payBy && payBy < today ? 'overdue' : 'due',
+    filing: filed ? 'filed' : fileBy && fileBy < today ? 'overdue' : 'due',
+  }
+}
+
+export function eventStage(e, today) {
+  const p = taxProgress(e, today)
+  if (p.filing === 'filed') return 'done'
+  if (p.payment === 'recorded' && p.filing !== 'overdue') return 'paid'
+  if (p.filing === 'overdue' || (p.payment === 'overdue' && !e?.nil_return) || (e?.days != null && e.days < 0)) return 'overdue'
   if (e?.amount_status === 'calculated' || e?.estimated_amount != null) return 'calculated'
   return 'todo'
 }

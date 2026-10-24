@@ -16,7 +16,7 @@ import I from '../icons'
 import { PageHead, Card, Pill, Btn, NotYet, Skeleton, ErrorBox, Empty } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
-import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason, UNRECONCILED_REASONS, reasonMeta } from '../lib/accounting'
+import { monthOptions, accountantMonth, closeReadiness, packages, packageSummary, monthGrid, complianceEvents, eventStage, taxProgress, packageExportData, createAccountantZipPackage, dedupeDocumentLinks, determineUnreconciledReason, UNRECONCILED_REASONS, reasonMeta } from '../lib/accounting'
 import { documentFileUrl, packageSource, documentContentBytes } from '../lib/actions'
 import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { quarterOf, reportingPeriod } from '../lib/accountantRegisters'
@@ -36,7 +36,7 @@ const monthLabel = (key, lang) => {
   const [y, m] = key.split('-').map(Number)
   return new Date(y, m - 1, 1).toLocaleDateString(lang === 'ru' ? 'ru-RU' : lang === 'id' ? 'id-ID' : 'en-GB', { month: 'long', year: 'numeric' })
 }
-const STAGE_TONE = { done: 'good', overdue: 'crit', calculated: 'info', todo: 'neutral' }
+const STAGE_TONE = { done: 'good', paid: 'info', overdue: 'crit', calculated: 'info', todo: 'neutral' }
 
 function MonthPicker({ value, onChange }) {
   const t = useT()
@@ -159,6 +159,7 @@ export function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
     <ul className="v2-taxlist">
       {events.slice(0, limit).map((e) => {
         const stage = eventStage(e)
+        const prog = taxProgress(e)
         const topicId = matchTopicId(e.rule_code || e.title)
         const matchedCard = topicId ? getTaxCard(topicId, lang) : null
         const whatText = Array.isArray(matchedCard?.what_is) && matchedCard.what_is[0]?.text
@@ -186,8 +187,10 @@ export function TaxList({ events, lang, t, limit, empty = 'acct.noEvents' }) {
             </span>
             <span className="v2-num v2-r">{e.estimated_amount != null ? money(e.estimated_amount) : e.nil_return && e.nil_rule === 'required' ? money(0) : '—'}</span>
             <Pill tone={STAGE_TONE[stage]}>{t(`acct.stage.${stage}`)}</Pill>
-            {(e.pay_by || e.nil_return || e.verified === false || e.documents > 0) && (
+            {(e.pay_by || e.nil_return || e.verified === false || e.documents > 0 || stage !== 'todo') && (
               <span className="v2-taxlist-more v2-small">
+                {/* Why the pill says what it says: payment and return are separate steps. */}
+                <span data-tax-progress={`${prog.payment}/${prog.filing}`}>{t(`acct.pay.${prog.payment}`)} · {t(`acct.file.${prog.filing}`)}</span>
                 {e.pay_by && e.pay_by !== e.due_date && <span>{t('acct.payBy', { d: shortDate(e.pay_by, lang) })}</span>}
                 {e.nil_return && <span className={e.nil_rule === 'required' ? 'v2-taxlist-nil' : 'v2-muted'}>{t(e.nil_rule === 'required' ? 'acct.nilReturn' : 'acct.nilOptional')}</span>}
                 {e.documents > 0 && <span>{t('acct.docsN', { n: e.documents })}</span>}
@@ -845,6 +848,7 @@ function TaxesTab({ month }) {
         {overdue.length > 0 && (
           <Card title={t('acct.overdueTitle', { n: overdue.length })}>
             <TaxList events={overdue} lang={lang} t={t} limit={24} />
+            <p className="v2-muted v2-small" data-tax-payment-note>{t('acct.paymentNotLinked')}</p>
           </Card>
         )}
         <Card title={t('acct.ahead')}>

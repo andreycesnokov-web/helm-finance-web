@@ -65,10 +65,21 @@ function recordFromBody(b = {}) {
     if (!loan) return { error: 'equity_has_no_repayments' };
     if (!Array.isArray(b.schedule) || b.schedule.length > MAX_SCHEDULE) return { error: 'invalid_schedule' };
     for (const s of b.schedule) { const v = repaymentFromBody(s); if (v.error) return { error: `schedule_${v.error}` }; schedule.push(v.row); }
+    if (!principalFits(amount, schedule.map((r) => r.principal), 0)) return { error: 'schedule_exceeds_loan' };
   }
   return { row: { source_kind: b.source_kind, instrument: b.instrument, counterparty_id: cp, lender_name: lender, amount: round2(amount), currency: 'IDR',
     received_on: b.received_on, received_transaction_id: rx, interest_rate_annual: rate,
     terms_text: typeof b.terms_text === 'string' && b.terms_text.trim() ? b.terms_text.trim().slice(0, 2000) : null, due_on: due }, schedule };
+}
+
+/**
+ * A loan's scheduled principal can never be more than was borrowed (financial integrity audit
+ * 2026-10-24): an extra instalment made the schedule promise 275M of principal on a 250M loan,
+ * so the upcoming repayments (Radar) and the outstanding balance (Funding) disagreed by 25M.
+ */
+function principalFits(loanAmount, scheduledPrincipals = [], add = 0) {
+  const total = scheduledPrincipals.reduce((s, p) => s + Number(p || 0), 0) + Number(add || 0);
+  return round2(total) <= round2(Number(loanAmount) || 0);
 }
 
 function paidFromBody(b = {}) {
@@ -90,7 +101,11 @@ function summarize(records = [], repayments = [], { today, months = [] } = {}) {
     const paidPrincipal = reps.filter((r) => r.paid_on).reduce((s, r) => s + Number(r.principal || 0), 0);
     const outstanding = rec.instrument === 'loan' && rec.status === 'active' ? round2(Math.max(0, Number(rec.amount) - paidPrincipal)) : 0;
     const next = reps.find((r) => !r.paid_on) || null;
-    return { ...rec, repayments: reps, outstanding, next_repayment: next };
+    // Principal still scheduled vs what is still owed. A difference is shown, never hidden: the
+    // schedule (Radar) and the balance (Funding) only agree when this is 0.
+    const unpaidPrincipal = round2(reps.filter((r) => !r.paid_on).reduce((s, r) => s + Number(r.principal || 0), 0));
+    const scheduleExcess = rec.instrument === 'loan' && rec.status === 'active' ? round2(Math.max(0, unpaidPrincipal - outstanding)) : 0;
+    return { ...rec, repayments: reps, outstanding, next_repayment: next, unpaid_principal: unpaidPrincipal, schedule_excess: scheduleExcess };
   });
   const upcoming = recs.flatMap((rec) => rec.repayments.filter((r) => !r.paid_on).map((r) => ({
     id: r.id, funding_record_id: rec.id, due_on: r.due_on, principal: Number(r.principal), interest: Number(r.interest),
@@ -106,6 +121,7 @@ function summarize(records = [], repayments = [], { today, months = [] } = {}) {
       raised_equity: sum(recs.filter((r) => r.instrument === 'equity'), (r) => Number(r.amount)),
       raised_loans: sum(recs.filter((r) => r.instrument === 'loan'), (r) => Number(r.amount)),
       loans_outstanding: sum(recs, (r) => r.outstanding),
+      schedule_excess: sum(recs, (r) => r.schedule_excess),
       next_repayment: upcoming[0] || null,
     },
     interest_by_month: interestByMonth,
@@ -115,4 +131,4 @@ function summarize(records = [], repayments = [], { today, months = [] } = {}) {
   };
 }
 
-module.exports = { SOURCES, INSTRUMENTS, EDIT_ROLES, canEditFunding, recordFromBody, repaymentFromBody, paidFromBody, summarize };
+module.exports = { SOURCES, INSTRUMENTS, EDIT_ROLES, canEditFunding, recordFromBody, repaymentFromBody, paidFromBody, principalFits, summarize };

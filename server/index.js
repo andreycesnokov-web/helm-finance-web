@@ -1061,6 +1061,7 @@ async function requireBusiness(req, res) {
 // @param allTxs — all-time transactions array (must include `created_at`)
 const burnRunway = require('./lib/burnRunway');
 const computeBurnAndRunway = burnRunway.computeBurnAndRunway;
+const { payrollSchedule } = require('./lib/payrollSchedule');
 
 
 // --- Pulse API -------------------------------------------------------------
@@ -1261,7 +1262,17 @@ app.get('/api/pulse', auth, async (req, res) => {
 
     // -- Burn rate & runway via rolling 30-day window ----------------------
     // allTxs has created_at (select('*')), so computeBurnAndRunway works here.
-    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance, asOfDate);
+    // The same classification evidence as the month figures above (a funding-register inflow is
+    // never operating revenue here either), and the payroll operations so the forecast can put
+    // salaries on their pay dates (lib/payrollSchedule.js). No payroll table → no schedule.
+    let payroll = null;
+    {
+      const { data: payRows, error: payErr } = await supabase.from('payroll_payments')
+        .select('id, status, period_month, payment_date, net_amount, amount, currency, transaction_id')
+        .or(bizOr);
+      if (!payErr) payroll = payrollSchedule(payRows || []);
+    }
+    const burnMetrics = computeBurnAndRunway(allTxs, totalBalance, asOfDate, { evidence: insightEvidence, payrollTxIds: payroll ? payroll.tx_ids : null });
     const burnRate = burnMetrics.burn_rate_daily;
     const runway   = burnMetrics.runway_days; // null when cash flow positive, break-even or insufficient data
 
@@ -1302,9 +1313,10 @@ app.get('/api/pulse', auth, async (req, res) => {
       } else {
         runwayPart = language === 'ru' ? 'Недостаточно данных для расчёта запаса.' : language === 'id' ? 'Data transaksi belum cukup.' : 'Insufficient data for runway calculation.';
       }
-      const incomePart = cx(language, 'incomeCoversObligations');
-      const riskPart   = cx(language, 'noRisksDetected');
-      aiText = `${runwayPart} ${incomePart} ${riskPart}`.trim();
+      // No "income covers obligations / no risks detected" here: nothing above checks either
+      // (the scheduled bills, payroll and loan repayments are Radar's job), and the en/ru keys
+      // were missing, so the raw keys reached the screen (financial integrity audit 2026-10-24).
+      aiText = runwayPart.trim();
     }
 
     // -- Today's focus ------------------------------------------------------
@@ -1349,6 +1361,11 @@ app.get('/api/pulse', auth, async (req, res) => {
       has_incomplete_balance: hasIncompleteBalance,
       unvalued_currencies: unvaluedCurrencies,
       burnWindowDays: burnMetrics.burn_window_days,
+      // Payroll on its pay dates for Radar / Pulse / Forecast: burn_daily is the part of
+      // burn_rate_daily that was salaries (paid in the same window).
+      payroll_schedule: payroll
+        ? { available: true, payments: payroll.payments, last_confirmed: payroll.last_confirmed, burn_daily: burnMetrics.payroll_spend_daily }
+        : { available: false },
       receivables, payables, netPosition,
       // Operating performance for the month, and the cash that moved but is NOT
       // operating performance. Kept apart so neither can distort the other.
@@ -9148,11 +9165,17 @@ app.post('/api/business-funding/:id/repayments', auth, async (req, res) => {
     if (!BFUND.canEditFunding(biz.role)) return res.status(403).json({ error: 'Only owner, CEO, admin or CFO can change repayments' });
     const v = BFUND.repaymentFromBody(req.body || {});
     if (v.error) return res.status(400).json(v);
-    const { data: recs, error: rErr } = await supabase.from('business_funding_records').select('id, instrument')
+    const { data: recs, error: rErr } = await supabase.from('business_funding_records').select('id, instrument, amount')
       .eq('id', req.params.id).eq('business_id', biz.business.id).limit(1);
     if (rErr && fundMissing(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '064' });
     if (!recs?.length) return res.status(404).json({ error: 'funding_not_found_in_this_business' });
     if (recs[0].instrument !== 'loan') return res.status(400).json({ error: 'equity_has_no_repayments' });
+    // The schedule's principal (paid and unpaid) may not grow past the loan amount.
+    const { data: existing, error: eErr } = await supabase.from('business_funding_repayments').select('principal')
+      .eq('funding_record_id', recs[0].id).eq('business_id', biz.business.id);
+    if (eErr) return res.status(500).json({ error: eErr.message });
+    if (!BFUND.principalFits(recs[0].amount, (existing || []).map((r) => r.principal), v.row.principal))
+      return res.status(400).json({ error: 'schedule_exceeds_loan' });
     const { data, error } = await supabase.from('business_funding_repayments')
       .insert({ ...v.row, business_id: biz.business.id, funding_record_id: recs[0].id, created_by_user_id: req.user.userId }).select('*').single();
     if (error) return res.status(500).json({ error: error.message });
@@ -12528,7 +12551,9 @@ async function buildAiCfoContext(userId, language = 'en', biz = null) {
 
   // ── Burn rate & runway — rolling 30-day window (business wallets only) ────
   const bizTxs      = (allTxs || []).filter(t => txBelongsToWallets(t, businessWallets, businessWalletIds, 'business'));
-  const burnMetrics = computeBurnAndRunway(bizTxs, totalBalance);
+  // Same classification evidence as Pulse, so AI CFO / MCP report the same runway.
+  const burnEvidence = biz ? await CATGROUPS.loadInsightEvidence(supabase, biz.business.id) : null;
+  const burnMetrics = computeBurnAndRunway(bizTxs, totalBalance, null, { evidence: burnEvidence });
   const burnRate    = burnMetrics.burn_rate_daily;
 
   // ── Debts breakdowns ──────────────────────────────────────────────────────
@@ -12751,7 +12776,7 @@ async function buildBusinessFinancialSnapshot(biz, language = 'en', asOfDate = n
   });
   const totalCash = byWallet.reduce((s, w) => s + (w.balance_idr ?? (w.currency === 'IDR' ? w.balance : 0)), 0);
 
-  const burn = computeBurnAndRunway(bizTxs, totalCash);
+  const burn = computeBurnAndRunway(bizTxs, totalCash, null, { evidence: await CATGROUPS.loadInsightEvidence(supabase, biz.business.id) });
   const dailyBurn = burn.burn_rate_daily;
 
   // Debts — only approved/open count as confirmed; pending tracked separately.
@@ -15794,18 +15819,20 @@ app.get('/api/accountant/tax-calendar', auth, async (req, res) => {
       const verifiedRule = !!rule && rule.status === 'active' && effectiveRuleActive(rule, rule.official_sources);
       const s = byKey.get(`${r.rule_code}|${r.period}`) || null;
       const due = verifiedRule && s?.due_date ? String(s.due_date).slice(0, 10) : r.due_date;
-      const done = s && (['paid', 'filed'].includes(s.payment_status) || ['paid', 'filed'].includes(s.status));
       const hadActivity = active.has(r.period);
+      const nilReturn = String(r.period_end || '') < today && !hadActivity && !(Number(s?.estimated_amount) > 0) && !(Number(s?.confirmed_amount) > 0);
+      // Payment and filing apart: a payment is not a filed return (taxDeadlines.taxStages).
+      const st = taxDeadlines.taxStages(s, { due, payBy: r.pay_by || null, today, nilReturn });
       return {
         ...r, id: s?.id || null, due_date: due, verified: verifiedRule,
         days: Math.ceil((new Date(due) - new Date(today)) / 86400000),
-        stage: done ? 'done' : due < today ? 'overdue' : 'todo',
+        stage: st.stage, payment_stage: st.payment_stage, filing_stage: st.filing_stage,
         amount_status: s?.amount_status || 'unknown', estimated_amount: s?.estimated_amount ?? null,
         confirmed_amount: s?.confirmed_amount ?? null, payment_status: s?.payment_status || 'unpaid',
         filing_status: s?.filing_status || 'not_filed', documents: s?.id ? (docCount.get(s.id) || 0) : 0,
         // No money moved in the period: the return is still due, with zero amounts.
         // Only for a period that has ended; a current or future month simply has no activity yet.
-        nil_return: String(r.period_end || '') < today && !hadActivity && !(Number(s?.estimated_amount) > 0) && !(Number(s?.confirmed_amount) > 0),
+        nil_return: nilReturn,
         nil_rule: taxDeadlines.nilRule(r.rule_code, r.period),
       };
     }).sort((a, b) => (a.due_date < b.due_date ? -1 : 1));

@@ -9,7 +9,8 @@ import { useBusinessRequest } from '../lib/useBusinessRequest'
 import { useT } from '../i18n'
 import { money } from '../lib/format'
 import Modal from './Modal'
-import { transferBetweenWallets, checkBillPayment, payBill } from '../lib/actions'
+import { transferBetweenWallets, checkBillPayment, payBill, updateTransaction } from '../lib/actions'
+import { useApi } from '../data'
 
 const num = (v) => { const n = Number(String(v ?? '').replace(/[\s.](?=\d{3}\b)/g, '').replace(',', '.')); return Number.isFinite(n) ? n : NaN }
 const today = () => new Date().toISOString().slice(0, 10)
@@ -97,6 +98,11 @@ export function PayBillDialog({ debt, accounts = [], onClose, onSaved }) {
   const [ack, setAck] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // The payment operation gets the category the user picks here — a bill carries none and the
+  // counterparty's default is free text, so nothing is guessed (financial integrity audit 2026-10-24).
+  const cats = useApi('/cashflow-categories')
+  const catOptions = (cats.data?.categories || []).filter((x) => x.is_active !== false && x.group_type === (income ? 'inflow' : 'outflow')).map((x) => x.name).filter(Boolean)
+  const [category, setCategory] = useState('')
   const n = num(amount)
   const w = same.find((x) => String(x.id) === walletId)
   const full = n >= left - 0.01
@@ -114,6 +120,12 @@ export function PayBillDialog({ debt, accounts = [], onClose, onSaved }) {
     setBusy(true); setErr('')
     try {
       const r = await payBill(request, debt.id, id, { amount: n, wallet_id: w.id, account: w.name, date, idempotency_key: id })
+      // Same idempotency key on a retry → the recorded payment is replayed, and setting the
+      // category again is harmless, so a failed category write can simply be retried.
+      if (category && r?.transaction_id != null) {
+        try { await updateTransaction(request, r.transaction_id, { category }) }
+        catch (x) { onSaved?.(r); setErr(t('payb.catFailed', { e: errText(t, x) })); return }
+      }
       onSaved?.(r); onClose()
     } catch (x) { setErr(errText(t, x)) } finally { setBusy(false) }
   }
@@ -142,6 +154,11 @@ export function PayBillDialog({ debt, accounts = [], onClose, onSaved }) {
           {same.map((x) => <option key={x.id} value={String(x.id)}>{x.name} · {money(x.balance, { currency: c, full: true })}</option>)}
         </select>
         {!same.length && <span className="v2-inline-err">{t('payb.noAcc', { c })}</span>}</label>
+      <label className="v2-field"><span className="v2-field-label">{t('payb.category')}</span>
+        <select className="v2-select" value={category} onChange={(e) => setCategory(e.target.value)} data-payb-category>
+          <option value="">{t('payb.categoryNone')}</option>
+          {catOptions.map((x) => <option key={x} value={x}>{x}</option>)}
+        </select></label>
       {n > left + 0.01 && <p className="v2-inline-err" role="alert">{t('payb.tooMuch', { v: money(left, { currency: c, full: true }) })}</p>}
       {over && <p className="v2-inline-err" role="alert">{t('xfer.err.over', { v: money(w.balance, { currency: c, full: true }) })}</p>}
       {sim && (

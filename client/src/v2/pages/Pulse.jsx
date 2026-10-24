@@ -12,16 +12,16 @@ import { PageHead, Card, Pill, Btn, Skeleton, ErrorBox } from '../ui'
 import { useT, useLang } from '../i18n'
 import { useApi } from '../data'
 import { money, shortDate, longDate } from '../lib/format'
-import { cashItems, forecast } from '../lib/radarSeries'
+import { cashItems, forecast, forecastBurn, withoutLateInflows } from '../lib/radarSeries'
 import {
-  runwayTarget, minCash, runwayDays, pulseStatus, headlineKey, decisions, nextDays, cashFlow, pctChange, obligationTiles,
+  runwayTarget, minCash, runwayDays, runwayGap, pulseStatus, headlineKey, decisions, nextDays, cashFlow, pctChange, obligationTiles,
 } from '../lib/pulseModel'
 import { useAskContext } from '../ai/AskContext'
 import InfoTooltip from '../../components/InfoTooltip'
 
 const iso = (d) => d.toISOString().slice(0, 10)
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d) }
-const STATUS = { good: { tone: 'good', key: 'pulse.status.good' }, warn: { tone: 'warn', key: 'pulse.status.warn' }, crit: { tone: 'crit', key: 'pulse.status.crit' } }
+const STATUS = { good: { tone: 'good', key: 'pulse.status.good' }, warn: { tone: 'warn', key: 'pulse.status.warn' }, crit: { tone: 'crit', key: 'pulse.status.crit' }, unknown: { tone: 'neutral', key: 'pulse.status.unknown' } }
 
 function DecisionRow({ d, t, lang }) {
   if (d.kind === 'approval') {
@@ -87,18 +87,23 @@ export default function Pulse() {
     const p = pulse.data
     if (!p) return null
     const obligations = obl.data?.obligations || []
-    const { items } = cashItems({ debts: p.debts, obligations, repayments: fund.data?.upcoming || [], rates: p.rates })
-    const f = forecast({ balance: p.totalBalance, burnRate: p.burnRate, items })
+    const { items } = cashItems({ debts: p.debts, obligations, repayments: fund.data?.upcoming || [], payroll: p.payroll_schedule, rates: p.rates })
+    const burnRate = forecastBurn(p)
+    const f = forecast({ balance: p.totalBalance, burnRate, items })
+    // The same line without overdue invoices counted as paid today: is "covered" only thanks to them?
+    const fNoLate = forecast({ balance: p.totalBalance, burnRate, items: withoutLateInflows(items) })
     const runway = runwayDays(p)
     const tg = targets.data?.targets || null
     const target = runwayTarget(tg)
     const floor = minCash(tg)
-    const status = pulseStatus({ runway, lowestExpected: f.lowest.value, target, floor })
+    const judged = { runway, lowestExpected: f.lowest.value, target, floor, lowestWithoutLate: fNoLate.lowest.value, gap: runwayGap(p) }
+    const status = pulseStatus(judged)
     return {
       p, f, runway, status, target, floor, targetIsDefault: tg?.runway_target_days == null,
-      head: headlineKey(status, { runway, lowestExpected: f.lowest.value, target, floor }),
+      head: headlineKey(status, judged),
+      late: items.filter((it) => it.dir === 'in' && it.tag === 'late').reduce((s, x) => s + x.amount, 0),
       decs: decisions({ debts: p.debts || [], obligations }),
-      next: nextDays(items, { burnRate: p.burnRate, forecastDays: f.days }),
+      next: nextDays(items, { burnRate, forecastDays: f.days }),
       tiles: obligationTiles(p),
       accounts: p.accounts || [],
     }
@@ -128,7 +133,8 @@ export default function Pulse() {
       <section className="v2-hero" aria-labelledby="v2-hero-title">
         <div className="v2-hero-text">
           <Pill tone={st.tone} dot>{t(st.key)}</Pill>
-          <h2 id="v2-hero-title" className="v2-hero-title">{t(m.head, { month: monthName, target, floor: floor == null ? '' : money(floor) })}</h2>
+          <h2 id="v2-hero-title" className="v2-hero-title">{t(m.head, { month: monthName, target, floor: floor == null ? '' : money(floor), late: money(m.late),
+            d: f.firstShortfall ? (f.firstShortfall.day === 0 ? t('radar.today') : shortDate(f.firstShortfall.date, lang)) : '', low: money(f.lowest.value) })}</h2>
           <p className="v2-hero-p">
             {flow && (flow.net < 0
               ? t('pulse.say.spendMore', { v: money(-flow.net) })

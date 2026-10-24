@@ -123,4 +123,24 @@ function advisoryCalendar(rules = [], profile = null, now = new Date()) {
   return out.sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
 }
 
-module.exports = { GENERAL, SOURCE, deadlinesFor, advisoryCalendar, monthlyPeriods, monthDay, appliesTo, nilRule };
+/**
+ * Payment and filing of one obligation, kept apart (financial integrity audit 2026-10-24). `s` is the
+ * stored compliance_events row (or null), `due` its file-by date, `payBy` its pay-by date.
+ * Money paid is never a filed return; a payment is "recorded" only when the obligation itself says
+ * so — moving money in a tax category does not change it (nothing links that money to the period yet).
+ *   stage  'done' (filed) | 'paid' (payment recorded, return not filed yet) | 'overdue' | 'todo'
+ * The client mirrors this in taxProgress / eventStage (client/src/v2/lib/accounting.js).
+ */
+function taxStages(s, { due, payBy, today, nilReturn = false } = {}) {
+  const paid = s?.payment_status === 'paid' || s?.status === 'paid';
+  const filed = s?.filing_status === 'filed' || s?.status === 'filed' || s?.payment_status === 'filed';
+  const payDate = payBy || due;
+  const payment = paid ? 'recorded' : payDate && payDate < today ? 'overdue' : 'due';
+  const filing = filed ? 'filed' : due && due < today ? 'overdue' : 'due';
+  const stage = filing === 'filed' ? 'done'
+    : payment === 'recorded' && filing !== 'overdue' ? 'paid'
+    : filing === 'overdue' || (payment === 'overdue' && !nilReturn) ? 'overdue' : 'todo';
+  return { payment_stage: payment, filing_stage: filing, stage };
+}
+
+module.exports = { GENERAL, SOURCE, deadlinesFor, advisoryCalendar, monthlyPeriods, monthDay, appliesTo, nilRule, taxStages };

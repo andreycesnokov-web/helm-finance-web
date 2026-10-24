@@ -40,22 +40,45 @@ export function runwayDays(pulse) {
 }
 
 /**
- * Overall status from runway and the 30-day forecast.
- *   crit  runway ≤ 14 days, or expected cash below zero inside 30 days
- *   warn  runway below the target, or expected cash dips under the minimum cash (P-08)
- *   good  otherwise (including "no burn measured")
+ * Why runway could not be measured, from GET /api/pulse: 'no_data' (no operating history yet)
+ * or 'incomplete' (some foreign-currency money has no IDR value). null when it was measured or
+ * when cash flow is positive / break-even — those are real answers, not missing ones.
  */
-export function pulseStatus({ runway, lowestExpected, target = RUNWAY_TARGET_DAYS, floor = null }) {
+export function runwayGap(pulse) {
+  if (pulse?.has_unvalued_tx || pulse?.runway_reason === 'incomplete_valuation') return 'incomplete'
+  if (pulse?.runway_reason === 'insufficient_data') return 'no_data'
+  return null
+}
+
+/**
+ * Overall status from runway and the 30-day forecast.
+ *   crit     runway ≤ 14 days, or expected cash below zero inside 30 days
+ *   warn     runway below the target, expected cash dips under the minimum cash (P-08), or cash
+ *            stays above zero only because overdue invoices are counted as paid today
+ *            (`lowestWithoutLate`, the expected line without them)
+ *   unknown  nothing above, and runway could not be measured (`gap`, see runwayGap): never
+ *            "covered" without the figures to say so
+ *   good     otherwise (including positive cash flow)
+ */
+export function pulseStatus({ runway, lowestExpected, target = RUNWAY_TARGET_DAYS, floor = null, lowestWithoutLate = null, gap = null }) {
   if ((runway != null && runway <= 14) || (lowestExpected != null && lowestExpected < 0)) return 'crit'
   if (runway != null && runway < target) return 'warn'
   if (floor != null && lowestExpected != null && lowestExpected < floor) return 'warn'
+  if (lowestWithoutLate != null && lowestWithoutLate < 0) return 'warn'
+  if (gap) return 'unknown'
   return 'good'
 }
 
 /** Headline copy key for the hero. */
-export function headlineKey(status, { runway, lowestExpected, target = RUNWAY_TARGET_DAYS, floor = null }) {
+export function headlineKey(status, { runway, lowestExpected, target = RUNWAY_TARGET_DAYS, floor = null, lowestWithoutLate = null, gap = null }) {
   if (status === 'crit') return lowestExpected != null && lowestExpected < 0 ? 'pulse.head.short' : 'pulse.head.critical'
-  if (status === 'warn') return runway != null && runway < target ? 'pulse.head.belowTarget' : (floor != null ? 'pulse.head.belowFloor' : 'pulse.head.belowTarget')
+  if (status === 'warn') {
+    if (runway != null && runway < target) return 'pulse.head.belowTarget'
+    if (floor != null && lowestExpected != null && lowestExpected < floor) return 'pulse.head.belowFloor'
+    if (lowestWithoutLate != null && lowestWithoutLate < 0) return 'pulse.head.dependsOnLate'
+    return 'pulse.head.belowTarget'
+  }
+  if (status === 'unknown') return gap === 'incomplete' ? 'pulse.head.incomplete' : 'pulse.head.noData'
   return runway == null ? 'pulse.head.noBurn' : 'pulse.head.covered'
 }
 

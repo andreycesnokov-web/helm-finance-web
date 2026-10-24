@@ -21,6 +21,14 @@
 // listed with a "Waiting for approval" tag but is NOT counted in any line or total
 // (`counted: false`), the same way the server leaves it out of Pulse totals. The
 // 'approve' what-if counts one such item, on screen only.
+//
+// Payroll (financial integrity audit 2026-10-24): salaries are paid on one day, not spread
+// over the month. When GET /api/pulse returns `payroll_schedule`, the salaries paid in the burn
+// window are taken OUT of the day-to-day spending (`forecastBurn`) and put back on their pay
+// dates: unpaid confirmed payments on their date (overdue ones today), a draft run's figure as
+// an estimate, and for later months the last confirmed payroll repeated on its pay day (an
+// estimate, tagged so). Without the schedule nothing changes. Net pay only: PPh 21 / BPJS
+// deposits stay outside the forecast until the tax engine calculates them.
 
 export const KEY_DATE_MIN_IDR = 1_000_000
 export const DEFAULT_HORIZON = 30
@@ -52,7 +60,7 @@ function tagOf(d, dir) {
  * Dated cash items inside the horizon.
  * @returns {{ items: Array, excluded: { foreign: number, undated: number } }}
  */
-export function cashItems({ debts = [], obligations = [], repayments = [], today = new Date(), horizon = DEFAULT_HORIZON, rates } = {}) {
+export function cashItems({ debts = [], obligations = [], repayments = [], payroll = null, today = new Date(), horizon = DEFAULT_HORIZON, rates } = {}) {
   const t0 = startOfDay(today)
   const items = []
   const excluded = { foreign: 0, undated: 0 }
@@ -110,9 +118,75 @@ export function cashItems({ debts = [], obligations = [], repayments = [], today
       tag: raw < 0 ? 'late' : 'scheduled', counted: true,
     })
   }
+  items.push(...payrollItems(payroll, t0, horizon))
   items.sort((a, b) => a.day - b.day || (a.dir === b.dir ? b.amount - a.amount : a.dir === 'out' ? -1 : 1))
   return { items, excluded }
 }
+
+const lastDayOf = (y, m) => new Date(y, m + 1, 0).getDate()
+
+/** Dated payroll items from GET /api/pulse `payroll_schedule` (see the header). IDR net pay. */
+export function payrollItems(payroll, t0, horizon) {
+  if (!payroll || payroll.available !== true) return []
+  const out = []
+  const payMonths = new Set() // months (YYYY-MM) that already have a pay date
+  for (const p of Array.isArray(payroll.payments) ? payroll.payments : []) {
+    const amount = num(p && p.amount)
+    if (!(amount > 0) || !p.date || !['scheduled', 'draft'].includes(p.status)) continue
+    const due = startOfDay(p.date)
+    if (Number.isNaN(due.getTime())) continue
+    payMonths.add(String(p.date).slice(0, 7))
+    const raw = dayDiff(due, t0)
+    const day = Math.max(0, raw)
+    if (day > horizon) continue
+    out.push({
+      key: `payroll:${p.period || ''}:${p.status}:${p.date}`, source: 'payroll', dir: 'out', amount, day,
+      date: isoDay(addDays(t0, day)), due_date: p.date, label: p.period || '', note: '', count: num(p.count),
+      tag: p.status === 'draft' ? 'estimated' : raw < 0 ? 'late' : 'scheduled', status: p.status, counted: true,
+    })
+  }
+  // Later months: the last confirmed payroll again, on its pay day — only while salaries are
+  // part of the measured spending (burn_daily > 0), because that is what forecastBurn takes out.
+  // Months follow PAY DATES, not payroll periods: October's salary paid on 5 November means the
+  // next estimate is 5 December (anchoring on the period put a second one on 5 November).
+  const last = payroll.last_confirmed
+  // A response without last_confirmed.date (older server) falls back to its period month: salaries are
+  // taken out of the spending either way, so they must always come back as dated items.
+  const lastDate = /^\d{4}-\d{2}-\d{2}$/.test(String(last?.date || '')) ? String(last.date)
+    : /^\d{4}-\d{2}$/.test(String(last?.period || '')) ? `${last.period}-01` : null
+  if (num(payroll.burn_daily) > 0 && last && num(last.amount) > 0 && lastDate) {
+    payMonths.add(lastDate.slice(0, 7))
+    const latest = [...payMonths].sort().pop()
+    let [y, m] = latest.split('-').map(Number)
+    for (;;) {
+      m += 1; if (m > 12) { m = 1; y += 1 }
+      const key = `${y}-${String(m).padStart(2, '0')}`
+      const date = new Date(y, m - 1, Math.min(Math.max(1, num(last.pay_day) || 1), lastDayOf(y, m - 1)))
+      const day = dayDiff(date, t0)
+      if (day > horizon) break
+      if (day < 0 || payMonths.has(key)) continue
+      out.push({
+        key: `payroll:${key}:estimate`, source: 'payroll', dir: 'out', amount: num(last.amount), day,
+        date: isoDay(date), due_date: isoDay(date), label: key, note: last.period, tag: 'estimated', status: 'estimate', counted: true,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Day-to-day spending used by the forecast lines: the measured burn without the salaries that
+ * payrollItems puts on their pay dates. Same burn as before when there is no payroll schedule.
+ */
+export function forecastBurn(pulse) {
+  const burn = num(pulse && pulse.burnRate)
+  const s = pulse && pulse.payroll_schedule
+  if (!s || s.available !== true) return burn
+  return Math.max(0, burn - num(s.burn_daily))
+}
+
+/** The same items without overdue money still to come in (a late invoice may never be paid). */
+export const withoutLateInflows = (items) => items.filter((it) => !(it.dir === 'in' && it.tag === 'late'))
 
 /**
  * What-if transforms. Nothing is saved; they only change the dated items fed to the
@@ -167,12 +241,24 @@ export function forecast({ balance = 0, burnRate = 0, items = [], horizon = DEFA
   const minBy = (k) => days.reduce((m, x) => (x[k] < m[k] ? x : m), days[0])
   const end = days[days.length - 1]
   const low = minBy('expected'), wlow = minBy('worst')
+  // The first day a line is below zero, and the day it is back at zero or above FOR GOOD (after the
+  // last day below zero) — a line that recovers and dips again does not "recover" at the first bounce.
+  const shortfall = (k) => {
+    const i = days.findIndex((x) => x[k] < 0)
+    if (i < 0) return null
+    let last = i
+    for (let j = i; j < days.length; j++) if (days[j][k] < 0) last = j
+    const back = days[last + 1] || null
+    return { date: days[i].date, day: days[i].day, value: days[i][k], recovers: back ? { date: back.date, day: back.day } : null }
+  }
   return {
     days,
     start: b,
     end: { date: end.date, value: end.expected, change: end.expected - b },
     lowest: { date: low.date, value: low.expected, day: low.day },
     worstLowest: { date: wlow.date, value: wlow.worst, day: wlow.day },
+    firstShortfall: shortfall('expected'),
+    worstFirstShortfall: shortfall('worst'),
     burnRate: burn,
   }
 }

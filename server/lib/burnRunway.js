@@ -14,7 +14,10 @@ const FININ = require('./financialInsights');
  * - Tax payments (PPh/PPN payments)
  * - Opening balance corrections
  */
-function isOperatingExpense(t) {
+// `evidence` (optional) is what Pulse's month figures and Advanced Insights already use
+// (CATGROUPS.loadInsightEvidence: the funding register and confirmed category groups), so the
+// burn and the month figures classify the same operation the same way.
+function isOperatingExpense(t, evidence = null) {
   if (!t) return false;
   const eff = FININ.effectiveDate(t);
   if (!eff) return false;
@@ -22,7 +25,7 @@ function isOperatingExpense(t) {
   const isTransfer = t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
   if (isTransfer) return false;
 
-  const cls = FININ.classifyTransaction(t).class;
+  const cls = FININ.classifyTransaction(t, evidence).class;
   if (FININ.NON_OPERATING.includes(cls)) return false;
 
   if (['direct_cost', 'operating_expense'].includes(cls)) return true;
@@ -38,7 +41,7 @@ function isOperatingExpense(t) {
  * - Opening balances
  * - Balance corrections
  */
-function isOperatingInflow(t) {
+function isOperatingInflow(t, evidence = null) {
   if (!t) return false;
   const eff = FININ.effectiveDate(t);
   if (!eff) return false;
@@ -46,7 +49,7 @@ function isOperatingInflow(t) {
   const isTransfer = t.type === 'transfer' || !!t.transfer_id || t.category === 'Transfer';
   if (isTransfer) return false;
 
-  const cls = FININ.classifyTransaction(t).class;
+  const cls = FININ.classifyTransaction(t, evidence).class;
   if (FININ.NON_OPERATING.includes(cls)) return false;
 
   if (cls === 'revenue') return true;
@@ -77,6 +80,11 @@ function extractIdrAmount(t) {
  * @param {Array} allTxs - Array of all business transactions
  * @param {number} totalBalance - Current total cash balance across active accounts
  * @param {string|Date} [asOfDate] - Optional anchor date for calculations (defaults to now)
+ * @param {{ evidence?: object, payrollTxIds?: Set<string> }} [opts]
+ *   evidence      classification evidence (see isOperatingExpense)
+ *   payrollTxIds  ids of the operations that paid a payroll payment (payroll_payments.transaction_id);
+ *                 their share of the window is returned as payroll_spend_daily, so a forecast can put
+ *                 salaries on their pay dates instead of spreading them (client radarSeries).
  * @returns {{
  *   daily_spend: number|null,
  *   daily_spend_window_days: number,
@@ -94,7 +102,9 @@ function extractIdrAmount(t) {
  *   unvalued_tx_count: number
  * }}
  */
-function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
+function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null, opts = {}) {
+  const evidence = opts.evidence || null;
+  const payrollIds = opts.payrollTxIds instanceof Set ? opts.payrollTxIds : null;
   const asOfStr = asOfDate
     ? (typeof asOfDate === 'string' ? asOfDate.slice(0, 10) : new Date(asOfDate).toISOString().slice(0, 10))
     : new Date().toISOString().slice(0, 10);
@@ -110,8 +120,8 @@ function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
     return d && d <= asOfStr;
   });
 
-  const allExpTxs = historicalTxs.filter(isOperatingExpense);
-  const allInTxs = historicalTxs.filter(isOperatingInflow);
+  const allExpTxs = historicalTxs.filter((t) => isOperatingExpense(t, evidence));
+  const allInTxs = historicalTxs.filter((t) => isOperatingInflow(t, evidence));
   const allOpTxs = [...allExpTxs, ...allInTxs];
 
   if (allOpTxs.length === 0) {
@@ -128,6 +138,7 @@ function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
       window_end: asOfStr,
       operating_expenses: 0,
       operating_inflows: 0,
+      payroll_spend_daily: 0,
       has_unvalued_tx: false,
       unvalued_tx_count: 0,
     };
@@ -197,6 +208,13 @@ function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
 
   // Numerator: operating expenses in window. Denominator: windowDays.
   const dailySpend = allExpTxs.length > 0 ? Math.round(totalExp / windowDays) : null;
+  // The salaries inside that spending (same window, same valuation), never more than the spend itself.
+  const payrollExp = payrollIds ? windowExpTxs.reduce((s, t) => {
+    if (!payrollIds.has(String(t.id))) return s;
+    const ext = extractIdrAmount(t);
+    return ext.is_unvalued ? s : s + (ext.amount_idr || 0);
+  }, 0) : 0;
+  const payrollSpendDaily = Math.min(dailySpend || 0, Math.round(payrollExp / windowDays));
 
   // Net burn: cash out minus cash in from operations
   const netCashDrain = totalExp - totalInflows;
@@ -242,6 +260,7 @@ function computeBurnAndRunway(allTxs, totalBalance, asOfDate = null) {
     window_end: asOfStr,
     operating_expenses: totalExp,
     operating_inflows: totalInflows,
+    payroll_spend_daily: payrollSpendDaily,
     has_unvalued_tx: hasUnvaluedTx,
     unvalued_tx_count: unvaluedTxCount,
     is_partial: hasUnvaluedTx,
