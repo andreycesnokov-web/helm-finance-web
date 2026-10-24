@@ -428,6 +428,13 @@ class ContentStore {
     return releaseManifest;
   }
 
+  saveReleaseManifest(release) {
+    if (!release || !release.release_id) return null;
+    const releaseFile = path.join(this.releasesDir, `${release.release_id}.json`);
+    fs.writeFileSync(releaseFile, JSON.stringify(release, null, 2), 'utf8');
+    return release;
+  }
+
   rollbackRelease(targetReleaseId, author = 'owner') {
     const targetFile = path.join(this.releasesDir, `${targetReleaseId}.json`);
     if (!fs.existsSync(targetFile)) {

@@ -1,5 +1,114 @@
 [
   {
+    "id": "aud-1792849177783-f6n3s7",
+    "timestamp": "2026-10-24T13:39:37.783Z",
+    "actor": "test-runner",
+    "action": "publish_release",
+    "entity": "release:rel-1792849177779-1ff6ca48",
+    "details": {
+      "version": "v202610241339",
+      "hash": "1ff6ca48",
+      "notes": "Verify integrations & help preservation"
+    }
+  },
+  {
+    "id": "aud-1792849177392-ktx04l",
+    "timestamp": "2026-10-24T13:39:37.393Z",
+    "actor": "test-runner",
+    "action": "rollback_release",
+    "entity": "release:rel-1792847838030-1ff6ca48",
+    "details": {
+      "version": "v202610241317",
+      "hash": "1ff6ca48"
+    }
+  },
+  {
+    "id": "aud-1792849177360-aj9aer",
+    "timestamp": "2026-10-24T13:39:37.360Z",
+    "actor": "test-runner",
+    "action": "publish_release",
+    "entity": "release:rel-1792849177354-f9481fd1",
+    "details": {
+      "version": "v202610241339",
+      "hash": "f9481fd1",
+      "notes": "Test Release v2"
+    }
+  },
+  {
+    "id": "aud-1792849177330-44gyqt",
+    "timestamp": "2026-10-24T13:39:37.330Z",
+    "actor": "test-runner",
+    "action": "update_page",
+    "entity": "page:home",
+    "details": {
+      "title": "CFO AI — Financial Operating System for Indonesia"
+    }
+  },
+  {
+    "id": "aud-1792849177316-ekuhs5",
+    "timestamp": "2026-10-24T13:39:37.316Z",
+    "actor": "test-runner",
+    "action": "update_pricing",
+    "entity": "pricing",
+    "details": {
+      "isValid": true,
+      "discrepancyCount": 0
+    }
+  },
+  {
+    "id": "aud-1792849177303-vxb570",
+    "timestamp": "2026-10-24T13:39:37.303Z",
+    "actor": "test-runner",
+    "action": "update_pricing",
+    "entity": "pricing",
+    "details": {
+      "isValid": false,
+      "discrepancyCount": 1
+    }
+  },
+  {
+    "id": "aud-1792849177293-h3gqex",
+    "timestamp": "2026-10-24T13:39:37.293Z",
+    "actor": "test-runner",
+    "action": "update_pricing",
+    "entity": "pricing",
+    "details": {
+      "isValid": false,
+      "discrepancyCount": 2
+    }
+  },
+  {
+    "id": "aud-1792849177283-k6jrxj",
+    "timestamp": "2026-10-24T13:39:37.283Z",
+    "actor": "test-runner",
+    "action": "update_pricing",
+    "entity": "pricing",
+    "details": {
+      "isValid": false,
+      "discrepancyCount": 1
+    }
+  },
+  {
+    "id": "aud-1792849177268-61e1az",
+    "timestamp": "2026-10-24T13:39:37.268Z",
+    "actor": "editor@cfo-ai.site",
+    "action": "login",
+    "entity": "auth",
+    "details": {
+      "role": "editor"
+    }
+  },
+  {
+    "id": "aud-1792849177230-7e8y6o",
+    "timestamp": "2026-10-24T13:39:37.231Z",
+    "actor": "admin@cfo-ai.site",
+    "action": "login",
+    "entity": "auth",
+    "details": {
+      "role": "owner"
+    }
+  },
+  {
     "id": "aud-1792847838034-asvwj5",
     "timestamp": "2026-10-24T13:17:18.034Z",
     "actor": "test-runner",

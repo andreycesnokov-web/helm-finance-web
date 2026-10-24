@@ -17,10 +17,12 @@ const {
   requireCmsRole
 } = require('./auth');
 const TranslationEngine = require('../engine/translationEngine');
+const CloudflarePublisher = require('../engine/cloudflarePublisher');
 
 function createCmsRoutes(contentStore) {
   const router = express.Router();
   const translationEngine = new TranslationEngine();
+  const cfPublisher = new CloudflarePublisher();
 
   // --- RATE LIMITING ---
   const loginAttempts = new Map();
@@ -480,33 +482,88 @@ function createCmsRoutes(contentStore) {
     });
   });
 
-  router.post('/releases/publish', requireCmsAuth, requireCmsRole(['owner']), (req, res) => {
+  router.post('/releases/publish', requireCmsAuth, requireCmsRole(['owner']), async (req, res) => {
     try {
       const { notes } = req.body;
       const release = contentStore.createRelease({
         author: req.cmsUser.email,
         notes: notes || 'Production website release'
       });
+
+      // Automatically trigger SSG pre-rendering build
+      try {
+        await cfPublisher.buildMarketingSite();
+      } catch (buildErr) {
+        console.error('[SSG Build Error]', buildErr.message);
+      }
+
+      // If CLOUDFLARE_API_TOKEN is provided, automatically deploy to Cloudflare Pages
+      let cfResult = null;
+      if (process.env.CLOUDFLARE_API_TOKEN) {
+        try {
+          cfResult = await cfPublisher.deployToCloudflare('main');
+          release.cf_deployment = cfResult;
+          contentStore.saveReleaseManifest(release);
+        } catch (cfErr) {
+          console.error('[Cloudflare Deploy Error]', cfErr.message);
+          cfResult = { success: false, error: cfErr.message };
+        }
+      }
+
       res.json({
         success: true,
         message: `Release ${release.version} published successfully!`,
-        release
+        release,
+        cloudflare: cfResult
       });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   });
 
-  router.post('/releases/:id/rollback', requireCmsAuth, requireCmsRole(['owner']), (req, res) => {
+  router.post('/releases/:id/rollback', requireCmsAuth, requireCmsRole(['owner']), async (req, res) => {
     try {
       const activePointer = contentStore.rollbackRelease(req.params.id, req.cmsUser.email);
+
+      // Re-run SSG build with restored release data
+      try {
+        await cfPublisher.buildMarketingSite();
+      } catch (buildErr) {
+        console.error('[SSG Rollback Build Error]', buildErr.message);
+      }
+
+      // If CLOUDFLARE_API_TOKEN is provided, deploy restored build to Cloudflare Pages
+      let cfResult = null;
+      if (process.env.CLOUDFLARE_API_TOKEN) {
+        try {
+          cfResult = await cfPublisher.deployToCloudflare('main');
+        } catch (cfErr) {
+          console.error('[Cloudflare Rollback Deploy Error]', cfErr.message);
+          cfResult = { success: false, error: cfErr.message };
+        }
+      }
+
       res.json({
         success: true,
         message: `Successfully rolled back to release ${activePointer.version}.`,
-        activePointer
+        activePointer,
+        cloudflare: cfResult
       });
     } catch (err) {
       res.status(400).json({ error: err.message });
+    }
+  });
+
+  router.get('/releases/verify-edge', requireCmsAuth, async (req, res) => {
+    try {
+      const verification = await cfPublisher.verifyLiveUrls();
+      res.json({
+        success: true,
+        verifiedAt: new Date().toISOString(),
+        surfaces: verification
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   });
 
