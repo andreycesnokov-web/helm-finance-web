@@ -1390,7 +1390,7 @@ export default {
     ok: 'Selesai',
     signOut: 'Keluar',
     signOutTitle: 'Keluar?',
-    signOutP: 'Di perangkat ini. Masuk lagi dengan tautan email.',
+    signOutP: 'Di perangkat ini. Anda bisa masuk lagi kapan saja.',
     me: {
       name: 'Nama',
       tz: 'Zona waktu',

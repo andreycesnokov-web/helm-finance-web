@@ -11,7 +11,7 @@ const SECRET = 'password-auth-unit-secret-0123456789abcdef';
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const gotrueToken = (claims) => `${b64({ alg: 'HS256' })}.${b64({ iat: Math.floor(Date.now() / 1000), ...claims })}.sig`;
 
-function harness({ gotrue = {}, rpc = {} } = {}) {
+function harness({ gotrue = {}, rpc = {}, log = { error() {}, warn() {} } } = {}) {
   const calls = [];
   const fetchImpl = async (url, init) => {
     const u = new URL(url), path = u.pathname.replace('/auth/v1', ''), body = init.body ? JSON.parse(init.body) : undefined;
@@ -26,7 +26,7 @@ function harness({ gotrue = {}, rpc = {} } = {}) {
   const rateLimited = (key, max) => { const n = (buckets.get(key) || 0) + 1; buckets.set(key, n); return n > max; };
   const app = express(); app.use(express.json());
   const auth = (req, res, next) => { try { req.user = jwt.verify(String(req.headers.authorization).replace('Bearer ', ''), SECRET); next(); } catch { res.status(401).json({ error: 'Invalid token' }); } };
-  install(app, { auth, supabase, enabled: true, gotrueUrl: 'http://gotrue.test', apiKey: 'service-key', jwtSecret: SECRET, appBaseUrl: 'https://app.test', rateLimited, fetchImpl, log: { error() {}, warn() {} } });
+  install(app, { auth, supabase, enabled: true, gotrueUrl: 'http://gotrue.test', apiKey: 'service-key', jwtSecret: SECRET, appBaseUrl: 'https://app.test', rateLimited, fetchImpl, log });
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}/api`;
   const post = async (p, body, token, ip = '198.51.100.' + Math.floor(Math.random() * 250)) => {
@@ -130,6 +130,19 @@ test('reset: only a fresh emailed-link session (amr otp/recovery) may set a pass
   } finally { h.close(); }
 });
 
+test('forgot and resend: an email-sending failure for a real account answers like an unknown address (no enumeration)', async () => {
+  const logs = [];
+  const fail = ({ body }) => body.email === 'real@x.co' ? { status: 500, data: { error_code: 'unexpected_failure', msg: 'Error sending email' } } : { status: 200, data: {} };
+  const h = harness({ log: { error: (m) => logs.push(m), warn() {} }, gotrue: { 'POST /recover': fail, 'POST /resend': fail } });
+  try {
+    for (const route of ['/auth/password/forgot', '/auth/password/resend']) {
+      const known = await h.post(route, { email: 'real@x.co' }), unknown = await h.post(route, { email: 'nobody@x.co' });
+      assert.deepEqual([known.status, known.body], [unknown.status, unknown.body]);
+      assert.deepEqual(known.body, { ok: true });
+    }
+    assert.ok(logs.some((m) => /forgot failed: 500/.test(m)) && logs.some((m) => /resend failed: 500/.test(m)), 'the operator still sees the failure');
+  } finally { h.close(); }
+});
 test('forgot and resend: same answer for unknown addresses and inside GoTrue\'s email interval', async () => {
   const h = harness({ gotrue: { 'POST /recover': ({ body }) => body.email === 'soon@x.co' ? { status: 429, data: { error_code: 'over_email_send_rate_limit' } } : { status: 200, data: {} }, 'POST /resend': () => ({ status: 200, data: {} }) } });
   try {

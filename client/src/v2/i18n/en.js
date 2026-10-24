@@ -1391,7 +1391,7 @@ export default {
     ok: 'Done',
     signOut: 'Sign out',
     signOutTitle: 'Sign out?',
-    signOutP: 'On this device. Sign in again with the email link.',
+    signOutP: 'On this device. You can sign in again at any time.',
     me: {
       name: 'Name',
       tz: 'Time zone',

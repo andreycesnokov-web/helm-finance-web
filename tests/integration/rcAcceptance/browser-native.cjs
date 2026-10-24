@@ -7,18 +7,15 @@ let browser,page;const origin='http://127.0.0.1:4333',target=new URL(process.env
 const proxy=http.createServer((req,res)=>{const upstream=http.request(new URL(req.url,target),{method:req.method,headers:{...req.headers,host:target.host}},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res)});upstream.on('error',()=>{res.writeHead(502);res.end()});req.pipe(upstream)});
 const save=()=>fs.writeFileSync('/evidence/BROWSER_NATIVE.json',JSON.stringify({mock_backend:false,transport:'real app HTTP via in-runner loopback reverse proxy; no host ports',results},null,2));
 const pass=name=>{results.push({case:name,status:'PASS'});save();console.log('PASS '+name)};
-async function login(){
- await page.goto(origin+'/login/email',{waitUntil:'networkidle'});await page.locator('input[type=email]').fill(C.owner.email);
- const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/api/auth/email/start')&&r.request().method()==='POST'),page.getByRole('button',{name:'Get a sign-in link',exact:true}).click()]);const body=await response.json();assert.ok(body.magic_link,'Synthetic login link missing');
- // Use the actual V2 local-test link rendered after the real start request.
- await page.getByRole('link',{name:'open the sign-in link',exact:true}).click();await page.waitForFunction(()=>!!localStorage.getItem('hf_token'));await page.waitForURL('**/account');
-}
+// The actual V2 sign-in screen of the served build (email + password by default; AUTH_UI=link for the link screen).
+const UI=require('./_uiLogin.cjs');
+async function login(){await UI.signIn(page,origin,C.owner)}
 async function cash(){return(await db.query("SELECT count(*)::int n,md5(jsonb_agg(to_jsonb(t) ORDER BY id)::text) hash,fn_wallet_ledger_balance($2)::text balance FROM transactions t WHERE business_id=$1",[C.biz,C.wallet])).rows[0]}
 (async()=>{await db.connect();assert.equal((await db.query('SELECT system_identifier::text id FROM pg_control_system()')).rows[0].id,C.cluster);
  await new Promise(r=>proxy.listen(4333,'127.0.0.1',r));browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const retained=fs.existsSync('/tmp/native-browser-state.json');
  const context=await browser.newContext({viewport:{width:1440,height:1000},...(retained?{storageState:'/tmp/native-browser-state.json'}:{})});await context.addInitScript(biz=>{localStorage.setItem('hf_lang','en');localStorage.setItem('last_active_workspace_id',biz);localStorage.setItem('activeBusinessId',biz)},C.biz);page=await context.newPage();
- if(retained)await page.goto(origin+'/account',{waitUntil:'networkidle'});else await login();assert.equal(await page.evaluate(()=>window.isSecureContext&&!!navigator.locks&&!!crypto.subtle),true);pass(retained?'retained actual V2 sign-in session and secure browser context':'actual V2 email/code UI sign-in and secure browser context');
+ if(retained)await page.goto(origin+'/account',{waitUntil:'networkidle'});else await login();assert.equal(await page.evaluate(()=>window.isSecureContext&&!!navigator.locks&&!!crypto.subtle),true);pass(retained?'retained actual V2 sign-in session and secure browser context':`actual V2 ${UI.MODE==='link'?'email link':'email + password'} UI sign-in and secure browser context`);
  await context.storageState({path:'/tmp/native-browser-state.json'});fs.chmodSync('/tmp/native-browser-state.json',0o600);
  await page.goto(origin+'/business/documents?doc='+C.doc,{waitUntil:'networkidle'});await page.locator('[data-doc-drawer="'+C.doc+'"]').waitFor();
  const nextTx=(await db.query("SELECT id,amount_original,description FROM transactions WHERE business_id=$1 AND description LIKE 'RC synthetic bank row %' AND id NOT IN(SELECT transaction_id FROM document_transaction_links WHERE document_id=$2) ORDER BY id LIMIT 1",[C.biz,C.doc])).rows[0];assert.ok(nextTx);

@@ -113,7 +113,10 @@ function install(app, { auth, supabase, enabled, gotrueUrl, apiKey, jwtSecret, a
         const target = kind === 'forgot' ? '/auth/reset' : '/auth/confirmed';
         const r = await gotrue(path, { body: { email: em, ...(extra || {}) }, query: { redirect_to: redirect(target) }, clientIp: ip(req) });
         if (r.code !== 'over_email_send_rate_limit' && (r.status === 429 || /rate_limit/.test(r.code || ''))) return res.status(429).json({ error: 'rate_limited' });
-        if (!r.ok && r.status >= 500) { log.error(`[password-auth] ${kind} failed: ${r.status} ${r.code || ''}`); return unavailable(res); }
+        // A 5xx here comes after Auth looked the address up (e.g. it could not SEND the email, which only happens
+        // for a real account), so a different answer would reveal which addresses exist. Same answer; the
+        // operator sees the failure in the log. Auth unreachable (no answer at all) stays 503 for every address.
+        if (!r.ok && r.status >= 500) log.error(`[password-auth] ${kind} failed: ${r.status} ${r.code || ''}`);
         return res.json({ ok: true });   // unknown, confirmed or unconfirmed: the same answer
       } catch (e) { log.error(`[password-auth] ${kind} error: ${e.message}`); return unavailable(res); }
     });
