@@ -682,6 +682,7 @@ function CloseTab({ month, onOpenChatModal }) {
                 <dt>{t('acct.prep.personal')}</dt><dd className="v2-num v2-r">{prep.personal} · {money(prep.personal_amount)}</dd>
                 <dt>{t('acct.prep.needsReview')}</dt><dd className="v2-num v2-r">{prep.purpose_marked_needs_review}</dd>
                 <dt>{t('acct.prep.reviewed')}</dt><dd className="v2-num v2-r">{prep.accountant_reviewed} / {prep.operations}</dd>
+                <dt>{t('acct.prep.reviewedOther')}</dt><dd className="v2-num v2-r">{prep.reviewed_by_other_role}</dd>
               </dl>
               <p className="v2-muted v2-small">{t('acct.prep.note')}</p>
             </Card>

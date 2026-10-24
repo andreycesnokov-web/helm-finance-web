@@ -47,7 +47,7 @@ function bodyFrom(b = {}) {
     const v = n == null ? null : n.trim().slice(0, 500) || null;
     out.note = v;
   }
-  for (const k of ['accountant_reviewed_at', 'accountant_reviewed_by', 'purpose_set_by', 'purpose_set_at', 'business_id', 'transaction_id'])
+  for (const k of ['accountant_reviewed_at', 'accountant_reviewed_by', 'accountant_reviewed_role', 'purpose_set_by', 'purpose_set_at', 'business_id', 'transaction_id'])
     if (Object.prototype.hasOwnProperty.call(b, k)) return { error: 'server_controlled_field', field: k };
   if (!Object.keys(out).length) return { error: 'nothing_to_change' };
   return { value: out };
@@ -57,25 +57,31 @@ function bodyFrom(b = {}) {
  * The row to write, from the stored row (or null) and a validated body. A changed purpose clears an earlier
  * accountant review: the review was of the previous classification. Never sets a review the caller did not ask for.
  */
-function nextRow(prev, body, { userId, businessId, transactionId, now = new Date().toISOString() }) {
+function nextRow(prev, body, { userId, role = null, businessId, transactionId, now = new Date().toISOString() }) {
   const row = {
     transaction_id: transactionId, business_id: businessId,
     business_purpose: prev?.business_purpose ?? null, purpose_set_by: prev?.purpose_set_by ?? null, purpose_set_at: prev?.purpose_set_at ?? null,
     accountant_reviewed_at: prev?.accountant_reviewed_at ?? null, accountant_reviewed_by: prev?.accountant_reviewed_by ?? null,
+    accountant_reviewed_role: prev?.accountant_reviewed_role ?? null,
     note: prev?.note ?? null, updated_at: now,
   };
+  const clearReview = () => { row.accountant_reviewed_at = null; row.accountant_reviewed_by = null; row.accountant_reviewed_role = null; };
   const purposeChanged = 'business_purpose' in body && body.business_purpose !== row.business_purpose;
   if (purposeChanged) {
     row.business_purpose = body.business_purpose; row.purpose_set_by = userId; row.purpose_set_at = now;
-    row.accountant_reviewed_at = null; row.accountant_reviewed_by = null;
+    clearReview();
   }
   if ('note' in body) row.note = body.note;
   if ('accountant_reviewed' in body) {
-    if (body.accountant_reviewed) { row.accountant_reviewed_at = now; row.accountant_reviewed_by = userId; }
-    else { row.accountant_reviewed_at = null; row.accountant_reviewed_by = null; }
+    // The reviewer's role is recorded with the mark: only an accountant's mark reads as an accountant's review.
+    if (body.accountant_reviewed) { row.accountant_reviewed_at = now; row.accountant_reviewed_by = userId; row.accountant_reviewed_role = role; }
+    else clearReview();
   }
   return row;
 }
+
+/** How a review mark reads: 'accountant' (by a member with the accountant role), 'other_role', or 'none'. */
+const reviewKind = (row) => (!row?.accountant_reviewed_at ? 'none' : row.accountant_reviewed_role === 'accountant' ? 'accountant' : 'other_role');
 
 const isMissingTable = (e) => !!e && (e.code === '42P01' || e.code === 'PGRST205' || /does not exist|could not find the table|schema cache/i.test(e.message || ''));
 
@@ -94,4 +100,4 @@ async function loadClassifications(db, businessId) {
 /** purposeOf(tx) for the insights classifier: the set purpose, or null (not set). */
 const purposeResolver = (byTx) => (tx) => (tx && tx.id != null ? byTx.get(String(tx.id))?.business_purpose || null : null);
 
-module.exports = { PURPOSES, REVIEW_ROLES, canReview, TABLE, PURPOSE_CLASS, PURPOSE_PNL, bodyFrom, nextRow, isMissingTable, loadClassifications, purposeResolver };
+module.exports = { PURPOSES, REVIEW_ROLES, canReview, TABLE, PURPOSE_CLASS, PURPOSE_PNL, bodyFrom, nextRow, reviewKind, isMissingTable, loadClassifications, purposeResolver };

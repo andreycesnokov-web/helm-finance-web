@@ -221,7 +221,7 @@ export function classificationRegister({ txs = [], classifications = [], operati
     columns: ['transaction_id', 'date', 'direction', 'amount', 'currency', 'account', 'counterparty', 'category', 'business_purpose', 'purpose_source', 'pnl_treatment',
       'documents', 'document_files', 'accountant_review', 'reviewed_by', 'reviewed_at', 'tax_treatment', 'notes'], rows: [] }
   const s = { operations: 0, purpose_set: 0, purpose_marked_needs_review: 0, needs_review: 0, personal: 0, personal_amount: 0, missing_documents: 0, missing_documents_amount: 0,
-    pending_document_review: 0, accountant_reviewed: 0, accountant_review_pending: 0, possible_fiscal_adjustment: 0 }
+    pending_document_review: 0, accountant_reviewed: 0, reviewed_by_other_role: 0, accountant_review_pending: 0, possible_fiscal_adjustment: 0 }
   for (const t of txs) {
     const id = String(t.id), c = cls.get(id) || null, pnl = pnlById.get(id) || ''
     const dir = t.type === 'income' ? 'in' : ['expense', 'payroll', 'bank_fee', 'fx_fee', 'network_fee'].includes(t.type) ? 'out' : 'other'
@@ -230,7 +230,9 @@ export function classificationRegister({ txs = [], classifications = [], operati
     const ownMove = !!t.transfer_id || t.type === 'transfer' || t.source === 'wallet_opening_balance' || t.type === 'correction'
     const docs = docsOf(id)
     const docState = DOC_STATE[opStatus.get(id)] || (docs.length ? 'present' : ownMove ? 'not required' : 'missing')
+    // Only a member with the accountant role makes an accountant's review; any other role's mark is shown as theirs.
     const reviewed = !!c?.accountant_reviewed_at
+    const byAccountant = reviewed && c.accountant_reviewed_role === 'accountant'
     const notes = []
     if (c?.note) notes.push(c.note)
     if (purpose === 'personal') notes.push('personal / non-business: not an operating cost')
@@ -241,8 +243,9 @@ export function classificationRegister({ txs = [], classifications = [], operati
     const amount = num(t.amount_original)
     table.rows.push([id, day(t), dir, amount, t.currency_original || 'IDR', walletOf(t)?.name || t.source || '', t.counterparty_name || t.counterparty || '',
       t.category || '', purpose || 'not determined', c?.business_purpose ? 'set by user' : derived ? 'from category / P&L' : 'not determined', pnl || 'not in report period/currency',
-      docState, docs.map((d) => docPaths[d]).filter(Boolean).join('; '), reviewed ? 'reviewed' : 'pending accountant review',
-      reviewed ? c.accountant_reviewed_by_name || '' : '', reviewed ? String(c.accountant_reviewed_at).slice(0, 19) : '',
+      docState, docs.map((d) => docPaths[d]).filter(Boolean).join('; '),
+      byAccountant ? 'reviewed by accountant' : reviewed ? `marked reviewed by ${c.accountant_reviewed_role || 'a non-accountant role'} — not an accountant review` : 'pending accountant review',
+      reviewed ? `${c.accountant_reviewed_by_name || ''} (${c.accountant_reviewed_role || '?'})` : '', reviewed ? String(c.accountant_reviewed_at).slice(0, 19) : '',
       purpose === 'personal' ? 'not a business expense — accountant review' : 'undetermined — accountant review', notes.join('; ')])
     s.operations++
     if (c?.business_purpose) s.purpose_set++
@@ -251,7 +254,8 @@ export function classificationRegister({ txs = [], classifications = [], operati
     if (purpose === 'personal') { s.personal++; s.personal_amount += Math.round(amount * 100) }
     if (docState === 'missing' && dir !== 'other') { s.missing_documents++; s.missing_documents_amount += Math.round(amount * 100) }
     if (docState === 'pending review') s.pending_document_review++
-    if (reviewed) s.accountant_reviewed++; else s.accountant_review_pending++
+    if (byAccountant) s.accountant_reviewed++; else s.accountant_review_pending++
+    if (reviewed && !byAccountant) s.reviewed_by_other_role++
     if (adjust) s.possible_fiscal_adjustment++
   }
   s.personal_amount /= 100; s.missing_documents_amount /= 100
@@ -327,7 +331,7 @@ export function readmeText({ period, company, totals, missingProfile = [], unava
       `  Operations ${totals.classification.operations} · business purpose set by a person ${totals.classification.purpose_set} · purpose unresolved ${totals.classification.needs_review}`,
       `  Personal / non-business paid from company accounts: ${totals.classification.personal} (${totals.classification.personal_amount}) — not operating costs`,
       `  Without a supporting document: ${totals.classification.missing_documents} (${totals.classification.missing_documents_amount}) · document check pending: ${totals.classification.pending_document_review}`,
-      `  Accountant review: ${totals.classification.accountant_reviewed} reviewed · ${totals.classification.accountant_review_pending} pending · possible fiscal adjustments flagged: ${totals.classification.possible_fiscal_adjustment}`,
+      `  Accountant review: ${totals.classification.accountant_reviewed} reviewed by an accountant · ${totals.classification.accountant_review_pending} pending (of which ${totals.classification.reviewed_by_other_role} marked by the owner or another non-accountant role) · possible fiscal adjustments flagged: ${totals.classification.possible_fiscal_adjustment}`,
       '  Tax treatment is undetermined for every operation: a receipt does not make an expense deductible; the accountant decides.',
     ] : []),
     '',

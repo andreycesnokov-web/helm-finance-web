@@ -34,9 +34,13 @@ CREATE TABLE public.transaction_classifications (
  purpose_set_at timestamptz NULL,
  accountant_reviewed_at timestamptz NULL,
  accountant_reviewed_by bigint REFERENCES public.users(id) ON DELETE SET NULL,
+ -- The reviewer's company role at the moment of the mark. Only 'accountant' is shown as an accountant's review;
+ -- an owner's / CEO's / admin's / CFO's mark is shown as theirs, never as an accountant's verification.
+ accountant_reviewed_role text NULL CHECK (accountant_reviewed_role IN ('owner','ceo','admin','cfo','accountant')),
  note text NULL CHECK (note IS NULL OR char_length(note) <= 500),
  updated_at timestamptz NOT NULL DEFAULT now(),
- CONSTRAINT transaction_classifications_review_pair_chk CHECK ((accountant_reviewed_at IS NULL) = (accountant_reviewed_by IS NULL))
+ CONSTRAINT transaction_classifications_review_pair_chk CHECK ((accountant_reviewed_at IS NULL) = (accountant_reviewed_by IS NULL)
+   AND (accountant_reviewed_at IS NULL) = (accountant_reviewed_role IS NULL))
 );
 CREATE INDEX transaction_classifications_business ON public.transaction_classifications(business_id);
 

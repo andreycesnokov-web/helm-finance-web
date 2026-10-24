@@ -407,7 +407,7 @@ export default {
     done: 'Done', notDone: 'not done', seePackages: 'See folders',
     taxesDue: 'Taxes due in {m}', fullCalendar: 'Full calendar', noEvents: 'No tax deadlines this month.',
     taxNote: 'Deadlines follow the general rules (PMK 81/2024); amounts come from your data and documents. Your accountant confirms before any payment.',
-    prep: { title: 'Accounting preparation · this month', operations: 'Operations (all kept)', noDocument: 'Without a supporting document', docPending: 'Document check pending', personal: 'Marked personal / non-business', needsReview: 'Marked “needs review”', reviewed: 'Reviewed by an accountant', note: 'Every operation stays in the records and in the cash. Missing documents and review marks go to the accountant package (register 11); tax treatment is the accountant’s decision.' },
+    prep: { title: 'Accounting preparation · this month', operations: 'Operations (all kept)', noDocument: 'Without a supporting document', docPending: 'Document check pending', personal: 'Marked personal / non-business', needsReview: 'Marked “needs review”', reviewed: 'Reviewed by an accountant', reviewedOther: 'Marked reviewed by the owner or another role (not an accountant)', note: 'Every operation stays in the records and in the cash. Missing documents and review marks go to the accountant package (register 11); tax treatment is the accountant’s decision.' },
     stage: { done: 'Return filed', paid: 'Paid · return not filed', overdue: 'Overdue', calculated: 'Calculated', todo: 'To prepare' },
     pay: { recorded: 'Payment recorded', overdue: 'Payment not recorded, pay-by date passed', due: 'Payment not recorded yet' },
     file: { filed: 'return filed', overdue: 'return not filed, deadline passed', due: 'return not filed yet' },
@@ -1003,7 +1003,7 @@ export default {
   },
   txd: {
     reloadFirst: "Reload the transaction before editing.",
-    acc: { title: 'For the accountant', purpose: 'Business purpose', fromCategory: 'From the category (not set)', note: 'Note for the accountant', reviewed: 'Reviewed by an accountant', reviewedBy: 'by {who} on {d}', taxNote: 'Tax treatment is decided by your accountant. A receipt alone does not make an expense deductible. This never changes the amount or the cash.', p: { operating: 'Business operating income or expense', personal: 'Personal / non-business (paid from a company account)', capital: 'Capital asset purchase', non_pnl: 'Financing, transfer or other movement outside profit', needs_review: 'Needs review' } },
+    acc: { title: 'For the accountant', purpose: 'Business purpose', fromCategory: 'From the category (not set)', note: 'Note for the accountant', reviewed: 'Mark as reviewed', reviewedBy: 'by {who} ({role}) on {d}', notAccountant: 'Recorded as a check by the {role}, not as a review by an accountant.', taxNote: 'Tax treatment is decided by your accountant. A receipt alone does not make an expense deductible. This never changes the amount or the cash.', p: { operating: 'Business operating income or expense', personal: 'Personal / non-business (paid from a company account)', capital: 'Capital asset purchase', non_pnl: 'Financing, transfer or other movement outside profit', needs_review: 'Needs review' } },
     desc: 'Description',
     date: 'Date',
     sameCcy: 'Only accounts in the same currency',

@@ -8580,7 +8580,8 @@ app.get('/api/transaction-classifications', auth, async (req, res) => {
     res.json({ available, purposes: TCLASS.PURPOSES, can_review: TCLASS.canReview(biz.role), can_classify: canCreateConfirmedFinancialRecord(biz.role),
       classifications: [...byTx.values()].map((r) => ({ transaction_id: String(r.transaction_id), business_purpose: r.business_purpose, purpose_set_at: r.purpose_set_at,
         purpose_set_by_name: r.purpose_set_by != null ? names[String(r.purpose_set_by)] : null, accountant_reviewed_at: r.accountant_reviewed_at,
-        accountant_reviewed_by_name: r.accountant_reviewed_by != null ? names[String(r.accountant_reviewed_by)] : null, note: r.note })) });
+        accountant_reviewed_by_name: r.accountant_reviewed_by != null ? names[String(r.accountant_reviewed_by)] : null,
+        accountant_reviewed_role: r.accountant_reviewed_role || null, review_kind: TCLASS.reviewKind(r), note: r.note })) });
   } catch (e) { res.status(500).json({ error: 'classifications_unavailable' }); }
 });
 
@@ -8606,7 +8607,7 @@ app.put('/api/transactions/:id/classification', auth, async (req, res) => {
     const { data: prevRows, error: pErr } = await supabase.from(TCLASS.TABLE).select('*').eq('transaction_id', tx.id).eq('business_id', biz.business.id).limit(1);
     if (pErr) return res.status(TCLASS.isMissingTable(pErr) ? 409 : 500).json({ error: TCLASS.isMissingTable(pErr) ? 'migration_not_applied' : 'classification_read_failed', migration: '20261024150000' });
     const prev = prevRows?.[0] || null;
-    const row = TCLASS.nextRow(prev, v.value, { userId: req.user.userId, businessId: biz.business.id, transactionId: tx.id });
+    const row = TCLASS.nextRow(prev, v.value, { userId: req.user.userId, role: biz.role, businessId: biz.business.id, transactionId: tx.id });
     const { data: saved, error: wErr } = await supabase.from(TCLASS.TABLE).upsert(row, { onConflict: 'transaction_id' }).select('*').single();
     if (wErr) return res.status(500).json({ error: 'classification_write_failed' });
     // The audit record is required, not best-effort: without it the change is undone.
@@ -8618,7 +8619,7 @@ app.put('/api/transactions/:id/classification', auth, async (req, res) => {
       return res.status(503).json({ error: 'audit_unavailable', message: 'Nothing was changed.' });
     }
     res.json({ classification: { transaction_id: String(saved.transaction_id), business_purpose: saved.business_purpose, purpose_set_at: saved.purpose_set_at,
-      accountant_reviewed_at: saved.accountant_reviewed_at, note: saved.note, review_cleared: !!prev?.accountant_reviewed_at && !saved.accountant_reviewed_at } });
+      accountant_reviewed_at: saved.accountant_reviewed_at, accountant_reviewed_role: saved.accountant_reviewed_role, review_kind: TCLASS.reviewKind(saved), note: saved.note, review_cleared: !!prev?.accountant_reviewed_at && !saved.accountant_reviewed_at } });
   } catch (e) { res.status(500).json({ error: 'classification_failed' }); }
 });
 

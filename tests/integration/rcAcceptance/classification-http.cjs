@@ -85,8 +85,12 @@ const classify = (id, body, opts) => api(`/transactions/${id}/classification`, {
   // Scenario 8: accountant review — server records actor and time; roles; purpose change clears it; audit trail.
   const rv = ok(await classify(T.S1, { accountant_reviewed: true }), 'review');
   assert.ok(rv.classification.accountant_reviewed_at);
-  const stored = (await q('SELECT accountant_reviewed_by::text by, business_purpose FROM transaction_classifications WHERE transaction_id=$1', [T.S1]))[0];
-  assert.equal(stored.by, String(C.owner.user.id));
+  // The owner's mark is stored with the owner role and never reads as an accountant's review.
+  assert.deepEqual([rv.classification.accountant_reviewed_role, rv.classification.review_kind], ['owner', 'other_role']);
+  const stored = (await q('SELECT accountant_reviewed_by::text by, accountant_reviewed_role role, business_purpose FROM transaction_classifications WHERE transaction_id=$1', [T.S1]))[0];
+  assert.deepEqual([stored.by, stored.role], [String(C.owner.user.id), 'owner']);
+  const pl8 = ok(await api(`/pulse/profit-loss?month=${M}&currency=IDR`), 'pnl review');
+  assert.equal(pl8.entries.find((e) => e.transaction_id === String(T.S1)).review_status, 'reviewed_not_by_accountant');
   assert.equal((await classify(T.S1, { accountant_reviewed: true, accountant_reviewed_by: 1 })).data.error, 'server_controlled_field');
   const cleared = ok(await classify(T.S1, { business_purpose: 'capital' }), 'purpose change');
   assert.equal(cleared.classification.review_cleared, true); assert.equal(cleared.classification.accountant_reviewed_at, null);

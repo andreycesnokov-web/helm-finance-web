@@ -28,11 +28,15 @@ let browser, page;
   await page.locator('[data-txd-purpose]').selectOption('personal');
   await page.locator('[data-txd-note]').fill('owner purchase, company card');
   await page.locator('[data-txd-reviewed]').check();
+  // The owner is not an accountant: the window says the mark is the owner's, not an accountant's review.
+  await page.locator('[data-txd-not-accountant]').waitFor();
+  assert.match(await page.locator('[data-txd-not-accountant]').innerText(), /not as a review by an accountant/);
   await page.screenshot({ path: '/evidence/classification-dialog-desktop.png' });
   await page.getByRole('button', { name: 'Save' }).click();
   await box.waitFor({ state: 'detached', timeout: 20000 });
   const row = (await db.query('SELECT business_purpose, note, accountant_reviewed_by::text by, accountant_reviewed_at FROM transaction_classifications WHERE transaction_id=$1', [txId])).rows[0];
-  assert.deepEqual([row.business_purpose, row.note, row.by], ['personal', 'owner purchase, company card', String(C.owner.user.id)]); assert.ok(row.accountant_reviewed_at);
+  assert.deepEqual([row.business_purpose, row.note, row.by], ['personal', 'owner purchase, company card', String(C.owner.user.id)]);
+  assert.equal((await db.query('SELECT accountant_reviewed_role r FROM transaction_classifications WHERE transaction_id=$1', [txId])).rows[0].r, 'owner'); assert.ok(row.accountant_reviewed_at);
   assert.deepEqual(await ledger(), before); assert.equal(await balance(), bal0);
   pass('the transaction window stores purpose, note and the review mark (owner as actor); the operation and the balance are unchanged');
   // Reopen: the window shows what is stored.

@@ -84,7 +84,8 @@ function buildReport(input, { businessId, ...query }) {
       bank_review:(bByTx.get(String(t.id))||[]).map(b=>({batch_id:b.batch_id,review_status:b.review_status,match_status:b.match_status})),
       business_purpose:classified.get(String(t.id))?.business_purpose||null,
       // An accountant's review mark is shown as such; it is never an approval of the books or of tax treatment.
-      review_status:classified.get(String(t.id))?.accountant_reviewed_at?'accountant_reviewed':'not_accountant_approved',
+      review_status:{accountant:'accountant_reviewed',other_role:'reviewed_not_by_accountant',none:'not_accountant_approved'}[CP.reviewKind(classified.get(String(t.id)))],
+      reviewed_role:classified.get(String(t.id))?.accountant_reviewed_role||null,
       accountant_reviewed_at:classified.get(String(t.id))?.accountant_reviewed_at||null,
       reconciliation_status:bByTx.has(String(t.id))?'statement_linked_not_reconciled':'not_verified' };
     const except = reason => exceptions.push({...ref,reason});

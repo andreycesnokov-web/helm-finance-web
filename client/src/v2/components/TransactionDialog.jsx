@@ -113,7 +113,11 @@ export default function TransactionDialog({ tx, wallets = [], categories = [], i
             <input className="v2-input" maxLength={500} value={cf.note} disabled={!clsApi.data?.can_classify} onChange={(e) => setCf({ ...cf, note: e.target.value })} data-txd-note /></label>
           <label className="v2-pe-sug-row">
             <input type="checkbox" checked={cf.reviewed} disabled={!clsApi.data?.can_review} onChange={(e) => setCf({ ...cf, reviewed: e.target.checked })} data-txd-reviewed />
-            <span>{t('txd.acc.reviewed')}{cls?.accountant_reviewed_at ? ` · ${t('txd.acc.reviewedBy', { who: cls.accountant_reviewed_by_name || '—', d: shortDate(cls.accountant_reviewed_at, lang) })}` : ''}</span></label>
+            <span>{t('txd.acc.reviewed')}{cls?.accountant_reviewed_at ? ` · ${t('txd.acc.reviewedBy', { who: cls.accountant_reviewed_by_name || '—', role: cls.accountant_reviewed_role ? t(`set.role.${cls.accountant_reviewed_role}`) : '—', d: shortDate(cls.accountant_reviewed_at, lang) })}` : ''}</span></label>
+          {/* Only a member with the accountant role makes an accountant's review; anyone else's mark says so. */}
+          {((cls?.accountant_reviewed_at && cls.accountant_reviewed_role !== 'accountant') || (cf.reviewed && !cls?.accountant_reviewed_at && active?.role !== 'accountant')) && (
+            <p className="v2-muted v2-small" data-txd-not-accountant>{t('txd.acc.notAccountant', { role: t(`set.role.${cls?.accountant_reviewed_at ? cls.accountant_reviewed_role : active?.role}`) })}</p>
+          )}
           <p className="v2-muted v2-small">{t('txd.acc.taxNote')}</p>
         </fieldset>
       )}

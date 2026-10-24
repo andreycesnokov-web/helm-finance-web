@@ -24,11 +24,16 @@ t('body: only purpose / review / note; who and when are never accepted from the 
 });
 
 t('review: set by the server with actor and time; a changed purpose clears an earlier review', () => {
-  const now = '2026-10-24T10:00:00.000Z', ctx = { userId: 9, businessId: B, transactionId: 3, now };
+  const now = '2026-10-24T10:00:00.000Z', ctx = { userId: 9, role: 'owner', businessId: B, transactionId: 3, now };
   const reviewed = TC.nextRow(null, { accountant_reviewed: true }, ctx);
-  assert.deepStrictEqual([reviewed.accountant_reviewed_by, reviewed.accountant_reviewed_at, reviewed.business_purpose], [9, now, null]);
+  assert.deepStrictEqual([reviewed.accountant_reviewed_by, reviewed.accountant_reviewed_at, reviewed.accountant_reviewed_role, reviewed.business_purpose], [9, now, 'owner', null]);
+  // An owner's mark is the owner's, never an accountant's review; only the accountant role makes one.
+  assert.strictEqual(TC.reviewKind(reviewed), 'other_role');
+  assert.strictEqual(TC.reviewKind(TC.nextRow(null, { accountant_reviewed: true }, { ...ctx, role: 'accountant' })), 'accountant');
+  assert.strictEqual(TC.reviewKind(null), 'none');
+  assert.strictEqual(TC.bodyFrom({ accountant_reviewed: true, accountant_reviewed_role: 'accountant' }).error, 'server_controlled_field');
   const changed = TC.nextRow(reviewed, { business_purpose: 'personal' }, { ...ctx, userId: 5, now: '2026-10-25T00:00:00.000Z' });
-  assert.deepStrictEqual([changed.business_purpose, changed.purpose_set_by, changed.accountant_reviewed_at, changed.accountant_reviewed_by], ['personal', 5, null, null]);
+  assert.deepStrictEqual([changed.business_purpose, changed.purpose_set_by, changed.accountant_reviewed_at, changed.accountant_reviewed_by, changed.accountant_reviewed_role], ['personal', 5, null, null, null]);
   // A note alone keeps the review; setting the same purpose again keeps it too.
   assert.strictEqual(TC.nextRow(reviewed, { note: 'receipt lost' }, ctx).accountant_reviewed_by, 9);
   const samePurpose = TC.nextRow({ ...reviewed, business_purpose: 'operating' }, { business_purpose: 'operating' }, ctx);
@@ -73,7 +78,9 @@ t('another company\'s mark is ignored', () => {
 });
 
 t('accountant review shows as a review mark only, never as approval of the books', () => {
-  const r = report([mark(3, null, { accountant_reviewed_at: '2026-10-24T10:00:00Z', accountant_reviewed_by: 9 })]);
+  const owner = report([mark(3, null, { accountant_reviewed_at: '2026-10-24T10:00:00Z', accountant_reviewed_by: 9, accountant_reviewed_role: 'owner' })]);
+  assert.strictEqual(owner.entries.find((x) => x.transaction_id === '3').review_status, 'reviewed_not_by_accountant');
+  const r = report([mark(3, null, { accountant_reviewed_at: '2026-10-24T10:00:00Z', accountant_reviewed_by: 9, accountant_reviewed_role: 'accountant' })]);
   const e = r.entries.find((x) => x.transaction_id === '3');
   assert.deepStrictEqual([e.review_status, e.accountant_reviewed_at], ['accountant_reviewed', '2026-10-24T10:00:00Z']);
   assert.strictEqual(r.accounting_ready, false);

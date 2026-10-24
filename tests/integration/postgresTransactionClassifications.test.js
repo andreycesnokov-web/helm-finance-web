@@ -30,8 +30,8 @@ async function company(){const b=randomUUID(),u=++uid,w=randomUUID();
  const t=(await c.query("INSERT INTO transactions(business_id,user_id,type,amount_original,amount_idr,currency_original,wallet_id,scope,transaction_date,category,description) VALUES($1,$2,'expense',1300000,1300000,'IDR',$3,'business','2026-10-05','Office expenses','Synthetic purchase') RETURNING id",[b,u,w])).rows[0].id;
  return {b,u,w,t}}
 const ledger=async(b)=>(await c.query("SELECT md5(jsonb_agg(to_jsonb(t) ORDER BY id)::text) h FROM transactions t WHERE business_id=$1",[b])).rows[0].h;
-const mark=(t,b,purpose,extra={})=>c.query('INSERT INTO transaction_classifications(transaction_id,business_id,business_purpose,accountant_reviewed_at,accountant_reviewed_by,note) VALUES($1,$2,$3,$4,$5,$6)',
- [t,b,purpose,extra.at||null,extra.by||null,extra.note||null]);
+const mark=(t,b,purpose,extra={})=>c.query('INSERT INTO transaction_classifications(transaction_id,business_id,business_purpose,accountant_reviewed_at,accountant_reviewed_by,accountant_reviewed_role,note) VALUES($1,$2,$3,$4,$5,$6,$7)',
+ [t,b,purpose,extra.at||null,extra.by||null,extra.role||null,extra.note||null]);
 
 test('a mark belongs to the operation\'s own company and never changes the ledger',async()=>{
  const A=await company(),B=await company(),h0=await ledger(A.b);
@@ -45,8 +45,10 @@ test('purpose values, review pair and note length are enforced',async()=>{
  const A=await company();
  await assert.rejects(mark(A.t,A.b,'deductible'),/check constraint/);
  await assert.rejects(mark(A.t,A.b,null,{at:new Date().toISOString()}),/review_pair_chk/);
+ await assert.rejects(mark(A.t,A.b,null,{at:new Date().toISOString(),by:A.u}),/review_pair_chk/,'a review needs the reviewer role');
+ await assert.rejects(mark(A.t,A.b,null,{at:new Date().toISOString(),by:A.u,role:'manager'}),/check constraint/,'only reviewing roles');
  await assert.rejects(mark(A.t,A.b,null,{note:'x'.repeat(501)}),/check constraint/);
- await mark(A.t,A.b,null,{at:new Date().toISOString(),by:A.u});
+ await mark(A.t,A.b,null,{at:new Date().toISOString(),by:A.u,role:'owner'});
  assert.equal((await c.query('SELECT business_purpose FROM transaction_classifications WHERE transaction_id=$1',[A.t])).rows[0].business_purpose,null,'NULL purpose = category decides');
 });
 test('only service_role may read or write; anon and authenticated get nothing; RLS on',async()=>{
