@@ -29,7 +29,7 @@ async function harness(table,fn,paging=false){
  const tag=`app.get('/api/${table}',`,start=index.indexOf(tag),end=index.indexOf('\n});',start)+5;assert.ok(start>0&&end>start);
  vm.runInNewContext(index.slice(start,end),{app,require:localRequire,auth:(req,res,next)=>{if(!req.headers.authorization)return res.sendStatus(401);req.user={userId:7};next();},
   requireBusiness:async(req,res)=>{if(req.headers['x-revoked']){res.sendStatus(403);return null;}return {business:{id:B},role:req.headers['x-role']||'owner'};},
-  canViewBusinessFinance:role=>['owner','cfo','accountant','auditor'].includes(role),supabase,bizOrFilter:()=>`business_id.eq.${B}`,balanceFailure:()=>false,enrichDebtsFor:async(biz,data)=>{assert.equal(biz,B);return data;},Date});
+  canViewBusinessFinance:role=>['owner','cfo','accountant','auditor'].includes(role),WL:require('../server/lib/walletLedger'),supabase,bizOrFilter:()=>`business_id.eq.${B}`,balanceFailure:()=>false,enrichDebtsFor:async(biz,data)=>{assert.equal(biz,B);return data;},Date});
  const s=await new Promise(resolve=>{const server=app.listen(0,'127.0.0.1',()=>resolve(server));});
  try{await fn({logs,id,get:(q,headers={authorization:'synthetic'})=>fetch(`http://127.0.0.1:${s.address().port}/api/${table}?period=all&${q}`,{headers})});}finally{await new Promise(r=>s.close(r));}
 }
@@ -48,5 +48,6 @@ test('combined actual transaction GET preserves cursor pages, document status an
  const second=await get('limit=2&before_id=2');assert.deepEqual((await second.json()).map(r=>r.id),[1]);
  const old=await get('');assert.equal(old.status,200);assert.ok(Array.isArray(await old.json()));
  for(const q of ['limit=501','limit=0','limit=2&before_id=bad']){const n=logs.length;assert.equal((await get(q)).status,400);assert.equal(logs.length,n);}
- const pageQueries=logs.filter(u=>u.pathname.endsWith('/transactions'));assert.equal(pageQueries[0].searchParams.get('order'),'id.desc');assert.equal(pageQueries.at(-1).searchParams.get('order'),'created_at.desc');
+ const pageQueries=logs.filter(u=>u.pathname.endsWith('/transactions'));assert.equal(pageQueries[0].searchParams.get('order'),'id.desc');// AC-0 / I-13: the unpaged list is read page by page, so it needs a tie-free order.
+ assert.equal(pageQueries.at(-1).searchParams.get('order'),'created_at.desc,id.desc');
 },true));
