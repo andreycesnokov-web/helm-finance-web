@@ -96,6 +96,20 @@ const RE = {
 };
 const NOT_CAPEX = [/maintenance/i, /\brepair/i, /\bservicing\b/i, /\brental\b/i, /\brent\b/i];
 
+// A person's confirmed P&L group outranks keywords (it is evidence, they are guesses). It applies only when the
+// money's direction fits the group: an expense in a revenue category is a refund and is left to the rules below.
+const GROUP_CLASS = {
+  revenue: { class: 'revenue', types: ['income'] },
+  other_income: { class: 'other', types: ['income'] },
+  direct_cost: { class: 'direct_cost', types: ['expense', 'payroll'] },
+  operating_cost: { class: 'operating_expense', types: ['expense', 'payroll'] },
+  interest: { class: 'interest', types: ['expense', 'income'] },
+  tax: { class: 'tax', types: ['expense'] },
+  asset_purchase: { class: 'capex', types: ['expense'] },
+  funding: { class: 'financing', types: ['income', 'expense'] },
+  transfer: { class: 'transfer', types: ['income', 'expense'] },
+};
+
 const hay = (tx) => `${(tx && tx.category) || ''} ${(tx && tx.description) || ''} ${(tx && tx.notes) || ''}`.trim();
 const hit = (list, s) => list.some((re) => re.test(s));
 
@@ -103,7 +117,12 @@ const hit = (list, s) => list.some((re) => re.test(s));
  * Classify one transaction.
  * @returns { class, matched_on, needs_review }
  */
-function classifyTransaction(tx) {
+/**
+ * @param evidence optional { fundingTx: Map<transaction id, null | principal> from the funding register — null for
+ *   money received (any amount), the principal for a repayment (a debit above it also carries interest and is left to
+ *   the rules below); categoryOf(tx) → { pnl_group } | null for this company's confirmed groups }
+ */
+function classifyTransaction(tx, evidence = null) {
   const s = hay(tx);
   const type = (tx && tx.type) || '';
   const src = (tx && tx.source) || '';
@@ -122,6 +141,13 @@ function classifyTransaction(tx) {
     return { class: 'opening_balance', matched_on: 'keyword', needs_review: false };
   if (type === 'transfer' || (tx && tx.transfer_id) || hit(RE.transfer, s))
     return { class: 'transfer', matched_on: 'type_or_keyword', needs_review: false };
+
+  // Recorded evidence next: the funding register, then a confirmed category group.
+  const fundingLimit = evidence && evidence.fundingTx && tx && tx.id != null ? evidence.fundingTx.get(String(tx.id)) : undefined;
+  if (fundingLimit !== undefined && (fundingLimit === null || amountOf(tx) <= Number(fundingLimit)))
+    return { class: 'financing', matched_on: 'funding_register', needs_review: false };
+  const confirmed = evidence && typeof evidence.categoryOf === 'function' ? GROUP_CLASS[evidence.categoryOf(tx)?.pnl_group] : null;
+  if (confirmed && confirmed.types.includes(type)) return { class: confirmed.class, matched_on: 'confirmed_category_group', needs_review: false };
 
   if (!s) return none;
 
@@ -192,7 +218,7 @@ function computeInsights(transactions = [], opts = {}) {
   };
 
   for (const t of rows) {
-    const { class: cls, needs_review } = classifyTransaction(t);
+    const { class: cls, needs_review } = classifyTransaction(t, opts.evidence || null);
     counts[cls] = (counts[cls] || 0) + 1;
     const amt = amountOf(t);
     const mk = monthKey(effectiveDate(t));

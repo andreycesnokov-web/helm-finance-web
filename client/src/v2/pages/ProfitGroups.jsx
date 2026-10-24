@@ -77,7 +77,8 @@ export default function ProfitGroups() {
                   <span className="v2-group-name">
                     <strong>{catLabel(t, c.name)}</strong>
                     <span className="v2-muted v2-small">{c.group_type === 'inflow' ? t('perf.groups.in') : c.group_type === 'outflow' ? t('perf.groups.out') : ''}
-                      {c.suggestion && ` · ${t('perf.groups.suggested', { g: t(`perf.g.${c.suggestion.pnl_group}`) })}`}</span>
+                      {c.suggestion && ` · ${t('perf.groups.suggested', { g: t(`perf.g.${c.suggestion.pnl_group}`) })}`}
+                      {c.scope === 'system' && ` · ${t('perf.groups.shared')}`}</span>
                     {c.suggestion?.note && <span className="v2-muted v2-small">{c.suggestion.note}</span>}
                   </span>
                   <label className="v2-field v2-group-pick">

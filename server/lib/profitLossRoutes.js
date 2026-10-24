@@ -1,5 +1,6 @@
 'use strict';
 const {buildReport,options}=require('./profitLoss');
+const {loadSystemMapping}=require('./categoryGroups');
 const PAGE=500,MAX=25000;
 // Explicit select list: never return document extraction text, bucket paths or credentials.
 const TABLES={
@@ -50,7 +51,10 @@ function install(app,{auth,requireBusiness,canViewBusinessFinance,supabase}) {
       // Four bounded reads at a time; no writes/RPCs, no credentials in response/logs.
       const keys=Object.keys(TABLES);
       for(let i=0;i<keys.length;i+=4)await Promise.all(keys.slice(i,i+4).map(async k=>{input[k]=await readAll(supabase,k,biz.business.id,opt,controller.signal);}));
-      res.json({...buildReport(input,{businessId:biz.business.id,...opt}),read_started_at:started,read_finished_at:new Date().toISOString()});
+      // Shared system categories count only with THIS company's confirmed group (none before the migration).
+      const sys=await loadSystemMapping(supabase,biz.business.id,controller.signal);
+      input.systemCategories=sys.systemCategories;input.categoryGroups=sys.categoryGroups;
+      res.json({...buildReport(input,{businessId:biz.business.id,...opt}),system_category_mapping:sys.available,read_started_at:started,read_finished_at:new Date().toISOString()});
     }catch(e){
       controller.abort();
       const code=['report_row_limit','report_changed_during_read','source_read_incomplete'].includes(e.message)?e.message:'profit_loss_unavailable';

@@ -2,6 +2,7 @@
 // One exact contribution list feeds totals, category detail and evidence export.
 'use strict';
 const M = require('./transactionClass');
+const CG = require('./categoryGroups');
 const GROUPS = ['revenue', 'direct_cost', 'operating_cost', 'other_income', 'interest', 'tax'];
 const CURRENCY=/^[A-Z][A-Z0-9]{2,9}$/; // Native codes, including existing USDT; no FX conversion.
 const norm = v => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -31,8 +32,8 @@ function options(q = {}) {
 function buildReport(input, { businessId, ...query }) {
   const opt = options(query), periods = [...new Set([opt.month,opt.compare,...opt.months].filter(Boolean))];
   if (!businessId) throw Error('business_required');
-  const cats = own(input.categories, businessId), byId = map(cats), byName = new Map();
-  for (const c of cats) { const k = norm(c.name); byName.set(k, [...(byName.get(k)||[]),c]); }
+  // Company categories, then shared system categories with THIS company's confirmed group only.
+  const categoryOf = CG.resolver({ businessId, companyCategories: input.categories, systemCategories: input.systemCategories, categoryGroups: input.categoryGroups }).category;
   const debts = own(input.debts,businessId), debtById = map(debts), debtByTx = new Map();
   for (const d of debts) if (d.linked_transaction_id != null) {
     const k=String(d.linked_transaction_id); debtByTx.set(k,[...(debtByTx.get(k)||[]),d]);
@@ -98,9 +99,7 @@ function buildReport(input, { businessId, ...query }) {
     // confirmed category, e.g. expense in revenue is a sales refund.
     if(M.cmpDec(amount,'0')<0) {except('negative_magnitude_needs_review');continue;}
     if(!['income','expense','payroll','bank_fee','fx_fee','network_fee'].includes(t.type)) {except('unsupported_transaction_type');continue;}
-    let c;
-    if(t.cashflow_category_id != null) c=byId.get(String(t.cashflow_category_id));
-    else {const hits=byName.get(norm(t.category))||[]; if(hits.length===1)c=hits[0];}
+    const c=categoryOf(t);
     if(!c?.pnl_group) {except('unclassified_or_ambiguous_category');continue;}
     if(['asset_purchase','funding','transfer'].includes(c.pnl_group)) {exclude(c.pnl_group);continue;}
     if(!GROUPS.includes(c.pnl_group)) {except('unsupported_category_group');continue;}

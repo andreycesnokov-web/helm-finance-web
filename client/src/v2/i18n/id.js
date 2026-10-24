@@ -1631,6 +1631,7 @@ export default {
     g: { revenue: 'Pendapatan', direct_cost: 'Biaya langsung', operating_cost: 'Biaya operasional', interest: 'Bunga pinjaman', other_income: 'Pendapatan lain', tax: 'Pajak', asset_purchase: 'Pembelian aset', funding: 'Pendanaan', transfer: 'Transfer' },
     groups: {
       nothingChanged: 'Belum ada perubahan',
+      shared: 'kategori standar · grup Anda hanya berlaku untuk perusahaan ini',
       open: 'Grup laba', setUp: 'Atur grup laba', title: 'Grup laba', sub: 'Grup untuk setiap kategori Anda',
       notAppliedTitle: 'Belum tersedia', notApplied: 'Grup laba bisa disimpan setelah pemilik menerapkan migrasi 062.', notAppliedNote: 'Menunggu migrasi 062',
       save: 'Simpan grup', saved: '{n} perubahan disimpan dan dicatat.', forbidden: 'Hanya pemilik, CEO, admin atau CFO yang bisa mengonfirmasi grup laba.',

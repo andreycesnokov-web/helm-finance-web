@@ -5,10 +5,17 @@ const express=require('express'),{createClient}=require('@supabase/supabase-js')
 const {install,readAll,NAMES}=require('../server/lib/profitLossRoutes');
 const {fixture,B,OTHER,tx}=require('./fixtures/profitLoss.cjs');
 function transport(f,mode='ok'){
- const logs=[];const tables=Object.fromEntries(Object.entries(f).map(([k,v])=>[NAMES[k]||k,v]));
+ const logs=[];const tables=Object.fromEntries(Object.entries(f).filter(([k])=>!['systemCategories','categoryGroups'].includes(k)).map(([k,v])=>[NAMES[k]||k,v]));
+ tables.business_category_pnl_groups=f.categoryGroups||[];
  return {logs,fetch:async(url,init)=>{
   const u=new URL(url),table=u.pathname.split('/').at(-1);logs.push({table,method:init.method||'GET',query:u.search});
-  assert.equal(init.method,'GET');assert.equal(u.searchParams.get('business_id'),'eq.'+B);assert.equal(u.searchParams.get('order'),'id.asc');
+  assert.equal(init.method,'GET');
+  // The ONE unscoped read: shared system categories (business_id IS NULL, is_system). Every other read is this company's.
+  const system=table==='cashflow_categories'&&u.searchParams.get('business_id')==='is.null';
+  if(system)assert.equal(u.searchParams.get('is_system'),'eq.true');else assert.equal(u.searchParams.get('business_id'),'eq.'+B);
+  assert.equal(u.searchParams.get('order'),table==='business_category_pnl_groups'?'category_id.asc':'id.asc');
+  if(table==='business_category_pnl_groups'&&mode==='nooverlay')return new Response(JSON.stringify({code:'42P01',message:'relation does not exist'}),{status:404,headers:{'content-type':'application/json'}});
+  if(system)return new Response(JSON.stringify(f.systemCategories||[]),{status:200,headers:{'content-type':'application/json'}});
   if(mode==='fail')return new Response(JSON.stringify({code:'42703',message:'private database failure detail'}),{status:400,headers:{'content-type':'application/json'}});
   let rows=(tables[table]||[]).filter(x=>x.business_id===B).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
   const offset=Number(u.searchParams.get('offset')),limit=Number(u.searchParams.get('limit'));
@@ -34,9 +41,41 @@ async function server(mode,fn){
 test('HTTP report uses current resolved company and safe exact selects; no writes',async()=>server('ok',async({f,wire,request})=>{
  const before=JSON.stringify(f),res=await request('month=2026-08&business_id='+OTHER);assert.equal(res.status,200);assert.equal(res.headers.get('cache-control'),'no-store');
  const body=await res.json();assert.equal(body.business_id,B);assert.equal(body.periods['2026-08'].totals.revenue,'975.1');assert.equal(JSON.stringify(f),before);
- assert.equal(wire.logs.length,13);assert.ok(wire.logs.every(l=>l.method==='GET'));assert.ok(decodeURIComponent(wire.logs[0].query).includes('amount_original::text'));
+ assert.equal(wire.logs.length,15);
+ assert.deepEqual(wire.logs.filter(l=>['cashflow_categories','business_category_pnl_groups'].includes(l.table)).map(l=>[l.table,new URLSearchParams(l.query).get('business_id')]),
+  [['cashflow_categories','eq.'+B],['cashflow_categories','is.null'],['business_category_pnl_groups','eq.'+B]]);assert.ok(wire.logs.every(l=>l.method==='GET'));assert.ok(decodeURIComponent(wire.logs[0].query).includes('amount_original::text'));
  assert.ok(!JSON.stringify(body).includes('synthetic-key'));
 }));
+// System categories (shared by all companies) count only with THIS company's confirmed group.
+const SYS='c0000000-0000-4000-8000-0000000000aa';
+const sysCat={id:SYS,business_id:null,name:'Office rent',pnl_group:null,is_system:true};
+async function systemServer(mode,extra,fn){
+ const f=fixture();Object.assign(f,extra);f.transactions=[...f.transactions,tx(90,'expense','300','Office rent',{cashflow_category_id:SYS})];
+ const wire=transport(f,mode),app=express();
+ const db=createClient('https://synthetic.invalid','synthetic-key',{global:{fetch:wire.fetch},auth:{persistSession:false,autoRefreshToken:false}});
+ install(app,{supabase:db,auth:(req,res,next)=>next(),requireBusiness:async()=>({business:{id:B,type:'business'},role:'owner'}),canViewBusinessFinance:()=>true});
+ const s=await new Promise(r=>{const s=app.listen(0,'127.0.0.1',()=>r(s));});
+ try{const res=await fetch('http://127.0.0.1:'+s.address().port+'/api/pulse/profit-loss?month=2026-08',{signal:AbortSignal.timeout(3000)});await fn(res,wire);}
+ finally{await new Promise(r=>s.close(r));}
+}
+test('a system category mapped by this company classifies its operations; nothing is written',async()=>{
+ await systemServer('ok',{systemCategories:[sysCat],categoryGroups:[{business_id:B,category_id:SYS,pnl_group:'operating_cost'}]},async(res,wire)=>{
+  assert.equal(res.status,200);const d=await res.json();assert.equal(d.system_category_mapping,true);
+  const e=d.entries.find(x=>x.transaction_id==='90');assert.equal(e.group,'operating_cost');assert.equal(e.category_id,SYS);
+  assert.ok(!d.exceptions.some(x=>x.transaction_id==='90'));assert.ok(wire.logs.every(l=>l.method==='GET'));
+ });
+});
+test('without this company confirmation a system category stays in Needs review',async()=>{
+ await systemServer('ok',{systemCategories:[sysCat],categoryGroups:[]},async(res)=>{
+  const d=await res.json();assert.ok(d.exceptions.some(x=>x.transaction_id==='90'&&x.reason==='unclassified_or_ambiguous_category'));
+  assert.ok(!d.entries.some(x=>x.transaction_id==='90'));
+ });
+});
+test('before the migration (no overlay table) the report still answers; system categories stay unclassified',async()=>{
+ await systemServer('nooverlay',{systemCategories:[sysCat]},async(res)=>{
+  assert.equal(res.status,200);const d=await res.json();assert.equal(d.system_category_mapping,false);assert.ok(d.exceptions.some(x=>x.transaction_id==='90'));
+ });
+});
 test('HTTP unauthorized / membership revoked / personal / low roles cause zero DB reads',async()=>server('ok',async({wire,request})=>{
  for(const [headers,status] of [[{},401],[{authorization:'x','x-revoked':'1'},403],[{authorization:'x','x-personal':'1'},403],...['employee','manager','viewer'].map(r=>[{authorization:'x','x-role':r},403])])assert.equal((await request('month=2026-08',headers)).status,status);
  assert.equal(wire.logs.length,0);

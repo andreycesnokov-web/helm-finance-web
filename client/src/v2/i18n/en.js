@@ -1632,6 +1632,7 @@ export default {
     g: { revenue: 'Revenue', direct_cost: 'Direct cost', operating_cost: 'Operating cost', interest: 'Loan interest', other_income: 'Other income', tax: 'Tax', asset_purchase: 'Asset purchase', funding: 'Funding', transfer: 'Transfer' },
     groups: {
       nothingChanged: 'Nothing changed yet',
+      shared: 'standard category · your group applies to this company only',
       open: 'Profit groups', setUp: 'Set up profit groups', title: 'Profit groups', sub: 'Which group each of your categories belongs to',
       notAppliedTitle: 'Not available yet', notApplied: 'Profit groups can be saved once the owner applies migration 062.', notAppliedNote: 'Waiting for migration 062',
       save: 'Save groups', saved: 'Saved {n} changes. They are logged.', forbidden: 'Only an owner, CEO, admin or CFO can confirm profit groups.',

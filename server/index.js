@@ -26,7 +26,8 @@ const CHECKLIST = require('./lib/billChecklist');   // Design v2 P-05 (migration
 const PNLMAP = require('./lib/pnlMapping');         // Design v2 P-10 (migration 062)
 const DW = require('./lib/debtWithholding');        // remaining balance with withholdings (batch 10)
 const ASSETS = require('./lib/assetRegister');      // Design v2 P-11 (migration 063)
-const BFUND = require('./lib/businessFunding');     // Design v2 P-03 (migration 064)
+const BFUND = require('./lib/businessFunding');
+const CATGROUPS = require('./lib/categoryGroups');  // per-company group of shared system categories     // Design v2 P-03 (migration 064)
 const aiAccountantCore = require('./lib/aiAccountantCore');
 // Telegram-created payables are IDR-only until multi-currency payables exist end to end.
 // See server/lib/telegramCurrency.js for why refusing beats recording a wrong row.
@@ -1252,7 +1253,9 @@ app.get('/api/pulse', auth, async (req, res) => {
     // `income` and `expenses` keep their names because the client reads them, but they
     // now mean OPERATING revenue and OPERATING cash out. Everything excluded is
     // reported separately below rather than hidden.
-    const monthInsights = FININ.computeInsights(txs || []);
+    // Recorded evidence (funding register, confirmed category groups) outranks keywords, as in Advanced Insights.
+    const insightEvidence = await CATGROUPS.loadInsightEvidence(supabase, biz.business.id);
+    const monthInsights = FININ.computeInsights(txs || [], { evidence: insightEvidence });
     const income   = monthInsights.metrics.operating_revenue;
     const expenses = monthInsights.metrics.operating_cash_out;
 
@@ -3163,7 +3166,7 @@ app.get('/api/pulse/advanced-insights', auth, async (req, res) => {
       return res.status(403).json({ error: 'Your role cannot view business finance' });
 
     let q = supabase.from('transactions')
-      .select('id, type, amount_original, amount_idr, currency_original, category, description, transaction_date, created_at, scope')
+      .select('id, type, amount_original, amount_idr, currency_original, category, cashflow_category_id, description, transaction_date, created_at, scope, source, transfer_id')
       .or(bizOrFilter(biz));
     const scope = req.query.scope;
     if (scope && scope !== 'all') q = q.eq('scope', scope);
@@ -3173,6 +3176,8 @@ app.get('/api/pulse/advanced-insights', auth, async (req, res) => {
     const insights = FININ.computeInsights(data || [], {
       from: req.query.from || null,
       to: req.query.to || null,
+      // The funding register and confirmed category groups classify before keywords.
+      evidence: await CATGROUPS.loadInsightEvidence(supabase, biz.business.id),
     });
     res.json({ ok: true, business_id: biz.business.id, ...insights });
   } catch (e) {
@@ -8895,10 +8900,21 @@ app.get('/api/pnl-mapping', auth, async (req, res) => {
     const { data: profRows } = await supabase.from('tax_profiles')
       .select('primary_kbli, additional_kbli, tax_regime').eq('business_id', biz.business.id).limit(1);
     const codes = PNLMAP.kbliCodes(profRows?.[0]);
-    const categories = (cats || []).filter((c) => c.is_active !== false)
-      .map((c) => ({ ...c, suggestion: PNLMAP.suggestFor(c.name, tpl, codes) }));
+    // Shared system categories too, each with THIS company's confirmed group (migration 20261024120000).
+    const { data: sysCats, error: sysErr } = await supabase.from('cashflow_categories')
+      .select('id, name, group_type, activity_type, is_active').is('business_id', null).eq('is_system', true)
+      .order('sort_order', { ascending: true }).order('name', { ascending: true });
+    if (sysErr) throw sysErr;
+    const { data: overlay, error: oErr } = await supabase.from(CATGROUPS.OVERLAY).select('category_id, pnl_group').eq('business_id', biz.business.id);
+    if (oErr && !CATGROUPS.isMissingTable(oErr)) throw oErr;
+    const systemMapping = !oErr;
+    const sysGroup = new Map((overlay || []).map((r) => [r.category_id, r.pnl_group]));
+    const categories = [
+      ...(cats || []).filter((c) => c.is_active !== false).map((c) => ({ ...c, scope: 'company' })),
+      ...(systemMapping ? (sysCats || []).filter((c) => c.is_active !== false).map((c) => ({ ...c, pnl_group: sysGroup.get(c.id) || null, scope: 'system' })) : []),
+    ].map((c) => ({ ...c, suggestion: PNLMAP.suggestFor(c.name, tpl, codes) }));
     res.json({
-      available: true, groups: PNLMAP.GROUPS, kbli: codes, tax_regime: profRows?.[0]?.tax_regime || null,
+      available: true, system_category_mapping: systemMapping, groups: PNLMAP.GROUPS, kbli: codes, tax_regime: profRows?.[0]?.tax_regime || null,
       confirmed: categories.some((c) => c.pnl_group), categories,
       missing_from_template: PNLMAP.missingTemplateCategories(categories, tpl, codes),
       can_edit: PNLMAP.canEditMapping(biz.role),
@@ -8922,13 +8938,40 @@ app.patch('/api/pnl-mapping', auth, async (req, res) => {
       .select('id, name, pnl_group').eq('business_id', biz.business.id).in('id', ids);
     if (rErr && TARGETS.isMissingColumn(rErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '062' });
     if (rErr) throw rErr;
-    // Every id must be this business's own category; nothing is written otherwise.
-    if ((rows || []).length !== ids.length)
+    // The rest must be shared system categories; their group is this company's own row in the overlay,
+    // never the shared category row (which every other company reads too).
+    const ownIds = new Set((rows || []).map((r) => r.id));
+    const restIds = ids.filter((id) => !ownIds.has(id));
+    let sysRows = [], overlayBefore = new Map();
+    if (restIds.length) {
+      const { data: sys, error: sErr } = await supabase.from('cashflow_categories')
+        .select('id, name').is('business_id', null).eq('is_system', true).in('id', restIds);
+      if (sErr) throw sErr;
+      sysRows = sys || [];
+    }
+    // Every id must be this business's own category or a system category; nothing is written otherwise.
+    if ((rows || []).length + sysRows.length !== ids.length)
       return res.status(404).json({ error: 'category_not_found_in_this_business' });
+    if (sysRows.length) {
+      const { data: ov, error: oErr } = await supabase.from(CATGROUPS.OVERLAY).select('category_id, pnl_group')
+        .eq('business_id', biz.business.id).in('category_id', sysRows.map((r) => r.id));
+      if (oErr && CATGROUPS.isMissingTable(oErr)) return res.status(409).json({ error: 'migration_not_applied', migration: '20261024120000' });
+      if (oErr) throw oErr;
+      overlayBefore = new Map((ov || []).map((r) => [r.category_id, r.pnl_group]));
+    }
+    const sysIds = new Set(sysRows.map((r) => r.id));
 
-    const before = Object.fromEntries(rows.map((r) => [r.id, r.pnl_group ?? null]));
+    const before = Object.fromEntries([...(rows || []).map((r) => [r.id, r.pnl_group ?? null]), ...sysRows.map((r) => [r.id, overlayBefore.get(r.id) ?? null])]);
     const changed = items.filter((i) => before[i.category_id] !== i.pnl_group);
-    for (const i of changed) {
+    for (const i of changed.filter((x) => sysIds.has(x.category_id))) {
+      const q = i.pnl_group === null
+        ? supabase.from(CATGROUPS.OVERLAY).delete().eq('business_id', biz.business.id).eq('category_id', i.category_id)
+        : supabase.from(CATGROUPS.OVERLAY).upsert({ business_id: biz.business.id, category_id: i.category_id, pnl_group: i.pnl_group,
+            confirmed_by_user_id: req.user.userId, confirmed_at: new Date().toISOString() }, { onConflict: 'business_id,category_id' });
+      const { error } = await q;
+      if (error) throw error;
+    }
+    for (const i of changed.filter((x) => !sysIds.has(x.category_id))) {
       const { error } = await supabase.from('cashflow_categories')
         .update({ pnl_group: i.pnl_group, updated_at: new Date().toISOString() })
         .eq('id', i.category_id).eq('business_id', biz.business.id);
@@ -8936,12 +8979,13 @@ app.patch('/api/pnl-mapping', auth, async (req, res) => {
       if (error) throw error;
     }
     if (changed.length) {
-      const names = Object.fromEntries(rows.map((r) => [r.id, r.name]));
+      const names = Object.fromEntries([...(rows || []), ...sysRows].map((r) => [r.id, r.name]));
+      const scope = (id) => (sysIds.has(id) ? 'system' : 'company');
       await recordAudit({
         businessId: biz.business.id, actorUserId: req.user.userId, actorRole: biz.role,
         entityType: 'pnl_mapping', entityId: biz.business.id, action: 'pnl_mapping_confirmed',
-        before: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], pnl_group: before[i.category_id] })),
-        after: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], pnl_group: i.pnl_group })),
+        before: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], scope: scope(i.category_id), pnl_group: before[i.category_id] })),
+        after: changed.map((i) => ({ category_id: i.category_id, name: names[i.category_id], scope: scope(i.category_id), pnl_group: i.pnl_group })),
       });
     }
     res.json({ ok: true, changed: changed.length });
