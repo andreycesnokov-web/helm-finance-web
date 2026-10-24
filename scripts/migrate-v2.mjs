@@ -65,6 +65,10 @@ export const MANIFEST = [
   { file: 'supabase/migrations/20261024090000_payroll_bpjs_breakdown.sql', probes: [defHas('rpc_payroll_run_action', 'bpjs_kes')] },
   { file: 'supabase/migrations/20261024120000_business_category_pnl_groups.sql', probes: [table('business_category_pnl_groups'), fn('fn_business_category_pnl_group_guard')] },
   { file: 'supabase/migrations/20261024150000_transaction_classifications.sql', probes: [table('transaction_classifications'), fn('fn_transaction_classification_guard')] },
+  // AC-0 / I-7: anon and authenticated hold nothing in schema public.
+  { file: 'supabase/migrations/20261025090000_public_role_least_privilege.sql', probes: [
+    `NOT has_table_privilege('anon', 'public.transactions', 'SELECT')`,
+    `NOT has_function_privilege('anon', 'public.rpc_reset_business_financial(uuid,bigint)', 'EXECUTE')`] },
 ];
 
 // Invariants that must hold after the run (by definition, not by table presence).
@@ -94,6 +98,13 @@ export const POSTFLIGHT = [
       OR has_table_privilege(r.role, 'public.business_category_pnl_groups', 'SELECT,INSERT,UPDATE,DELETE')
       OR has_table_privilege(r.role, 'public.transaction_classifications', 'SELECT,INSERT,UPDATE,DELETE')
       OR has_function_privilege(r.role, 'public.rpc_payroll_run_action(uuid,bigint,text,jsonb)', 'EXECUTE')))`],
+  ['schema public grants nothing to anon/authenticated (tables, views, sequences) and no public function is executable by PUBLIC, anon or authenticated',
+    `NOT EXISTS (SELECT 1 FROM unnest(ARRAY['anon','authenticated']) r(role) WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname=r.role) AND (
+      EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace AND c.relkind IN ('r','v','m','p')
+        AND has_table_privilege(r.role, c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'))
+      OR EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace AND c.relkind='S'
+        AND has_sequence_privilege(r.role, c.oid, 'USAGE,SELECT,UPDATE'))
+      OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND has_function_privilege(r.role, p.oid, 'EXECUTE'))))`],
   ['billing schema versions complete', `(SELECT count(*)=4 FROM public.billing_schema_versions WHERE version IN ('20261015033808','20261017090000','20261017120000','20261018090000'))`],
   ['plan publication requires every metered limit to be decided (absent is never unlimited)', defHas('billing_terms_error', 'An undecided metered limit')],
 ];
